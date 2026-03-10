@@ -1,0 +1,86 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // Helper function to check if user is authenticated
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+    
+    // Helper function to check if user is admin
+    function isAdmin() {
+      return isAuthenticated() && 
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
+    }
+    
+    // Helper function to check if user owns the cafe
+    function isCafeOwner(cafeId) {
+      return isAuthenticated() && 
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.cafeId == cafeId;
+    }
+    
+    // Users collection
+    match /users/{userId} {
+      // Users can read their own document
+      allow read: if isAuthenticated() && request.auth.uid == userId;
+      // Only admin can create/update users
+      allow write: if isAdmin();
+      // Allow user to update their own non-role fields
+      allow update: if isAuthenticated() && 
+        request.auth.uid == userId && 
+        !request.resource.data.diff(resource.data).affectedKeys().hasAny(['role', 'cafeId']);
+    }
+    
+    // Cafes collection
+    match /cafes/{cafeId} {
+      // Anyone can read cafe info (for public ordering page)
+      allow read: if true;
+      // Only cafe owner or admin can update
+      allow update: if isCafeOwner(cafeId) || isAdmin();
+      // Only admin can create/delete cafes
+      allow create, delete: if isAdmin();
+    }
+    
+    // Menu items collection
+    match /menuItems/{itemId} {
+      // Anyone can read menu items (for public ordering page)
+      allow read: if true;
+      // Only cafe owner or admin can write
+      allow create, update, delete: if 
+        isAdmin() || 
+        (isAuthenticated() && isCafeOwner(resource.data.cafeId)) ||
+        (isAuthenticated() && isCafeOwner(request.resource.data.cafeId));
+    }
+    
+    // Orders collection
+    match /orders/{orderId} {
+      // Anyone can create orders (customers don't need auth)
+      allow create: if true;
+      // Cafe owner can read their orders, admin can read all
+      allow read: if isAdmin() || 
+        (isAuthenticated() && isCafeOwner(resource.data.cafeId));
+      // Cafe owner can update order status, admin can update anything
+      allow update: if isAdmin() || 
+        (isAuthenticated() && isCafeOwner(resource.data.cafeId));
+      // Only admin can delete orders
+      allow delete: if isAdmin();
+    }
+    
+    // Offers collection
+    match /offers/{offerId} {
+      // Anyone can read active offers (for public ordering page)
+      allow read: if true;
+      // Only cafe owner or admin can write
+      allow create, update, delete: if 
+        isAdmin() || 
+        (isAuthenticated() && isCafeOwner(resource.data.cafeId)) ||
+        (isAuthenticated() && isCafeOwner(request.resource.data.cafeId));
+    }
+    
+    // System collection (counters, etc.)
+    match /system/{docId} {
+      // Anyone can read/write counters (for order numbering)
+      allow read, write: if true;
+    }
+  }
+}
