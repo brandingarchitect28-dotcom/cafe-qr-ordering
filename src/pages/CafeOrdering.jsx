@@ -355,8 +355,17 @@ const CafeOrdering = () => {
     setCart(cart.filter(item => item.id !== itemId));
   };
 
-  const calculateTotal = () => {
+  const calculateSubtotal = () => {
     return cart.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+  };
+
+  const calculateGST = () => {
+    if (!cafe?.gstEnabled) return 0;
+    return calculateSubtotal() * (parseFloat(cafe.gstRate) || 0) / 100;
+  };
+
+  const calculateTotal = () => {
+    return calculateSubtotal() + calculateGST();
   };
 
   const cartItemsCount = cart.reduce((sum, item) => sum + item.quantity, 0);
@@ -494,11 +503,17 @@ const CafeOrdering = () => {
         }
       });
 
+      const subtotal = calculateSubtotal();
+      const gstAmount = calculateGST();
+      const total = calculateTotal();
+
       const orderData = {
         cafeId,
         orderNumber,
         items: cart.map(item => ({ name: item.name, price: item.price, quantity: item.quantity })),
-        totalAmount: calculateTotal(),
+        subtotalAmount: subtotal,
+        gstAmount: gstAmount,
+        totalAmount: total,
         paymentStatus: paymentMode === 'prepaid' ? 'paid' : 'pending',
         paymentMode,
         orderStatus: 'new',
@@ -529,10 +544,16 @@ const CafeOrdering = () => {
       
       orderSummary += `\n*Items:*\n`;
       cart.forEach(item => {
-        orderSummary += `• ${item.name} x${item.quantity}\n`;
+        orderSummary += `• ${item.name} x${item.quantity} ₹${(item.price * item.quantity).toFixed(2)}\n`;
       });
-      
-      orderSummary += `\n*Total: ₹${calculateTotal().toFixed(2)}*\n`;
+
+      if (cafe?.gstEnabled && gstAmount > 0) {
+        orderSummary += `\n*Subtotal: ₹${subtotal.toFixed(2)}*\n`;
+        orderSummary += `*GST (${cafe.gstRate}%): ₹${gstAmount.toFixed(2)}*\n`;
+        orderSummary += `*Total: ₹${total.toFixed(2)}*\n`;
+      } else {
+        orderSummary += `\n*Total: ₹${total.toFixed(2)}*\n`;
+      }
       orderSummary += `*Payment Mode:* ${paymentMode === 'counter' ? 'Pay at Counter' : paymentMode === 'table' ? 'Pay on Table' : 'Prepaid (UPI)'}`;
       
       if (specialInstructions) {
@@ -1041,10 +1062,29 @@ const CafeOrdering = () => {
                   ))}
                 </div>
 
-                {/* Total */}
-                <div className="flex justify-between items-center p-4 rounded-xl" style={{ backgroundColor: `${COLORS.primary}15` }}>
-                  <span className="font-semibold" style={{ color: COLORS.text }}>Total</span>
-                  <span className="text-2xl font-bold" style={{ color: COLORS.primary }}>₹{calculateTotal().toFixed(2)}</span>
+                {/* Order Total Breakdown */}
+                <div className="p-4 rounded-xl space-y-2" style={{ backgroundColor: `${COLORS.primary}15` }}>
+                  {cafe?.gstEnabled && calculateGST() > 0 ? (
+                    <>
+                      <div className="flex justify-between items-center">
+                        <span className="text-sm" style={{ color: COLORS.textMuted }}>Subtotal</span>
+                        <span className="font-medium" style={{ color: COLORS.text }}>₹{calculateSubtotal().toFixed(2)}</span>
+                      </div>
+                      <div className="flex justify-between items-center">
+                        <span className="text-sm" style={{ color: COLORS.textMuted }}>GST ({cafe.gstRate}%)</span>
+                        <span className="font-medium" style={{ color: COLORS.text }}>₹{calculateGST().toFixed(2)}</span>
+                      </div>
+                      <div className="border-t pt-2 flex justify-between items-center" style={{ borderColor: `${COLORS.primary}30` }}>
+                        <span className="font-semibold" style={{ color: COLORS.text }}>Total</span>
+                        <span className="text-2xl font-bold" style={{ color: COLORS.primary }}>₹{calculateTotal().toFixed(2)}</span>
+                      </div>
+                    </>
+                  ) : (
+                    <div className="flex justify-between items-center">
+                      <span className="font-semibold" style={{ color: COLORS.text }}>Total</span>
+                      <span className="text-2xl font-bold" style={{ color: COLORS.primary }}>₹{calculateTotal().toFixed(2)}</span>
+                    </div>
+                  )}
                 </div>
 
                 {/* Customer Details */}

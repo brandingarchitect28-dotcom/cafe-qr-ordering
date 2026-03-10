@@ -20,7 +20,10 @@ const Settings = () => {
     whatsappNumber: '',
     upiId: '',
     primaryColor: '#D4AF37',
-    mode: 'light'
+    mode: 'light',
+    gstEnabled: false,
+    gstRate: 5,
+    gstNumber: ''
   });
 
   // REAL-TIME: Load settings with onSnapshot
@@ -39,7 +42,10 @@ const Settings = () => {
             whatsappNumber: data.whatsappNumber || '',
             upiId: data.upiId || '',
             primaryColor: data.primaryColor || '#D4AF37',
-            mode: data.mode || 'light'
+            mode: data.mode || 'light',
+            gstEnabled: data.gstEnabled || false,
+            gstRate: data.gstRate ?? 5,
+            gstNumber: data.gstNumber || ''
           });
         }
         setLoading(false);
@@ -91,7 +97,10 @@ const Settings = () => {
         whatsappNumber: settings.whatsappNumber,
         upiId: settings.upiId,
         primaryColor: settings.primaryColor,
-        mode: settings.mode
+        mode: settings.mode,
+        gstEnabled: settings.gstEnabled,
+        gstRate: parseFloat(settings.gstRate) || 0,
+        gstNumber: settings.gstNumber
       });
       toast.success('Settings saved successfully!');
     } catch (error) {
@@ -209,6 +218,67 @@ const Settings = () => {
               placeholder="merchant@upi"
             />
           </div>
+        </div>
+      </div>
+
+      {/* NEW: Billing Settings */}
+      <div className="bg-[#0F0F0F] border border-white/5 rounded-sm p-6">
+        <h3 className="text-xl font-semibold text-white mb-6" style={{ fontFamily: 'Playfair Display, serif' }}>
+          Billing Settings
+        </h3>
+
+        <div className="space-y-4">
+          {/* GST Toggle */}
+          <div className="flex items-center justify-between">
+            <div>
+              <label className="block text-white text-sm font-medium">Enable GST Billing</label>
+              <p className="text-[#A3A3A3] text-xs mt-1">Apply GST tax to all customer orders</p>
+            </div>
+            <button
+              type="button"
+              onClick={() => setSettings(prev => ({ ...prev, gstEnabled: !prev.gstEnabled }))}
+              className={`relative inline-flex h-7 w-12 items-center rounded-full transition-colors duration-200 focus:outline-none ${
+                settings.gstEnabled ? 'bg-[#D4AF37]' : 'bg-white/10'
+              }`}
+            >
+              <span
+                className={`inline-block h-5 w-5 transform rounded-full bg-white shadow transition-transform duration-200 ${
+                  settings.gstEnabled ? 'translate-x-6' : 'translate-x-1'
+                }`}
+              />
+            </button>
+          </div>
+
+          {/* GST Rate and Number — only shown when GST is ON */}
+          {settings.gstEnabled && (
+            <>
+              <div>
+                <label className="block text-white text-sm font-medium mb-2">GST Rate (%)</label>
+                <input
+                  type="number"
+                  min="0"
+                  max="100"
+                  step="0.01"
+                  value={settings.gstRate}
+                  onChange={(e) => setSettings(prev => ({ ...prev, gstRate: e.target.value }))}
+                  className="w-full bg-black/20 border border-white/10 text-white placeholder:text-neutral-600 focus:border-[#D4AF37] focus:ring-1 focus:ring-[#D4AF37] rounded-sm h-12 px-4 transition-all"
+                  placeholder="e.g., 5"
+                />
+                <p className="text-[#A3A3A3] text-xs mt-2">Common GST rates: 5%, 12%, 18%</p>
+              </div>
+
+              <div>
+                <label className="block text-white text-sm font-medium mb-2">GST Number (Optional)</label>
+                <input
+                  type="text"
+                  value={settings.gstNumber}
+                  onChange={(e) => setSettings(prev => ({ ...prev, gstNumber: e.target.value }))}
+                  className="w-full bg-black/20 border border-white/10 text-white placeholder:text-neutral-600 focus:border-[#D4AF37] focus:ring-1 focus:ring-[#D4AF37] rounded-sm h-12 px-4 transition-all"
+                  placeholder="e.g., 27AAPFU0939F1ZV"
+                />
+              </div>
+            </>
+          )}
         </div>
       </div>
 
