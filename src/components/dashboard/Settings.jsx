@@ -23,7 +23,17 @@ const Settings = () => {
     mode: 'light',
     gstEnabled: false,
     gstRate: 5,
-    gstNumber: ''
+    gstNumber: '',
+    // Feature: Currency
+    currencyCode: 'INR',
+    currencySymbol: '₹',
+    // Feature: Tax
+    taxEnabled: false,
+    taxName: 'GST',
+    taxRate: 5,
+    // Feature: Service Charge
+    serviceChargeEnabled: false,
+    serviceChargeRate: 10
   });
 
   // REAL-TIME: Load settings with onSnapshot
@@ -45,7 +55,14 @@ const Settings = () => {
             mode: data.mode || 'light',
             gstEnabled: data.gstEnabled || false,
             gstRate: data.gstRate ?? 5,
-            gstNumber: data.gstNumber || ''
+            gstNumber: data.gstNumber || '',
+            currencyCode: data.currencyCode || 'INR',
+            currencySymbol: data.currencySymbol || '₹',
+            taxEnabled: data.taxEnabled || false,
+            taxName: data.taxName || 'GST',
+            taxRate: data.taxRate ?? 5,
+            serviceChargeEnabled: data.serviceChargeEnabled || false,
+            serviceChargeRate: data.serviceChargeRate ?? 10
           });
         }
         setLoading(false);
@@ -100,7 +117,14 @@ const Settings = () => {
         mode: settings.mode,
         gstEnabled: settings.gstEnabled,
         gstRate: parseFloat(settings.gstRate) || 0,
-        gstNumber: settings.gstNumber
+        gstNumber: settings.gstNumber,
+        currencyCode: settings.currencyCode,
+        currencySymbol: settings.currencySymbol,
+        taxEnabled: settings.taxEnabled,
+        taxName: settings.taxName || 'GST',
+        taxRate: parseFloat(settings.taxRate) || 0,
+        serviceChargeEnabled: settings.serviceChargeEnabled,
+        serviceChargeRate: parseFloat(settings.serviceChargeRate) || 0
       });
       toast.success('Settings saved successfully!');
     } catch (error) {
@@ -278,6 +302,135 @@ const Settings = () => {
                 />
               </div>
             </>
+          )}
+        </div>
+      </div>
+
+
+      {/* Currency Settings */}
+      <div className="bg-[#0F0F0F] border border-white/5 rounded-sm p-6">
+        <h3 className="text-xl font-semibold text-white mb-6" style={{ fontFamily: 'Playfair Display, serif' }}>
+          Currency Settings
+        </h3>
+        <div>
+          <label className="block text-white text-sm font-medium mb-2">Currency</label>
+          <select
+            value={settings.currencyCode}
+            onChange={(e) => {
+              const options = {
+                INR: '₹', USD: '$', EUR: '€', GBP: '£', AED: 'د.إ', AUD: '$'
+              };
+              setSettings(prev => ({
+                ...prev,
+                currencyCode: e.target.value,
+                currencySymbol: options[e.target.value] || '₹'
+              }));
+            }}
+            className="w-full bg-black/20 border border-white/10 text-white focus:border-[#D4AF37] focus:ring-1 focus:ring-[#D4AF37] rounded-sm h-12 px-4 transition-all"
+          >
+            <option value="INR" className="bg-[#0F0F0F]">INR (₹) — Indian Rupee</option>
+            <option value="USD" className="bg-[#0F0F0F]">USD ($) — US Dollar</option>
+            <option value="EUR" className="bg-[#0F0F0F]">EUR (€) — Euro</option>
+            <option value="GBP" className="bg-[#0F0F0F]">GBP (£) — British Pound</option>
+            <option value="AED" className="bg-[#0F0F0F]">AED (د.إ) — UAE Dirham</option>
+            <option value="AUD" className="bg-[#0F0F0F]">AUD ($) — Australian Dollar</option>
+          </select>
+          <p className="text-[#A3A3A3] text-xs mt-2">
+            Selected: {settings.currencyCode} — Symbol: {settings.currencySymbol}
+          </p>
+        </div>
+      </div>
+
+      {/* Tax Settings */}
+      <div className="bg-[#0F0F0F] border border-white/5 rounded-sm p-6">
+        <h3 className="text-xl font-semibold text-white mb-6" style={{ fontFamily: 'Playfair Display, serif' }}>
+          Tax Settings
+        </h3>
+        <div className="space-y-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <label className="block text-white text-sm font-medium">Enable Tax</label>
+              <p className="text-[#A3A3A3] text-xs mt-1">Apply tax to all customer orders</p>
+            </div>
+            <button
+              type="button"
+              onClick={() => setSettings(prev => ({ ...prev, taxEnabled: !prev.taxEnabled }))}
+              className={`relative inline-flex h-7 w-12 items-center rounded-full transition-colors duration-200 focus:outline-none ${
+                settings.taxEnabled ? 'bg-[#D4AF37]' : 'bg-white/10'
+              }`}
+            >
+              <span className={`inline-block h-5 w-5 transform rounded-full bg-white shadow transition-transform duration-200 ${
+                settings.taxEnabled ? 'translate-x-6' : 'translate-x-1'
+              }`} />
+            </button>
+          </div>
+          {settings.taxEnabled && (
+            <>
+              <div>
+                <label className="block text-white text-sm font-medium mb-2">Tax Name</label>
+                <input
+                  type="text"
+                  value={settings.taxName}
+                  onChange={(e) => setSettings(prev => ({ ...prev, taxName: e.target.value }))}
+                  className="w-full bg-black/20 border border-white/10 text-white placeholder:text-neutral-600 focus:border-[#D4AF37] focus:ring-1 focus:ring-[#D4AF37] rounded-sm h-12 px-4 transition-all"
+                  placeholder="e.g., GST, VAT, Sales Tax"
+                />
+              </div>
+              <div>
+                <label className="block text-white text-sm font-medium mb-2">Tax Percentage (%)</label>
+                <input
+                  type="number"
+                  min="0"
+                  max="100"
+                  step="0.01"
+                  value={settings.taxRate}
+                  onChange={(e) => setSettings(prev => ({ ...prev, taxRate: e.target.value }))}
+                  className="w-full bg-black/20 border border-white/10 text-white placeholder:text-neutral-600 focus:border-[#D4AF37] focus:ring-1 focus:ring-[#D4AF37] rounded-sm h-12 px-4 transition-all"
+                  placeholder="e.g., 10"
+                />
+              </div>
+            </>
+          )}
+        </div>
+      </div>
+
+      {/* Service Charge Settings */}
+      <div className="bg-[#0F0F0F] border border-white/5 rounded-sm p-6">
+        <h3 className="text-xl font-semibold text-white mb-6" style={{ fontFamily: 'Playfair Display, serif' }}>
+          Service Charge
+        </h3>
+        <div className="space-y-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <label className="block text-white text-sm font-medium">Enable Service Charge</label>
+              <p className="text-[#A3A3A3] text-xs mt-1">Add a service charge to all orders</p>
+            </div>
+            <button
+              type="button"
+              onClick={() => setSettings(prev => ({ ...prev, serviceChargeEnabled: !prev.serviceChargeEnabled }))}
+              className={`relative inline-flex h-7 w-12 items-center rounded-full transition-colors duration-200 focus:outline-none ${
+                settings.serviceChargeEnabled ? 'bg-[#D4AF37]' : 'bg-white/10'
+              }`}
+            >
+              <span className={`inline-block h-5 w-5 transform rounded-full bg-white shadow transition-transform duration-200 ${
+                settings.serviceChargeEnabled ? 'translate-x-6' : 'translate-x-1'
+              }`} />
+            </button>
+          </div>
+          {settings.serviceChargeEnabled && (
+            <div>
+              <label className="block text-white text-sm font-medium mb-2">Service Charge Percentage (%)</label>
+              <input
+                type="number"
+                min="0"
+                max="100"
+                step="0.01"
+                value={settings.serviceChargeRate}
+                onChange={(e) => setSettings(prev => ({ ...prev, serviceChargeRate: e.target.value }))}
+                className="w-full bg-black/20 border border-white/10 text-white placeholder:text-neutral-600 focus:border-[#D4AF37] focus:ring-1 focus:ring-[#D4AF37] rounded-sm h-12 px-4 transition-all"
+                placeholder="e.g., 10"
+              />
+            </div>
           )}
         </div>
       </div>
