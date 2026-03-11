@@ -1068,7 +1068,7 @@ const CafeOrdering = () => {
                       )}
                       <div className="flex-1">
                         <h4 className="font-semibold" style={{ color: COLORS.text }}>{item.name}</h4>
-                        <p className="text-sm" style={{ color: COLORS.primary }}>{CUR}{item.price} each</p>
+                        <p className="text-sm" style={{ color: COLORS.primary }}>{CUR}{parseFloat(item.price).toFixed(2)} each</p>
                         {item.isFreeItem && <span className="text-xs text-green-500 font-bold">FREE!</span>}
                       </div>
                       <div className="flex items-center gap-2">
