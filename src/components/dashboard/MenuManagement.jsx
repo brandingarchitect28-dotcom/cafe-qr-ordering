@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
-import { useCollection } from '../../hooks/useFirestore';
+import { useCollection, useDocument } from '../../hooks/useFirestore';
 import { where, addDoc, collection, doc, updateDoc, deleteDoc } from 'firebase/firestore';
 import { db } from '../../lib/firebase';
 import { uploadImage } from '../../utils/uploadImage';
@@ -10,6 +10,8 @@ import { toast } from 'sonner';
 const MenuManagement = () => {
   const { user } = useAuth();
   const cafeId = user?.cafeId;
+  const { data: cafe } = useDocument('cafes', cafeId);
+  const CUR = cafe?.currencySymbol || '₹';
   const [showForm, setShowForm] = useState(false);
   const [editingItem, setEditingItem] = useState(null);
   const [uploading, setUploading] = useState(false);
@@ -189,7 +191,7 @@ const MenuManagement = () => {
             {/* Price + Category */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
-                <label className="block text-white text-sm font-medium mb-2">Price (₹)</label>
+                <label className="block text-white text-sm font-medium mb-2">{`Price (${CUR})`}</label>
                 <input
                   type="number"
                   step="0.01"
@@ -302,7 +304,7 @@ const MenuManagement = () => {
                     <h3 className="text-xl font-semibold text-white">{item.name}</h3>
                     {item.category && <p className="text-[#A3A3A3] text-sm">{item.category}</p>}
                   </div>
-                  <span className="text-lg font-bold text-[#D4AF37]">₹{item.price.toFixed(2)}</span>
+                  <span className="text-lg font-bold text-[#D4AF37]">{CUR}{item.price.toFixed(2)}</span>
                 </div>
                 <div className="flex items-center gap-2 mb-4">
                   <div className={`px-2 py-1 rounded-sm text-xs font-medium ${item.available ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-red-400'}`}>

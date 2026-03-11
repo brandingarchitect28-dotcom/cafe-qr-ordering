@@ -1,6 +1,6 @@
 import React, { useMemo } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
-import { useCollection } from '../../hooks/useFirestore';
+import { useCollection, useDocument } from '../../hooks/useFirestore';
 import { where } from 'firebase/firestore';
 import { BarChart, Bar, LineChart, Line, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 
@@ -9,6 +9,8 @@ const Analytics = () => {
   const cafeId = user?.cafeId;
 
   const { data: orders } = useCollection('orders', cafeId ? [where('cafeId', '==', cafeId)] : []);
+  const { data: cafe } = useDocument('cafes', cafeId);
+  const CUR = cafe?.currencySymbol || '₹';
 
   const analytics = useMemo(() => {
     if (!orders || orders.length === 0) return null;
@@ -98,9 +100,10 @@ const Analytics = () => {
             <Tooltip 
               contentStyle={{ backgroundColor: '#0F0F0F', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '4px' }}
               labelStyle={{ color: '#E5E5E5' }}
+              formatter={(value) => [`${CUR}${value}`, `Revenue (${CUR})`]}
             />
             <Legend wrapperStyle={{ color: '#E5E5E5' }} />
-            <Line type="monotone" dataKey="revenue" stroke="#D4AF37" strokeWidth={2} name="Revenue (₹)" />
+            <Line type="monotone" dataKey="revenue" stroke="#D4AF37" strokeWidth={2} {...{ name: `Revenue (${CUR})` }} />
           </LineChart>
         </ResponsiveContainer>
       </div>

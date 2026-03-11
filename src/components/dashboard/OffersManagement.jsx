@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
-import { useCollection } from '../../hooks/useFirestore';
+import { useCollection, useDocument } from '../../hooks/useFirestore';
 import { where, addDoc, collection, doc, updateDoc, deleteDoc } from 'firebase/firestore';
 import { db } from '../../lib/firebase';
 import { uploadImage } from '../../utils/uploadImage';
@@ -16,6 +16,8 @@ const OFFER_TYPES = [
 const OffersManagement = () => {
   const { user } = useAuth();
   const cafeId = user?.cafeId;
+  const { data: cafe } = useDocument('cafes', cafeId);
+  const CUR = cafe?.currencySymbol || '₹';
   const [showForm, setShowForm] = useState(false);
   const [editingOffer, setEditingOffer] = useState(null);
   const [uploading, setUploading] = useState(false);
@@ -362,7 +364,7 @@ const OffersManagement = () => {
                         <span className="text-white text-sm font-medium truncate">{item.name}</span>
                         {isSelected && <Check className="w-4 h-4 text-[#D4AF37] flex-shrink-0" />}
                       </div>
-                      <span className="text-[#D4AF37] text-sm">₹{item.price}</span>
+                      <span className="text-[#D4AF37] text-sm">{CUR}{item.price}</span>
                     </button>
                   );
                 })}
@@ -383,7 +385,7 @@ const OffersManagement = () => {
                     <div key={item.itemId} className="flex items-center justify-between bg-white/5 p-3 rounded">
                       <div>
                         <span className="text-white font-medium">{item.itemName}</span>
-                        <span className="text-[#A3A3A3] ml-2">₹{item.itemPrice}</span>
+                        <span className="text-[#A3A3A3] ml-2">{CUR}{item.itemPrice}</span>
                       </div>
                       <div className="flex items-center gap-3">
                         <div className="flex items-center gap-2">
@@ -415,7 +417,7 @@ const OffersManagement = () => {
                   ))}
                   <div className="border-t border-white/10 pt-3 mt-3 flex justify-between">
                     <span className="text-[#A3A3A3]">Original Price:</span>
-                    <span className="text-white font-bold">₹{originalPrice.toFixed(2)}</span>
+                    <span className="text-white font-bold">{CUR}{originalPrice.toFixed(2)}</span>
                   </div>
                 </div>
               </div>
@@ -431,13 +433,13 @@ const OffersManagement = () => {
                     value={formData.comboPrice}
                     onChange={(e) => setFormData(prev => ({ ...prev, comboPrice: e.target.value }))}
                     className="w-40 bg-black/20 border border-white/10 text-white placeholder:text-neutral-600 focus:border-[#D4AF37] focus:ring-1 focus:ring-[#D4AF37] rounded-sm h-12 px-4 transition-all"
-                    placeholder="₹"
+                    placeholder={CUR}
                     min="0"
                     step="0.01"
                   />
                   {savings > 0 && (
                     <span className="text-green-400 font-semibold">
-                      Customer saves ₹{savings.toFixed(2)}!
+                      Customer saves {CUR}{savings.toFixed(2)}!
                     </span>
                   )}
                 </div>
@@ -454,12 +456,12 @@ const OffersManagement = () => {
                     className="w-full bg-black/20 border border-white/10 text-white focus:border-[#D4AF37] focus:ring-1 focus:ring-[#D4AF37] rounded-sm h-12 px-4 transition-all"
                   >
                     <option value="percentage">Percentage (%)</option>
-                    <option value="flat">Flat Amount (₹)</option>
+                    <option value="flat">{`Flat Amount (${CUR})`}</option>
                   </select>
                 </div>
                 <div>
                   <label className="block text-white text-sm font-medium mb-2">
-                    {formData.discountType === 'percentage' ? 'Discount (%)' : 'Discount Amount (₹)'}
+                    {formData.discountType === 'percentage' ? 'Discount (%)' : `Discount Amount (${CUR})`}
                   </label>
                   <input
                     type="number"
@@ -495,7 +497,7 @@ const OffersManagement = () => {
                   >
                     <option value="">Select item...</option>
                     {menuItems?.map(item => (
-                      <option key={item.id} value={item.id}>{item.name} (₹{item.price})</option>
+                      <option key={item.id} value={item.id}>{item.name} ({CUR}{item.price})</option>
                     ))}
                   </select>
                 </div>
@@ -619,10 +621,10 @@ const OffersManagement = () => {
                       </div>
                       {offer.type === 'combo' && offer.comboPrice && (
                         <div className="mt-2 flex items-center gap-2">
-                          <span className="text-[#A3A3A3] line-through">₹{offer.originalPrice}</span>
-                          <span className="text-[#D4AF37] font-bold text-lg">₹{offer.comboPrice}</span>
+                          <span className="text-[#A3A3A3] line-through">{CUR}{offer.originalPrice}</span>
+                          <span className="text-[#D4AF37] font-bold text-lg">{CUR}{offer.comboPrice}</span>
                           {offer.savings > 0 && (
-                            <span className="text-green-400 text-sm">Save ₹{offer.savings.toFixed(0)}</span>
+                            <span className="text-green-400 text-sm">Save {CUR}{offer.savings.toFixed(0)}</span>
                           )}
                         </div>
                       )}
@@ -631,7 +633,7 @@ const OffersManagement = () => {
                           <span className="text-[#D4AF37] font-bold">
                             {offer.discountType === 'percentage' 
                               ? `${offer.discountAmount}% OFF` 
-                              : `₹${offer.discountAmount} OFF`}
+                              : `${CUR}${offer.discountAmount} OFF`}
                           </span>
                         </div>
                       )}

@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useEffect, useRef, useCallback } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
-import { useCollection } from '../../hooks/useFirestore';
+import { useCollection, useDocument } from '../../hooks/useFirestore';
 import { where, doc, updateDoc } from 'firebase/firestore';
 import { db } from '../../lib/firebase';
 import { AlertCircle, Search, Download, Phone, MapPin, Clock, Bell, Volume2, X } from 'lucide-react';
@@ -14,6 +14,8 @@ const NOTIFICATION_SOUND = 'data:audio/mp3;base64,SUQzBAAAAAAAI1RTU0UAAAAPAAADTG
 const OrdersManagement = () => {
   const { user } = useAuth();
   const cafeId = user?.cafeId;
+  const { data: cafe } = useDocument('cafes', cafeId);
+  const cafeCurrency = cafe?.currencySymbol || '₹';
   const [statusFilter, setStatusFilter] = useState('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [startDate, setStartDate] = useState('');
@@ -244,7 +246,7 @@ const OrdersManagement = () => {
                 )}
                 <p className="text-sm">{getItemsCount(newOrderNotification.items)}</p>
                 <p className="font-bold text-xl mt-2">
-                  ₹{(newOrderNotification.totalAmount || 0).toFixed(0)}
+                  {newOrderNotification.currencySymbol || cafeCurrency}{(newOrderNotification.totalAmount || 0).toFixed(0)}
                 </p>
               </div>
             </div>
@@ -394,7 +396,7 @@ const OrdersManagement = () => {
                         </td>
                         <td className="px-4 py-4 text-[#A3A3A3]">{getItemsCount(order.items)}</td>
                         <td className="px-4 py-4">
-                          <span className="text-[#D4AF37] font-bold">₹{(order.totalAmount || order.total || 0).toFixed(0)}</span>
+                          <span className="text-[#D4AF37] font-bold">{order.currencySymbol || cafeCurrency}{(order.totalAmount || order.total || 0).toFixed(0)}</span>
                         </td>
                         <td className="px-4 py-4">
                           <span className={`px-2 py-1 rounded text-xs font-medium border ${getPaymentBadge(order.paymentStatus)}`}>
@@ -441,12 +443,12 @@ const OrdersManagement = () => {
                                   {order.items?.map((item, idx) => (
                                     <div key={idx} className="flex justify-between text-sm">
                                       <span className="text-white">{item.name} x{item.quantity}</span>
-                                      <span className="text-[#D4AF37]">₹{(item.price * item.quantity).toFixed(2)}</span>
+                                      <span className="text-[#D4AF37]">{order.currencySymbol || cafeCurrency}{(item.price * item.quantity).toFixed(2)}</span>
                                     </div>
                                   ))}
                                   <div className="border-t border-white/10 pt-2 mt-2 flex justify-between font-bold">
                                     <span className="text-white">Total</span>
-                                    <span className="text-[#D4AF37]">₹{(order.totalAmount || order.total || 0).toFixed(2)}</span>
+                                    <span className="text-[#D4AF37]">{order.currencySymbol || cafeCurrency}{(order.totalAmount || order.total || 0).toFixed(2)}</span>
                                   </div>
                                 </div>
                               </div>
@@ -513,7 +515,7 @@ const OrdersManagement = () => {
                     </div>
                   </div>
                   <div className="flex flex-col items-end gap-1">
-                    <span className="text-[#D4AF37] font-bold">₹{(order.totalAmount || order.total || 0).toFixed(0)}</span>
+                    <span className="text-[#D4AF37] font-bold">{order.currencySymbol || cafeCurrency}{(order.totalAmount || order.total || 0).toFixed(0)}</span>
                     <span className={`px-2 py-0.5 rounded text-xs font-medium border capitalize ${getStatusBadge(order.orderStatus)}`}>
                       {order.orderStatus || 'new'}
                     </span>
@@ -539,7 +541,7 @@ const OrdersManagement = () => {
                         {order.items?.map((item, idx) => (
                           <div key={idx} className="flex justify-between text-sm">
                             <span className="text-white">{item.name} x{item.quantity}</span>
-                            <span className="text-[#D4AF37]">₹{(item.price * item.quantity).toFixed(2)}</span>
+                            <span className="text-[#D4AF37]">{order.currencySymbol || cafeCurrency}{(item.price * item.quantity).toFixed(2)}</span>
                           </div>
                         ))}
                       </div>
