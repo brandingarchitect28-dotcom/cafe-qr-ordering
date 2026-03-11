@@ -477,7 +477,6 @@ const CafeOrdering = () => {
           toast.success(`${offer.title} added to cart!`);
         }
         
-        setShowCheckout(true);
       }
     }
   };
