@@ -3,7 +3,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import { doc, updateDoc, onSnapshot } from 'firebase/firestore';
 import { db } from '../../lib/firebase';
 import { uploadImage } from '../../utils/uploadImage';
-import { Save, Sun, Moon, ShoppingCart, Plus, Coffee } from 'lucide-react';
+import { Save, Sun, Moon, ShoppingCart, Plus, Coffee, CreditCard, Eye, EyeOff, ShieldCheck, AlertTriangle } from 'lucide-react';
 import { toast } from 'sonner';
 
 const Settings = () => {
@@ -12,6 +12,17 @@ const Settings = () => {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState(false);
+
+  // Feature 3: Payment Settings state
+  const [showKeySecret, setShowKeySecret] = useState(false);
+  const [paymentSettings, setPaymentSettings] = useState({
+    enabled: false,
+    gateway: 'razorpay',
+    keyId: '',
+    keySecret: '',
+    merchantName: '',
+    currency: 'INR',
+  });
 
   const [settings, setSettings] = useState({
     name: '',
@@ -64,6 +75,18 @@ const Settings = () => {
             serviceChargeEnabled: data.serviceChargeEnabled || false,
             serviceChargeRate: data.serviceChargeRate ?? 10
           });
+
+          // Feature 3: hydrate payment settings
+          if (data.paymentSettings) {
+            setPaymentSettings({
+              enabled:      data.paymentSettings.enabled      ?? false,
+              gateway:      data.paymentSettings.gateway      || 'razorpay',
+              keyId:        data.paymentSettings.keyId        || '',
+              keySecret:    data.paymentSettings.keySecret    || '',
+              merchantName: data.paymentSettings.merchantName || '',
+              currency:     data.paymentSettings.currency     || 'INR',
+            });
+          }
         }
         setLoading(false);
       },
@@ -124,7 +147,16 @@ const Settings = () => {
         taxName: settings.taxName || 'GST',
         taxRate: parseFloat(settings.taxRate) || 0,
         serviceChargeEnabled: settings.serviceChargeEnabled,
-        serviceChargeRate: parseFloat(settings.serviceChargeRate) || 0
+        serviceChargeRate: parseFloat(settings.serviceChargeRate) || 0,
+        // Feature 3: persist payment settings as nested map
+        paymentSettings: {
+          enabled:      paymentSettings.enabled,
+          gateway:      paymentSettings.gateway,
+          keyId:        paymentSettings.keyId.trim(),
+          keySecret:    paymentSettings.keySecret.trim(),
+          merchantName: paymentSettings.merchantName.trim(),
+          currency:     paymentSettings.currency,
+        },
       });
       toast.success('Settings saved successfully!');
     } catch (error) {
@@ -660,6 +692,202 @@ const Settings = () => {
               </button>
             </div>
           </div>
+        </div>
+      </div>
+
+      {/* ── Feature 3: Payment Settings ── */}
+      <div className="bg-[#0F0F0F] border border-white/5 rounded-sm p-6">
+        <div className="flex items-center gap-3 mb-6">
+          <div className="w-9 h-9 rounded-lg bg-[#D4AF37]/10 flex items-center justify-center">
+            <CreditCard className="w-5 h-5 text-[#D4AF37]" />
+          </div>
+          <h3 className="text-xl font-semibold text-white" style={{ fontFamily: 'Playfair Display, serif' }}>
+            Payment Settings
+          </h3>
+        </div>
+
+        <div className="space-y-5">
+
+          {/* Enable Online Payments toggle */}
+          <div className="flex items-center justify-between p-4 bg-black/20 rounded-sm border border-white/5">
+            <div>
+              <p className="text-white font-medium">Enable Online Payments</p>
+              <p className="text-[#A3A3A3] text-xs mt-0.5">
+                Allow customers to pay online via Razorpay at checkout
+              </p>
+            </div>
+            <button
+              type="button"
+              data-testid="payment-enabled-toggle"
+              onClick={() => setPaymentSettings(prev => ({ ...prev, enabled: !prev.enabled }))}
+              className={`relative inline-flex h-7 w-12 items-center rounded-full transition-colors duration-200 focus:outline-none ${
+                paymentSettings.enabled ? 'bg-[#D4AF37]' : 'bg-white/10'
+              }`}
+            >
+              <span
+                className={`inline-block h-5 w-5 transform rounded-full bg-white shadow transition-transform duration-200 ${
+                  paymentSettings.enabled ? 'translate-x-6' : 'translate-x-1'
+                }`}
+              />
+            </button>
+          </div>
+
+          {/* Status pill — always visible */}
+          <div className={`flex items-center gap-2 px-4 py-2.5 rounded-sm border text-sm font-medium ${
+            paymentSettings.enabled
+              ? 'bg-green-500/10 border-green-500/20 text-green-400'
+              : 'bg-white/5 border-white/10 text-[#A3A3A3]'
+          }`}>
+            <ShieldCheck className="w-4 h-4 flex-shrink-0" />
+            {paymentSettings.enabled
+              ? 'Online payments ENABLED — customers will see a "Pay Online" button at checkout'
+              : 'Online payments DISABLED — customers default to Pay at Counter'}
+          </div>
+
+          {/* Expanded fields — only when enabled */}
+          {paymentSettings.enabled && (
+            <div className="space-y-4 pt-1">
+
+              {/* Security notice */}
+              <div className="flex items-start gap-3 p-4 bg-yellow-500/5 border border-yellow-500/20 rounded-sm">
+                <AlertTriangle className="w-4 h-4 text-yellow-500 flex-shrink-0 mt-0.5" />
+                <p className="text-yellow-400/80 text-xs leading-relaxed">
+                  Your Razorpay keys are stored in your private Firestore document and are only
+                  readable by you. Never share your Key Secret publicly. For production, consider
+                  using a backend/Cloud Function to keep the secret server-side.
+                </p>
+              </div>
+
+              {/* Payment Gateway selector */}
+              <div>
+                <label className="block text-white text-sm font-medium mb-2">
+                  Payment Gateway
+                </label>
+                <select
+                  data-testid="payment-gateway-select"
+                  value={paymentSettings.gateway}
+                  onChange={(e) => setPaymentSettings(prev => ({ ...prev, gateway: e.target.value }))}
+                  className="w-full bg-black/20 border border-white/10 text-white focus:border-[#D4AF37] focus:ring-1 focus:ring-[#D4AF37] rounded-sm h-12 px-4 transition-all"
+                >
+                  <option value="razorpay" className="bg-[#0F0F0F]">Razorpay</option>
+                  <option value="stripe"   className="bg-[#0F0F0F]">Stripe (coming soon)</option>
+                  <option value="paytm"    className="bg-[#0F0F0F]">Paytm (coming soon)</option>
+                </select>
+              </div>
+
+              {/* Merchant Name */}
+              <div>
+                <label className="block text-white text-sm font-medium mb-2">
+                  Merchant Name
+                  <span className="text-[#A3A3A3] font-normal ml-1 text-xs">(shown on payment popup)</span>
+                </label>
+                <input
+                  type="text"
+                  data-testid="payment-merchant-name"
+                  value={paymentSettings.merchantName}
+                  onChange={(e) => setPaymentSettings(prev => ({ ...prev, merchantName: e.target.value }))}
+                  placeholder="e.g., Downtown Coffee"
+                  className="w-full bg-black/20 border border-white/10 text-white placeholder:text-neutral-600 focus:border-[#D4AF37] focus:ring-1 focus:ring-[#D4AF37] rounded-sm h-12 px-4 transition-all"
+                />
+              </div>
+
+              {/* Currency */}
+              <div>
+                <label className="block text-white text-sm font-medium mb-2">Currency</label>
+                <select
+                  data-testid="payment-currency-select"
+                  value={paymentSettings.currency}
+                  onChange={(e) => setPaymentSettings(prev => ({ ...prev, currency: e.target.value }))}
+                  className="w-full bg-black/20 border border-white/10 text-white focus:border-[#D4AF37] focus:ring-1 focus:ring-[#D4AF37] rounded-sm h-12 px-4 transition-all"
+                >
+                  <option value="INR" className="bg-[#0F0F0F]">INR — Indian Rupee</option>
+                  <option value="USD" className="bg-[#0F0F0F]">USD — US Dollar</option>
+                  <option value="EUR" className="bg-[#0F0F0F]">EUR — Euro</option>
+                  <option value="GBP" className="bg-[#0F0F0F]">GBP — British Pound</option>
+                  <option value="AED" className="bg-[#0F0F0F]">AED — UAE Dirham</option>
+                </select>
+              </div>
+
+              {/* Razorpay Key ID */}
+              <div>
+                <label className="block text-white text-sm font-medium mb-2">
+                  Razorpay Key ID
+                  <span className="text-[#A3A3A3] font-normal ml-1 text-xs">(starts with rzp_)</span>
+                </label>
+                <input
+                  type="text"
+                  data-testid="payment-key-id"
+                  value={paymentSettings.keyId}
+                  onChange={(e) => setPaymentSettings(prev => ({ ...prev, keyId: e.target.value }))}
+                  placeholder="rzp_live_xxxxxxxxxxxx"
+                  className="w-full bg-black/20 border border-white/10 text-white placeholder:text-neutral-600 focus:border-[#D4AF37] focus:ring-1 focus:ring-[#D4AF37] rounded-sm h-12 px-4 font-mono transition-all"
+                />
+                <p className="text-[#A3A3A3] text-xs mt-1.5">
+                  Find this in your{' '}
+                  <a
+                    href="https://dashboard.razorpay.com/app/keys"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-[#D4AF37] underline underline-offset-2 hover:text-[#C5A059] transition-colors"
+                  >
+                    Razorpay Dashboard → API Keys
+                  </a>
+                </p>
+              </div>
+
+              {/* Razorpay Key Secret */}
+              <div>
+                <label className="block text-white text-sm font-medium mb-2">
+                  Razorpay Key Secret
+                </label>
+                <div className="relative">
+                  <input
+                    type={showKeySecret ? 'text' : 'password'}
+                    data-testid="payment-key-secret"
+                    value={paymentSettings.keySecret}
+                    onChange={(e) => setPaymentSettings(prev => ({ ...prev, keySecret: e.target.value }))}
+                    placeholder="••••••••••••••••••••"
+                    className="w-full bg-black/20 border border-white/10 text-white placeholder:text-neutral-600 focus:border-[#D4AF37] focus:ring-1 focus:ring-[#D4AF37] rounded-sm h-12 px-4 pr-12 font-mono transition-all"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowKeySecret(v => !v)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-[#A3A3A3] hover:text-white transition-colors p-1"
+                    tabIndex={-1}
+                    title={showKeySecret ? 'Hide secret' : 'Show secret'}
+                  >
+                    {showKeySecret
+                      ? <EyeOff className="w-4 h-4" />
+                      : <Eye className="w-4 h-4" />
+                    }
+                  </button>
+                </div>
+                <p className="text-[#A3A3A3] text-xs mt-1.5">
+                  Keep this confidential. It is stored in your private Firestore document.
+                </p>
+              </div>
+
+              {/* Key validation hints */}
+              {paymentSettings.keyId && !paymentSettings.keyId.startsWith('rzp_') && (
+                <p className="text-red-400 text-xs flex items-center gap-1.5">
+                  <AlertTriangle className="w-3.5 h-3.5" />
+                  Key ID should start with <code className="font-mono">rzp_live_</code> or <code className="font-mono">rzp_test_</code>
+                </p>
+              )}
+              {paymentSettings.keyId.startsWith('rzp_test_') && (
+                <p className="text-yellow-400 text-xs flex items-center gap-1.5">
+                  <AlertTriangle className="w-3.5 h-3.5" />
+                  You are using a <strong>test</strong> key. Switch to <code className="font-mono">rzp_live_</code> for production.
+                </p>
+              )}
+              {paymentSettings.keyId.startsWith('rzp_live_') && paymentSettings.keySecret && (
+                <p className="text-green-400 text-xs flex items-center gap-1.5">
+                  <ShieldCheck className="w-3.5 h-3.5" />
+                  Live credentials look good. Save settings to activate.
+                </p>
+              )}
+            </div>
+          )}
         </div>
       </div>
 

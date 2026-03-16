@@ -3,10 +3,13 @@ import { useAuth } from '../../contexts/AuthContext';
 import { useCollection, useDocument } from '../../hooks/useFirestore';
 import { where, doc, updateDoc } from 'firebase/firestore';
 import { db } from '../../lib/firebase';
-import { AlertCircle, Search, Download, Phone, MapPin, Clock, Bell, Volume2, X } from 'lucide-react';
+import { AlertCircle, Search, Download, Phone, MapPin, Clock, Bell, Volume2, X, FileText, Eye, PlusCircle } from 'lucide-react';
 import { toast } from 'sonner';
 import { CSVLink } from 'react-csv';
 import { motion, AnimatePresence } from 'framer-motion';
+import InvoiceModal from './InvoiceModal';
+import { getInvoiceByOrderId } from '../../services/invoiceService';
+import ExternalOrderModal, { getSourceMeta } from './ExternalOrderModal';
 
 // Notification sound (base64 encoded short beep)
 const NOTIFICATION_SOUND = 'data:audio/mp3;base64,SUQzBAAAAAAAI1RTU0UAAAAPAAADTGF2ZjU4Ljc2LjEwMAAAAAAAAAAAAAAA/+M4wAAAAAAAAAAAAEluZm8AAAAPAAAAAwAAAbAAqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV////////////////////////////////////////////AAAAAExhdmM1OC4xMwAAAAAAAAAAAAAAACQDgAAAAAAAAAGw3X+VkgAAAAAAAAAAAAAAAAD/4xjEAAJQAVAAAAAAvYCCB4P+UBn//+D4PoGH/ygM///KAHAY////4Pg+D7/8EMOD4f/6gYf///wfB9///5QGf/lAZ//+UAcH0GH////+oGH//6gYf5QBwfD4fygDg//+D5//ygMAAAAAAA/+MYxBYCwAFYAAAAAPHjx4sePHjx5OTk5FRUVFRU9PT09PT09PT0/////////////////////////////////+MYxCMAAADSAAAAAP///////////////////////////////////////////////+MYxDAAAADSAAAAAP///////////////////////////////////////////////+MYxD4AAADSAAAAAP//////////////////////////////////////////////';
@@ -25,6 +28,13 @@ const OrdersManagement = () => {
   const [soundEnabled, setSoundEnabled] = useState(true);
   const previousOrdersRef = useRef([]);
   const audioRef = useRef(null);
+
+  // ── Feature 1: Invoice state ──
+  const [viewingInvoice, setViewingInvoice] = useState(null);   // invoice object
+  const [invoiceLoading, setInvoiceLoading] = useState(null);   // orderId being loaded
+
+  // ── External Orders: modal state ──
+  const [showExternalModal, setShowExternalModal] = useState(false);
 
   // Debug: Log cafeId
   useEffect(() => {
@@ -180,14 +190,17 @@ const OrdersManagement = () => {
       'Payment Mode': order.paymentMode || '',
       'Payment Status': order.paymentStatus || '',
       'Order Status': order.orderStatus || '',
+      'Order Source': order.orderSource || 'direct',
+      'External Order': order.externalOrder ? 'Yes' : 'No',
       'Special Instructions': order.specialInstructions || ''
     }));
   }, [filteredOrders]);
 
   const getStatusBadge = (status) => {
     const styles = {
-      new: 'bg-blue-500/20 text-blue-400 border-blue-500/30',
+      new:       'bg-blue-500/20 text-blue-400 border-blue-500/30',
       preparing: 'bg-orange-500/20 text-orange-400 border-orange-500/30',
+      ready:     'bg-emerald-500/20 text-emerald-400 border-emerald-500/30',
       completed: 'bg-green-500/20 text-green-400 border-green-500/30',
       cancelled: 'bg-red-500/20 text-red-400 border-red-500/30'
     };
@@ -214,8 +227,46 @@ const OrdersManagement = () => {
     setNewOrderNotification(null);
   };
 
+  // ── Feature 1: Invoice handlers ──
+  const handleViewInvoice = async (orderId, e) => {
+    e.stopPropagation();
+    setInvoiceLoading(orderId);
+    const { data, error } = await getInvoiceByOrderId(orderId);
+    setInvoiceLoading(null);
+    if (error) { toast.error('Could not load invoice'); return; }
+    if (!data) { toast.error('Invoice not generated yet — try again in a moment'); return; }
+    setViewingInvoice(data);
+  };
+
+  const handleDownloadInvoice = async (orderId, e) => {
+    e.stopPropagation();
+    setInvoiceLoading(orderId);
+    const { data, error } = await getInvoiceByOrderId(orderId);
+    setInvoiceLoading(null);
+    if (error || !data) { toast.error('Invoice not available yet — try again in a moment'); return; }
+    // Open invoice modal; user clicks "Download PDF" inside it
+    setViewingInvoice(data);
+  };
+
   return (
     <div className="space-y-6 relative">
+      {/* ── Feature 1: Invoice Modal ── */}
+      {viewingInvoice && (
+        <InvoiceModal
+          invoice={viewingInvoice}
+          onClose={() => setViewingInvoice(null)}
+        />
+      )}
+
+      {/* ── External Order Modal ── */}
+      {showExternalModal && (
+        <ExternalOrderModal
+          onClose={() => setShowExternalModal(false)}
+          onSuccess={(id, num) => {
+            toast.success(`Order #${String(num).padStart(3,'0')} added to kitchen queue`);
+          }}
+        />
+      )}
       {/* New Order Notification Popup */}
       <AnimatePresence>
         {newOrderNotification && (
@@ -255,22 +306,33 @@ const OrdersManagement = () => {
       </AnimatePresence>
 
       {/* Header with Sound Toggle */}
-      <div className="flex justify-between items-center">
+      <div className="flex flex-wrap justify-between items-center gap-3">
         <h2 className="text-2xl font-bold text-white" style={{ fontFamily: 'Playfair Display, serif' }}>
           Orders Management
         </h2>
-        <button
-          onClick={() => setSoundEnabled(!soundEnabled)}
-          className={`flex items-center gap-2 px-4 py-2 rounded-sm transition-all ${
-            soundEnabled 
-              ? 'bg-[#D4AF37]/20 text-[#D4AF37] border border-[#D4AF37]/30' 
-              : 'bg-white/5 text-[#A3A3A3] border border-white/10'
-          }`}
-          data-testid="sound-toggle"
-        >
-          <Volume2 className="w-4 h-4" />
-          {soundEnabled ? 'Sound On' : 'Sound Off'}
-        </button>
+        <div className="flex items-center gap-2 flex-wrap">
+          {/* ── External Order Button ── */}
+          <button
+            onClick={() => setShowExternalModal(true)}
+            data-testid="add-external-order-btn"
+            className="flex items-center gap-2 px-4 py-2 bg-[#D4AF37] hover:bg-[#C5A059] text-black font-bold rounded-sm text-sm transition-all"
+          >
+            <PlusCircle className="w-4 h-4" />
+            Add External Order
+          </button>
+          <button
+            onClick={() => setSoundEnabled(!soundEnabled)}
+            className={`flex items-center gap-2 px-4 py-2 rounded-sm transition-all ${
+              soundEnabled
+                ? 'bg-[#D4AF37]/20 text-[#D4AF37] border border-[#D4AF37]/30'
+                : 'bg-white/5 text-[#A3A3A3] border border-white/10'
+            }`}
+            data-testid="sound-toggle"
+          >
+            <Volume2 className="w-4 h-4" />
+            {soundEnabled ? 'Sound On' : 'Sound Off'}
+          </button>
+        </div>
       </div>
 
       {/* Search and Export */}
@@ -324,7 +386,7 @@ const OrdersManagement = () => {
 
       {/* Status Filter Tabs */}
       <div className="flex flex-wrap gap-2">
-        {['all', 'new', 'preparing', 'completed', 'cancelled'].map(status => (
+        {['all', 'new', 'preparing', 'ready', 'completed', 'cancelled'].map(status => (
           <button
             key={status}
             data-testid={`filter-${status}`}
@@ -379,9 +441,19 @@ const OrdersManagement = () => {
                         data-testid={`order-row-${order.id}`}
                       >
                         <td className="px-4 py-4">
-                          <span className="text-[#D4AF37] font-bold text-lg">
-                            {formatOrderNumber(order.orderNumber)}
-                          </span>
+                          <div className="flex flex-col gap-1">
+                            <span className="text-[#D4AF37] font-bold text-lg">
+                              {formatOrderNumber(order.orderNumber)}
+                            </span>
+                            {order.orderSource && (() => {
+                              const meta = getSourceMeta(order.orderSource);
+                              return (
+                                <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-black border w-fit ${meta.bg}`}>
+                                  {meta.label}
+                                </span>
+                              );
+                            })()}
+                          </div>
                         </td>
                         <td className="px-4 py-4 text-white font-medium">{order.customerName || '-'}</td>
                         <td className="px-4 py-4 text-[#A3A3A3]">{order.customerPhone || '-'}</td>
@@ -409,27 +481,53 @@ const OrdersManagement = () => {
                           </span>
                         </td>
                         <td className="px-4 py-4" onClick={(e) => e.stopPropagation()}>
-                          <div className="flex gap-2">
-                            <select
-                              data-testid={`order-status-${order.id}`}
-                              value={order.orderStatus || 'new'}
-                              onChange={(e) => updateOrderStatus(order.id, e.target.value)}
-                              className="bg-black/40 border border-white/10 text-white rounded px-2 py-1 text-xs focus:border-[#D4AF37] focus:ring-1 focus:ring-[#D4AF37]"
-                            >
-                              <option value="new">New</option>
-                              <option value="preparing">Preparing</option>
-                              <option value="completed">Completed</option>
-                              <option value="cancelled">Cancelled</option>
-                            </select>
-                            <select
-                              data-testid={`payment-status-${order.id}`}
-                              value={order.paymentStatus || 'pending'}
-                              onChange={(e) => updatePaymentStatus(order.id, e.target.value)}
-                              className="bg-black/40 border border-white/10 text-white rounded px-2 py-1 text-xs focus:border-[#D4AF37] focus:ring-1 focus:ring-[#D4AF37]"
-                            >
-                              <option value="pending">Pending</option>
-                              <option value="paid">Paid</option>
-                            </select>
+                          <div className="flex flex-col gap-2">
+                            <div className="flex gap-2">
+                              <select
+                                data-testid={`order-status-${order.id}`}
+                                value={order.orderStatus || 'new'}
+                                onChange={(e) => updateOrderStatus(order.id, e.target.value)}
+                                className="bg-black/40 border border-white/10 text-white rounded px-2 py-1 text-xs focus:border-[#D4AF37] focus:ring-1 focus:ring-[#D4AF37]"
+                              >
+                                <option value="new">New</option>
+                                <option value="preparing">Preparing</option>
+                                <option value="ready">Ready</option>
+                                <option value="completed">Completed</option>
+                                <option value="cancelled">Cancelled</option>
+                              </select>
+                              <select
+                                data-testid={`payment-status-${order.id}`}
+                                value={order.paymentStatus || 'pending'}
+                                onChange={(e) => updatePaymentStatus(order.id, e.target.value)}
+                                className="bg-black/40 border border-white/10 text-white rounded px-2 py-1 text-xs focus:border-[#D4AF37] focus:ring-1 focus:ring-[#D4AF37]"
+                              >
+                                <option value="pending">Pending</option>
+                                <option value="paid">Paid</option>
+                              </select>
+                            </div>
+                            {/* ── Feature 1: Invoice Buttons ── */}
+                            <div className="flex gap-1.5">
+                              <button
+                                onClick={(e) => handleViewInvoice(order.id, e)}
+                                disabled={invoiceLoading === order.id}
+                                data-testid={`view-invoice-${order.id}`}
+                                className="flex items-center gap-1 px-2.5 py-1.5 bg-[#D4AF37]/10 hover:bg-[#D4AF37]/20 border border-[#D4AF37]/30 text-[#D4AF37] rounded text-xs font-medium transition-all disabled:opacity-50"
+                                title="View Invoice"
+                              >
+                                <Eye className="w-3 h-3" />
+                                {invoiceLoading === order.id ? '...' : 'Invoice'}
+                              </button>
+                              <button
+                                onClick={(e) => handleDownloadInvoice(order.id, e)}
+                                disabled={invoiceLoading === order.id}
+                                data-testid={`download-invoice-${order.id}`}
+                                className="flex items-center gap-1 px-2.5 py-1.5 bg-white/5 hover:bg-white/10 border border-white/10 text-[#A3A3A3] hover:text-white rounded text-xs font-medium transition-all disabled:opacity-50"
+                                title="Download PDF"
+                              >
+                                <FileText className="w-3 h-3" />
+                                PDF
+                              </button>
+                            </div>
                           </div>
                         </td>
                       </tr>
@@ -506,9 +604,19 @@ const OrdersManagement = () => {
                   onClick={() => setExpandedOrder(expandedOrder === order.id ? null : order.id)}
                 >
                   <div className="flex items-center gap-4">
-                    <span className="text-[#D4AF37] font-bold text-xl">
-                      {formatOrderNumber(order.orderNumber)}
-                    </span>
+                    <div className="flex flex-col gap-1">
+                      <span className="text-[#D4AF37] font-bold text-xl">
+                        {formatOrderNumber(order.orderNumber)}
+                      </span>
+                      {order.orderSource && (() => {
+                        const meta = getSourceMeta(order.orderSource);
+                        return (
+                          <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-black border w-fit ${meta.bg}`}>
+                            {meta.label}
+                          </span>
+                        );
+                      })()}
+                    </div>
                     <div>
                       <p className="text-white font-medium">{order.customerName}</p>
                       <p className="text-[#A3A3A3] text-sm">{order.customerPhone}</p>
@@ -562,6 +670,7 @@ const OrdersManagement = () => {
                       >
                         <option value="new">New</option>
                         <option value="preparing">Preparing</option>
+                        <option value="ready">Ready</option>
                         <option value="completed">Completed</option>
                         <option value="cancelled">Cancelled</option>
                       </select>
@@ -573,6 +682,25 @@ const OrdersManagement = () => {
                         <option value="pending">Pending</option>
                         <option value="paid">Paid</option>
                       </select>
+                    </div>
+                    {/* ── Feature 1: Invoice Buttons (mobile) ── */}
+                    <div className="flex gap-2" onClick={(e) => e.stopPropagation()}>
+                      <button
+                        onClick={(e) => handleViewInvoice(order.id, e)}
+                        disabled={invoiceLoading === order.id}
+                        className="flex-1 flex items-center justify-center gap-2 py-2.5 bg-[#D4AF37]/10 hover:bg-[#D4AF37]/20 border border-[#D4AF37]/30 text-[#D4AF37] rounded text-sm font-medium transition-all disabled:opacity-50"
+                      >
+                        <Eye className="w-4 h-4" />
+                        {invoiceLoading === order.id ? 'Loading…' : 'View Invoice'}
+                      </button>
+                      <button
+                        onClick={(e) => handleDownloadInvoice(order.id, e)}
+                        disabled={invoiceLoading === order.id}
+                        className="flex-1 flex items-center justify-center gap-2 py-2.5 bg-white/5 hover:bg-white/10 border border-white/10 text-[#A3A3A3] hover:text-white rounded text-sm font-medium transition-all disabled:opacity-50"
+                      >
+                        <FileText className="w-4 h-4" />
+                        Download PDF
+                      </button>
                     </div>
                   </div>
                 )}

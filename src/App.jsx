@@ -7,6 +7,7 @@ import Login from './pages/Login';
 import Dashboard from './pages/Dashboard';
 import AdminPanel from './pages/AdminPanel';
 import CafeOrdering from './pages/CafeOrdering';
+import KitchenDisplay from './pages/KitchenDisplay';
 import './App.css';
 
 const RoleBasedRedirect = () => {
@@ -55,6 +56,9 @@ function App() {
             />
             
             <Route path="/cafe/:cafeId" element={<CafeOrdering />} />
+
+            {/* Feature 4: Kitchen Display System — public URL, staff open on tablet */}
+            <Route path="/kitchen/:cafeId" element={<KitchenDisplay />} />
             
             <Route
               path="/unauthorized"

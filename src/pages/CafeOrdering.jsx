@@ -2,6 +2,8 @@ import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useParams } from 'react-router-dom';
 import { collection, query, where, doc, addDoc, serverTimestamp, runTransaction, onSnapshot } from 'firebase/firestore';
 import { db } from '../lib/firebase';
+import { createInvoiceForOrder } from '../services/invoiceService';
+import { deductStockForOrder } from '../services/inventoryService';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ShoppingCart, Plus, Minus, X, Search, Coffee, Package, ChevronDown, RefreshCw, AlertCircle } from 'lucide-react';
 import { toast } from 'sonner';
@@ -533,7 +535,7 @@ const CafeOrdering = () => {
         totalAmount: total,
         currencyCode: cafe?.currencyCode || 'INR',
         currencySymbol: cafe?.currencySymbol || '₹',
-        paymentStatus: paymentMode === 'prepaid' ? 'paid' : 'pending',
+        paymentStatus: (paymentMode === 'prepaid' || paymentMode === 'online') ? 'paid' : 'pending',
         paymentMode,
         orderStatus: 'new',
         orderType,
@@ -545,8 +547,19 @@ const CafeOrdering = () => {
         createdAt: serverTimestamp()
       };
 
-      await addDoc(collection(db, 'orders'), orderData);
-      
+      const orderDocRef = await addDoc(collection(db, 'orders'), orderData);
+
+      // ── Feature 1: Auto-generate invoice (non-blocking, does not affect order flow) ──
+      createInvoiceForOrder(
+        { ...orderData, orderNumber },
+        orderDocRef.id,
+        cafe
+      ).catch((err) => console.error('[Invoice] Background generation failed:', err));
+
+      // ── Feature 5: Auto-deduct inventory stock (non-blocking, safe) ──
+      deductStockForOrder(cafeId, orderData.items, menuItems)
+        .catch((err) => console.error('[Inventory] Stock deduction failed (non-fatal):', err));
+
       const formattedOrderNumber = String(orderNumber).padStart(3, '0');
 
       const cur = cafe?.currencySymbol || '₹';
@@ -583,7 +596,7 @@ const CafeOrdering = () => {
       } else {
         orderSummary += `\n*Total: ${cur}${total.toFixed(2)}*\n`;
       }
-      orderSummary += `*Payment Mode:* ${paymentMode === 'counter' ? 'Pay at Counter' : paymentMode === 'table' ? 'Pay on Table' : 'Prepaid (UPI)'}`;
+      orderSummary += `*Payment Mode:* ${paymentMode === 'counter' ? 'Pay at Counter' : paymentMode === 'table' ? 'Pay on Table' : paymentMode === 'online' ? 'Online Payment (Razorpay)' : 'Prepaid (UPI)'}`;
       
       if (specialInstructions) {
         orderSummary += `\n\n*Special Instructions:* ${specialInstructions}`;
@@ -1200,11 +1213,14 @@ const CafeOrdering = () => {
                   {/* Payment Mode */}
                   <div className="space-y-2">
                     <label className="text-sm font-medium" style={{ color: COLORS.textMuted }}>Payment</label>
-                    <div className="flex gap-3">
+                    <div className="flex gap-3 flex-wrap">
+                      {/* Always show counter + table */}
                       {[
                         { id: 'counter', label: 'At Counter' },
-                        { id: 'table', label: 'On Table' },
-                        { id: 'prepaid', label: 'UPI' }
+                        { id: 'table',   label: 'On Table'  },
+                        { id: 'prepaid', label: 'UPI'       },
+                        // Feature 3: show Pay Online only if cafe has it enabled
+                        ...(cafe?.paymentSettings?.enabled ? [{ id: 'online', label: '💳 Pay Online' }] : []),
                       ].map((mode) => (
                         <button
                           key={mode.id}
@@ -1212,13 +1228,30 @@ const CafeOrdering = () => {
                           className="flex-1 py-3 rounded-xl font-medium transition-all text-sm"
                           style={{
                             backgroundColor: paymentMode === mode.id ? COLORS.primary : COLORS.backgroundSecondary,
-                            color: paymentMode === mode.id ? 'white' : COLORS.textLight
+                            color: paymentMode === mode.id ? 'white' : COLORS.textLight,
+                            minWidth: mode.id === 'online' ? '100%' : undefined,
                           }}
                         >
                           {mode.label}
                         </button>
                       ))}
                     </div>
+
+                    {/* Feature 3: Razorpay "Pay Online" info strip */}
+                    {paymentMode === 'online' && cafe?.paymentSettings?.enabled && (
+                      <div
+                        className="flex items-center gap-3 px-4 py-3 rounded-xl text-sm"
+                        style={{ backgroundColor: `${COLORS.primary}15`, border: `1px solid ${COLORS.primary}30` }}
+                      >
+                        <span style={{ color: COLORS.primary }}>💳</span>
+                        <span style={{ color: COLORS.textLight }}>
+                          You will be taken to a secure Razorpay payment page after placing your order.
+                          {cafe.paymentSettings.merchantName && (
+                            <span style={{ color: COLORS.primary }}> · {cafe.paymentSettings.merchantName}</span>
+                          )}
+                        </span>
+                      </div>
+                    )}
                   </div>
                 </div>
 

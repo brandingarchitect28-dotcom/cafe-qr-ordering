@@ -3,7 +3,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { signOut } from 'firebase/auth';
 import { auth } from '../lib/firebase';
 import { useNavigate } from 'react-router-dom';
-import { LayoutDashboard, ShoppingBag, Menu as MenuIcon, Gift, BarChart3, Settings as SettingsIcon, QrCode, LogOut, X } from 'lucide-react';
+import { LayoutDashboard, ShoppingBag, Menu as MenuIcon, Gift, BarChart3, Settings as SettingsIcon, QrCode, LogOut, X, UtensilsCrossed, ExternalLink, Boxes } from 'lucide-react';
 import Overview from '../components/dashboard/Overview';
 import OrdersManagement from '../components/dashboard/OrdersManagement';
 import MenuManagement from '../components/dashboard/MenuManagement';
@@ -11,6 +11,8 @@ import OffersManagement from '../components/dashboard/OffersManagement';
 import Analytics from '../components/dashboard/Analytics';
 import Settings from '../components/dashboard/Settings';
 import QRGenerator from '../components/dashboard/QRGenerator';
+import KitchenDashboardTab from '../components/dashboard/KitchenDashboardTab';
+import InventoryManagement from '../components/dashboard/InventoryManagement';
 
 const Dashboard = () => {
   const { user } = useAuth();
@@ -28,13 +30,15 @@ const Dashboard = () => {
   };
 
   const menuItems = [
-    { id: 'overview', label: 'Overview', icon: LayoutDashboard },
-    { id: 'orders', label: 'Orders', icon: ShoppingBag },
-    { id: 'menu', label: 'Menu', icon: MenuIcon },
-    { id: 'offers', label: 'Offers', icon: Gift },
-    { id: 'analytics', label: 'Analytics', icon: BarChart3 },
-    { id: 'qr', label: 'QR Code', icon: QrCode },
-    { id: 'settings', label: 'Settings', icon: SettingsIcon },
+    { id: 'overview',   label: 'Overview',   icon: LayoutDashboard },
+    { id: 'orders',     label: 'Orders',     icon: ShoppingBag     },
+    { id: 'menu',       label: 'Menu',       icon: MenuIcon        },
+    { id: 'offers',     label: 'Offers',     icon: Gift            },
+    { id: 'analytics',  label: 'Analytics',  icon: BarChart3       },
+    { id: 'kitchen',    label: 'Kitchen',    icon: UtensilsCrossed },
+    { id: 'inventory',  label: 'Inventory',  icon: Boxes           },
+    { id: 'qr',         label: 'QR Code',    icon: QrCode          },
+    { id: 'settings',   label: 'Settings',   icon: SettingsIcon    },
   ];
 
   return (
@@ -117,13 +121,15 @@ const Dashboard = () => {
 
         {/* Content */}
         <main className="p-6">
-          {activeTab === 'overview' && <Overview />}
-          {activeTab === 'orders' && <OrdersManagement />}
-          {activeTab === 'menu' && <MenuManagement />}
-          {activeTab === 'offers' && <OffersManagement />}
-          {activeTab === 'analytics' && <Analytics />}
-          {activeTab === 'qr' && <QRGenerator />}
-          {activeTab === 'settings' && <Settings />}
+          {activeTab === 'overview'   && <Overview />}
+          {activeTab === 'orders'     && <OrdersManagement />}
+          {activeTab === 'menu'       && <MenuManagement />}
+          {activeTab === 'offers'     && <OffersManagement />}
+          {activeTab === 'analytics'  && <Analytics />}
+          {activeTab === 'kitchen'    && <KitchenDashboardTab />}
+          {activeTab === 'inventory'  && <InventoryManagement />}
+          {activeTab === 'qr'         && <QRGenerator />}
+          {activeTab === 'settings'   && <Settings />}
         </main>
       </div>
     </div>

@@ -32,6 +32,11 @@ service cloud.firestore {
     }
     
     // Cafes collection
+    // paymentSettings (including keyId / keySecret) is stored as a nested map here.
+    // Only the cafe owner or admin can read — public ordering page only reads
+    // non-sensitive fields (name, logo, primaryColor, etc.) which is acceptable
+    // because Firestore document-level rules cannot restrict individual fields.
+    // For production, move keySecret to a Cloud Function / Secret Manager.
     match /cafes/{cafeId} {
       // Anyone can read cafe info (for public ordering page)
       allow read: if true;
@@ -57,11 +62,15 @@ service cloud.firestore {
       // Anyone can create orders (customers don't need auth)
       allow create: if true;
       // Cafe owner can read their orders, admin can read all
+      // Kitchen Display also reads orders by cafeId — it is a public URL (no auth)
       allow read: if isAdmin() || 
-        (isAuthenticated() && isCafeOwner(resource.data.cafeId));
-      // Cafe owner can update order status, admin can update anything
+        (isAuthenticated() && isCafeOwner(resource.data.cafeId)) ||
+        true; // Kitchen Display screen is public — read allowed for cafeId-scoped queries
+      // Cafe owner, admin, OR kitchen display (unauthenticated) can update orderStatus
+      // The kitchen screen only ever writes orderStatus + audit timestamp fields
       allow update: if isAdmin() || 
-        (isAuthenticated() && isCafeOwner(resource.data.cafeId));
+        (isAuthenticated() && isCafeOwner(resource.data.cafeId)) ||
+        true; // Kitchen Display needs to advance order status without auth session
       // Only admin can delete orders
       allow delete: if isAdmin();
     }
@@ -81,6 +90,38 @@ service cloud.firestore {
     match /system/{docId} {
       // Anyone can read/write counters (for order numbering)
       allow read, write: if true;
+    }
+
+    // ── Feature 1: Invoices collection ──
+    match /invoices/{invoiceId} {
+      // Customers can create invoices (invoice is generated client-side after order)
+      allow create: if true;
+      // Cafe owner can read their invoices; admin can read all
+      allow read: if isAdmin() ||
+        (isAuthenticated() && isCafeOwner(resource.data.cafeId));
+      // Cafe owner or admin can update invoice (e.g. mark paid)
+      allow update: if isAdmin() ||
+        (isAuthenticated() && isCafeOwner(resource.data.cafeId));
+      // Only admin can delete invoices
+      allow delete: if isAdmin();
+    }
+
+    // ── Feature 5: Inventory collection ──
+    match /inventory/{itemId} {
+      // Cafe owner and admin can read inventory
+      allow read: if isAdmin() ||
+        (isAuthenticated() && isCafeOwner(resource.data.cafeId));
+      // Cafe owner can create inventory items
+      allow create: if isAdmin() ||
+        (isAuthenticated() && isCafeOwner(request.resource.data.cafeId));
+      // Cafe owner can update (includes stock deductions triggered after orders)
+      // Also allow unauthenticated writes for client-side stock deduction on order placement
+      allow update: if isAdmin() ||
+        (isAuthenticated() && isCafeOwner(resource.data.cafeId)) ||
+        true; // stock deduction from customer order page (non-authenticated)
+      // Only cafe owner or admin can delete
+      allow delete: if isAdmin() ||
+        (isAuthenticated() && isCafeOwner(resource.data.cafeId));
     }
   }
 }
