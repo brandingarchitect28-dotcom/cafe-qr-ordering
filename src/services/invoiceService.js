@@ -58,6 +58,32 @@ export const createInvoiceForOrder = async (orderData, orderId, cafeData) => {
   try {
     const invoiceNumber = await generateInvoiceNumber();
 
+    // ── Recalculate amounts using correct order: subtotal → serviceCharge → GST ──
+    const subtotal = orderData.subtotalAmount ??
+      (orderData.items || []).reduce((s, i) => s + (i.price * i.quantity), 0);
+
+    const serviceChargeEnabled = cafeData?.serviceChargeEnabled || false;
+    const serviceChargeRate    = parseFloat(cafeData?.serviceChargeRate) || 0;
+    const serviceChargeAmount  = serviceChargeEnabled
+      ? subtotal * serviceChargeRate / 100
+      : (orderData.serviceChargeAmount ?? 0);
+
+    // GST applied on subtotal + serviceCharge (per task spec)
+    const gstEnabled   = cafeData?.gstEnabled || false;
+    const gstRate      = parseFloat(cafeData?.gstRate) || 0;
+    const gstAmount    = gstEnabled
+      ? (subtotal + serviceChargeAmount) * gstRate / 100
+      : (orderData.gstAmount ?? 0);
+
+    // Tax (separate from GST — legacy field)
+    const taxEnabled = cafeData?.taxEnabled || false;
+    const taxRate    = parseFloat(cafeData?.taxRate) || 0;
+    const taxAmount  = taxEnabled
+      ? subtotal * taxRate / 100
+      : (orderData.taxAmount ?? 0);
+
+    const totalAmount = subtotal + serviceChargeAmount + gstAmount + taxAmount;
+
     const invoiceDoc = {
       // Linking fields
       orderId,
@@ -65,40 +91,48 @@ export const createInvoiceForOrder = async (orderData, orderId, cafeData) => {
       orderNumber: orderData.orderNumber ?? null,
 
       // Cafe info snapshot (denormalised so invoice is self-contained)
-      cafeName: cafeData?.name || 'Café',
-      cafeAddress: cafeData?.address || '',
-      cafePhone: cafeData?.phone || '',
-      cafeGstNumber: cafeData?.gstNumber || '',
+      cafeName:      cafeData?.name     || 'Café',
+      cafeAddress:   cafeData?.address  || '',
+      cafePhone:     cafeData?.phone    || '',
+      cafeGstNumber: cafeData?.gstNumber || cafeData?.cafeGstNumber || '',
       currencySymbol: orderData.currencySymbol || cafeData?.currencySymbol || '₹',
-      currencyCode: orderData.currencyCode || cafeData?.currencyCode || 'INR',
+      currencyCode:   orderData.currencyCode   || cafeData?.currencyCode   || 'INR',
 
       // Customer info
-      customerName: orderData.customerName || '',
+      customerName:  orderData.customerName  || '',
       customerPhone: orderData.customerPhone || '',
-      tableNumber: orderData.tableNumber || '',
-      orderType: orderData.orderType || 'dine-in',
+      tableNumber:   orderData.tableNumber   || '',
+      orderType:     orderData.orderType     || 'dine-in',
 
-      // Items  (array of { name, price, quantity })
+      // Items (array of { name, price, quantity })
       items: orderData.items || [],
 
-      // Amounts
-      subtotalAmount: orderData.subtotalAmount ?? orderData.totalAmount ?? 0,
-      taxAmount: orderData.taxAmount ?? 0,
-      serviceChargeAmount: orderData.serviceChargeAmount ?? 0,
-      gstAmount: orderData.gstAmount ?? 0,
-      totalAmount: orderData.totalAmount ?? orderData.total ?? 0,
+      // ── Amounts (correct calculation order) ──
+      subtotalAmount,
 
-      // Tax meta
-      taxEnabled: cafeData?.taxEnabled || false,
+      // Service Charge
+      serviceChargeEnabled,
+      serviceChargeRate,
+      serviceChargePercentage: serviceChargeRate,   // alias per task spec
+      serviceChargeAmount,
+
+      // GST (applied on subtotal + serviceCharge)
+      gstEnabled,
+      gstRate,
+      gstPercentage: gstRate,                       // alias per task spec
+      gstAmount,
+
+      // Tax (legacy separate field)
+      taxEnabled,
       taxName: cafeData?.taxName || 'Tax',
-      taxRate: cafeData?.taxRate || 0,
-      serviceChargeEnabled: cafeData?.serviceChargeEnabled || false,
-      serviceChargeRate: cafeData?.serviceChargeRate || 0,
-      gstEnabled: cafeData?.gstEnabled || false,
-      gstRate: cafeData?.gstRate || 0,
+      taxRate,
+      taxAmount,
+
+      // Final total
+      totalAmount,
 
       // Payment
-      paymentMode: orderData.paymentMode || 'counter',
+      paymentMode:   orderData.paymentMode   || 'counter',
       paymentStatus: orderData.paymentStatus || 'pending',
 
       // Invoice meta

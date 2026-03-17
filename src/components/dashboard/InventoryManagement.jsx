@@ -20,7 +20,7 @@ import { toast } from 'sonner';
 import {
   Plus, Pencil, Trash2, X, Search, AlertTriangle,
   Package, RefreshCw, ChevronDown, CheckCircle2,
-  BarChart2, Filter, Save, Boxes,
+  BarChart2, Filter, Save, Boxes, FlaskConical,
 } from 'lucide-react';
 import {
   subscribeToInventory,
@@ -30,6 +30,7 @@ import {
   deleteInventoryItem,
   UNITS,
 } from '../../services/inventoryService';
+import RecipeManager from './RecipeManager';
 
 // ─── constants ───────────────────────────────────────────────────────────────
 
@@ -279,6 +280,7 @@ const InventoryManagement = () => {
   const [deleting,   setDeleting  ] = useState(false);
   const [search,     setSearch    ] = useState('');
   const [catFilter,  setCatFilter ] = useState('all');
+  const [showRecipeManager, setShowRecipeManager] = useState(false);
 
   // ── real-time listener ──────────────────────────────────────────────────
   useEffect(() => {
@@ -346,6 +348,13 @@ const InventoryManagement = () => {
   return (
     <div className="space-y-5">
 
+      {/* ── Recipe Manager Modal ── */}
+      <AnimatePresence>
+        {showRecipeManager && (
+          <RecipeManager onClose={() => setShowRecipeManager(false)} />
+        )}
+      </AnimatePresence>
+
       {/* ── Low Stock Alert Banner ─────────────────────────────────────── */}
       <AnimatePresence>
         {lowStockItems.length > 0 && (
@@ -394,14 +403,23 @@ const InventoryManagement = () => {
             )}
           </p>
         </div>
-        <button
-          onClick={openAddForm}
-          data-testid="add-inventory-btn"
-          className="flex items-center gap-2 px-5 py-2.5 bg-[#D4AF37] hover:bg-[#C5A059] text-black font-bold rounded-sm text-sm transition-all whitespace-nowrap"
-        >
-          <Plus className="w-4 h-4" />
-          Add Item
-        </button>
+        <div className="flex items-center gap-2 flex-wrap">
+          <button
+            onClick={() => setShowRecipeManager(true)}
+            className="flex items-center gap-2 px-4 py-2.5 bg-white/5 hover:bg-white/10 border border-white/10 text-white font-semibold rounded-sm text-sm transition-all"
+          >
+            <FlaskConical className="w-4 h-4 text-[#D4AF37]" />
+            Manage Recipes
+          </button>
+          <button
+            onClick={openAddForm}
+            data-testid="add-inventory-btn"
+            className="flex items-center gap-2 px-5 py-2.5 bg-[#D4AF37] hover:bg-[#C5A059] text-black font-bold rounded-sm text-sm transition-all whitespace-nowrap"
+          >
+            <Plus className="w-4 h-4" />
+            Add Item
+          </button>
+        </div>
       </div>
 
       {/* ── Search + Category filter ───────────────────────────────────── */}

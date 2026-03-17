@@ -123,5 +123,16 @@ service cloud.firestore {
       allow delete: if isAdmin() ||
         (isAuthenticated() && isCafeOwner(resource.data.cafeId));
     }
+
+    // ── Recipes collection ──
+    match /recipes/{menuItemId} {
+      // Public read — ordering page fetches recipes for stock deduction
+      allow read: if true;
+      // Only cafe owner or admin can write recipes
+      allow create, update: if isAdmin() ||
+        (isAuthenticated() && isCafeOwner(request.resource.data.cafeId));
+      allow delete: if isAdmin() ||
+        (isAuthenticated() && isCafeOwner(resource.data.cafeId));
+    }
   }
 }

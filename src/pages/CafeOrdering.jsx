@@ -4,6 +4,7 @@ import { collection, query, where, doc, addDoc, serverTimestamp, runTransaction,
 import { db } from '../lib/firebase';
 import { createInvoiceForOrder } from '../services/invoiceService';
 import { deductStockForOrder } from '../services/inventoryService';
+import { deductStockByRecipe } from '../services/recipeService';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ShoppingCart, Plus, Minus, X, Search, Coffee, Package, ChevronDown, RefreshCw, AlertCircle } from 'lucide-react';
 import { toast } from 'sonner';
@@ -559,6 +560,10 @@ const CafeOrdering = () => {
       // ── Feature 5: Auto-deduct inventory stock (non-blocking, safe) ──
       deductStockForOrder(cafeId, orderData.items, menuItems)
         .catch((err) => console.error('[Inventory] Stock deduction failed (non-fatal):', err));
+
+      // ── Recipe-based stock deduction (non-blocking, safe) ──
+      deductStockByRecipe(cafeId, orderData.items, menuItems)
+        .catch((err) => console.error('[Recipe] Stock deduction failed (non-fatal):', err));
 
       const formattedOrderNumber = String(orderNumber).padStart(3, '0');
 

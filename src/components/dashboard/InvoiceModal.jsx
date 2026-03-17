@@ -33,6 +33,10 @@ const formatDate = (ts) => {
 /* ─── printable receipt HTML ─────────────────────────────────── */
 const buildPrintHTML = (inv) => {
   const cur = inv.currencySymbol || '₹';
+  // Support both field name conventions (gstRate / gstPercentage)
+  const gstPct = inv.gstPercentage  ?? inv.gstRate  ?? 0;
+  const scPct  = inv.serviceChargePercentage ?? inv.serviceChargeRate ?? 0;
+  const taxPct = inv.taxRate ?? 0;
   const hasExtras =
     (inv.taxEnabled && inv.taxAmount > 0) ||
     (inv.serviceChargeEnabled && inv.serviceChargeAmount > 0) ||
@@ -57,18 +61,18 @@ const buildPrintHTML = (inv) => {
       <td class="right">${cur}${fmt(inv.subtotalAmount)}</td>
     </tr>
     ${
-      inv.taxEnabled && inv.taxAmount > 0
-        ? `<tr class="sub-row"><td colspan="3">${inv.taxName || 'Tax'} (${inv.taxRate}%)</td><td class="right">${cur}${fmt(inv.taxAmount)}</td></tr>`
+      inv.serviceChargeEnabled && inv.serviceChargeAmount > 0
+        ? `<tr class="sub-row"><td colspan="3">Service Charge (${scPct}%)</td><td class="right">${cur}${fmt(inv.serviceChargeAmount)}</td></tr>`
         : ''
     }
     ${
-      inv.serviceChargeEnabled && inv.serviceChargeAmount > 0
-        ? `<tr class="sub-row"><td colspan="3">Service Charge (${inv.serviceChargeRate}%)</td><td class="right">${cur}${fmt(inv.serviceChargeAmount)}</td></tr>`
+      inv.taxEnabled && inv.taxAmount > 0
+        ? `<tr class="sub-row"><td colspan="3">${inv.taxName || 'Tax'} (${taxPct}%)</td><td class="right">${cur}${fmt(inv.taxAmount)}</td></tr>`
         : ''
     }
     ${
       inv.gstEnabled && inv.gstAmount > 0
-        ? `<tr class="sub-row"><td colspan="3">GST (${inv.gstRate}%)</td><td class="right">${cur}${fmt(inv.gstAmount)}</td></tr>`
+        ? `<tr class="sub-row"><td colspan="3">GST (${gstPct}%)</td><td class="right">${cur}${fmt(inv.gstAmount)}</td></tr>`
         : ''
     }`
     : '';
@@ -242,6 +246,24 @@ const InvoiceModal = ({ invoice, onClose }) => {
               </div>
             </div>
             <div className="flex items-center gap-2">
+              {/* Public invoice link */}
+              <button
+                onClick={() => {
+                  const url = `${window.location.origin}/invoice/${invoice.id}`;
+                  navigator.clipboard.writeText(url);
+                  const msg =
+                    `Thank you for visiting ${invoice.cafeName || 'our café'} ☕\n\n` +
+                    `Your invoice is ready.\n` +
+                    `Invoice No: ${invoice.invoiceNumber}\n` +
+                    `Amount: ${invoice.currencySymbol || '₹'}${(parseFloat(invoice.totalAmount) || 0).toFixed(2)}\n\n` +
+                    `View invoice: ${url}`;
+                  window.open(`https://wa.me/${(invoice.customerPhone || '').replace(/\D/g, '')}?text=${encodeURIComponent(msg)}`, '_blank');
+                }}
+                className="flex items-center gap-2 px-3 py-2 bg-green-600 hover:bg-green-700 text-white font-semibold rounded-lg text-sm transition-all"
+                title="Send invoice via WhatsApp"
+              >
+                📱 <span className="hidden sm:inline">WhatsApp</span>
+              </button>
               <button
                 onClick={handleDownload}
                 className="flex items-center gap-2 px-4 py-2 bg-[#D4AF37] hover:bg-[#C5A059] text-black font-semibold rounded-lg text-sm transition-all"
@@ -376,21 +398,21 @@ const InvoiceModal = ({ invoice, onClose }) => {
                     <span>Subtotal</span>
                     <span>{cur}{fmt(invoice.subtotalAmount)}</span>
                   </div>
-                  {invoice.taxEnabled && invoice.taxAmount > 0 && (
-                    <div className="flex justify-between text-[#A3A3A3]">
-                      <span>{invoice.taxName || 'Tax'} ({invoice.taxRate}%)</span>
-                      <span>{cur}{fmt(invoice.taxAmount)}</span>
-                    </div>
-                  )}
                   {invoice.serviceChargeEnabled && invoice.serviceChargeAmount > 0 && (
                     <div className="flex justify-between text-[#A3A3A3]">
-                      <span>Service Charge ({invoice.serviceChargeRate}%)</span>
+                      <span>Service Charge ({invoice.serviceChargePercentage ?? invoice.serviceChargeRate ?? 0}%)</span>
                       <span>{cur}{fmt(invoice.serviceChargeAmount)}</span>
+                    </div>
+                  )}
+                  {invoice.taxEnabled && invoice.taxAmount > 0 && (
+                    <div className="flex justify-between text-[#A3A3A3]">
+                      <span>{invoice.taxName || 'Tax'} ({invoice.taxRate ?? 0}%)</span>
+                      <span>{cur}{fmt(invoice.taxAmount)}</span>
                     </div>
                   )}
                   {invoice.gstEnabled && invoice.gstAmount > 0 && (
                     <div className="flex justify-between text-[#A3A3A3]">
-                      <span>GST ({invoice.gstRate}%)</span>
+                      <span>GST ({invoice.gstPercentage ?? invoice.gstRate ?? 0}%)</span>
                       <span>{cur}{fmt(invoice.gstAmount)}</span>
                     </div>
                   )}

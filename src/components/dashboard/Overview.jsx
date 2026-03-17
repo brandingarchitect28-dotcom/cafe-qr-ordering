@@ -19,7 +19,10 @@ import { motion, AnimatePresence } from 'framer-motion';
 import {
   IndianRupee, ShoppingBag, TrendingUp, Clock,
   AlertTriangle, Zap, MapPin, Package, ExternalLink,
+  Send, RefreshCw,
 } from 'lucide-react';
+import { toast } from 'sonner';
+import { generateAndSendReport, startDailyReportScheduler, stopDailyReportScheduler } from '../../services/whatsappReportService';
 
 // ─── helpers ──────────────────────────────────────────────────────────────────
 
@@ -280,6 +283,36 @@ const Overview = () => {
     { label: 'Active Orders',   value: stats.activeOrders,                       icon: Clock,       color: 'text-[#F59E0B]', accent: '#F59E0B' },
   ];
 
+  // ── WhatsApp Daily Report ──────────────────────────────────────────────
+  const [reportSending, setReportSending] = useState(false);
+
+  // Start 11 PM auto-scheduler when cafe data loads
+  useEffect(() => {
+    if (!cafeId || !cafe?.whatsappNumber) return;
+    const stop = startDailyReportScheduler(
+      cafeId,
+      cafe.whatsappNumber,
+      () => toast.success('📊 Daily report sent to WhatsApp!')
+    );
+    return () => stop();
+  }, [cafeId, cafe?.whatsappNumber]);
+
+  const handleSendReport = async () => {
+    if (!cafe?.whatsappNumber) {
+      toast.error('Add your WhatsApp number in Settings first');
+      return;
+    }
+    setReportSending(true);
+    try {
+      await generateAndSendReport(cafeId, cafe.whatsappNumber);
+      toast.success('📊 Report opened in WhatsApp!');
+    } catch (err) {
+      toast.error('Failed to generate report');
+    } finally {
+      setReportSending(false);
+    }
+  };
+
   // ── render ─────────────────────────────────────────────────────────────
   return (
     <div className="space-y-6">
@@ -303,6 +336,26 @@ const Overview = () => {
             </div>
           );
         })}
+      </div>
+
+      {/* ── WhatsApp Daily Report Button ────────────────────────────────── */}
+      <div className="bg-[#0F0F0F] border border-white/5 rounded-sm px-5 py-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+        <div>
+          <p className="text-white font-semibold text-sm">📊 Daily Analytics Report</p>
+          <p className="text-[#A3A3A3] text-xs mt-0.5">
+            Auto-sends to WhatsApp at 11:00 PM · or send now manually
+          </p>
+        </div>
+        <button
+          onClick={handleSendReport}
+          disabled={reportSending}
+          className="flex items-center gap-2 px-4 py-2 bg-green-600 hover:bg-green-700 text-white font-bold rounded-sm text-sm transition-all disabled:opacity-50 flex-shrink-0"
+        >
+          {reportSending
+            ? <><RefreshCw className="w-4 h-4 animate-spin" /> Generating…</>
+            : <><Send className="w-4 h-4" /> Send Report Now</>
+          }
+        </button>
       </div>
 
       {/* Low Stock Alert */}
