@@ -3,9 +3,9 @@ import { useAuth } from '../../contexts/AuthContext';
 import { useCollection, useDocument } from '../../hooks/useFirestore';
 import { where, addDoc, collection, doc, updateDoc, deleteDoc } from 'firebase/firestore';
 import { db } from '../../lib/firebase';
-import { uploadImage } from '../../utils/uploadImage';
 import { Plus, Edit, Trash2, X, Package, Percent, Gift, Check } from 'lucide-react';
 import { toast } from 'sonner';
+import MediaUpload from '../MediaUpload';
 
 const OFFER_TYPES = [
   { id: 'combo', label: 'Combo Deal', icon: Package, description: 'Bundle items at special price' },
@@ -68,28 +68,8 @@ const OffersManagement = () => {
     return 0;
   }, [formData, originalPrice]);
 
-  const handleImageUpload = async (e) => {
-    const file = e.target.files[0];
-    if (!file) return;
-    if (!file.type.startsWith('image/')) { toast.error('Please select an image file (JPG, PNG, WebP)'); return; }
-    if (file.size > 5 * 1024 * 1024) { toast.error('Image must be under 5MB'); return; }
-    if (!cafeId) { toast.error('Cafe ID missing — please refresh'); return; }
-
-    setUploading(true);
-    const toastId = toast.loading('Uploading banner...');
-    try {
-      const path = `offers/${cafeId}/${Date.now()}_${file.name}`;
-      const url = await uploadImage(file, path, (pct) => {
-        toast.loading(`Uploading... ${pct}%`, { id: toastId });
-      });
-      setFormData(prev => ({ ...prev, bannerImage: url }));
-      toast.success('Banner uploaded!', { id: toastId });
-    } catch (error) {
-      console.error('Upload error:', error);
-      toast.error(error.message || 'Upload failed', { id: toastId });
-    } finally {
-      setUploading(false);
-    }
+  const handleBannerChange = (url) => {
+    setFormData(prev => ({ ...prev, bannerImage: url }));
   };
 
   const addItemToOffer = (menuItem) => {
@@ -514,24 +494,15 @@ const OffersManagement = () => {
               </div>
             )}
 
-            {/* Banner Image */}
-            <div>
-              <label className="block text-white text-sm font-medium mb-2">Banner Image (Optional)</label>
-              <div className="space-y-2">
-                <input
-                  type="file"
-                  accept="image/*"
-                  data-testid="offer-banner-upload"
-                  onChange={handleImageUpload}
-                  className="w-full bg-black/20 border border-white/10 text-white rounded-sm px-4 py-3 file:mr-4 file:py-2 file:px-4 file:rounded-sm file:border-0 file:bg-[#D4AF37] file:text-black file:font-semibold hover:file:bg-[#C5A059] transition-all"
-                />
-                {formData.bannerImage && (
-                  <div className="relative w-full h-32">
-                    <img src={formData.bannerImage} alt="Banner preview" className="w-full h-full object-cover rounded-sm" />
-                  </div>
-                )}
-              </div>
-            </div>
+            {/* Banner Image / Media */}
+            <MediaUpload
+              label="Banner Image / GIF / Video (Optional)"
+              value={formData.bannerImage}
+              onChange={handleBannerChange}
+              storagePath={`offers/${cafeId}`}
+              maxSizeMB={20}
+              disabled={uploading}
+            />
 
             {/* Active Toggle */}
             <div className="flex items-center gap-3">

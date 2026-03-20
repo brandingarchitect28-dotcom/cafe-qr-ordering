@@ -56,10 +56,11 @@ const Dashboard = () => {
       )}
 
       {/* Sidebar */}
-      <aside className={`fixed top-0 left-0 h-screen w-64 bg-[#050505] border-r border-white/5 flex flex-col p-4 z-50 transform transition-transform lg:translate-x-0 ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'}`}>
-        <div className="flex items-center justify-between mb-8">
+      <aside className={`fixed top-0 left-0 h-screen w-64 bg-[#050505] border-r border-white/5 flex flex-col z-50 transform transition-transform lg:translate-x-0 ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'}`}>
+        {/* Logo header — fixed at top */}
+        <div className="flex items-center justify-between p-4 flex-shrink-0">
           <h1 className="text-xl font-bold text-[#D4AF37]" style={{ fontFamily: 'Playfair Display, serif' }}>BRANDING ARCHITECT</h1>
-          <button 
+          <button
             className="lg:hidden text-[#A3A3A3] hover:text-white"
             onClick={() => setSidebarOpen(false)}
           >
@@ -67,7 +68,8 @@ const Dashboard = () => {
           </button>
         </div>
 
-        <nav className="flex-1 space-y-2">
+        {/* Scrollable nav */}
+        <nav className="flex-1 overflow-y-auto px-4 pb-2 space-y-1 scrollbar-thin scrollbar-thumb-white/10 scrollbar-track-transparent">
           {menuItems.map((item) => {
             const Icon = item.icon;
             return (
@@ -84,17 +86,18 @@ const Dashboard = () => {
                     : 'text-[#A3A3A3] hover:text-white hover:bg-white/5'
                 }`}
               >
-                <Icon className="w-5 h-5" />
+                <Icon className="w-5 h-5 flex-shrink-0" />
                 {item.label}
               </button>
             );
           })}
         </nav>
 
-        <div className="border-t border-white/5 pt-4">
-          <div className="px-4 py-3 mb-2">
-            <p className="text-[#A3A3A3] text-sm">Logged in as</p>
-            <p className="text-white font-semibold">{user?.email}</p>
+        {/* Logout — always visible at bottom */}
+        <div className="border-t border-white/5 p-4 flex-shrink-0">
+          <div className="px-4 py-2 mb-2">
+            <p className="text-[#A3A3A3] text-xs">Logged in as</p>
+            <p className="text-white text-sm font-semibold truncate">{user?.email}</p>
           </div>
           <button
             data-testid="logout-btn"

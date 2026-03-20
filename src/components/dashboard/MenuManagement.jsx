@@ -3,9 +3,9 @@ import { useAuth } from '../../contexts/AuthContext';
 import { useCollection, useDocument } from '../../hooks/useFirestore';
 import { where, addDoc, collection, doc, updateDoc, deleteDoc } from 'firebase/firestore';
 import { db } from '../../lib/firebase';
-import { uploadImage } from '../../utils/uploadImage';
 import { Plus, Edit, Trash2, X, RefreshCw } from 'lucide-react';
 import { toast } from 'sonner';
+import MediaUpload, { MediaPreview } from '../MediaUpload';
 
 const MenuManagement = () => {
   const { user } = useAuth();
@@ -14,9 +14,7 @@ const MenuManagement = () => {
   const CUR = cafe?.currencySymbol || '₹';
   const [showForm, setShowForm] = useState(false);
   const [editingItem, setEditingItem] = useState(null);
-  const [uploading, setUploading] = useState(false);
-  const [uploadProgress, setUploadProgress] = useState(0);
-  const [selectedFile, setSelectedFile] = useState(null);
+  const [saving, setSaving] = useState(false);
 
   const [formData, setFormData] = useState({
     name: '', price: '', category: '', image: '', available: true
@@ -27,61 +25,18 @@ const MenuManagement = () => {
     cafeId ? [where('cafeId', '==', cafeId)] : []
   );
 
-  // ─── File selection (does NOT upload yet) ─────────────────────────────────
-  const handleFileSelect = (e) => {
-    const file = e.target.files[0];
-    if (!file) return;
-
-    if (!file.type.startsWith('image/')) {
-      toast.error('Please select an image file (JPG, PNG, WebP)');
-      e.target.value = '';
-      return;
-    }
-    if (file.size > 5 * 1024 * 1024) {
-      toast.error('Image must be under 5MB');
-      e.target.value = '';
-      return;
-    }
-    setSelectedFile(file);
-  };
-
   // ─── Upload + Save ─────────────────────────────────────────────────────────
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!cafeId) { toast.error('Cafe ID not found — please refresh'); return; }
 
-    setUploading(true);
-    setUploadProgress(0);
-    let imageUrl = formData.image; // keep existing URL if no new file chosen
-
+    setSaving(true);
     try {
-      // Step 1: Upload image if a new file was selected
-      if (selectedFile) {
-        const toastId = toast.loading('Uploading image... 0%');
-        try {
-          const path = `menu/${cafeId}/${Date.now()}_${selectedFile.name}`;
-          imageUrl = await uploadImage(selectedFile, path, (pct) => {
-            setUploadProgress(pct);
-            if (pct < 30) toast.loading('Starting upload...', { id: toastId });
-            else if (pct < 50) toast.loading('Uploading image...', { id: toastId });
-            else if (pct < 90) toast.loading(`Uploading... ${pct}%`, { id: toastId });
-            else toast.loading('Finalizing upload...', { id: toastId });
-          });
-          toast.success('Image uploaded!', { id: toastId });
-        } catch (uploadError) {
-          toast.error(`Image upload failed: ${uploadError.message}`, { id: toastId });
-          setUploading(false);
-          setUploadProgress(0);
-          return; // Stop — don't save item without image if one was selected
-        }
-      }
-
-      // Step 2: Save to Firestore
       const itemData = {
-        name: formData.name,
-        price: parseFloat(formData.price),
-        category: formData.category,
-        image: imageUrl,
+        name:      formData.name,
+        price:     parseFloat(formData.price),
+        category:  formData.category,
+        image:     formData.image,
         available: formData.available,
         cafeId,
       };
@@ -93,26 +48,22 @@ const MenuManagement = () => {
         await addDoc(collection(db, 'menuItems'), itemData);
         toast.success('Menu item added ✓');
       }
-
       resetForm();
-
     } catch (error) {
       console.error('Save error:', error);
       toast.error('Failed to save item: ' + (error.message || 'Unknown error'));
     } finally {
-      setUploading(false);
-      setUploadProgress(0);
+      setSaving(false);
     }
   };
 
   const handleEdit = (item) => {
     setEditingItem(item);
-    setSelectedFile(null);
     setFormData({
-      name: item.name,
-      price: item.price,
-      category: item.category || '',
-      image: item.image || '',
+      name:      item.name,
+      price:     item.price,
+      category:  item.category || '',
+      image:     item.image || '',
       available: item.available,
     });
     setShowForm(true);
@@ -139,8 +90,7 @@ const MenuManagement = () => {
   const resetForm = () => {
     setFormData({ name: '', price: '', category: '', image: '', available: true });
     setEditingItem(null);
-    setSelectedFile(null);
-    setUploadProgress(0);
+    setSaving(false);
     setShowForm(false);
   };
 
@@ -168,7 +118,7 @@ const MenuManagement = () => {
             <h3 className="text-xl font-semibold text-white" style={{ fontFamily: 'Playfair Display, serif' }}>
               {editingItem ? 'Edit Menu Item' : 'Add New Menu Item'}
             </h3>
-            <button onClick={resetForm} disabled={uploading} className="text-[#A3A3A3] hover:text-white transition-colors disabled:opacity-50">
+            <button onClick={resetForm} disabled={saving} className="text-[#A3A3A3] hover:text-white transition-colors disabled:opacity-50">
               <X className="w-6 h-6" />
             </button>
           </div>
@@ -184,7 +134,7 @@ const MenuManagement = () => {
                 className="w-full bg-black/20 border border-white/10 text-white placeholder:text-neutral-600 focus:border-[#D4AF37] focus:ring-1 focus:ring-[#D4AF37] rounded-sm h-12 px-4 transition-all"
                 placeholder="e.g., Espresso"
                 required
-                disabled={uploading}
+                disabled={saving}
               />
             </div>
 
@@ -200,7 +150,7 @@ const MenuManagement = () => {
                   className="w-full bg-black/20 border border-white/10 text-white placeholder:text-neutral-600 focus:border-[#D4AF37] focus:ring-1 focus:ring-[#D4AF37] rounded-sm h-12 px-4 transition-all"
                   placeholder="99"
                   required
-                  disabled={uploading}
+                  disabled={saving}
                 />
               </div>
               <div>
@@ -211,45 +161,20 @@ const MenuManagement = () => {
                   onChange={(e) => setFormData(prev => ({ ...prev, category: e.target.value }))}
                   className="w-full bg-black/20 border border-white/10 text-white placeholder:text-neutral-600 focus:border-[#D4AF37] focus:ring-1 focus:ring-[#D4AF37] rounded-sm h-12 px-4 transition-all"
                   placeholder="e.g., Coffee"
-                  disabled={uploading}
+                  disabled={saving}
                 />
               </div>
             </div>
 
-            {/* Image */}
-            <div>
-              <label className="block text-white text-sm font-medium mb-2">Image</label>
-              <input
-                type="file"
-                accept="image/*"
-                onChange={handleFileSelect}
-                disabled={uploading}
-                className="w-full bg-black/20 border border-white/10 text-white rounded-sm px-4 py-3 file:mr-4 file:py-2 file:px-4 file:rounded-sm file:border-0 file:bg-[#D4AF37] file:text-black file:font-semibold hover:file:bg-[#C5A059] transition-all disabled:opacity-50"
-              />
-              {/* Show selected file name */}
-              {selectedFile && (
-                <p className="text-sm text-[#D4AF37] mt-1">Selected: {selectedFile.name} ({(selectedFile.size / 1024).toFixed(0)} KB)</p>
-              )}
-              {/* Show existing image preview */}
-              {formData.image && !selectedFile && (
-                <div className="mt-2">
-                  <p className="text-xs text-[#A3A3A3] mb-1">Current image:</p>
-                  <img src={formData.image} alt="Current" className="w-24 h-24 object-cover rounded-sm border border-white/10" />
-                </div>
-              )}
-              {/* Upload progress bar */}
-              {uploading && uploadProgress > 0 && (
-                <div className="mt-2">
-                  <div className="w-full bg-white/10 rounded-full h-2">
-                    <div
-                      className="bg-[#D4AF37] h-2 rounded-full transition-all duration-300"
-                      style={{ width: `${uploadProgress}%` }}
-                    />
-                  </div>
-                  <p className="text-xs text-[#A3A3A3] mt-1">{uploadProgress}% uploaded</p>
-                </div>
-              )}
-            </div>
+            {/* Media Upload — supports image, gif, mp4 */}
+            <MediaUpload
+              label="Item Media (Image / GIF / Video)"
+              value={formData.image}
+              onChange={(url) => setFormData(prev => ({ ...prev, image: url }))}
+              storagePath={`menu/${cafeId}`}
+              maxSizeMB={20}
+              disabled={saving}
+            />
 
             {/* Available checkbox */}
             <div className="flex items-center gap-3">
@@ -257,7 +182,7 @@ const MenuManagement = () => {
                 type="checkbox"
                 checked={formData.available}
                 onChange={(e) => setFormData(prev => ({ ...prev, available: e.target.checked }))}
-                disabled={uploading}
+                disabled={saving}
                 className="w-5 h-5 rounded border-white/10 bg-black/20 text-[#D4AF37] focus:ring-[#D4AF37]"
               />
               <label className="text-white">Available for order</label>
@@ -267,16 +192,16 @@ const MenuManagement = () => {
             <div className="flex gap-3">
               <button
                 type="submit"
-                disabled={uploading}
+                disabled={saving}
                 className="bg-[#D4AF37] text-black hover:bg-[#C5A059] rounded-sm px-6 py-3 font-semibold transition-all duration-300 disabled:opacity-60 disabled:cursor-not-allowed flex items-center gap-2"
               >
-                {uploading && <RefreshCw className="w-4 h-4 animate-spin" />}
-                {buttonLabel()}
+                {saving && <RefreshCw className="w-4 h-4 animate-spin" />}
+                {saving ? 'Saving...' : editingItem ? 'Update Item' : 'Add Item'}
               </button>
               <button
                 type="button"
                 onClick={resetForm}
-                disabled={uploading}
+                disabled={saving}
                 className="bg-transparent border border-white/10 text-white hover:bg-white/5 rounded-sm px-6 py-3 font-semibold transition-all disabled:opacity-50"
               >
                 Cancel
@@ -295,7 +220,11 @@ const MenuManagement = () => {
             <div key={item.id} className="bg-[#0F0F0F] border border-white/5 rounded-sm overflow-hidden hover:border-white/10 transition-colors">
               {item.image && (
                 <div className="aspect-video overflow-hidden">
-                  <img src={item.image} alt={item.name} className="w-full h-full object-cover" />
+                  <MediaPreview
+                    url={item.image}
+                    alt={item.name}
+                    className="w-full h-full"
+                  />
                 </div>
               )}
               <div className="p-6">
