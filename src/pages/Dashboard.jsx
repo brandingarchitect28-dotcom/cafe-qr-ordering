@@ -3,7 +3,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { signOut } from 'firebase/auth';
 import { auth } from '../lib/firebase';
 import { useNavigate } from 'react-router-dom';
-import { LayoutDashboard, ShoppingBag, Menu as MenuIcon, Gift, BarChart3, Settings as SettingsIcon, QrCode, LogOut, X, UtensilsCrossed, ExternalLink, Boxes } from 'lucide-react';
+import { LayoutDashboard, ShoppingBag, Menu as MenuIcon, Gift, BarChart3, Settings as SettingsIcon, QrCode, LogOut, X, UtensilsCrossed, ExternalLink, Boxes, Sparkles, Upload } from 'lucide-react';
 import Overview from '../components/dashboard/Overview';
 import OrdersManagement from '../components/dashboard/OrdersManagement';
 import MenuManagement from '../components/dashboard/MenuManagement';
@@ -13,6 +13,8 @@ import Settings from '../components/dashboard/Settings';
 import QRGenerator from '../components/dashboard/QRGenerator';
 import KitchenDashboardTab from '../components/dashboard/KitchenDashboardTab';
 import InventoryManagement from '../components/dashboard/InventoryManagement';
+import AIInsights from '../components/dashboard/AIInsights';
+import AIMenuUpload from '../components/dashboard/AIMenuUpload';
 
 const Dashboard = () => {
   const { user } = useAuth();
@@ -37,6 +39,8 @@ const Dashboard = () => {
     { id: 'analytics',  label: 'Analytics',  icon: BarChart3       },
     { id: 'kitchen',    label: 'Kitchen',    icon: UtensilsCrossed },
     { id: 'inventory',  label: 'Inventory',  icon: Boxes           },
+    { id: 'ai',         label: 'AI Insights',icon: Sparkles        },
+    { id: 'aimenu',     label: 'AI Menu',    icon: Upload          },
     { id: 'qr',         label: 'QR Code',    icon: QrCode          },
     { id: 'settings',   label: 'Settings',   icon: SettingsIcon    },
   ];
@@ -128,6 +132,8 @@ const Dashboard = () => {
           {activeTab === 'analytics'  && <Analytics />}
           {activeTab === 'kitchen'    && <KitchenDashboardTab />}
           {activeTab === 'inventory'  && <InventoryManagement />}
+          {activeTab === 'ai'         && <AIInsights />}
+          {activeTab === 'aimenu'     && <AIMenuUpload onClose={() => setActiveTab('menu')} />}
           {activeTab === 'qr'         && <QRGenerator />}
           {activeTab === 'settings'   && <Settings />}
         </main>

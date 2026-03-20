@@ -1,14 +1,14 @@
 import React, { useState, useMemo, useEffect, useRef, useCallback } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
 import { useCollection, useDocument } from '../../hooks/useFirestore';
-import { where, doc, updateDoc } from 'firebase/firestore';
+import { where, doc, updateDoc, getDoc } from 'firebase/firestore';
 import { db } from '../../lib/firebase';
 import { AlertCircle, Search, Download, Phone, MapPin, Clock, Bell, Volume2, X, FileText, Eye, PlusCircle } from 'lucide-react';
 import { toast } from 'sonner';
 import { CSVLink } from 'react-csv';
 import { motion, AnimatePresence } from 'framer-motion';
 import InvoiceModal from './InvoiceModal';
-import { getInvoiceByOrderId } from '../../services/invoiceService';
+import { getInvoiceByOrderId, getInvoiceById, ensureInvoiceForOrder } from '../../services/invoiceService';
 import ExternalOrderModal, { getSourceMeta } from './ExternalOrderModal';
 
 // Notification sound (base64 encoded short beep)
@@ -132,6 +132,33 @@ const OrdersManagement = () => {
     try {
       await updateDoc(doc(db, 'orders', orderId), { paymentStatus: status });
       toast.success('Payment status updated');
+
+      // ── Auto-generate invoice when payment becomes paid ──────────────
+      // Safe: ensureInvoiceForOrder is idempotent — skips if invoice exists
+      if (status === 'paid') {
+        // Find the order from already-loaded list (no extra Firestore read)
+        const order = orders?.find(o => o.id === orderId);
+        if (order) {
+          // Fetch cafe data for tax/GST settings (needed for invoice amounts)
+          let cafeData = cafe;
+          if (!cafeData && cafeId) {
+            try {
+              const cafeSnap = await getDoc(doc(db, 'cafes', cafeId));
+              if (cafeSnap.exists()) cafeData = cafeSnap.data();
+            } catch (_) { /* non-fatal */ }
+          }
+          // Non-blocking — never delays the UI
+          ensureInvoiceForOrder(orderId, { ...order, paymentStatus: 'paid' }, cafeData)
+            .then(({ invoiceId, skipped, error }) => {
+              if (error) {
+                console.error('[Orders] Invoice generation failed (non-fatal):', error);
+              } else if (!skipped) {
+                toast.success('Invoice generated ✓');
+              }
+            })
+            .catch(err => console.error('[Orders] ensureInvoiceForOrder threw (non-fatal):', err));
+        }
+      }
     } catch (error) {
       console.error('Error updating payment:', error);
       toast.error('Failed to update payment');
@@ -231,21 +258,52 @@ const OrdersManagement = () => {
   const handleViewInvoice = async (orderId, e) => {
     e.stopPropagation();
     setInvoiceLoading(orderId);
-    const { data, error } = await getInvoiceByOrderId(orderId);
-    setInvoiceLoading(null);
-    if (error) { toast.error('Could not load invoice'); return; }
-    if (!data) { toast.error('Invoice not generated yet — try again in a moment'); return; }
-    setViewingInvoice(data);
+
+    try {
+      // Fast path — use invoiceId directly from order doc if available
+      const order = orders?.find(o => o.id === orderId);
+      let data, error;
+
+      if (order?.invoiceId) {
+        ({ data, error } = await getInvoiceById(order.invoiceId));
+      } else {
+        ({ data, error } = await getInvoiceByOrderId(orderId));
+      }
+
+      if (error) { toast.error('Invoice could not be loaded.'); return; }
+      if (!data)  { toast.info('Invoice still generating. Please try again in a moment.'); return; }
+      setViewingInvoice(data);
+    } catch (err) {
+      toast.error('Invoice could not be loaded.');
+    } finally {
+      setInvoiceLoading(null);
+    }
   };
 
   const handleDownloadInvoice = async (orderId, e) => {
     e.stopPropagation();
     setInvoiceLoading(orderId);
-    const { data, error } = await getInvoiceByOrderId(orderId);
-    setInvoiceLoading(null);
-    if (error || !data) { toast.error('Invoice not available yet — try again in a moment'); return; }
-    // Open invoice modal; user clicks "Download PDF" inside it
-    setViewingInvoice(data);
+
+    try {
+      const order = orders?.find(o => o.id === orderId);
+      let data, error;
+
+      if (order?.invoiceId) {
+        ({ data, error } = await getInvoiceById(order.invoiceId));
+      } else {
+        ({ data, error } = await getInvoiceByOrderId(orderId));
+      }
+
+      if (error || !data) {
+        toast.info('Invoice still generating. Please try again in a moment.');
+        return;
+      }
+      setViewingInvoice(data);
+    } catch (err) {
+      toast.error('Invoice could not be loaded.');
+    } finally {
+      setInvoiceLoading(null);
+    }
   };
 
   return (
@@ -507,26 +565,34 @@ const OrdersManagement = () => {
                             </div>
                             {/* ── Feature 1: Invoice Buttons ── */}
                             <div className="flex gap-1.5">
-                              <button
-                                onClick={(e) => handleViewInvoice(order.id, e)}
-                                disabled={invoiceLoading === order.id}
-                                data-testid={`view-invoice-${order.id}`}
-                                className="flex items-center gap-1 px-2.5 py-1.5 bg-[#D4AF37]/10 hover:bg-[#D4AF37]/20 border border-[#D4AF37]/30 text-[#D4AF37] rounded text-xs font-medium transition-all disabled:opacity-50"
-                                title="View Invoice"
-                              >
-                                <Eye className="w-3 h-3" />
-                                {invoiceLoading === order.id ? '...' : 'Invoice'}
-                              </button>
-                              <button
-                                onClick={(e) => handleDownloadInvoice(order.id, e)}
-                                disabled={invoiceLoading === order.id}
-                                data-testid={`download-invoice-${order.id}`}
-                                className="flex items-center gap-1 px-2.5 py-1.5 bg-white/5 hover:bg-white/10 border border-white/10 text-[#A3A3A3] hover:text-white rounded text-xs font-medium transition-all disabled:opacity-50"
-                                title="Download PDF"
-                              >
-                                <FileText className="w-3 h-3" />
-                                PDF
-                              </button>
+                              {order.invoiceId || order.paymentStatus !== 'pending' ? (
+                                <>
+                                  <button
+                                    onClick={(e) => handleViewInvoice(order.id, e)}
+                                    disabled={invoiceLoading === order.id}
+                                    data-testid={`view-invoice-${order.id}`}
+                                    className="flex items-center gap-1 px-2.5 py-1.5 bg-[#D4AF37]/10 hover:bg-[#D4AF37]/20 border border-[#D4AF37]/30 text-[#D4AF37] rounded text-xs font-medium transition-all disabled:opacity-50"
+                                    title="View Invoice"
+                                  >
+                                    <Eye className="w-3 h-3" />
+                                    {invoiceLoading === order.id ? '...' : 'Invoice'}
+                                  </button>
+                                  <button
+                                    onClick={(e) => handleDownloadInvoice(order.id, e)}
+                                    disabled={invoiceLoading === order.id}
+                                    data-testid={`download-invoice-${order.id}`}
+                                    className="flex items-center gap-1 px-2.5 py-1.5 bg-white/5 hover:bg-white/10 border border-white/10 text-[#A3A3A3] hover:text-white rounded text-xs font-medium transition-all disabled:opacity-50"
+                                    title="Download PDF"
+                                  >
+                                    <FileText className="w-3 h-3" />
+                                    PDF
+                                  </button>
+                                </>
+                              ) : (
+                                <span className="text-[#555] text-xs italic px-1 py-1.5">
+                                  Invoice generating…
+                                </span>
+                              )}
                             </div>
                           </div>
                         </td>
@@ -685,22 +751,30 @@ const OrdersManagement = () => {
                     </div>
                     {/* ── Feature 1: Invoice Buttons (mobile) ── */}
                     <div className="flex gap-2" onClick={(e) => e.stopPropagation()}>
-                      <button
-                        onClick={(e) => handleViewInvoice(order.id, e)}
-                        disabled={invoiceLoading === order.id}
-                        className="flex-1 flex items-center justify-center gap-2 py-2.5 bg-[#D4AF37]/10 hover:bg-[#D4AF37]/20 border border-[#D4AF37]/30 text-[#D4AF37] rounded text-sm font-medium transition-all disabled:opacity-50"
-                      >
-                        <Eye className="w-4 h-4" />
-                        {invoiceLoading === order.id ? 'Loading…' : 'View Invoice'}
-                      </button>
-                      <button
-                        onClick={(e) => handleDownloadInvoice(order.id, e)}
-                        disabled={invoiceLoading === order.id}
-                        className="flex-1 flex items-center justify-center gap-2 py-2.5 bg-white/5 hover:bg-white/10 border border-white/10 text-[#A3A3A3] hover:text-white rounded text-sm font-medium transition-all disabled:opacity-50"
-                      >
-                        <FileText className="w-4 h-4" />
-                        Download PDF
-                      </button>
+                      {order.invoiceId || order.paymentStatus !== 'pending' ? (
+                        <>
+                          <button
+                            onClick={(e) => handleViewInvoice(order.id, e)}
+                            disabled={invoiceLoading === order.id}
+                            className="flex-1 flex items-center justify-center gap-2 py-2.5 bg-[#D4AF37]/10 hover:bg-[#D4AF37]/20 border border-[#D4AF37]/30 text-[#D4AF37] rounded text-sm font-medium transition-all disabled:opacity-50"
+                          >
+                            <Eye className="w-4 h-4" />
+                            {invoiceLoading === order.id ? 'Loading…' : 'View Invoice'}
+                          </button>
+                          <button
+                            onClick={(e) => handleDownloadInvoice(order.id, e)}
+                            disabled={invoiceLoading === order.id}
+                            className="flex-1 flex items-center justify-center gap-2 py-2.5 bg-white/5 hover:bg-white/10 border border-white/10 text-[#A3A3A3] hover:text-white rounded text-sm font-medium transition-all disabled:opacity-50"
+                          >
+                            <FileText className="w-4 h-4" />
+                            Download PDF
+                          </button>
+                        </>
+                      ) : (
+                        <p className="text-[#555] text-xs italic py-2">
+                          Invoice generating… please wait.
+                        </p>
+                      )}
                     </div>
                   </div>
                 )}

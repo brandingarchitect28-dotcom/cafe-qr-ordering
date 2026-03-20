@@ -668,6 +668,31 @@ const CafeOrdering = () => {
     );
   }
 
+  // ── isActive gate — show service unavailable if admin disabled this café ──
+  if (cafe.isActive === false) {
+    return (
+      <div className="min-h-screen flex items-center justify-center" style={{ backgroundColor: defaultColors.background }}>
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="text-center p-8 max-w-sm"
+        >
+          <div className="w-20 h-20 rounded-full mx-auto mb-5 flex items-center justify-center"
+            style={{ background: `${defaultColors.primary}15`, border: `2px solid ${defaultColors.primary}30` }}>
+            <Coffee className="w-10 h-10" style={{ color: defaultColors.primary }} />
+          </div>
+          <h1 className="text-2xl font-bold mb-3"
+            style={{ fontFamily: 'Playfair Display, serif', color: defaultColors.text }}>
+            Service Temporarily Unavailable
+          </h1>
+          <p className="text-sm leading-relaxed" style={{ color: defaultColors.textMuted }}>
+            We're sorry — this café is currently not accepting online orders. Please visit us in person or try again later.
+          </p>
+        </motion.div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen" style={{ backgroundColor: COLORS.background, fontFamily: 'Inter, sans-serif' }}>
       

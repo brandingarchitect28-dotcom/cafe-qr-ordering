@@ -134,5 +134,17 @@ service cloud.firestore {
       allow delete: if isAdmin() ||
         (isAuthenticated() && isCafeOwner(resource.data.cafeId));
     }
+
+    // ── systemConfig — admin only (encrypted API keys) ──
+    match /systemConfig/{docId} {
+      allow read, write: if isAdmin();
+    }
+
+    // ── AI Insights cache per café ──
+    match /cafes/{cafeId}/aiCache/{docId} {
+      allow read: if isAdmin() ||
+        (isAuthenticated() && isCafeOwner(cafeId));
+      allow write: if true; // written server-side by Cloud Function
+    }
   }
 }

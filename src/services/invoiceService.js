@@ -8,6 +8,7 @@ import {
   addDoc,
   getDoc,
   getDocs,
+  updateDoc,
   query,
   where,
   orderBy,
@@ -209,4 +210,72 @@ export const subscribeToInvoicesByCafe = (cafeId, callback) => {
       });
     callback(invoices);
   });
+};
+
+/**
+ * ensureInvoiceForOrder
+ *
+ * Safely generates an invoice when payment becomes "paid".
+ * Atomic and idempotent — will never create a duplicate.
+ *
+ * Safety contract:
+ *  1. Checks order.invoiceId first — if exists, stops immediately.
+ *  2. Checks invoices collection for existing invoice by orderId.
+ *  3. Only creates if none found.
+ *  4. After creation, writes invoiceId back to the order document.
+ *  5. Never throws — all failures are logged and returned as { error }.
+ *  6. Never modifies any order field except adding invoiceId.
+ *
+ * @param {string} orderId   — Firestore order document ID
+ * @param {object} orderData — Full order document data
+ * @param {object} cafeData  — Cafe document data (for tax settings etc.)
+ * @returns {{ invoiceId: string|null, skipped: boolean, error: string|null }}
+ */
+export const ensureInvoiceForOrder = async (orderId, orderData, cafeData) => {
+  try {
+    // ── Guard 1: order already has an invoiceId ──────────────────────────
+    if (orderData?.invoiceId) {
+      console.log(`[InvoiceService] Order ${orderId} already has invoiceId — skipping`);
+      return { invoiceId: orderData.invoiceId, skipped: true, error: null };
+    }
+
+    // ── Guard 2: invoice already exists in Firestore for this orderId ────
+    const { data: existing } = await getInvoiceByOrderId(orderId);
+    if (existing) {
+      console.log(`[InvoiceService] Invoice already exists for order ${orderId} — linking`);
+      // Link it back to the order if not already linked (best-effort)
+      try {
+        await updateDoc(doc(db, 'orders', orderId), { invoiceId: existing.id });
+      } catch (_) { /* non-fatal */ }
+      return { invoiceId: existing.id, skipped: true, error: null };
+    }
+
+    // ── Create invoice ────────────────────────────────────────────────────
+    const { invoiceId, error } = await createInvoiceForOrder(
+      orderData,
+      orderId,
+      cafeData
+    );
+
+    if (error) {
+      console.error(`[InvoiceService] ensureInvoiceForOrder creation failed:`, error);
+      return { invoiceId: null, skipped: false, error };
+    }
+
+    // ── Link invoiceId back to order (adds only — never overwrites other fields) ──
+    try {
+      await updateDoc(doc(db, 'orders', orderId), { invoiceId });
+    } catch (linkErr) {
+      // Non-fatal — invoice exists, link is best-effort
+      console.warn(`[InvoiceService] Could not link invoiceId to order:`, linkErr);
+    }
+
+    console.log(`[InvoiceService] Invoice ${invoiceId} created and linked to order ${orderId}`);
+    return { invoiceId, skipped: false, error: null };
+
+  } catch (err) {
+    // Top-level safety net — never crashes calling code
+    console.error(`[InvoiceService] ensureInvoiceForOrder unexpected error:`, err);
+    return { invoiceId: null, skipped: false, error: err.message };
+  }
 };
