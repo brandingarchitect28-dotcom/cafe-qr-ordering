@@ -16,9 +16,6 @@
  */
 
 import React, { useState, useRef } from 'react';
-import { uploadImage } from '../utils/uploadImage';
-import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
-import { storage } from '../config/firebase';
 import { motion, AnimatePresence } from 'framer-motion';
 import { toast } from 'sonner';
 import { Upload, X, Film, Image, RefreshCw } from 'lucide-react';
@@ -41,7 +38,44 @@ export const getFileMediaType = (file) => {
   return null;
 };
 
-// Upload video via REST API (SDK doesn't support progress for large files well)
+// Upload ANY file via Firebase SDK resumable upload (works for images, GIFs, and videos)
+async function uploadMediaSDK(file, storagePath, onProgress) {
+  const { ref, uploadBytesResumable, getDownloadURL } = await import('firebase/storage');
+  const { storage } = await import('../config/firebase');
+
+  const storageRef = ref(storage, storagePath);
+
+  return new Promise((resolve, reject) => {
+    const task = uploadBytesResumable(storageRef, file, { contentType: file.type });
+
+    task.on(
+      'state_changed',
+      (snap) => {
+        const pct = Math.round((snap.bytesTransferred / snap.totalBytes) * 100);
+        if (onProgress) onProgress(pct);
+      },
+      (error) => {
+        if (error.code === 'storage/unauthorized') {
+          reject(new Error('Permission denied — update Firebase Storage rules'));
+        } else if (error.code === 'storage/canceled') {
+          reject(new Error('Upload cancelled'));
+        } else {
+          reject(new Error(error.message || 'Upload failed'));
+        }
+      },
+      async () => {
+        try {
+          const url = await getDownloadURL(task.snapshot.ref);
+          resolve(url);
+        } catch (err) {
+          reject(new Error('Failed to get download URL: ' + err.message));
+        }
+      }
+    );
+  });
+}
+
+// REST fallback (used only if SDK fails)
 async function uploadVideoREST(file, storagePath) {
   const bucket = import.meta.env.VITE_FIREBASE_STORAGE_BUCKET;
   if (!bucket) throw new Error('VITE_FIREBASE_STORAGE_BUCKET not set');
@@ -149,7 +183,7 @@ const MediaUpload = ({
     const objectUrl = URL.createObjectURL(file);
     setLocalPreview(objectUrl);
 
-    // Upload
+    // Upload — use SDK resumable for all types, REST as fallback
     setUploading(true);
     setProgress(0);
     const toastId = toast.loading('Uploading...');
@@ -158,24 +192,34 @@ const MediaUpload = ({
       const path = `${storagePath}/${Date.now()}_${file.name}`;
       let url;
 
-      if (mediaType === 'video') {
-        // Video: use REST upload
-        setProgress(30);
-        toast.loading('Uploading video...', { id: toastId });
+      try {
+        // Primary: Firebase SDK resumable upload (handles images, GIFs, MP4)
+        url = await uploadMediaSDK(file, path, (pct) => {
+          setProgress(pct);
+          toast.loading(
+            mediaType === 'video'
+              ? `Uploading video... ${pct}%`
+              : `Uploading... ${pct}%`,
+            { id: toastId }
+          );
+        });
+      } catch (sdkErr) {
+        console.warn('[MediaUpload] SDK failed, trying REST fallback:', sdkErr.message);
+        // Fallback: REST API
+        setProgress(40);
+        toast.loading('Retrying upload...', { id: toastId });
         url = await uploadVideoREST(file, path);
         setProgress(100);
-      } else {
-        // Image / GIF: use existing uploadImage utility
-        url = await uploadImage(file, path, (pct) => {
-          setProgress(pct);
-          toast.loading(`Uploading... ${pct}%`, { id: toastId });
-        });
       }
 
       onChange(url);
-      toast.success(`${mediaType === 'video' ? 'Video' : 'Image'} uploaded ✓`, { id: toastId });
+      toast.success(
+        mediaType === 'video' ? 'Video uploaded ✓' : 'Image uploaded ✓',
+        { id: toastId }
+      );
     } catch (err) {
-      toast.error(err.message || 'Upload failed', { id: toastId });
+      console.error('[MediaUpload] All upload methods failed:', err);
+      toast.error(err.message || 'Upload failed — check internet and try again', { id: toastId });
       setLocalPreview(null);
     } finally {
       setUploading(false);
