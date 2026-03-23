@@ -531,8 +531,8 @@ const CafeOrderingPremium = () => {
       setPaymentMode('counter');
       setShowCheckout(false);
 
-      // Open WhatsApp for owner notification (new tab)
-      window.open(waUrl, '_blank');
+      // iOS-compatible WhatsApp redirect (window.open blocked by Safari)
+      window.location.href = waUrl;
 
       // Navigate customer to live order tracking
       navigate(`/track/${orderRef.id}`);

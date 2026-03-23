@@ -621,7 +621,7 @@ const OrdersManagement = () => {
                                           `*Total:* ${cur}${(order.totalAmount||order.total||0).toFixed(2)}\n` +
                                           `*Payment:* ${order.paymentStatus === 'paid' ? '✅ Paid' : '⏳ Pending'}\n` +
                                           `*Mode:* ${order.paymentMode||'counter'}`;
-                                        window.open(`https://wa.me/${phone}?text=${encodeURIComponent(msg)}`, '_blank');
+                                        window.location.href = `https://wa.me/${phone}?text=${encodeURIComponent(msg)}`;
                                       }}
                                       data-testid={`wa-invoice-${order.id}`}
                                       className="flex items-center gap-1 px-2.5 py-1.5 bg-green-500/10 hover:bg-green-500/20 border border-green-500/20 text-green-400 rounded text-xs font-medium transition-all"

@@ -224,6 +224,11 @@ const KitchenDisplay = () => {
   const [advancing,   setAdvancing   ] = useState(null);  // orderId being mutated
   const [ticker,      setTicker      ] = useState(0);     // forces clock re-render
 
+  // ── Pagination: track current page per column ─────────────────────────────
+  const PAGE_SIZE = 20; // show 20 cards per column — handles 300+ orders without lag
+  const [colPages, setColPages] = useState({ new: 0, preparing: 0, ready: 0 });
+  const setColPage = (colId, page) => setColPages(prev => ({ ...prev, [colId]: page }));
+
   const prevOrderIdsRef = useRef(new Set());
   const notifyAudioRef  = useRef(null);
 
@@ -264,17 +269,11 @@ const KitchenDisplay = () => {
     );
 
     const unsub = onSnapshot(q, snap => {
-      const incoming = snap.docs
+      const incoming   = snap.docs
         .map(d => ({ id: d.id, ...d.data() }))
-        .filter(o => o.orderStatus !== 'completed' && o.orderStatus !== 'cancelled')
-        .sort((a, b) => {
-          const ta = a.createdAt?.toDate?.() || new Date(0);
-          const tb = b.createdAt?.toDate?.() || new Date(0);
-          return ta - tb;   // oldest first inside each column
-        });
-
-      // Detect brand-new orders → play sound notification
+        .filter(o => o.orderStatus !== 'completed' && o.orderStatus !== 'cancelled');
       const incomingIds = new Set(incoming.map(o => o.id));
+
       if (prevOrderIdsRef.current.size > 0) {
         const newOnes = incoming.filter(o => !prevOrderIdsRef.current.has(o.id));
         if (newOnes.length > 0) {
@@ -285,6 +284,8 @@ const KitchenDisplay = () => {
               { duration: 6000, icon: '🍽️' }
             );
           });
+          // Jump to page 0 so new orders are visible at the top
+          setColPages({ new: 0, preparing: 0, ready: 0 });
         }
       }
       prevOrderIdsRef.current = incomingIds;
@@ -336,11 +337,28 @@ const KitchenDisplay = () => {
     }
   };
 
-  // ── derived column data ───────────────────────────────────────────────────
-  const columns = COLUMNS.map(col => ({
-    ...col,
-    orders: orders.filter(o => o.orderStatus === col.id),
-  }));
+  // ── derived column data with pagination ──────────────────────────────────
+  const columns = COLUMNS.map(col => {
+    const allColOrders = orders
+      .filter(o => o.orderStatus === col.id)
+      .sort((a, b) => {
+        // Newest orders on top (descending)
+        const ta = a.createdAt?.toDate?.() || new Date(0);
+        const tb = b.createdAt?.toDate?.() || new Date(0);
+        return tb - ta;
+      });
+    const page      = colPages[col.id] || 0;
+    const totalPages = Math.ceil(allColOrders.length / PAGE_SIZE) || 1;
+    const pageOrders = allColOrders.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE);
+    return {
+      ...col,
+      orders:     pageOrders,
+      allOrders:  allColOrders,
+      totalCount: allColOrders.length,
+      page,
+      totalPages,
+    };
+  });
 
   const totalActive = orders.length;
 
@@ -512,6 +530,32 @@ const KitchenDisplay = () => {
                 )}
               </AnimatePresence>
             </div>
+
+            {/* Pagination controls — only shown when column has >PAGE_SIZE orders */}
+            {col.totalCount > PAGE_SIZE && (
+              <div className="flex items-center justify-between px-3 py-2 border-t"
+                style={{ borderColor: col.border, background: col.bg }}>
+                <button
+                  onClick={() => setColPage(col.id, Math.max(0, col.page - 1))}
+                  disabled={col.page === 0}
+                  className="px-3 py-1 rounded text-xs font-bold transition-all disabled:opacity-30"
+                  style={{ background: col.page === 0 ? 'transparent' : col.accent + '20', color: col.accent }}
+                >
+                  ← Prev
+                </button>
+                <span className="text-xs" style={{ color: col.accent + 'aa' }}>
+                  {col.page + 1} / {col.totalPages} · {col.totalCount} orders
+                </span>
+                <button
+                  onClick={() => setColPage(col.id, Math.min(col.totalPages - 1, col.page + 1))}
+                  disabled={col.page >= col.totalPages - 1}
+                  className="px-3 py-1 rounded text-xs font-bold transition-all disabled:opacity-30"
+                  style={{ background: col.page >= col.totalPages - 1 ? 'transparent' : col.accent + '20', color: col.accent }}
+                >
+                  Next →
+                </button>
+              </div>
+            )}
           </div>
         ))}
       </div>

@@ -257,7 +257,7 @@ const InvoiceModal = ({ invoice, onClose }) => {
                     `Invoice No: ${invoice.invoiceNumber}\n` +
                     `Amount: ${invoice.currencySymbol || '₹'}${(parseFloat(invoice.totalAmount) || 0).toFixed(2)}\n\n` +
                     `View invoice: ${url}`;
-                  window.open(`https://wa.me/${(invoice.customerPhone || '').replace(/\D/g, '')}?text=${encodeURIComponent(msg)}`, '_blank');
+                  window.location.href = `https://wa.me/${(invoice.customerPhone || '').replace(/\D/g, '')}?text=${encodeURIComponent(msg)}`;
                 }}
                 className="flex items-center gap-2 px-3 py-2 bg-green-600 hover:bg-green-700 text-white font-semibold rounded-lg text-sm transition-all"
                 title="Send invoice via WhatsApp"

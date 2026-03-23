@@ -146,8 +146,12 @@ const AdvancedAnalytics = () => {
   const handleWA = () => {
     if (!data) { toast.error('No data'); return; }
     const msg = buildWhatsAppReport(data, cafe, fromDate, toDate);
-    const phone = cafe?.whatsappNumber || '';
-    window.open(phone ? `https://wa.me/${phone.replace(/\D/g,'')}?text=${encodeURIComponent(msg)}` : `https://wa.me/?text=${encodeURIComponent(msg)}`, '_blank');
+    const phone = (cafe?.whatsappNumber || '').replace(/\D/g, '');
+    const url = phone
+      ? `https://wa.me/${phone}?text=${encodeURIComponent(msg)}`
+      : `https://wa.me/?text=${encodeURIComponent(msg)}`;
+    // iOS-compatible: window.open is blocked by Safari
+    window.location.href = url;
   };
 
   const inputCls = 'bg-black/20 border border-white/10 text-white rounded-sm px-3 h-9 text-sm focus:border-[#D4AF37] outline-none';
