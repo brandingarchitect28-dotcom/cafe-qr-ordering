@@ -146,5 +146,45 @@ service cloud.firestore {
         (isAuthenticated() && isCafeOwner(cafeId));
       allow write: if true; // written server-side by Cloud Function
     }
+
+    // ── Task 10: Queue collection — Cloud Functions process these ──
+    match /queues/{jobId} {
+      allow read:   if isAdmin();
+      allow create: if isAuthenticated(); // cafe owners can enqueue jobs
+      allow update: if false;            // only Cloud Functions update status
+      allow delete: if isAdmin();
+    }
+
+    // ── Task 10: WhatsApp send logs ──
+    match /whatsappLogs/{logId} {
+      allow read:  if isAdmin() || (isAuthenticated() &&
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.cafeId ==
+        resource.data.cafeId);
+      allow write: if false; // written only by Cloud Functions
+    }
+
+    // ── Task 14: New café subcollections (systemType = "new") ──
+    match /cafes/{cafeId}/orders/{orderId} {
+      allow create: if true;
+      allow read:   if true;
+      allow update: if true;
+      allow delete: if isAdmin();
+    }
+
+    match /cafes/{cafeId}/menu/{itemId} {
+      allow read:   if true;
+      allow create, update: if isAdmin() || (isAuthenticated() && isCafeOwner(cafeId));
+      allow delete: if isAdmin() || (isAuthenticated() && isCafeOwner(cafeId));
+    }
+
+    match /cafes/{cafeId}/inventory/{itemId} {
+      allow read:   if isAdmin() || (isAuthenticated() && isCafeOwner(cafeId));
+      allow write:  if isAdmin() || (isAuthenticated() && isCafeOwner(cafeId));
+    }
+
+    match /cafes/{cafeId}/recipes/{recipeId} {
+      allow read:   if true;
+      allow write:  if isAdmin() || (isAuthenticated() && isCafeOwner(cafeId));
+    }
   }
 }

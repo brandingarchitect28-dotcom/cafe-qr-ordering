@@ -5,6 +5,8 @@ import { doc, getDoc } from 'firebase/firestore';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { AlertCircle } from 'lucide-react';
+import { AnimatePresence } from 'framer-motion';
+import ForgotPassword from '../components/ForgotPassword';
 
 const Login = () => {
   const [email, setEmail] = useState('');
@@ -13,6 +15,7 @@ const Login = () => {
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
   const { userRole } = useAuth();
+  const [showForgot, setShowForgot] = useState(false);
 
   React.useEffect(() => {
     if (userRole === 'admin') navigate('/admin');
@@ -130,9 +133,18 @@ const Login = () => {
             </div>
 
             <div>
-              <label className="block text-[#E5E5E5] text-sm font-medium mb-2" style={{ fontFamily: 'Manrope, sans-serif' }}>
-                Password
-              </label>
+              <div className="flex items-center justify-between mb-2">
+                <label className="block text-[#E5E5E5] text-sm font-medium" style={{ fontFamily: 'Manrope, sans-serif' }}>
+                  Password
+                </label>
+                <button
+                  type="button"
+                  onClick={() => setShowForgot(true)}
+                  className="text-[#D4AF37] hover:text-[#C5A059] text-xs transition-colors"
+                >
+                  Forgot password?
+                </button>
+              </div>
               <input
                 type="password"
                 data-testid="login-password-input"
@@ -156,6 +168,11 @@ const Login = () => {
           </form>
         </div>
       </div>
+
+      {/* Forgot Password Modal */}
+      <AnimatePresence>
+        {showForgot && <ForgotPassword onClose={() => setShowForgot(false)} />}
+      </AnimatePresence>
     </div>
   );
 };

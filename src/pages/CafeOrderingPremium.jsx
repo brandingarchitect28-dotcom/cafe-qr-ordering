@@ -16,7 +16,7 @@
 import React, {
   useState, useEffect, useMemo, useRef, useCallback,
 } from 'react';
-import { useParams } from 'react-router-dom';
+import { useParams, useNavigate } from 'react-router-dom';
 import {
   collection, query, where, doc, addDoc,
   serverTimestamp, runTransaction, onSnapshot,
@@ -290,6 +290,7 @@ MenuCard.displayName = 'MenuCard';
 
 const CafeOrderingPremium = () => {
   const { cafeId } = useParams();
+  const navigate   = useNavigate();
   const [cafe,          setCafe         ] = useState(null);
   const [menuItems,     setMenuItems    ] = useState([]);
   const [offers,        setOffers       ] = useState([]);
@@ -529,10 +530,12 @@ const CafeOrderingPremium = () => {
       setSpecialInstructions('');
       setPaymentMode('counter');
       setShowCheckout(false);
-      setOrderDone(true);
 
-      // Redirect to WhatsApp
-      window.location.href = waUrl;
+      // Open WhatsApp for owner notification (new tab)
+      window.open(waUrl, '_blank');
+
+      // Navigate customer to live order tracking
+      navigate(`/track/${orderRef.id}`);
     } catch (err) {
       toast.error('Failed to place order. Please try again.');
       console.error(err);

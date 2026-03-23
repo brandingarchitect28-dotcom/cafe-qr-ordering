@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
-import { useParams } from 'react-router-dom';
+import { useParams, useNavigate } from 'react-router-dom';
 import { collection, query, where, doc, addDoc, serverTimestamp, runTransaction, onSnapshot } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import { createInvoiceForOrder } from '../services/invoiceService';
@@ -117,6 +117,7 @@ const LoadingSkeleton = ({ message = "Loading...", colors }) => (
 
 const CafeOrdering = () => {
   const { cafeId } = useParams();
+  const navigate = useNavigate();
   const [cafe, setCafe] = useState(null);
   const [menuItems, setMenuItems] = useState([]);
   const [offers, setOffers] = useState([]);
@@ -623,8 +624,12 @@ const CafeOrdering = () => {
       setPaymentMode('counter');
       setSpecialInstructions('');
       setShowCheckout(false);
-      
-      window.location.href = whatsappUrl;
+
+      // Open WhatsApp for owner notification
+      window.open(whatsappUrl, '_blank');
+
+      // Navigate customer to live order tracking
+      navigate(`/track/${orderDocRef.id}`);
       
     } catch (error) {
       console.error('Error placing order:', error);

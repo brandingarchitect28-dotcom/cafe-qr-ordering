@@ -5,6 +5,7 @@ import { db } from '../../lib/firebase';
 import { uploadImage } from '../../utils/uploadImage';
 import { Save, Sun, Moon, ShoppingCart, Plus, Coffee, CreditCard, Eye, EyeOff, ShieldCheck, AlertTriangle } from 'lucide-react';
 import { toast } from 'sonner';
+import ChangePassword from './ChangePassword';
 
 const Settings = () => {
   const { user } = useAuth();
@@ -892,6 +893,9 @@ const Settings = () => {
       </div>
 
       {/* Save Button */}
+      {/* Change Password Section */}
+      <ChangePassword />
+
       <button
         onClick={handleSave}
         disabled={saving || uploading}

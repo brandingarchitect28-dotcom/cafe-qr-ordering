@@ -437,3 +437,168 @@ exports.getCachedInsights = functions.https.onCall(async (data, context) => {
     generatedAt: cache.generatedAt?.toDate?.()?.toISOString(),
   };
 });
+
+// ═══════════════════════════════════════════════════════════════════════════
+// TASK 10: BACKGROUND QUEUE PROCESSOR
+// Collection: /queues/{jobId}
+// Triggered on new document creation. Handles:
+//  - invoice_generate: auto-generate invoice for order
+//  - whatsapp_send: log WhatsApp message sends
+// Features: retry on failure (max 3), idempotency via processedAt field
+// ═══════════════════════════════════════════════════════════════════════════
+
+exports.processQueue = functions.firestore
+  .document('queues/{jobId}')
+  .onCreate(async (snap, context) => {
+    const jobId = context.params.jobId;
+    const job   = snap.data();
+
+    // Idempotency: skip already processed jobs
+    if (job.processedAt || job.status === 'done') {
+      console.log(`[Queue] Job ${jobId} already processed, skipping`);
+      return null;
+    }
+
+    // Mark as processing
+    await snap.ref.update({ status: 'processing', startedAt: admin.firestore.FieldValue.serverTimestamp() });
+
+    const retries = job.retries || 0;
+    const MAX_RETRIES = 3;
+
+    try {
+      const { type, cafeId, orderId, orderData, cafeData } = job;
+
+      if (type === 'invoice_generate') {
+        // ── Generate invoice for order ───────────────────────────────────
+        if (!orderId || !orderData) throw new Error('Missing orderId or orderData');
+
+        const invoiceRef = db.collection('invoices').doc();
+
+        // Build invoice
+        const subtotal  = orderData.subtotalAmount  || orderData.total || 0;
+        const gstAmount = orderData.gstAmount        || 0;
+        const scAmount  = orderData.serviceChargeAmount || 0;
+        const total     = orderData.totalAmount      || subtotal + gstAmount + scAmount;
+
+        const invoice = {
+          cafeId,
+          orderId,
+          orderNumber:    orderData.orderNumber,
+          invoiceNumber:  `INV-${String(orderData.orderNumber || '').padStart(4, '0')}`,
+          customerName:   orderData.customerName  || '',
+          customerPhone:  orderData.customerPhone || '',
+          items:          orderData.items         || [],
+          subtotalAmount: subtotal,
+          gstAmount,
+          serviceChargeAmount: scAmount,
+          totalAmount:    total,
+          paymentMode:    orderData.paymentMode   || 'counter',
+          paymentStatus:  orderData.paymentStatus || 'pending',
+          createdAt:      admin.firestore.FieldValue.serverTimestamp(),
+          status:         'generated',
+        };
+
+        await invoiceRef.set(invoice);
+        // Write invoiceId back to order
+        await db.collection('orders').doc(orderId).update({ invoiceId: invoiceRef.id });
+
+        console.log(`[Queue] Invoice ${invoiceRef.id} generated for order ${orderId}`);
+
+      } else if (type === 'whatsapp_log') {
+        // ── Log WhatsApp message send ───────────────────────────────────
+        await db.collection('whatsappLogs').add({
+          cafeId,
+          phone:     job.phone || '',
+          message:   job.message || '',
+          sentAt:    admin.firestore.FieldValue.serverTimestamp(),
+          status:    'sent',
+        });
+        console.log(`[Queue] WhatsApp log saved for cafe ${cafeId}`);
+
+      } else {
+        console.warn(`[Queue] Unknown job type: ${type}`);
+      }
+
+      // Mark done
+      await snap.ref.update({
+        status: 'done',
+        processedAt: admin.firestore.FieldValue.serverTimestamp(),
+        error: null,
+      });
+
+    } catch (err) {
+      console.error(`[Queue] Job ${jobId} failed (attempt ${retries + 1}):`, err.message);
+
+      if (retries < MAX_RETRIES) {
+        // Schedule retry
+        await snap.ref.update({
+          status: 'pending',
+          retries: retries + 1,
+          lastError: err.message,
+        });
+      } else {
+        // Max retries reached — mark failed
+        await snap.ref.update({
+          status: 'failed',
+          lastError: err.message,
+          failedAt: admin.firestore.FieldValue.serverTimestamp(),
+        });
+        console.error(`[Queue] Job ${jobId} permanently failed after ${MAX_RETRIES} retries`);
+      }
+    }
+
+    return null;
+  });
+
+// ═══════════════════════════════════════════════════════════════════════════
+// TASK 6: AUTO-INVOICE ON ONLINE PAYMENT + MARK AS PAID TRIGGER
+// When order.paymentStatus changes to 'paid' → auto-generate invoice
+// ═══════════════════════════════════════════════════════════════════════════
+
+exports.onOrderPaid = functions.firestore
+  .document('orders/{orderId}')
+  .onUpdate(async (change, context) => {
+    const before = change.before.data();
+    const after  = change.after.data();
+    const orderId = context.params.orderId;
+
+    // Only fire when paymentStatus transitions to 'paid'
+    if (before.paymentStatus === 'paid' || after.paymentStatus !== 'paid') return null;
+    // Skip if invoice already exists
+    if (after.invoiceId) return null;
+
+    console.log(`[onOrderPaid] Order ${orderId} marked paid — queueing invoice`);
+
+    // Enqueue invoice generation
+    await db.collection('queues').add({
+      type:        'invoice_generate',
+      cafeId:      after.cafeId,
+      orderId,
+      orderData:   after,
+      status:      'pending',
+      retries:     0,
+      createdAt:   admin.firestore.FieldValue.serverTimestamp(),
+    });
+
+    return null;
+  });
+
+// ═══════════════════════════════════════════════════════════════════════════
+// TASK 12: SECURITY — Validate cafe ownership before sensitive operations
+// ═══════════════════════════════════════════════════════════════════════════
+
+exports.validateCafeAccess = functions.https.onCall(async (data, context) => {
+  if (!context.auth) throw new functions.https.HttpsError('unauthenticated', 'Login required');
+
+  const { cafeId } = data;
+  const uid = context.auth.uid;
+
+  const userDoc = await db.collection('users').doc(uid).get();
+  if (!userDoc.exists) throw new functions.https.HttpsError('not-found', 'User not found');
+
+  const userData = userDoc.data();
+  if (userData.role === 'admin') return { access: true, role: 'admin' };
+  if (userData.cafeId === cafeId) return { access: true, role: 'cafe' };
+
+  throw new functions.https.HttpsError('permission-denied', 'Access denied to this café');
+});

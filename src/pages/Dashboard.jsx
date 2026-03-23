@@ -3,18 +3,20 @@ import { useAuth } from '../contexts/AuthContext';
 import { signOut } from 'firebase/auth';
 import { auth } from '../lib/firebase';
 import { useNavigate } from 'react-router-dom';
-import { LayoutDashboard, ShoppingBag, Menu as MenuIcon, Gift, BarChart3, Settings as SettingsIcon, QrCode, LogOut, X, UtensilsCrossed, ExternalLink, Boxes, Sparkles, Upload } from 'lucide-react';
+import { LayoutDashboard, ShoppingBag, Menu as MenuIcon, Gift, BarChart3, Settings as SettingsIcon, QrCode, LogOut, X, UtensilsCrossed, ExternalLink, Boxes, Sparkles, Upload, TrendingUp, MessageSquare } from 'lucide-react';
 import Overview from '../components/dashboard/Overview';
 import OrdersManagement from '../components/dashboard/OrdersManagement';
 import MenuManagement from '../components/dashboard/MenuManagement';
 import OffersManagement from '../components/dashboard/OffersManagement';
 import Analytics from '../components/dashboard/Analytics';
+import AdvancedAnalytics from '../components/dashboard/AdvancedAnalytics';
 import Settings from '../components/dashboard/Settings';
 import QRGenerator from '../components/dashboard/QRGenerator';
 import KitchenDashboardTab from '../components/dashboard/KitchenDashboardTab';
 import InventoryManagement from '../components/dashboard/InventoryManagement';
 import AIInsights from '../components/dashboard/AIInsights';
 import AIMenuUpload from '../components/dashboard/AIMenuUpload';
+import WhatsAppMarketing from '../components/dashboard/WhatsAppMarketing';
 
 const Dashboard = () => {
   const { user } = useAuth();
@@ -32,17 +34,19 @@ const Dashboard = () => {
   };
 
   const menuItems = [
-    { id: 'overview',   label: 'Overview',   icon: LayoutDashboard },
-    { id: 'orders',     label: 'Orders',     icon: ShoppingBag     },
-    { id: 'menu',       label: 'Menu',       icon: MenuIcon        },
-    { id: 'offers',     label: 'Offers',     icon: Gift            },
-    { id: 'analytics',  label: 'Analytics',  icon: BarChart3       },
-    { id: 'kitchen',    label: 'Kitchen',    icon: UtensilsCrossed },
-    { id: 'inventory',  label: 'Inventory',  icon: Boxes           },
-    { id: 'ai',         label: 'AI Insights',icon: Sparkles        },
-    { id: 'aimenu',     label: 'AI Menu',    icon: Upload          },
-    { id: 'qr',         label: 'QR Code',    icon: QrCode          },
-    { id: 'settings',   label: 'Settings',   icon: SettingsIcon    },
+    { id: 'overview',   label: 'Overview',    icon: LayoutDashboard },
+    { id: 'orders',     label: 'Orders',      icon: ShoppingBag     },
+    { id: 'menu',       label: 'Menu',        icon: MenuIcon        },
+    { id: 'offers',     label: 'Offers',      icon: Gift            },
+    { id: 'analytics',  label: 'Analytics',   icon: BarChart3       },
+    { id: 'advanced',   label: 'Reports',     icon: TrendingUp      },
+    { id: 'marketing',  label: 'Marketing',   icon: MessageSquare   },
+    { id: 'kitchen',    label: 'Kitchen',     icon: UtensilsCrossed },
+    { id: 'inventory',  label: 'Inventory',   icon: Boxes           },
+    { id: 'ai',         label: 'AI Insights', icon: Sparkles        },
+    { id: 'aimenu',     label: 'AI Menu',     icon: Upload          },
+    { id: 'qr',         label: 'QR Code',     icon: QrCode          },
+    { id: 'settings',   label: 'Settings',    icon: SettingsIcon    },
   ];
 
   return (
@@ -133,6 +137,8 @@ const Dashboard = () => {
           {activeTab === 'menu'       && <MenuManagement />}
           {activeTab === 'offers'     && <OffersManagement />}
           {activeTab === 'analytics'  && <Analytics />}
+          {activeTab === 'advanced'   && <AdvancedAnalytics />}
+          {activeTab === 'marketing'  && <WhatsAppMarketing />}
           {activeTab === 'kitchen'    && <KitchenDashboardTab />}
           {activeTab === 'inventory'  && <InventoryManagement />}
           {activeTab === 'ai'         && <AIInsights />}

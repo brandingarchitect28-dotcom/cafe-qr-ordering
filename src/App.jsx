@@ -10,6 +10,7 @@ import CafeOrdering from './pages/CafeOrdering';
 import CafeOrderingPremium from './pages/CafeOrderingPremium';
 import KitchenDisplay from './pages/KitchenDisplay';
 import InvoicePage from './pages/InvoicePage';
+import OrderTracking from './pages/OrderTracking';
 import { doc, onSnapshot } from 'firebase/firestore';
 import { db } from './lib/firebase';
 import './App.css';
@@ -94,6 +95,9 @@ function App() {
 
             {/* Feature 3: Public Invoice Page — no auth required */}
             <Route path="/invoice/:invoiceId" element={<InvoicePage />} />
+
+            {/* Task 7: Customer order tracking — real-time status */}
+            <Route path="/track/:orderId" element={<OrderTracking />} />
             
             <Route
               path="/unauthorized"
