@@ -3,7 +3,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import { useCollection, useDocument } from '../../hooks/useFirestore';
 import { where, doc, updateDoc, getDoc } from 'firebase/firestore';
 import { db } from '../../lib/firebase';
-import { AlertCircle, Search, Download, Phone, MapPin, Clock, Bell, Volume2, X, FileText, Eye, PlusCircle } from 'lucide-react';
+import { AlertCircle, Search, Download, Phone, MapPin, Clock, Bell, Volume2, X, FileText, Eye, PlusCircle, MessageSquare } from 'lucide-react';
 import { toast } from 'sonner';
 import { CSVLink } from 'react-csv';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -270,8 +270,25 @@ const OrdersManagement = () => {
         ({ data, error } = await getInvoiceByOrderId(orderId));
       }
 
+      // If still no invoice — auto-generate it now
+      if (!data && order) {
+        toast.loading('Generating invoice…', { id: 'inv-gen' });
+        try {
+          const cafeSnap = await import('firebase/firestore').then(({ doc, getDoc }) => getDoc(doc(db, 'cafes', order.cafeId)));
+          const cafeData = cafeSnap.exists() ? cafeSnap.data() : {};
+          const result   = await ensureInvoiceForOrder(orderId, order, cafeData);
+          if (result?.invoiceId) {
+            ({ data } = await getInvoiceById(result.invoiceId));
+          }
+          toast.dismiss('inv-gen');
+        } catch (genErr) {
+          toast.dismiss('inv-gen');
+          console.error('[Invoice] Auto-generate failed:', genErr);
+        }
+      }
+
       if (error) { toast.error('Invoice could not be loaded.'); return; }
-      if (!data)  { toast.info('Invoice still generating. Please try again in a moment.'); return; }
+      if (!data)  { toast.info('Invoice not available for this order.'); return; }
       setViewingInvoice(data);
     } catch (err) {
       toast.error('Invoice could not be loaded.');
@@ -587,6 +604,33 @@ const OrdersManagement = () => {
                                     <FileText className="w-3 h-3" />
                                     PDF
                                   </button>
+                                  {/* WhatsApp Send Invoice */}
+                                  {order.customerPhone && (
+                                    <button
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        const phone = order.customerPhone.replace(/\D/g,'');
+                                        const cur   = order.currencySymbol || cafeCurrency || '₹';
+                                        const items = (order.items||[]).map(i => `• ${i.name} x${i.quantity} — ${cur}${(i.price*i.quantity).toFixed(2)}`).join('\n');
+                                        const msg =
+                                          `🧾 *Invoice — Order #${String(order.orderNumber||'').padStart(3,'0')}*\n\n` +
+                                          `*Customer:* ${order.customerName||''}\n` +
+                                          `*Items:*\n${items}\n\n` +
+                                          (order.gstAmount > 0 ? `*GST:* ${cur}${(order.gstAmount||0).toFixed(2)}\n` : '') +
+                                          (order.serviceChargeAmount > 0 ? `*Service Charge:* ${cur}${(order.serviceChargeAmount||0).toFixed(2)}\n` : '') +
+                                          `*Total:* ${cur}${(order.totalAmount||order.total||0).toFixed(2)}\n` +
+                                          `*Payment:* ${order.paymentStatus === 'paid' ? '✅ Paid' : '⏳ Pending'}\n` +
+                                          `*Mode:* ${order.paymentMode||'counter'}`;
+                                        window.open(`https://wa.me/${phone}?text=${encodeURIComponent(msg)}`, '_blank');
+                                      }}
+                                      data-testid={`wa-invoice-${order.id}`}
+                                      className="flex items-center gap-1 px-2.5 py-1.5 bg-green-500/10 hover:bg-green-500/20 border border-green-500/20 text-green-400 rounded text-xs font-medium transition-all"
+                                      title="Send Invoice via WhatsApp"
+                                    >
+                                      <MessageSquare className="w-3 h-3" />
+                                      WA
+                                    </button>
+                                  )}
                                 </>
                               ) : (
                                 <span className="text-[#555] text-xs italic px-1 py-1.5">

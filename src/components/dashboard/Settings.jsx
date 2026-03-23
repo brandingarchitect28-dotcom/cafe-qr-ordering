@@ -767,10 +767,11 @@ const Settings = () => {
                 <select
                   data-testid="payment-gateway-select"
                   value={paymentSettings.gateway}
-                  onChange={(e) => setPaymentSettings(prev => ({ ...prev, gateway: e.target.value }))}
+                  onChange={(e) => setPaymentSettings(prev => ({ ...prev, gateway: e.target.value, keyId:'', keySecret:'' }))}
                   className="w-full bg-black/20 border border-white/10 text-white focus:border-[#D4AF37] focus:ring-1 focus:ring-[#D4AF37] rounded-sm h-12 px-4 transition-all"
                 >
                   <option value="razorpay" className="bg-[#0F0F0F]">Razorpay</option>
+                  <option value="cashfree" className="bg-[#0F0F0F]">Cashfree</option>
                   <option value="stripe"   className="bg-[#0F0F0F]">Stripe (coming soon)</option>
                   <option value="paytm"    className="bg-[#0F0F0F]">Paytm (coming soon)</option>
                 </select>
@@ -809,83 +810,114 @@ const Settings = () => {
                 </select>
               </div>
 
-              {/* Razorpay Key ID */}
-              <div>
-                <label className="block text-white text-sm font-medium mb-2">
-                  Razorpay Key ID
-                  <span className="text-[#A3A3A3] font-normal ml-1 text-xs">(starts with rzp_)</span>
-                </label>
-                <input
-                  type="text"
-                  data-testid="payment-key-id"
-                  value={paymentSettings.keyId}
-                  onChange={(e) => setPaymentSettings(prev => ({ ...prev, keyId: e.target.value }))}
-                  placeholder="rzp_live_xxxxxxxxxxxx"
-                  className="w-full bg-black/20 border border-white/10 text-white placeholder:text-neutral-600 focus:border-[#D4AF37] focus:ring-1 focus:ring-[#D4AF37] rounded-sm h-12 px-4 font-mono transition-all"
-                />
-                <p className="text-[#A3A3A3] text-xs mt-1.5">
-                  Find this in your{' '}
-                  <a
-                    href="https://dashboard.razorpay.com/app/keys"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-[#D4AF37] underline underline-offset-2 hover:text-[#C5A059] transition-colors"
-                  >
-                    Razorpay Dashboard → API Keys
-                  </a>
-                </p>
-              </div>
-
-              {/* Razorpay Key Secret */}
-              <div>
-                <label className="block text-white text-sm font-medium mb-2">
-                  Razorpay Key Secret
-                </label>
-                <div className="relative">
-                  <input
-                    type={showKeySecret ? 'text' : 'password'}
-                    data-testid="payment-key-secret"
-                    value={paymentSettings.keySecret}
-                    onChange={(e) => setPaymentSettings(prev => ({ ...prev, keySecret: e.target.value }))}
-                    placeholder="••••••••••••••••••••"
-                    className="w-full bg-black/20 border border-white/10 text-white placeholder:text-neutral-600 focus:border-[#D4AF37] focus:ring-1 focus:ring-[#D4AF37] rounded-sm h-12 px-4 pr-12 font-mono transition-all"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setShowKeySecret(v => !v)}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-[#A3A3A3] hover:text-white transition-colors p-1"
-                    tabIndex={-1}
-                    title={showKeySecret ? 'Hide secret' : 'Show secret'}
-                  >
-                    {showKeySecret
-                      ? <EyeOff className="w-4 h-4" />
-                      : <Eye className="w-4 h-4" />
-                    }
-                  </button>
+              {/* ── Razorpay fields ─────────────────────────────────── */}
+              {paymentSettings.gateway === 'razorpay' && (
+                <div className="space-y-4">
+                  <div>
+                    <label className="block text-white text-sm font-medium mb-2">
+                      Razorpay Key ID
+                      <span className="text-[#A3A3A3] font-normal ml-1 text-xs">(starts with rzp_)</span>
+                    </label>
+                    <input
+                      type="text"
+                      data-testid="payment-key-id"
+                      value={paymentSettings.keyId}
+                      onChange={(e) => setPaymentSettings(prev => ({ ...prev, keyId: e.target.value }))}
+                      placeholder="rzp_live_xxxxxxxxxxxx"
+                      className="w-full bg-black/20 border border-white/10 text-white placeholder:text-neutral-600 focus:border-[#D4AF37] focus:ring-1 focus:ring-[#D4AF37] rounded-sm h-12 px-4 font-mono transition-all"
+                    />
+                    <p className="text-[#A3A3A3] text-xs mt-1.5">
+                      Find this in your{' '}
+                      <a href="https://dashboard.razorpay.com/app/keys" target="_blank" rel="noopener noreferrer"
+                        className="text-[#D4AF37] underline underline-offset-2 hover:text-[#C5A059] transition-colors">
+                        Razorpay Dashboard → API Keys
+                      </a>
+                    </p>
+                  </div>
+                  <div>
+                    <label className="block text-white text-sm font-medium mb-2">Razorpay Key Secret</label>
+                    <div className="relative">
+                      <input
+                        type={showKeySecret ? 'text' : 'password'}
+                        data-testid="payment-key-secret"
+                        value={paymentSettings.keySecret}
+                        onChange={(e) => setPaymentSettings(prev => ({ ...prev, keySecret: e.target.value }))}
+                        placeholder="••••••••••••••••••••"
+                        className="w-full bg-black/20 border border-white/10 text-white placeholder:text-neutral-600 focus:border-[#D4AF37] focus:ring-1 focus:ring-[#D4AF37] rounded-sm h-12 px-4 pr-12 font-mono transition-all"
+                      />
+                      <button type="button" onClick={() => setShowKeySecret(v => !v)}
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-[#A3A3A3] hover:text-white transition-colors p-1" tabIndex={-1}>
+                        {showKeySecret ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                      </button>
+                    </div>
+                    <p className="text-[#A3A3A3] text-xs mt-1.5">Keep this confidential. Stored in your private Firestore document.</p>
+                  </div>
+                  {paymentSettings.keyId && !paymentSettings.keyId.startsWith('rzp_') && (
+                    <p className="text-red-400 text-xs flex items-center gap-1.5">
+                      <AlertTriangle className="w-3.5 h-3.5" />
+                      Key ID should start with <code className="font-mono">rzp_live_</code> or <code className="font-mono">rzp_test_</code>
+                    </p>
+                  )}
+                  {paymentSettings.keyId.startsWith('rzp_test_') && (
+                    <p className="text-yellow-400 text-xs flex items-center gap-1.5">
+                      <AlertTriangle className="w-3.5 h-3.5" />
+                      Test key — switch to <code className="font-mono">rzp_live_</code> for production.
+                    </p>
+                  )}
+                  {paymentSettings.keyId.startsWith('rzp_live_') && paymentSettings.keySecret && (
+                    <p className="text-green-400 text-xs flex items-center gap-1.5">
+                      <ShieldCheck className="w-3.5 h-3.5" />
+                      Live credentials look good. Save settings to activate.
+                    </p>
+                  )}
                 </div>
-                <p className="text-[#A3A3A3] text-xs mt-1.5">
-                  Keep this confidential. It is stored in your private Firestore document.
-                </p>
-              </div>
+              )}
 
-              {/* Key validation hints */}
-              {paymentSettings.keyId && !paymentSettings.keyId.startsWith('rzp_') && (
-                <p className="text-red-400 text-xs flex items-center gap-1.5">
-                  <AlertTriangle className="w-3.5 h-3.5" />
-                  Key ID should start with <code className="font-mono">rzp_live_</code> or <code className="font-mono">rzp_test_</code>
-                </p>
-              )}
-              {paymentSettings.keyId.startsWith('rzp_test_') && (
-                <p className="text-yellow-400 text-xs flex items-center gap-1.5">
-                  <AlertTriangle className="w-3.5 h-3.5" />
-                  You are using a <strong>test</strong> key. Switch to <code className="font-mono">rzp_live_</code> for production.
-                </p>
-              )}
-              {paymentSettings.keyId.startsWith('rzp_live_') && paymentSettings.keySecret && (
-                <p className="text-green-400 text-xs flex items-center gap-1.5">
-                  <ShieldCheck className="w-3.5 h-3.5" />
-                  Live credentials look good. Save settings to activate.
-                </p>
+              {/* ── Cashfree fields ─────────────────────────────────── */}
+              {paymentSettings.gateway === 'cashfree' && (
+                <div className="space-y-4">
+                  <div className="p-3 rounded-lg bg-blue-500/5 border border-blue-500/20">
+                    <p className="text-blue-400 text-xs">
+                      Get your credentials from{' '}
+                      <a href="https://merchant.cashfree.com/merchants/login" target="_blank" rel="noopener noreferrer"
+                        className="underline">Cashfree Merchant Dashboard</a>
+                      {' '}→ Developers → API Keys
+                    </p>
+                  </div>
+                  <div>
+                    <label className="block text-white text-sm font-medium mb-2">Cashfree App ID</label>
+                    <input
+                      type="text"
+                      value={paymentSettings.keyId}
+                      onChange={(e) => setPaymentSettings(prev => ({ ...prev, keyId: e.target.value }))}
+                      placeholder="Your Cashfree App ID"
+                      className="w-full bg-black/20 border border-white/10 text-white placeholder:text-neutral-600 focus:border-[#D4AF37] focus:ring-1 focus:ring-[#D4AF37] rounded-sm h-12 px-4 font-mono transition-all"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-white text-sm font-medium mb-2">Cashfree Secret Key</label>
+                    <div className="relative">
+                      <input
+                        type={showKeySecret ? 'text' : 'password'}
+                        value={paymentSettings.keySecret}
+                        onChange={(e) => setPaymentSettings(prev => ({ ...prev, keySecret: e.target.value }))}
+                        placeholder="••••••••••••••••••••"
+                        className="w-full bg-black/20 border border-white/10 text-white placeholder:text-neutral-600 focus:border-[#D4AF37] focus:ring-1 focus:ring-[#D4AF37] rounded-sm h-12 px-4 pr-12 font-mono transition-all"
+                      />
+                      <button type="button" onClick={() => setShowKeySecret(v => !v)}
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-[#A3A3A3] hover:text-white transition-colors p-1" tabIndex={-1}>
+                        {showKeySecret ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                      </button>
+                    </div>
+                    <p className="text-[#A3A3A3] text-xs mt-1.5">Stored securely in your private Firestore document.</p>
+                  </div>
+                  {paymentSettings.keyId && paymentSettings.keySecret && (
+                    <p className="text-green-400 text-xs flex items-center gap-1.5">
+                      <ShieldCheck className="w-3.5 h-3.5" />
+                      Cashfree credentials ready. Save settings to activate.
+                    </p>
+                  )}
+                </div>
               )}
             </div>
           )}

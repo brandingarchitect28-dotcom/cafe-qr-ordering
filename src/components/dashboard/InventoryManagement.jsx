@@ -40,6 +40,7 @@ const EMPTY_FORM = {
   quantity:          '',
   unit:              'pcs',
   lowStockThreshold: '',
+  costPerUnit:       '',   // ₹ cost per unit — used for profit calculation
 };
 
 // ─── helpers ─────────────────────────────────────────────────────────────────
@@ -183,6 +184,26 @@ const InventoryForm = ({ initial, onSave, onClose, saving }) => {
               placeholder="e.g., 500"
               className={inputCls}
               data-testid="inv-threshold"
+            />
+          </div>
+
+          {/* Cost Per Unit — for profit calculation */}
+          <div>
+            <label className={labelCls}>
+              Cost Per Unit (₹)
+              <span className="text-[#A3A3A3] font-normal ml-1 text-xs">
+                (used to calculate COGS and net profit)
+              </span>
+            </label>
+            <input
+              type="number"
+              min="0"
+              step="0.01"
+              value={form.costPerUnit}
+              onChange={e => set('costPerUnit', e.target.value)}
+              placeholder="e.g., 5.50"
+              className={inputCls}
+              data-testid="inv-cost"
             />
           </div>
 

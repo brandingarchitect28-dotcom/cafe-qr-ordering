@@ -9,11 +9,11 @@
  */
 
 import React, { useState, useEffect } from 'react';
-import { useParams } from 'react-router-dom';
+import { useParams, useNavigate } from 'react-router-dom';
 import { doc, onSnapshot } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Coffee, ChefHat, CheckCircle, Clock, Package } from 'lucide-react';
+import { Coffee, ChefHat, CheckCircle, Clock, Package, ArrowLeft, Home } from 'lucide-react';
 
 // ─── Status config ─────────────────────────────────────────────────────────────
 
@@ -99,6 +99,7 @@ const StepIndicator = ({ status, primary }) => {
 
 const OrderTracking = () => {
   const { orderId } = useParams();
+  const navigate    = useNavigate();
   const [order,    setOrder   ] = useState(null);
   const [loading,  setLoading ] = useState(true);
   const [notFound, setNotFound] = useState(false);
@@ -228,6 +229,32 @@ const OrderTracking = () => {
         </motion.div>
 
         {/* Footer */}
+        {/* Back to Menu button */}
+        <div className="flex gap-3 mt-4">
+          {order?.cafeId && (
+            <motion.button
+              whileHover={{ scale: 1.03 }}
+              whileTap={{ scale: 0.97 }}
+              onClick={() => navigate(`/cafe/${order.cafeId}`)}
+              className="flex-1 flex items-center justify-center gap-2 py-3 rounded-xl text-black font-bold text-sm"
+              style={{ background: `linear-gradient(135deg, ${primary}, ${primary}cc)` }}
+            >
+              <Home className="w-4 h-4" />
+              Back to Menu
+            </motion.button>
+          )}
+          <motion.button
+            whileHover={{ scale: 1.03 }}
+            whileTap={{ scale: 0.97 }}
+            onClick={() => navigate(-1)}
+            className="flex items-center justify-center gap-2 px-4 py-3 rounded-xl text-sm font-semibold"
+            style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)', color: '#A3A3A3' }}
+          >
+            <ArrowLeft className="w-4 h-4" />
+            Back
+          </motion.button>
+        </div>
+
         <p className="text-center text-[#333] text-xs mt-4">
           Powered by Branding Architect SmartCafé OS
         </p>
