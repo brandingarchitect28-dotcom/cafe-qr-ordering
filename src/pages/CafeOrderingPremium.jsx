@@ -379,37 +379,44 @@ const CafeOrderingPremium = () => {
   }, [cafeId]);
 
   // ── Cart helpers ───────────────────────────────────────────────────────────
-  const cartTotal   = useMemo(() => cart.reduce((s, i) => s + i.price * i.quantity, 0), [cart]);
-  const cartCount   = useMemo(() => cart.reduce((s, i) => s + i.quantity, 0), [cart]);
-  const cartQtyFor  = (id) => cart.find(i => i.id === id)?.quantity || 0;
+  const cartTotal  = useMemo(() => cart.reduce((s, i) => s + i.price * i.quantity, 0), [cart]);
+  const cartCount  = useMemo(() => cart.reduce((s, i) => s + i.quantity, 0), [cart]);
+  const cartQtyFor = (id) => cart.find(i => i.id === id)?.quantity || 0;
 
-  // ── Derived charge amounts — kept in sync with confirmOrder calculation ────
-  // These mirror exactly what confirmOrder sends to backend (no hidden additions)
+  // ── Unified safe pricing system ────────────────────────────────────────────
+  // safeNum: prevents NaN/undefined from breaking calculations
+  const safeNum = (v) => { const n = parseFloat(v); return isNaN(n) || !isFinite(n) ? 0 : n; };
+
   const taxCharge = useMemo(() =>
-    cafe?.taxEnabled ? cartTotal * (parseFloat(cafe.taxRate) || 0) / 100 : 0,
+    cafe?.taxEnabled ? cartTotal * safeNum(cafe.taxRate) / 100 : 0,
   [cartTotal, cafe?.taxEnabled, cafe?.taxRate]);
 
   const serviceCharge = useMemo(() =>
-    cafe?.serviceChargeEnabled ? cartTotal * (parseFloat(cafe.serviceChargeRate) || 0) / 100 : 0,
+    cafe?.serviceChargeEnabled ? cartTotal * safeNum(cafe.serviceChargeRate) / 100 : 0,
   [cartTotal, cafe?.serviceChargeEnabled, cafe?.serviceChargeRate]);
 
   const gstCharge = useMemo(() =>
-    cafe?.gstEnabled ? cartTotal * (parseFloat(cafe.gstRate) || 0) / 100 : 0,
+    cafe?.gstEnabled ? cartTotal * safeNum(cafe.gstRate) / 100 : 0,
   [cartTotal, cafe?.gstEnabled, cafe?.gstRate]);
 
-  // totalWithCharges = exact amount sent to backend and to payment gateway
-  const totalWithCharges = useMemo(() =>
-    cartTotal + taxCharge + serviceCharge + gstCharge,
-  [cartTotal, taxCharge, serviceCharge, gstCharge]);
+  const platformFeeCharge = useMemo(() =>
+    cafe?.platformFeeEnabled ? safeNum(cafe.platformFeeAmount) : 0,
+  [cafe?.platformFeeEnabled, cafe?.platformFeeAmount]);
 
-  // Transparency log — called before payment so console confirms UI = payment amount
+  // totalWithCharges — integer, same value shown in UI and sent to payment gateway
+  const totalWithCharges = useMemo(() =>
+    Math.round(cartTotal + taxCharge + serviceCharge + gstCharge + platformFeeCharge),
+  [cartTotal, taxCharge, serviceCharge, gstCharge, platformFeeCharge]);
+
+  // Debug log — confirms UI amount = payment amount before every order
   const logAmountBreakdown = () => {
     console.log('──── Order Amount Breakdown ────');
-    console.log('Items Total:    ', cartTotal.toFixed(2));
-    if (cafe?.taxEnabled)           console.log(`${cafe.taxName || 'Tax'} (${cafe.taxRate}%):`, taxCharge.toFixed(2));
-    if (cafe?.serviceChargeEnabled) console.log(`Service Charge (${cafe.serviceChargeRate}%):`, serviceCharge.toFixed(2));
-    if (cafe?.gstEnabled)           console.log(`GST (${cafe.gstRate}%):`, gstCharge.toFixed(2));
-    console.log('Final Amount Sent to Payment:  ', totalWithCharges.toFixed(2));
+    console.log('Items:    ', cartTotal.toFixed(2));
+    console.log('GST:      ', gstCharge.toFixed(2));
+    console.log('Tax:      ', taxCharge.toFixed(2));
+    console.log('Service:  ', serviceCharge.toFixed(2));
+    console.log('Platform: ', platformFeeCharge.toFixed(2));
+    console.log('Final:    ', totalWithCharges);
     console.log('────────────────────────────────');
   };
 
@@ -482,11 +489,12 @@ const CafeOrderingPremium = () => {
         cd.exists() ? tx.update(counterRef, { currentOrderNumber: oNum }) : tx.set(counterRef, { currentOrderNumber: oNum });
       });
 
-      const subtotal = cartTotal;
-      const taxAmount = cafe?.taxEnabled ? subtotal * (parseFloat(cafe.taxRate) || 0) / 100 : 0;
-      const scAmount  = cafe?.serviceChargeEnabled ? subtotal * (parseFloat(cafe.serviceChargeRate) || 0) / 100 : 0;
-      const gstAmount = cafe?.gstEnabled ? subtotal * (parseFloat(cafe.gstRate) || 0) / 100 : 0;
-      const total     = subtotal + taxAmount + scAmount + gstAmount;
+      // All values come from the unified pricing memos — same numbers as UI
+      const subtotal  = cartTotal;
+      const taxAmount = taxCharge;
+      const scAmount  = serviceCharge;
+      const gstAmount = gstCharge;
+      const total     = totalWithCharges; // Math.round integer
 
       // Transparency: confirm UI amount = payment amount before sending
       logAmountBreakdown();
@@ -499,6 +507,7 @@ const CafeOrderingPremium = () => {
         taxAmount,
         serviceChargeAmount: scAmount,
         gstAmount,
+        platformFeeAmount:   platformFeeCharge,
         totalAmount: total,
         currencyCode:   cafe?.currencyCode   || 'INR',
         currencySymbol: cafe?.currencySymbol || '₹',
@@ -1025,6 +1034,12 @@ const CafeOrderingPremium = () => {
                           <span>{CUR}{fmt(gstCharge)}</span>
                         </div>
                       )}
+                      {cafe?.platformFeeEnabled && platformFeeCharge > 0 && (
+                        <div className="flex justify-between" style={{ color: T.textMuted }}>
+                          <span>Platform Fee</span>
+                          <span>{CUR}{fmt(platformFeeCharge)}</span>
+                        </div>
+                      )}
                       <div className="flex justify-between font-bold text-lg border-t pt-2" style={{ borderColor: T.borderLight }}>
                         <span style={{ color: T.text }}>Total</span>
                         <span style={{ color: primary }}>{CUR}{fmt(totalWithCharges)}</span>
@@ -1194,7 +1209,13 @@ const CafeOrderingPremium = () => {
                         <span style={{ color: T.text }}>{gstCharge > 0 ? `${CUR}${fmt(gstCharge)}` : '—'}</span>
                       </div>
                     )}
-                    {!cafe?.taxEnabled && !cafe?.serviceChargeEnabled && !cafe?.gstEnabled && (
+                    {cafe?.platformFeeEnabled && platformFeeCharge > 0 && (
+                      <div className="flex justify-between text-sm">
+                        <span style={{ color: T.textMuted }}>Platform Fee</span>
+                        <span style={{ color: T.text }}>{CUR}{fmt(platformFeeCharge)}</span>
+                      </div>
+                    )}
+                    {!cafe?.taxEnabled && !cafe?.serviceChargeEnabled && !cafe?.gstEnabled && !cafe?.platformFeeEnabled && (
                       <div className="flex justify-between text-sm">
                         <span style={{ color: T.textMuted }}>No additional charges</span>
                         <span style={{ color: T.textMuted }}>✓</span>

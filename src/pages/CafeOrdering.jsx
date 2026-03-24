@@ -362,45 +362,63 @@ const CafeOrdering = () => {
     setCart(cart.filter(item => item.id !== itemId));
   };
 
-  const calculateSubtotal = () => {
-    return cart.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+  // ── Unified safe pricing system ───────────────────────────────────────────
+  // Single source of truth for all charge calculations.
+  // - All values default to 0 (no undefined/NaN possible)
+  // - finalAmount is always a safe integer (Math.round)
+  // - UI, order data, and payment all use the same values
+
+  const safeNum = (v) => {
+    const n = parseFloat(v);
+    return isNaN(n) || !isFinite(n) ? 0 : n;
   };
 
-  const calculateTax = () => {
-    if (!cafe?.taxEnabled) return 0;
-    return calculateSubtotal() * (parseFloat(cafe.taxRate) || 0) / 100;
-  };
+  const itemsTotal = cart.reduce((sum, item) =>
+    sum + (safeNum(item.price) * safeNum(item.quantity)), 0);
 
-  const calculateServiceCharge = () => {
-    if (!cafe?.serviceChargeEnabled) return 0;
-    return calculateSubtotal() * (parseFloat(cafe.serviceChargeRate) || 0) / 100;
-  };
+  // GST (legacy field — kept for backward compat with existing orders)
+  const gstAmount = cafe?.gstEnabled
+    ? itemsTotal * safeNum(cafe.gstRate) / 100
+    : 0;
 
-  const calculateTotal = () => {
-    return calculateSubtotal() + calculateTax() + calculateServiceCharge();
-  };
+  // Tax (separate named tax — shown as taxName label)
+  const taxAmount = cafe?.taxEnabled
+    ? itemsTotal * safeNum(cafe.taxRate) / 100
+    : 0;
 
-  // Keep legacy GST for backward compat with existing orders
-  const calculateGST = () => {
-    if (!cafe?.gstEnabled) return 0;
-    return calculateSubtotal() * (parseFloat(cafe.gstRate) || 0) / 100;
-  };
+  // Service charge
+  const serviceChargeAmount = cafe?.serviceChargeEnabled
+    ? itemsTotal * safeNum(cafe.serviceChargeRate) / 100
+    : 0;
 
-  // Transparency: log breakdown whenever cart changes
+  // Platform fee — fixed amount set by owner
+  const platformFeeAmount = cafe?.platformFeeEnabled
+    ? safeNum(cafe.platformFeeAmount)
+    : 0;
+
+  // Final total — integer (Math.round prevents decimals sent to payment gateway)
+  const finalAmount = Math.round(
+    itemsTotal + gstAmount + taxAmount + serviceChargeAmount + platformFeeAmount
+  );
+
+  // Legacy calc wrappers — keep existing code that calls these working unchanged
+  const calculateSubtotal      = () => itemsTotal;
+  const calculateTax           = () => taxAmount;
+  const calculateServiceCharge = () => serviceChargeAmount;
+  const calculateGST           = () => gstAmount;
+  const calculateTotal         = () => finalAmount;
+  const CUR_SYMBOL             = cafe?.currencySymbol || '₹';
+
+  // Debug log — called before payment to confirm UI = payment amount
   const logAmountBreakdown = () => {
-    const itemsTotal   = calculateSubtotal();
-    const tax          = calculateTax();
-    const serviceCharge = calculateServiceCharge();
-    const gst          = calculateGST();
-    const finalAmount  = calculateTotal();
     console.log('──── Order Amount Breakdown ────');
-    console.log('Items Total:    ', itemsTotal.toFixed(2));
-    if (cafe?.taxEnabled)           console.log(`${cafe.taxName || 'Tax'} (${cafe.taxRate}%):`, tax.toFixed(2));
-    if (cafe?.serviceChargeEnabled) console.log(`Service Charge (${cafe.serviceChargeRate}%):`, serviceCharge.toFixed(2));
-    if (cafe?.gstEnabled)           console.log(`GST (${cafe.gstRate}%):`, gst.toFixed(2));
-    console.log('Final Amount Sent to Payment:  ', finalAmount.toFixed(2));
+    console.log('Items:    ', itemsTotal.toFixed(2));
+    console.log('GST:      ', gstAmount.toFixed(2));
+    console.log('Tax:      ', taxAmount.toFixed(2));
+    console.log('Service:  ', serviceChargeAmount.toFixed(2));
+    console.log('Platform: ', platformFeeAmount.toFixed(2));
+    console.log('Final:    ', finalAmount);
     console.log('────────────────────────────────');
-    return finalAmount;
   };
 
   const cartItemsCount = cart.reduce((sum, item) => sum + item.quantity, 0);
@@ -537,11 +555,10 @@ const CafeOrdering = () => {
         }
       });
 
+      // All values come from the unified pricing system defined above
+      // No recalculation — same numbers shown in UI = sent to backend = sent to payment
       const subtotal = calculateSubtotal();
-      const taxAmount = calculateTax();
-      const serviceChargeAmount = calculateServiceCharge();
-      const gstAmount = calculateGST(); // legacy
-      const total = calculateTotal();
+      const total    = calculateTotal(); // finalAmount — already Math.round integer
 
       // Transparency log — verifies UI amount = payment amount
       logAmountBreakdown();
@@ -550,11 +567,12 @@ const CafeOrdering = () => {
         cafeId,
         orderNumber,
         items: cart.map(item => ({ name: item.name, price: item.price, quantity: item.quantity })),
-        subtotalAmount: subtotal,
-        taxAmount: taxAmount,
+        subtotalAmount:      subtotal,
+        taxAmount:           taxAmount,
         serviceChargeAmount: serviceChargeAmount,
-        gstAmount: gstAmount,
-        totalAmount: total,
+        gstAmount:           gstAmount,
+        platformFeeAmount:   platformFeeAmount,
+        totalAmount:         total,
         currencyCode: cafe?.currencyCode || 'INR',
         currencySymbol: cafe?.currencySymbol || '₹',
         // TASK 1 FIX: Always 'pending' at creation.
@@ -1249,7 +1267,7 @@ const CafeOrdering = () => {
                 <div className="p-4 rounded-xl space-y-2" style={{ backgroundColor: `${COLORS.primary}15` }}>
                   <div className="flex justify-between items-center">
                     <span className="text-sm" style={{ color: COLORS.textMuted }}>Items Total</span>
-                    <span className="font-medium" style={{ color: COLORS.text }}>{CUR}{calculateSubtotal().toFixed(2)}</span>
+                    <span className="font-medium" style={{ color: COLORS.text }}>{CUR}{itemsTotal.toFixed(2)}</span>
                   </div>
                   {cafe?.taxEnabled && (
                     <div className="flex justify-between items-center">
@@ -1257,7 +1275,7 @@ const CafeOrdering = () => {
                         {cafe.taxName || 'Tax'} ({cafe.taxRate}%)
                       </span>
                       <span className="font-medium" style={{ color: COLORS.text }}>
-                        {calculateTax() > 0 ? `${CUR}${calculateTax().toFixed(2)}` : '—'}
+                        {taxAmount > 0 ? `${CUR}${taxAmount.toFixed(2)}` : '—'}
                       </span>
                     </div>
                   )}
@@ -1267,7 +1285,7 @@ const CafeOrdering = () => {
                         Service Charge ({cafe.serviceChargeRate}%)
                       </span>
                       <span className="font-medium" style={{ color: COLORS.text }}>
-                        {calculateServiceCharge() > 0 ? `${CUR}${calculateServiceCharge().toFixed(2)}` : '—'}
+                        {serviceChargeAmount > 0 ? `${CUR}${serviceChargeAmount.toFixed(2)}` : '—'}
                       </span>
                     </div>
                   )}
@@ -1277,11 +1295,17 @@ const CafeOrdering = () => {
                         GST ({cafe.gstRate}%)
                       </span>
                       <span className="font-medium" style={{ color: COLORS.text }}>
-                        {calculateGST() > 0 ? `${CUR}${calculateGST().toFixed(2)}` : '—'}
+                        {gstAmount > 0 ? `${CUR}${gstAmount.toFixed(2)}` : '—'}
                       </span>
                     </div>
                   )}
-                  {!cafe?.taxEnabled && !cafe?.serviceChargeEnabled && !cafe?.gstEnabled && (
+                  {cafe?.platformFeeEnabled && platformFeeAmount > 0 && (
+                    <div className="flex justify-between items-center">
+                      <span className="text-sm" style={{ color: COLORS.textMuted }}>Platform Fee</span>
+                      <span className="font-medium" style={{ color: COLORS.text }}>{CUR}{platformFeeAmount.toFixed(2)}</span>
+                    </div>
+                  )}
+                  {!cafe?.taxEnabled && !cafe?.serviceChargeEnabled && !cafe?.gstEnabled && !cafe?.platformFeeEnabled && (
                     <div className="flex justify-between items-center">
                       <span className="text-xs" style={{ color: COLORS.textMuted }}>No additional charges</span>
                       <span className="text-xs" style={{ color: COLORS.textMuted }}>✓</span>
@@ -1289,7 +1313,7 @@ const CafeOrdering = () => {
                   )}
                   <div className="border-t pt-2 flex justify-between items-center" style={{ borderColor: `${COLORS.primary}30` }}>
                     <span className="font-semibold" style={{ color: COLORS.text }}>Total</span>
-                    <span className="text-2xl font-bold" style={{ color: COLORS.primary }}>{CUR}{calculateTotal().toFixed(2)}</span>
+                    <span className="text-2xl font-bold" style={{ color: COLORS.primary }}>{CUR}{finalAmount}</span>
                   </div>
                 </div>
 

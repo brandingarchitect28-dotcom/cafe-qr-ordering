@@ -46,7 +46,10 @@ const Settings = () => {
     taxRate: 5,
     // Feature: Service Charge
     serviceChargeEnabled: false,
-    serviceChargeRate: 10
+    serviceChargeRate: 10,
+    // Feature: Platform Fee
+    platformFeeEnabled: false,
+    platformFeeAmount: 0,
   });
 
   // REAL-TIME: Load settings with onSnapshot
@@ -75,7 +78,9 @@ const Settings = () => {
             taxName: data.taxName || 'GST',
             taxRate: data.taxRate ?? 5,
             serviceChargeEnabled: data.serviceChargeEnabled || false,
-            serviceChargeRate: data.serviceChargeRate ?? 10
+            serviceChargeRate: data.serviceChargeRate ?? 10,
+            platformFeeEnabled: data.platformFeeEnabled || false,
+            platformFeeAmount:  data.platformFeeAmount  ?? 0,
           });
 
           // Feature 3: hydrate payment settings
@@ -151,6 +156,8 @@ const Settings = () => {
         taxRate: parseFloat(settings.taxRate) || 0,
         serviceChargeEnabled: settings.serviceChargeEnabled,
         serviceChargeRate: parseFloat(settings.serviceChargeRate) || 0,
+        platformFeeEnabled: settings.platformFeeEnabled,
+        platformFeeAmount:  parseFloat(settings.platformFeeAmount) || 0,
         // Feature 3: persist payment settings as nested map
         paymentSettings: {
           enabled:      paymentSettings.enabled,
@@ -466,6 +473,47 @@ const Settings = () => {
                 className="w-full bg-black/20 border border-white/10 text-white placeholder:text-neutral-600 focus:border-[#D4AF37] focus:ring-1 focus:ring-[#D4AF37] rounded-sm h-12 px-4 transition-all"
                 placeholder="e.g., 10"
               />
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Platform Fee Settings */}
+      <div className="bg-[#0F0F0F] border border-white/5 rounded-sm p-6">
+        <h3 className="text-xl font-semibold text-white mb-6" style={{ fontFamily: 'Playfair Display, serif' }}>
+          Platform Fee
+        </h3>
+        <div className="space-y-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <label className="block text-white text-sm font-medium">Enable Platform Fee</label>
+              <p className="text-[#A3A3A3] text-xs mt-1">Add a fixed platform fee to every order</p>
+            </div>
+            <button
+              type="button"
+              onClick={() => setSettings(prev => ({ ...prev, platformFeeEnabled: !prev.platformFeeEnabled }))}
+              className={`relative inline-flex h-7 w-12 items-center rounded-full transition-colors duration-200 focus:outline-none ${
+                settings.platformFeeEnabled ? 'bg-[#D4AF37]' : 'bg-white/10'
+              }`}
+            >
+              <span className={`inline-block h-5 w-5 transform rounded-full bg-white shadow transition-transform duration-200 ${
+                settings.platformFeeEnabled ? 'translate-x-6' : 'translate-x-1'
+              }`} />
+            </button>
+          </div>
+          {settings.platformFeeEnabled && (
+            <div>
+              <label className="block text-white text-sm font-medium mb-2">Platform Fee Amount (₹)</label>
+              <input
+                type="number"
+                min="0"
+                step="1"
+                value={settings.platformFeeAmount}
+                onChange={(e) => setSettings(prev => ({ ...prev, platformFeeAmount: e.target.value }))}
+                className="w-full bg-black/20 border border-white/10 text-white placeholder:text-neutral-600 focus:border-[#D4AF37] focus:ring-1 focus:ring-[#D4AF37] rounded-sm h-12 px-4 transition-all"
+                placeholder="e.g., 20"
+              />
+              <p className="text-[#A3A3A3] text-xs mt-1.5">Fixed amount added to every order total</p>
             </div>
           )}
         </div>
