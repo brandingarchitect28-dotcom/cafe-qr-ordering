@@ -75,9 +75,12 @@ app.post('/create-order', async (req, res) => {
   });
 
   // ── Build Cashfree request body ─────────────────────────────────────────────
+  // Fix floating point precision: 1.1500000000000001 → 1.15
+  const formattedAmount = Number(parseFloat(amount).toFixed(2));
+
   const cfPayload = JSON.stringify({
     order_id:       orderId,
-    order_amount:   Number(amount),
+    order_amount:   formattedAmount,
     order_currency: currency || 'INR',
     customer_details: {
       customer_id:    cleanPhone,
