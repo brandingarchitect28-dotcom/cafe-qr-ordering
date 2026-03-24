@@ -383,6 +383,36 @@ const CafeOrderingPremium = () => {
   const cartCount   = useMemo(() => cart.reduce((s, i) => s + i.quantity, 0), [cart]);
   const cartQtyFor  = (id) => cart.find(i => i.id === id)?.quantity || 0;
 
+  // ── Derived charge amounts — kept in sync with confirmOrder calculation ────
+  // These mirror exactly what confirmOrder sends to backend (no hidden additions)
+  const taxCharge = useMemo(() =>
+    cafe?.taxEnabled ? cartTotal * (parseFloat(cafe.taxRate) || 0) / 100 : 0,
+  [cartTotal, cafe?.taxEnabled, cafe?.taxRate]);
+
+  const serviceCharge = useMemo(() =>
+    cafe?.serviceChargeEnabled ? cartTotal * (parseFloat(cafe.serviceChargeRate) || 0) / 100 : 0,
+  [cartTotal, cafe?.serviceChargeEnabled, cafe?.serviceChargeRate]);
+
+  const gstCharge = useMemo(() =>
+    cafe?.gstEnabled ? cartTotal * (parseFloat(cafe.gstRate) || 0) / 100 : 0,
+  [cartTotal, cafe?.gstEnabled, cafe?.gstRate]);
+
+  // totalWithCharges = exact amount sent to backend and to payment gateway
+  const totalWithCharges = useMemo(() =>
+    cartTotal + taxCharge + serviceCharge + gstCharge,
+  [cartTotal, taxCharge, serviceCharge, gstCharge]);
+
+  // Transparency log — called before payment so console confirms UI = payment amount
+  const logAmountBreakdown = () => {
+    console.log('──── Order Amount Breakdown ────');
+    console.log('Items Total:    ', cartTotal.toFixed(2));
+    if (cafe?.taxEnabled)           console.log(`${cafe.taxName || 'Tax'} (${cafe.taxRate}%):`, taxCharge.toFixed(2));
+    if (cafe?.serviceChargeEnabled) console.log(`Service Charge (${cafe.serviceChargeRate}%):`, serviceCharge.toFixed(2));
+    if (cafe?.gstEnabled)           console.log(`GST (${cafe.gstRate}%):`, gstCharge.toFixed(2));
+    console.log('Final Amount Sent to Payment:  ', totalWithCharges.toFixed(2));
+    console.log('────────────────────────────────');
+  };
+
   const addToCart = useCallback((item) => {
     setCart(prev => {
       const ex = prev.find(i => i.id === item.id);
@@ -457,6 +487,9 @@ const CafeOrderingPremium = () => {
       const scAmount  = cafe?.serviceChargeEnabled ? subtotal * (parseFloat(cafe.serviceChargeRate) || 0) / 100 : 0;
       const gstAmount = cafe?.gstEnabled ? subtotal * (parseFloat(cafe.gstRate) || 0) / 100 : 0;
       const total     = subtotal + taxAmount + scAmount + gstAmount;
+
+      // Transparency: confirm UI amount = payment amount before sending
+      logAmountBreakdown();
 
       const orderData = {
         cafeId,
@@ -967,10 +1000,42 @@ const CafeOrderingPremium = () => {
 
               {cart.length > 0 && (
                 <div className="px-5 py-4 border-t flex-shrink-0 space-y-3" style={{ borderColor: T.borderLight }}>
-                  <div className="flex justify-between font-bold text-lg">
-                    <span style={{ color: T.text }}>Total</span>
-                    <span style={{ color: primary }}>{CUR}{fmt(cartTotal)}</span>
-                  </div>
+                  {/* Transparent breakdown in cart drawer */}
+                  {(cafe?.taxEnabled || cafe?.serviceChargeEnabled || cafe?.gstEnabled) ? (
+                    <div className="space-y-1 text-sm">
+                      <div className="flex justify-between" style={{ color: T.textMuted }}>
+                        <span>Items Total</span>
+                        <span>{CUR}{fmt(cartTotal)}</span>
+                      </div>
+                      {cafe?.taxEnabled && taxCharge > 0 && (
+                        <div className="flex justify-between" style={{ color: T.textMuted }}>
+                          <span>{cafe.taxName || 'Tax'} ({cafe.taxRate}%)</span>
+                          <span>{CUR}{fmt(taxCharge)}</span>
+                        </div>
+                      )}
+                      {cafe?.serviceChargeEnabled && serviceCharge > 0 && (
+                        <div className="flex justify-between" style={{ color: T.textMuted }}>
+                          <span>Service Charge ({cafe.serviceChargeRate}%)</span>
+                          <span>{CUR}{fmt(serviceCharge)}</span>
+                        </div>
+                      )}
+                      {cafe?.gstEnabled && gstCharge > 0 && (
+                        <div className="flex justify-between" style={{ color: T.textMuted }}>
+                          <span>GST ({cafe.gstRate}%)</span>
+                          <span>{CUR}{fmt(gstCharge)}</span>
+                        </div>
+                      )}
+                      <div className="flex justify-between font-bold text-lg border-t pt-2" style={{ borderColor: T.borderLight }}>
+                        <span style={{ color: T.text }}>Total</span>
+                        <span style={{ color: primary }}>{CUR}{fmt(totalWithCharges)}</span>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="flex justify-between font-bold text-lg">
+                      <span style={{ color: T.text }}>Total</span>
+                      <span style={{ color: primary }}>{CUR}{fmt(totalWithCharges)}</span>
+                    </div>
+                  )}
                   <motion.button
                     whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}
                     onClick={() => { setShowCart(false); setShowCheckout(true); }}
@@ -1083,8 +1148,8 @@ const CafeOrderingPremium = () => {
 
                 {paymentMode === 'prepaid' && cafe?.upiId && (
                   <div className="p-4 rounded-xl text-center" style={{ background: T.bgInput, border: `1px solid ${T.border}` }}>
-                    <QRCodeSVG value={`upi://pay?pa=${cafe.upiId}&pn=${cafe.name}&am=${cartTotal}&cu=INR`} size={140} className="mx-auto" />
-                    <p className="text-xs mt-2" style={{ color: T.textMuted }}>Scan to pay {CUR}{fmt(cartTotal)}</p>
+                    <QRCodeSVG value={`upi://pay?pa=${cafe.upiId}&pn=${cafe.name}&am=${totalWithCharges}&cu=INR`} size={140} className="mx-auto" />
+                    <p className="text-xs mt-2" style={{ color: T.textMuted }}>Scan to pay {CUR}{fmt(totalWithCharges)}</p>
                   </div>
                 )}
 
@@ -1097,7 +1162,7 @@ const CafeOrderingPremium = () => {
                     style={{ background: T.bgInput, border: `1px solid ${T.border}`, color: T.text }} />
                 </div>
 
-                {/* Order summary */}
+                {/* Order summary — always shows full transparent breakdown */}
                 <div className="p-4 rounded-xl space-y-2" style={{ background: `${primary}08`, border: `1px solid ${primary}20` }}>
                   <p className="font-semibold text-sm mb-3" style={{ color: T.text }}>Order Summary</p>
                   {cart.map(item => (
@@ -1106,9 +1171,39 @@ const CafeOrderingPremium = () => {
                       <span style={{ color: T.text }}>{CUR}{fmt(item.price * item.quantity)}</span>
                     </div>
                   ))}
-                  <div className="border-t pt-2 flex justify-between font-bold" style={{ borderColor: T.borderLight }}>
-                    <span style={{ color: T.text }}>Total</span>
-                    <span style={{ color: primary }}>{CUR}{fmt(cartTotal)}</span>
+                  <div className="border-t pt-2 mt-1 space-y-1" style={{ borderColor: T.borderLight }}>
+                    <div className="flex justify-between text-sm">
+                      <span style={{ color: T.textMuted }}>Items Total</span>
+                      <span style={{ color: T.text }}>{CUR}{fmt(cartTotal)}</span>
+                    </div>
+                    {cafe?.taxEnabled && (
+                      <div className="flex justify-between text-sm">
+                        <span style={{ color: T.textMuted }}>{cafe.taxName || 'Tax'} ({cafe.taxRate}%)</span>
+                        <span style={{ color: T.text }}>{taxCharge > 0 ? `${CUR}${fmt(taxCharge)}` : '—'}</span>
+                      </div>
+                    )}
+                    {cafe?.serviceChargeEnabled && (
+                      <div className="flex justify-between text-sm">
+                        <span style={{ color: T.textMuted }}>Service Charge ({cafe.serviceChargeRate}%)</span>
+                        <span style={{ color: T.text }}>{serviceCharge > 0 ? `${CUR}${fmt(serviceCharge)}` : '—'}</span>
+                      </div>
+                    )}
+                    {cafe?.gstEnabled && (
+                      <div className="flex justify-between text-sm">
+                        <span style={{ color: T.textMuted }}>GST ({cafe.gstRate}%)</span>
+                        <span style={{ color: T.text }}>{gstCharge > 0 ? `${CUR}${fmt(gstCharge)}` : '—'}</span>
+                      </div>
+                    )}
+                    {!cafe?.taxEnabled && !cafe?.serviceChargeEnabled && !cafe?.gstEnabled && (
+                      <div className="flex justify-between text-sm">
+                        <span style={{ color: T.textMuted }}>No additional charges</span>
+                        <span style={{ color: T.textMuted }}>✓</span>
+                      </div>
+                    )}
+                    <div className="border-t pt-2 flex justify-between font-bold" style={{ borderColor: T.borderLight }}>
+                      <span style={{ color: T.text }}>Total</span>
+                      <span style={{ color: primary }}>{CUR}{fmt(totalWithCharges)}</span>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -1124,7 +1219,7 @@ const CafeOrderingPremium = () => {
                   {orderPlacing
                     ? <><motion.div animate={{ rotate: 360 }} transition={{ duration: 1, repeat: Infinity, ease: 'linear' }}
                         className="w-5 h-5 rounded-full border-2 border-black/30 border-t-black" />Placing Order…</>
-                    : `Place Order • ${CUR}${fmt(cartTotal)}`
+                    : `Place Order • ${CUR}${fmt(totalWithCharges)}`
                   }
                 </motion.button>
               </div>

@@ -386,6 +386,23 @@ const CafeOrdering = () => {
     return calculateSubtotal() * (parseFloat(cafe.gstRate) || 0) / 100;
   };
 
+  // Transparency: log breakdown whenever cart changes
+  const logAmountBreakdown = () => {
+    const itemsTotal   = calculateSubtotal();
+    const tax          = calculateTax();
+    const serviceCharge = calculateServiceCharge();
+    const gst          = calculateGST();
+    const finalAmount  = calculateTotal();
+    console.log('──── Order Amount Breakdown ────');
+    console.log('Items Total:    ', itemsTotal.toFixed(2));
+    if (cafe?.taxEnabled)           console.log(`${cafe.taxName || 'Tax'} (${cafe.taxRate}%):`, tax.toFixed(2));
+    if (cafe?.serviceChargeEnabled) console.log(`Service Charge (${cafe.serviceChargeRate}%):`, serviceCharge.toFixed(2));
+    if (cafe?.gstEnabled)           console.log(`GST (${cafe.gstRate}%):`, gst.toFixed(2));
+    console.log('Final Amount Sent to Payment:  ', finalAmount.toFixed(2));
+    console.log('────────────────────────────────');
+    return finalAmount;
+  };
+
   const cartItemsCount = cart.reduce((sum, item) => sum + item.quantity, 0);
 
   // Categories
@@ -525,6 +542,9 @@ const CafeOrdering = () => {
       const serviceChargeAmount = calculateServiceCharge();
       const gstAmount = calculateGST(); // legacy
       const total = calculateTotal();
+
+      // Transparency log — verifies UI amount = payment amount
+      logAmountBreakdown();
 
       const orderData = {
         cafeId,
@@ -1225,43 +1245,52 @@ const CafeOrdering = () => {
                   ))}
                 </div>
 
-                {/* Order Total Breakdown */}
+                {/* Order Total Breakdown — always shown for full transparency */}
                 <div className="p-4 rounded-xl space-y-2" style={{ backgroundColor: `${COLORS.primary}15` }}>
-                  {(cafe?.taxEnabled || cafe?.serviceChargeEnabled || cafe?.gstEnabled) ? (
-                    <>
-                      <div className="flex justify-between items-center">
-                        <span className="text-sm" style={{ color: COLORS.textMuted }}>Subtotal</span>
-                        <span className="font-medium" style={{ color: COLORS.text }}>{CUR}{calculateSubtotal().toFixed(2)}</span>
-                      </div>
-                      {cafe?.taxEnabled && calculateTax() > 0 && (
-                        <div className="flex justify-between items-center">
-                          <span className="text-sm" style={{ color: COLORS.textMuted }}>{cafe.taxName || 'Tax'} ({cafe.taxRate}%)</span>
-                          <span className="font-medium" style={{ color: COLORS.text }}>{CUR}{calculateTax().toFixed(2)}</span>
-                        </div>
-                      )}
-                      {cafe?.serviceChargeEnabled && calculateServiceCharge() > 0 && (
-                        <div className="flex justify-between items-center">
-                          <span className="text-sm" style={{ color: COLORS.textMuted }}>Service Charge ({cafe.serviceChargeRate}%)</span>
-                          <span className="font-medium" style={{ color: COLORS.text }}>{CUR}{calculateServiceCharge().toFixed(2)}</span>
-                        </div>
-                      )}
-                      {cafe?.gstEnabled && calculateGST() > 0 && (
-                        <div className="flex justify-between items-center">
-                          <span className="text-sm" style={{ color: COLORS.textMuted }}>GST ({cafe.gstRate}%)</span>
-                          <span className="font-medium" style={{ color: COLORS.text }}>{CUR}{calculateGST().toFixed(2)}</span>
-                        </div>
-                      )}
-                      <div className="border-t pt-2 flex justify-between items-center" style={{ borderColor: `${COLORS.primary}30` }}>
-                        <span className="font-semibold" style={{ color: COLORS.text }}>Total</span>
-                        <span className="text-2xl font-bold" style={{ color: COLORS.primary }}>{CUR}{calculateTotal().toFixed(2)}</span>
-                      </div>
-                    </>
-                  ) : (
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm" style={{ color: COLORS.textMuted }}>Items Total</span>
+                    <span className="font-medium" style={{ color: COLORS.text }}>{CUR}{calculateSubtotal().toFixed(2)}</span>
+                  </div>
+                  {cafe?.taxEnabled && (
                     <div className="flex justify-between items-center">
-                      <span className="font-semibold" style={{ color: COLORS.text }}>Total</span>
-                      <span className="text-2xl font-bold" style={{ color: COLORS.primary }}>{CUR}{calculateTotal().toFixed(2)}</span>
+                      <span className="text-sm" style={{ color: COLORS.textMuted }}>
+                        {cafe.taxName || 'Tax'} ({cafe.taxRate}%)
+                      </span>
+                      <span className="font-medium" style={{ color: COLORS.text }}>
+                        {calculateTax() > 0 ? `${CUR}${calculateTax().toFixed(2)}` : '—'}
+                      </span>
                     </div>
                   )}
+                  {cafe?.serviceChargeEnabled && (
+                    <div className="flex justify-between items-center">
+                      <span className="text-sm" style={{ color: COLORS.textMuted }}>
+                        Service Charge ({cafe.serviceChargeRate}%)
+                      </span>
+                      <span className="font-medium" style={{ color: COLORS.text }}>
+                        {calculateServiceCharge() > 0 ? `${CUR}${calculateServiceCharge().toFixed(2)}` : '—'}
+                      </span>
+                    </div>
+                  )}
+                  {cafe?.gstEnabled && (
+                    <div className="flex justify-between items-center">
+                      <span className="text-sm" style={{ color: COLORS.textMuted }}>
+                        GST ({cafe.gstRate}%)
+                      </span>
+                      <span className="font-medium" style={{ color: COLORS.text }}>
+                        {calculateGST() > 0 ? `${CUR}${calculateGST().toFixed(2)}` : '—'}
+                      </span>
+                    </div>
+                  )}
+                  {!cafe?.taxEnabled && !cafe?.serviceChargeEnabled && !cafe?.gstEnabled && (
+                    <div className="flex justify-between items-center">
+                      <span className="text-xs" style={{ color: COLORS.textMuted }}>No additional charges</span>
+                      <span className="text-xs" style={{ color: COLORS.textMuted }}>✓</span>
+                    </div>
+                  )}
+                  <div className="border-t pt-2 flex justify-between items-center" style={{ borderColor: `${COLORS.primary}30` }}>
+                    <span className="font-semibold" style={{ color: COLORS.text }}>Total</span>
+                    <span className="text-2xl font-bold" style={{ color: COLORS.primary }}>{CUR}{calculateTotal().toFixed(2)}</span>
+                  </div>
                 </div>
 
                 {/* Customer Details */}
