@@ -1,7 +1,7 @@
 {
   "name": "smartcafe-backend",
-  "version": "1.0.0",
-  "description": "SmartCafe OS — Cashfree payment backend for Render deployment",
+  "version": "1.1.0",
+  "description": "SmartCafe OS — Cashfree payment + webhook backend for Render deployment",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
@@ -11,9 +11,10 @@
     "node": ">=18.0.0"
   },
   "dependencies": {
-    "cors":    "^2.8.5",
-    "dotenv":  "^16.4.5",
-    "express": "^4.19.2"
+    "cors":             "^2.8.5",
+    "dotenv":           "^16.4.5",
+    "express":          "^4.19.2",
+    "firebase-admin":   "^12.0.0"
   },
   "devDependencies": {
     "nodemon": "^3.1.4"

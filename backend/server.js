@@ -177,36 +177,166 @@ app.post('/create-order', async (req, res) => {
   }
 });
 
-// ─── POST /webhook ────────────────────────────────────────────────────────────
-app.post('/webhook', (req, res) => {
-  const body = req.body;
-  console.log('[webhook] ─── Incoming payload ────────────────────────────────');
-  console.log(JSON.stringify(body, null, 2));
-  console.log('[webhook] ─────────────────────────────────────────────────────');
+// ─── Firebase Admin — initialised once, used by webhook ─────────────────────
+// Set FIREBASE_SERVICE_ACCOUNT in Render env vars (JSON string of service account)
+let firestoreDb = null;
 
-  const orderStatus   = body?.data?.order?.order_status    || body?.order_status;
-  const paymentStatus = body?.data?.payment?.payment_status || body?.payment_status;
-  const orderId       = body?.data?.order?.order_id         || body?.order_id;
+try {
+  const admin = require('firebase-admin');
 
-  console.log('[webhook] orderId:', orderId, '| orderStatus:', orderStatus, '| paymentStatus:', paymentStatus);
+  if (!admin.apps.length) {
+    const serviceAccountRaw = process.env.FIREBASE_SERVICE_ACCOUNT;
 
-  if (orderStatus === 'PAID' || paymentStatus === 'SUCCESS') {
-    console.log('[webhook] Payment SUCCESS for order:', orderId);
-    // TODO: strip timestamp suffix and update Firestore
-    // const firestoreId = orderId.split('_').slice(0,-1).join('_');
-    // await db.collection('orders').doc(firestoreId).update({ paymentStatus: 'paid' });
-  } else if (paymentStatus === 'FAILED') {
-    console.log('[webhook] Payment FAILED for order:', orderId);
-  } else if (paymentStatus === 'USER_DROPPED') {
-    console.log('[webhook] User DROPPED payment for order:', orderId);
-  } else if (orderStatus === 'ACTIVE') {
-    console.log('[webhook] Payment PENDING for order:', orderId);
+    if (!serviceAccountRaw) {
+      console.warn('[Firebase] FIREBASE_SERVICE_ACCOUNT env var not set.');
+      console.warn('[Firebase] Webhook will log only — no Firestore updates until configured.');
+    } else {
+      const serviceAccount = JSON.parse(serviceAccountRaw);
+      admin.initializeApp({
+        credential: admin.credential.cert(serviceAccount),
+      });
+      firestoreDb = admin.firestore();
+      console.log('[Firebase] Admin SDK initialised successfully.');
+    }
   } else {
-    console.log('[webhook] Unhandled status — orderStatus:', orderStatus, 'paymentStatus:', paymentStatus);
+    firestoreDb = admin.firestore();
+  }
+} catch (err) {
+  console.error('[Firebase] Admin SDK init failed:', err.message);
+  console.error('[Firebase] Check FIREBASE_SERVICE_ACCOUNT format (must be valid JSON string).');
+}
+
+// ─── Helper: strip timestamp suffix to get Firestore doc ID ──────────────────
+// uniqueOrderId format: {firestoreDocId}_{timestamp}
+// Example: XyZ1AbcDef9_1742803200000 → XyZ1AbcDef9
+// Firebase auto-IDs are alphanumeric (no underscores), so last segment is always the timestamp.
+function getFirestoreDocId(cashfreeOrderId) {
+  if (!cashfreeOrderId) return null;
+  const parts = String(cashfreeOrderId).split('_');
+  if (parts.length < 2) return cashfreeOrderId; // no suffix — use as-is
+  return parts.slice(0, -1).join('_');
+}
+
+// ─── POST /webhook/cashfree ────────────────────────────────────────────────────
+// Register this URL in Cashfree Dashboard → Developers → Webhooks:
+//   https://your-app.onrender.com/webhook/cashfree
+//
+// Also kept as /webhook for backward compat (old setting in Cashfree dashboard).
+//
+// Cashfree webhook payload (v2023-08-01):
+// {
+//   data: {
+//     order:   { order_id, order_status }
+//     payment: { payment_status, payment_amount, payment_currency }
+//   }
+//   event_time: "...",
+//   type: "PAYMENT_SUCCESS_WEBHOOK" | "PAYMENT_FAILED_WEBHOOK"
+// }
+async function handleCashfreeWebhook(req, res) {
+  // Always respond 200 immediately — Cashfree retries on non-200
+  res.status(200).send('OK');
+
+  const body = req.body;
+  console.log('[webhook] Webhook received');
+  console.log('[webhook] Full payload:', JSON.stringify(body, null, 2));
+
+  // ── Extract fields — support both v2 and v1 payload shapes ───────────────
+  const cashfreeOrderId = body?.data?.order?.order_id    || body?.order_id    || null;
+  const paymentStatus   = body?.data?.payment?.payment_status || body?.payment_status || null;
+  const orderStatus     = body?.data?.order?.order_status     || body?.order_status   || null;
+  const eventType       = body?.type || null;
+
+  console.log('[webhook] cashfreeOrderId:', cashfreeOrderId);
+  console.log('[webhook] paymentStatus  :', paymentStatus);
+  console.log('[webhook] orderStatus    :', orderStatus);
+  console.log('[webhook] eventType      :', eventType);
+
+  // ── Determine outcome ─────────────────────────────────────────────────────
+  const isSuccess = paymentStatus === 'SUCCESS'
+    || orderStatus  === 'PAID'
+    || eventType    === 'PAYMENT_SUCCESS_WEBHOOK';
+
+  const isFailed  = paymentStatus === 'FAILED'
+    || paymentStatus === 'USER_DROPPED'
+    || eventType    === 'PAYMENT_FAILED_WEBHOOK';
+
+  if (!cashfreeOrderId) {
+    console.error('[webhook] No order_id in payload — cannot update Firestore');
+    return;
   }
 
-  res.status(200).json({ received: true });
-});
+  // ── Derive Firestore document ID ──────────────────────────────────────────
+  // uniqueOrderId was created as: firestoreDocId + '_' + Date.now()
+  const firestoreDocId = getFirestoreDocId(cashfreeOrderId);
+  console.log('[webhook] firestoreDocId:', firestoreDocId);
+
+  // ── Skip if Firebase Admin not configured ─────────────────────────────────
+  if (!firestoreDb) {
+    console.warn('[webhook] Firestore not initialised — skipping DB update.');
+    console.warn('[webhook] Add FIREBASE_SERVICE_ACCOUNT to Render env vars to enable.');
+    return;
+  }
+
+  try {
+    const orderRef = firestoreDb.collection('orders').doc(firestoreDocId);
+    const orderSnap = await orderRef.get();
+
+    if (!orderSnap.exists) {
+      console.error('[webhook] Order not found in Firestore:', firestoreDocId);
+      return;
+    }
+
+    const existingOrder = orderSnap.data();
+    console.log('[webhook] Order found:', firestoreDocId,
+      '| currentPaymentStatus:', existingOrder.paymentStatus);
+
+    // ── Idempotency: skip if already in final state ───────────────────────
+    if (isSuccess && existingOrder.paymentStatus === 'paid') {
+      console.log('[webhook] Order already marked paid — skipping duplicate webhook');
+      return;
+    }
+    if (isFailed && existingOrder.paymentStatus === 'failed') {
+      console.log('[webhook] Order already marked failed — skipping duplicate webhook');
+      return;
+    }
+
+    // ── Update Firestore ───────────────────────────────────────────────────
+    // Updating paymentStatus triggers existing Firebase onSnapshot listeners
+    // on the frontend — dashboard, kitchen display, and order tracking all
+    // update automatically without any additional code.
+
+    if (isSuccess) {
+      await orderRef.update({
+        paymentStatus: 'paid',
+        updatedAt:     firestoreDb.constructor.Timestamp
+          ? firestoreDb.constructor.Timestamp.now()
+          : new Date(),
+      });
+      console.log('[webhook] Order updated to PAID:', firestoreDocId);
+
+    } else if (isFailed) {
+      await orderRef.update({
+        paymentStatus: 'failed',
+        updatedAt:     new Date(),
+      });
+      console.log('[webhook] Order updated to FAILED:', firestoreDocId);
+
+    } else {
+      console.log('[webhook] Unhandled status — no DB update made.',
+        '| paymentStatus:', paymentStatus,
+        '| orderStatus:', orderStatus);
+    }
+
+  } catch (err) {
+    // Task 7: Never crash on DB error — webhook already responded 200
+    console.error('[webhook] Order update failed:', firestoreDocId, '|', err.message);
+  }
+}
+
+// Register both paths — new canonical + old for backward compat
+app.post('/webhook/cashfree', handleCashfreeWebhook);
+app.post('/webhook',          handleCashfreeWebhook);
+
 
 // ─── 404 ─────────────────────────────────────────────────────────────────────
 app.use((req, res) => {
