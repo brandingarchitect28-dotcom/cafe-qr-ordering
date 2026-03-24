@@ -233,52 +233,51 @@ function getFirestoreDocId(cashfreeOrderId) {
 //   type: "PAYMENT_SUCCESS_WEBHOOK" | "PAYMENT_FAILED_WEBHOOK"
 // }
 async function handleCashfreeWebhook(req, res) {
-  // Always respond 200 immediately — Cashfree retries on non-200
+  // Send 200 FIRST — before any processing.
+  // Cashfree marks the test as failed if 200 does not arrive immediately.
   res.status(200).send('OK');
 
-  const body = req.body;
-  console.log('[webhook] Webhook received');
-  console.log('[webhook] Full payload:', JSON.stringify(body, null, 2));
-
-  // ── Extract fields — support both v2 and v1 payload shapes ───────────────
-  const cashfreeOrderId = body?.data?.order?.order_id    || body?.order_id    || null;
-  const paymentStatus   = body?.data?.payment?.payment_status || body?.payment_status || null;
-  const orderStatus     = body?.data?.order?.order_status     || body?.order_status   || null;
-  const eventType       = body?.type || null;
-
-  console.log('[webhook] cashfreeOrderId:', cashfreeOrderId);
-  console.log('[webhook] paymentStatus  :', paymentStatus);
-  console.log('[webhook] orderStatus    :', orderStatus);
-  console.log('[webhook] eventType      :', eventType);
-
-  // ── Determine outcome ─────────────────────────────────────────────────────
-  const isSuccess = paymentStatus === 'SUCCESS'
-    || orderStatus  === 'PAID'
-    || eventType    === 'PAYMENT_SUCCESS_WEBHOOK';
-
-  const isFailed  = paymentStatus === 'FAILED'
-    || paymentStatus === 'USER_DROPPED'
-    || eventType    === 'PAYMENT_FAILED_WEBHOOK';
-
-  if (!cashfreeOrderId) {
-    console.error('[webhook] No order_id in payload — cannot update Firestore');
-    return;
-  }
-
-  // ── Derive Firestore document ID ──────────────────────────────────────────
-  // uniqueOrderId was created as: firestoreDocId + '_' + Date.now()
-  const firestoreDocId = getFirestoreDocId(cashfreeOrderId);
-  console.log('[webhook] firestoreDocId:', firestoreDocId);
-
-  // ── Skip if Firebase Admin not configured ─────────────────────────────────
-  if (!firestoreDb) {
-    console.warn('[webhook] Firestore not initialised — skipping DB update.');
-    console.warn('[webhook] Add FIREBASE_SERVICE_ACCOUNT to Render env vars to enable.');
-    return;
-  }
-
+  // All remaining work is best-effort — wrapped in try/catch so no exception
+  // can ever surface after the response has already been sent.
   try {
-    const orderRef = firestoreDb.collection('orders').doc(firestoreDocId);
+    const body = req.body || {};
+    console.log('[webhook] Webhook received');
+    console.log('[webhook] Full payload:', JSON.stringify(body, null, 2));
+
+    // Extract fields — support both Cashfree v2 and v1 payload shapes
+    const cashfreeOrderId = body?.data?.order?.order_id         || body?.order_id    || null;
+    const paymentStatus   = body?.data?.payment?.payment_status || body?.payment_status || null;
+    const orderStatus     = body?.data?.order?.order_status     || body?.order_status   || null;
+    const eventType       = body?.type || null;
+
+    console.log('[webhook] cashfreeOrderId:', cashfreeOrderId);
+    console.log('[webhook] paymentStatus  :', paymentStatus);
+    console.log('[webhook] orderStatus    :', orderStatus);
+    console.log('[webhook] eventType      :', eventType);
+
+    const isSuccess = paymentStatus === 'SUCCESS'
+      || orderStatus === 'PAID'
+      || eventType   === 'PAYMENT_SUCCESS_WEBHOOK';
+
+    const isFailed  = paymentStatus === 'FAILED'
+      || paymentStatus === 'USER_DROPPED'
+      || eventType   === 'PAYMENT_FAILED_WEBHOOK';
+
+    if (!cashfreeOrderId) {
+      console.warn('[webhook] No order_id in payload — logging only, no DB update');
+      return;
+    }
+
+    const firestoreDocId = getFirestoreDocId(cashfreeOrderId);
+    console.log('[webhook] firestoreDocId:', firestoreDocId);
+
+    if (!firestoreDb) {
+      console.warn('[webhook] Firestore not initialised — skipping DB update.');
+      console.warn('[webhook] Add FIREBASE_SERVICE_ACCOUNT to Render env vars to enable.');
+      return;
+    }
+
+    const orderRef  = firestoreDb.collection('orders').doc(firestoreDocId);
     const orderSnap = await orderRef.get();
 
     if (!orderSnap.exists) {
@@ -290,7 +289,7 @@ async function handleCashfreeWebhook(req, res) {
     console.log('[webhook] Order found:', firestoreDocId,
       '| currentPaymentStatus:', existingOrder.paymentStatus);
 
-    // ── Idempotency: skip if already in final state ───────────────────────
+    // Idempotency: skip if already in final state
     if (isSuccess && existingOrder.paymentStatus === 'paid') {
       console.log('[webhook] Order already marked paid — skipping duplicate webhook');
       return;
@@ -300,38 +299,32 @@ async function handleCashfreeWebhook(req, res) {
       return;
     }
 
-    // ── Update Firestore ───────────────────────────────────────────────────
-    // Updating paymentStatus triggers existing Firebase onSnapshot listeners
-    // on the frontend — dashboard, kitchen display, and order tracking all
-    // update automatically without any additional code.
-
+    // Update Firestore — triggers existing onSnapshot listeners on frontend
+    // (dashboard, kitchen display, order tracking) automatically
     if (isSuccess) {
-      await orderRef.update({
-        paymentStatus: 'paid',
-        updatedAt:     firestoreDb.constructor.Timestamp
-          ? firestoreDb.constructor.Timestamp.now()
-          : new Date(),
-      });
+      await orderRef.update({ paymentStatus: 'paid', updatedAt: new Date() });
       console.log('[webhook] Order updated to PAID:', firestoreDocId);
-
     } else if (isFailed) {
-      await orderRef.update({
-        paymentStatus: 'failed',
-        updatedAt:     new Date(),
-      });
+      await orderRef.update({ paymentStatus: 'failed', updatedAt: new Date() });
       console.log('[webhook] Order updated to FAILED:', firestoreDocId);
-
     } else {
-      console.log('[webhook] Unhandled status — no DB update made.',
-        '| paymentStatus:', paymentStatus,
-        '| orderStatus:', orderStatus);
+      console.log('[webhook] Unhandled status — no DB update.',
+        '| paymentStatus:', paymentStatus, '| orderStatus:', orderStatus);
     }
 
   } catch (err) {
-    // Task 7: Never crash on DB error — webhook already responded 200
-    console.error('[webhook] Order update failed:', firestoreDocId, '|', err.message);
+    // Log but never re-throw — 200 was already sent
+    console.error('[webhook] Processing error (200 already sent):', err.message);
   }
 }
+
+// ─── GET /webhook/cashfree — health check (Cashfree test tool hits this first) ─
+app.get('/webhook/cashfree', (req, res) => {
+  res.status(200).send('Webhook endpoint active');
+});
+app.get('/webhook', (req, res) => {
+  res.status(200).send('Webhook endpoint active');
+});
 
 // Register both paths — new canonical + old for backward compat
 app.post('/webhook/cashfree', handleCashfreeWebhook);
