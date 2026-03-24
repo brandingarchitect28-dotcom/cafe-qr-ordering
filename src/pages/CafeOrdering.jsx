@@ -537,7 +537,10 @@ const CafeOrdering = () => {
         totalAmount: total,
         currencyCode: cafe?.currencyCode || 'INR',
         currencySymbol: cafe?.currencySymbol || '₹',
-        paymentStatus: (paymentMode === 'prepaid' || paymentMode === 'online') ? 'paid' : 'pending',
+        // TASK 1 FIX: Always 'pending' at creation.
+        // Never mark paid before actual payment confirmation.
+        // Only updated to 'paid' by: owner manual action OR future webhook.
+        paymentStatus: 'pending',
         paymentMode,
         orderStatus: 'new',
         orderType,
@@ -566,60 +569,77 @@ const CafeOrdering = () => {
       deductStockByRecipe(cafeId, orderData.items, menuItems)
         .catch((err) => console.error('[Recipe] Stock deduction failed (non-fatal):', err));
 
-      // ── Cashfree payment redirect (Task 2) ─────────────────────────────
+      // TASK 7: Log order creation (no sensitive data logged)
+      console.log('[Order] Created successfully:', {
+        orderId:     orderDocRef.id,
+        orderNumber: String(orderNumber).padStart(3, '0'),
+        paymentMode,
+        paymentStatus: 'pending',
+        totalAmount: total,
+      });
+
+      // ── Cashfree payment via backend proxy (Tasks 2, 4, 5) ─────────────
+      // TASK 2: Direct browser call to api.cashfree.com is CORS-blocked.
+      //         Call your Render/backend instead — it holds the keys server-side.
+      // TASK 5: Frontend sends ONLY orderId, amount, phone, cafeId.
+      //         Keys NEVER leave the backend.
+      // TASK 4: orderId passed consistently so webhook can match it later.
       if (
         paymentMode === 'online' &&
         cafe?.paymentSettings?.enabled &&
-        cafe?.paymentSettings?.gateway === 'cashfree' &&
-        cafe?.paymentSettings?.keyId &&
-        cafe?.paymentSettings?.keySecret
+        cafe?.paymentSettings?.gateway === 'cashfree'
       ) {
         try {
-          console.log('[Cashfree] Initiating payment for order', orderDocRef.id);
-          const cfBody = {
-            order_id:     orderDocRef.id,
-            order_amount: total,
-            order_currency: cafe?.currencyCode || 'INR',
-            customer_details: {
-              customer_id:    customerPhone.replace(/\D/g,'') || orderDocRef.id.slice(0,10),
-              customer_name:  customerName,
-              customer_phone: customerPhone,
-            },
-            order_meta: {
-              return_url: `${window.location.origin}/track/${orderDocRef.id}`,
-            },
-          };
-          console.log('[Cashfree] Request body:', cfBody);
+          // ── REPLACE THIS URL with your Render backend URL ──────────────
+          // e.g. https://your-app.onrender.com/create-order
+          const BACKEND_URL = cafe?.paymentSettings?.backendUrl || '';
 
-          const cfResp = await fetch('https://api.cashfree.com/pg/orders', {
-            method: 'POST',
-            headers: {
-              'Content-Type':   'application/json',
-              'x-api-version':  '2023-08-01',
-              'x-client-id':     cafe.paymentSettings.keyId,
-              'x-client-secret': cafe.paymentSettings.keySecret,
-            },
-            body: JSON.stringify(cfBody),
-          });
-
-          const cfData = await cfResp.json();
-          console.log('[Cashfree] Response:', cfData);
-
-          if (cfData?.payment_session_id) {
-            // Redirect to Cashfree payment page
-            const paymentLink = `https://payments.cashfree.com/order/#${cfData.payment_session_id}`;
-            window.location.href = paymentLink;
-            return; // Stop here — user will be redirected
-          } else if (cfData?.payment_link) {
-            window.location.href = cfData.payment_link;
-            return;
+          if (!BACKEND_URL) {
+            console.warn('[Payment] Backend URL not configured. Set paymentSettings.backendUrl in café settings.');
+            toast.error('Payment backend not configured. Please pay at counter.');
           } else {
-            console.error('[Cashfree] No payment link in response:', cfData);
-            toast.error('Payment gateway error. Please use another payment method.');
+            // TASK 7: Log payment initiation (no keys)
+            console.log('[Payment] Initiating Cashfree via backend:', {
+              orderId: orderDocRef.id,
+              amount:  total,
+              cafeId,
+            });
+
+            const resp = await fetch(`${BACKEND_URL}/create-order`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              // TASK 5: Only non-sensitive data sent from frontend
+              body: JSON.stringify({
+                orderId:  orderDocRef.id,  // TASK 4: consistent orderId for webhook
+                amount:   total,
+                phone:    customerPhone,
+                cafeId,
+                currency: cafe?.currencyCode || 'INR',
+                customerName,
+                returnUrl: `${window.location.origin}/track/${orderDocRef.id}`,
+              }),
+            });
+
+            const data = await resp.json();
+            console.log('[Payment] Backend response received:', { status: resp.status, hasLink: !!data?.payment_link });
+
+            if (data?.payment_link) {
+              // TASK 7: Log redirect
+              console.log('[Payment] Redirecting to payment page for order', orderDocRef.id);
+              window.location.href = data.payment_link;
+              return;
+            } else if (data?.payment_session_id) {
+              window.location.href = `https://payments.cashfree.com/order/#${data.payment_session_id}`;
+              return;
+            } else {
+              console.error('[Payment] No payment link returned:', data?.error || data);
+              toast.error('Payment gateway error. Please pay at counter.');
+            }
           }
         } catch (cfErr) {
-          console.error('[Cashfree] Payment initiation failed:', cfErr);
-          toast.error('Payment gateway unavailable. Order saved — please pay at counter.');
+          // TASK 6: On any failure, order stays 'pending' — no data lost
+          console.error('[Payment] Backend call failed (order preserved as pending):', cfErr.message);
+          toast.error('Payment unavailable. Your order is saved — please pay at counter.');
         }
       }
 

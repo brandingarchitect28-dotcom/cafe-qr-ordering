@@ -22,6 +22,7 @@ const Settings = () => {
     keyId: '',
     keySecret: '',
     merchantName: '',
+    backendUrl: '',   // Task 5: Render/backend URL for server-side Cashfree calls
     currency: 'INR',
   });
 
@@ -85,6 +86,7 @@ const Settings = () => {
               keyId:        data.paymentSettings.keyId        || '',
               keySecret:    data.paymentSettings.keySecret    || '',
               merchantName: data.paymentSettings.merchantName || '',
+              backendUrl:   data.paymentSettings.backendUrl   || '',
               currency:     data.paymentSettings.currency     || 'INR',
             });
           }
@@ -156,6 +158,7 @@ const Settings = () => {
           keyId:        paymentSettings.keyId.trim(),
           keySecret:    paymentSettings.keySecret.trim(),
           merchantName: paymentSettings.merchantName.trim(),
+          backendUrl:   paymentSettings.backendUrl.trim(),
           currency:     paymentSettings.currency,
         },
       });
@@ -910,6 +913,23 @@ const Settings = () => {
                       </button>
                     </div>
                     <p className="text-[#A3A3A3] text-xs mt-1.5">Stored securely in your private Firestore document.</p>
+                  </div>
+                  {/* Backend URL for server-side Cashfree calls (Task 5) */}
+                  <div>
+                    <label className="block text-white text-sm font-medium mb-2">
+                      Backend URL
+                      <span className="text-[#A3A3A3] font-normal ml-1 text-xs">(your Render/server URL)</span>
+                    </label>
+                    <input
+                      type="text"
+                      value={paymentSettings.backendUrl}
+                      onChange={(e) => setPaymentSettings(prev => ({ ...prev, backendUrl: e.target.value }))}
+                      placeholder="https://your-app.onrender.com"
+                      className="w-full bg-black/20 border border-white/10 text-white placeholder:text-neutral-600 focus:border-[#D4AF37] focus:ring-1 focus:ring-[#D4AF37] rounded-sm h-12 px-4 font-mono transition-all"
+                    />
+                    <p className="text-[#A3A3A3] text-xs mt-1.5">
+                      Your backend creates the Cashfree order server-side — keys never exposed to browser.
+                    </p>
                   </div>
                   {paymentSettings.keyId && paymentSettings.keySecret && (
                     <p className="text-green-400 text-xs flex items-center gap-1.5">
