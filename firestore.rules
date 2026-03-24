@@ -186,5 +186,27 @@ service cloud.firestore {
       allow read:   if true;
       allow write:  if isAdmin() || (isAuthenticated() && isCafeOwner(cafeId));
     }
+    // ── Staff Management collections ──────────────────────────────────────────
+    match /staff/{staffId} {
+      allow read:   if isAdmin() || (isAuthenticated() && isCafeOwner(resource.data.cafeId));
+      allow create: if isAdmin() || (isAuthenticated() && isCafeOwner(request.resource.data.cafeId));
+      allow update: if isAdmin() || (isAuthenticated() && isCafeOwner(resource.data.cafeId));
+      allow delete: if isAdmin();
+    }
+
+    match /attendance/{recordId} {
+      // Allow unauthenticated create — QR scan happens on staff tablet without owner login
+      allow create: if true;
+      allow read:   if isAdmin() || (isAuthenticated() && isCafeOwner(resource.data.cafeId));
+      allow update: if true; // check-out updates from staff tablet
+      allow delete: if isAdmin();
+    }
+
+    match /salary/{salaryId} {
+      allow read:   if isAdmin() || (isAuthenticated() && isCafeOwner(resource.data.cafeId));
+      allow create: if isAdmin() || (isAuthenticated() && isCafeOwner(request.resource.data.cafeId));
+      allow update: if isAdmin() || (isAuthenticated() && isCafeOwner(resource.data.cafeId));
+      allow delete: if isAdmin();
+    }
   }
 }

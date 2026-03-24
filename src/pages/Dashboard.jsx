@@ -3,7 +3,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { signOut } from 'firebase/auth';
 import { auth } from '../lib/firebase';
 import { useNavigate } from 'react-router-dom';
-import { LayoutDashboard, ShoppingBag, Menu as MenuIcon, Gift, BarChart3, Settings as SettingsIcon, QrCode, LogOut, X, UtensilsCrossed, ExternalLink, Boxes, Sparkles, Upload, TrendingUp, MessageSquare, Bot, FileText } from 'lucide-react';
+import { LayoutDashboard, ShoppingBag, Menu as MenuIcon, Gift, BarChart3, Settings as SettingsIcon, QrCode, LogOut, X, UtensilsCrossed, ExternalLink, Boxes, Sparkles, Upload, TrendingUp, MessageSquare, Bot, FileText, Users } from 'lucide-react';
 import Overview from '../components/dashboard/Overview';
 import OrdersManagement from '../components/dashboard/OrdersManagement';
 import MenuManagement from '../components/dashboard/MenuManagement';
@@ -19,6 +19,7 @@ import AIMenuUpload from '../components/dashboard/AIMenuUpload';
 import WhatsAppMarketing from '../components/dashboard/WhatsAppMarketing';
 import AskAI from '../components/dashboard/AskAI';
 import InvoicesTab from '../components/dashboard/InvoicesTab';
+import StaffManagement from '../components/dashboard/StaffManagement';
 
 const Dashboard = () => {
   const { user } = useAuth();
@@ -50,6 +51,7 @@ const Dashboard = () => {
     { id: 'ai',         label: 'AI Insights', icon: Sparkles        },
     { id: 'aimenu',     label: 'AI Menu',     icon: Upload          },
     { id: 'qr',         label: 'QR Code',     icon: QrCode          },
+    { id: 'staff',      label: 'Staff',       icon: Users           },
     { id: 'settings',   label: 'Settings',    icon: SettingsIcon    },
   ];
 
@@ -150,6 +152,7 @@ const Dashboard = () => {
           {activeTab === 'ai'         && <AIInsights />}
           {activeTab === 'aimenu'     && <AIMenuUpload onClose={() => setActiveTab('menu')} />}
           {activeTab === 'qr'         && <QRGenerator />}
+          {activeTab === 'staff'      && <StaffManagement />}
           {activeTab === 'settings'   && <Settings />}
         </main>
       </div>
