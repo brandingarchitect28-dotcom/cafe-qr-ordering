@@ -6,28 +6,31 @@ const https   = require('https');
 require('dotenv').config();
 
 const app  = express();
-const PORT = process.env.PORT || 3000;
+const PORT = process.env.PORT || 5000;
 
-// ─── Validate required env vars on startup ────────────────────────────────────
+// ─── Warn about missing env vars but NEVER exit — server must start regardless ─
+// If APP_ID / SECRET_KEY are missing, /create-order will return a clear error.
+// Killing the process here causes Render to show "Application Loading" forever.
 const REQUIRED_ENV = ['APP_ID', 'SECRET_KEY'];
 const missing = REQUIRED_ENV.filter(k => !process.env[k]);
 if (missing.length) {
-  console.error('[Startup] Missing required environment variables:', missing.join(', '));
-  console.error('[Startup] Check your .env file or Render environment settings.');
-  process.exit(1);
+  console.warn('[Startup] WARNING — missing env vars:', missing.join(', '));
+  console.warn('[Startup] Add them in Render → Environment. Payment routes will fail until set.');
+  // DO NOT process.exit() — server must keep running so health checks pass
 }
 
-// ─── FIX 5: Detect environment from APP_ID prefix ────────────────────────────
-// Cashfree TEST keys start with "TEST_"
-// Using wrong host for the key type causes "client session is invalid"
-const IS_SANDBOX     = process.env.APP_ID.startsWith('TEST_');
-const CF_HOST        = IS_SANDBOX ? 'sandbox.cashfree.com' : 'api.cashfree.com';
+console.log('App started');
+
+// ─── Cashfree environment detection (safe — guards APP_ID access) ─────────────
+const APP_ID_VAL       = process.env.APP_ID || '';
+const IS_SANDBOX       = APP_ID_VAL.startsWith('TEST_');
+const CF_HOST          = IS_SANDBOX ? 'sandbox.cashfree.com' : 'api.cashfree.com';
 const CF_CHECKOUT_BASE = IS_SANDBOX
   ? 'https://sandbox.cashfree.com/pg/view/sessions'
   : 'https://payments.cashfree.com/order';
 
-console.log(`[Startup] Environment : ${IS_SANDBOX ? 'SANDBOX (test keys)' : 'PRODUCTION (live keys)'}`);
-console.log(`[Startup] Cashfree API: ${CF_HOST}`);
+console.log(`[Startup] Cashfree env : ${APP_ID_VAL ? (IS_SANDBOX ? 'SANDBOX' : 'PRODUCTION') : 'NOT SET'}`);
+console.log(`[Startup] Cashfree API : ${CF_HOST}`);
 
 // ─── Middleware ───────────────────────────────────────────────────────────────
 app.use(cors({
@@ -69,6 +72,12 @@ app.post('/create-order', async (req, res) => {
   console.log('[create-order] ─────────────────────────────────────────────────');
 
   // ── Input validation ────────────────────────────────────────────────────────
+  // Guard: keys must be set or return clear error (server still runs without them)
+  if (!process.env.APP_ID || !process.env.SECRET_KEY) {
+    console.error('[create-order] APP_ID or SECRET_KEY not set — add them in Render environment');
+    return res.status(503).json({ error: 'Payment gateway not configured. Add APP_ID and SECRET_KEY in Render environment.' });
+  }
+
   if (!orderId || !amount || !phone) {
     console.warn('[create-order] FAIL — missing required fields');
     return res.status(400).json({ error: 'orderId, amount and phone are required.' });
