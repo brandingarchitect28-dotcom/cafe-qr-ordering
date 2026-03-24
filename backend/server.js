@@ -17,13 +17,24 @@ if (missing.length) {
   process.exit(1);
 }
 
+// ─── FIX 5: Detect environment from APP_ID prefix ────────────────────────────
+// Cashfree TEST keys start with "TEST_"
+// Using wrong host for the key type causes "client session is invalid"
+const IS_SANDBOX     = process.env.APP_ID.startsWith('TEST_');
+const CF_HOST        = IS_SANDBOX ? 'sandbox.cashfree.com' : 'api.cashfree.com';
+const CF_CHECKOUT_BASE = IS_SANDBOX
+  ? 'https://sandbox.cashfree.com/pg/view/sessions'
+  : 'https://payments.cashfree.com/order';
+
+console.log(`[Startup] Environment : ${IS_SANDBOX ? 'SANDBOX (test keys)' : 'PRODUCTION (live keys)'}`);
+console.log(`[Startup] Cashfree API: ${CF_HOST}`);
+
 // ─── Middleware ───────────────────────────────────────────────────────────────
 app.use(cors({
-  origin: '*',   // Tighten in production: set to your Netlify domain
+  origin: '*',
   methods: ['GET', 'POST'],
   allowedHeaders: ['Content-Type'],
 }));
-
 app.use(express.json());
 
 // ─── Request logger ───────────────────────────────────────────────────────────
@@ -32,54 +43,65 @@ app.use((req, res, next) => {
   next();
 });
 
-// ─── GET / — Health check ─────────────────────────────────────────────────────
+// ─── GET / ───────────────────────────────────────────────────────────────────
 app.get('/', (req, res) => {
   res.json({
-    status:  'ok',
-    message: 'Backend running',
-    version: '1.0.0',
-    time:    new Date().toISOString(),
+    status:      'ok',
+    message:     'Backend running',
+    version:     '1.1.0',
+    environment: IS_SANDBOX ? 'sandbox' : 'production',
+    time:        new Date().toISOString(),
   });
 });
 
-// ─── POST /create-order — Cashfree order creation ────────────────────────────
-// Called by frontend (CafeOrdering.jsx) with:
-//   orderId, amount, phone, cafeId, currency, customerName, returnUrl
-// Returns: { payment_link } or { error }
-// Keys live HERE — never in the browser.
+// ─── POST /create-order ───────────────────────────────────────────────────────
 app.post('/create-order', async (req, res) => {
   const { orderId, amount, phone, cafeId, currency, customerName, returnUrl } = req.body;
 
+  // ── Task 7: Log full incoming request ──────────────────────────────────────
+  console.log('[create-order] ─── Incoming request ───────────────────────────');
+  console.log('[create-order] orderId:     ', orderId);
+  console.log('[create-order] amount:      ', amount, '(raw)');
+  console.log('[create-order] phone:       ', phone);
+  console.log('[create-order] cafeId:      ', cafeId);
+  console.log('[create-order] customerName:', customerName);
+  console.log('[create-order] returnUrl:   ', returnUrl);
+  console.log('[create-order] ─────────────────────────────────────────────────');
+
   // ── Input validation ────────────────────────────────────────────────────────
   if (!orderId || !amount || !phone) {
-    console.warn('[create-order] Missing required fields:', { orderId, amount, phone });
+    console.warn('[create-order] FAIL — missing required fields');
     return res.status(400).json({ error: 'orderId, amount and phone are required.' });
   }
-
   if (isNaN(amount) || Number(amount) <= 0) {
-    console.warn('[create-order] Invalid amount:', amount);
+    console.warn('[create-order] FAIL — invalid amount:', amount);
     return res.status(400).json({ error: 'amount must be a positive number.' });
   }
 
   const cleanPhone = String(phone).replace(/\D/g, '');
   if (cleanPhone.length < 10) {
-    console.warn('[create-order] Invalid phone:', phone);
-    return res.status(400).json({ error: 'Invalid phone number.' });
+    console.warn('[create-order] FAIL — invalid phone:', phone, 'cleaned:', cleanPhone);
+    return res.status(400).json({ error: 'Phone number must be at least 10 digits.' });
   }
 
-  console.log('[create-order] Initiating Cashfree order:', {
-    orderId,
-    amount,
-    cafeId,
-    // No keys logged — ever
-  });
+  // ── FIX 2: Integer amount — no decimals, no precision errors ───────────────
+  // Math.round eliminates 1.1500000000000001, 115.999999 etc.
+  const formattedAmount = Math.round(Number(amount));
+  console.log('[create-order] Amount:', amount, '->', formattedAmount, '(rounded integer)');
 
-  // ── Build Cashfree request body ─────────────────────────────────────────────
-  // Fix floating point precision: 1.1500000000000001 → 1.15
-  const formattedAmount = Number(parseFloat(amount).toFixed(2));
+  if (formattedAmount <= 0) {
+    return res.status(400).json({ error: 'Order amount must be greater than zero.' });
+  }
 
-  const cfPayload = JSON.stringify({
-    order_id:       orderId,
+  // ── FIX 1: Always unique orderId — Cashfree rejects reused IDs ─────────────
+  // Reusing an orderId returns the OLD session which may be expired/invalid
+  // causing "client session is invalid" on the payment page
+  const uniqueOrderId = `${orderId}_${Date.now()}`;
+  console.log('[create-order] uniqueOrderId:', uniqueOrderId);
+
+  // ── Build Cashfree payload ──────────────────────────────────────────────────
+  const cfPayloadObj = {
+    order_id:       uniqueOrderId,
     order_amount:   formattedAmount,
     order_currency: currency || 'INR',
     customer_details: {
@@ -90,68 +112,103 @@ app.post('/create-order', async (req, res) => {
     order_meta: {
       return_url: returnUrl || `https://your-frontend.netlify.app/track/${orderId}`,
     },
-  });
+  };
 
-  // ── Cashfree API call — server-side only ────────────────────────────────────
+  // Task 7: Log exact payload sent to Cashfree (no keys)
+  console.log('[create-order] Payload to Cashfree:', JSON.stringify(cfPayloadObj, null, 2));
+
+  // ── Call Cashfree server-side ───────────────────────────────────────────────
   try {
-    const cfData = await cashfreeRequest(cfPayload);
+    const cfData = await cashfreeRequest(JSON.stringify(cfPayloadObj));
 
-    console.log('[create-order] Cashfree response status:', cfData.cf_order_id ? 'success' : 'no order id');
+    // FIX 6: Log FULL response — essential for diagnosing any Cashfree error
+    console.log('[create-order] ─── Cashfree full response ───────────────────');
+    console.log(JSON.stringify(cfData, null, 2));
+    console.log('[create-order] ─────────────────────────────────────────────');
 
-    if (cfData.payment_session_id) {
-      const payment_link = `https://payments.cashfree.com/order/#${cfData.payment_session_id}`;
-      console.log('[create-order] Payment link generated for order:', orderId);
-      return res.json({ payment_link, payment_session_id: cfData.payment_session_id });
+    // FIX 3: Strict session validation — empty string or null are both invalid
+    const session = cfData.payment_session_id;
+    if (session && typeof session === 'string' && session.trim() !== '') {
+
+      // FIX 4+5: Build correct URL for the right environment
+      // Mixing sandbox session with production URL → "client session is invalid"
+      const payment_link = IS_SANDBOX
+        ? `${CF_CHECKOUT_BASE}/${session}`
+        : `${CF_CHECKOUT_BASE}/#${session}`;
+
+      console.log('[create-order] SUCCESS');
+      console.log('[create-order]   uniqueOrderId      :', uniqueOrderId);
+      console.log('[create-order]   payment_session_id :', session);
+      console.log('[create-order]   payment_link       :', payment_link);
+      console.log('[create-order]   environment        :', IS_SANDBOX ? 'SANDBOX' : 'PRODUCTION');
+
+      // FIX 4: Return fresh session — frontend must use it immediately
+      return res.json({
+        success:            true,
+        payment_link,
+        payment_session_id: session,
+        order_id:           uniqueOrderId,
+        environment:        IS_SANDBOX ? 'sandbox' : 'production',
+      });
     }
 
-    if (cfData.message) {
-      console.error('[create-order] Cashfree error:', cfData.message);
-      return res.status(502).json({ error: cfData.message });
+    // ── Cashfree returned an error ────────────────────────────────────────────
+    const errMsg  = cfData.message || cfData.error || cfData.type || 'Unknown Cashfree error';
+    const errCode = cfData.code    || cfData.status || 'UNKNOWN';
+    console.error('[create-order] Cashfree error — message:', errMsg, '| code:', errCode);
+
+    // Targeted diagnosis for common errors
+    if (errMsg.includes('order already exists')) {
+      console.error('[create-order] CAUSE: Duplicate order_id — this should be fixed by uniqueOrderId suffix');
+    }
+    if (errMsg.includes('session') || errMsg.includes('client')) {
+      console.error('[create-order] CAUSE: Session/auth issue — verify APP_ID + SECRET_KEY are',
+        IS_SANDBOX ? 'SANDBOX (TEST_...)' : 'PRODUCTION (CF_...)');
+    }
+    if (errMsg.includes('amount')) {
+      console.error('[create-order] CAUSE: Amount issue — sent:', formattedAmount);
     }
 
-    console.error('[create-order] Unexpected Cashfree response:', JSON.stringify(cfData));
-    return res.status(502).json({ error: 'Unexpected response from payment gateway.' });
+    return res.status(502).json({ error: errMsg, code: errCode });
 
   } catch (err) {
-    console.error('[create-order] Cashfree API call failed:', err.message);
+    console.error('[create-order] API call failed:', err.message);
     return res.status(500).json({ error: 'Payment gateway unreachable. Please try again.' });
   }
 });
 
-// ─── POST /webhook — Cashfree payment status webhook ─────────────────────────
-// Cashfree sends this when payment is completed/failed.
-// Set this URL in Cashfree Dashboard → Webhooks:
-//   https://your-app.onrender.com/webhook
+// ─── POST /webhook ────────────────────────────────────────────────────────────
 app.post('/webhook', (req, res) => {
   const body = req.body;
+  console.log('[webhook] ─── Incoming payload ────────────────────────────────');
+  console.log(JSON.stringify(body, null, 2));
+  console.log('[webhook] ─────────────────────────────────────────────────────');
 
-  console.log('[webhook] Received payload:', JSON.stringify(body, null, 2));
-
-  // Cashfree webhook payload shape (v2023-08-01):
-  // { data: { order: { order_id, order_status }, payment: { payment_status } } }
-  const orderStatus   = body?.data?.order?.order_status   || body?.order_status;
+  const orderStatus   = body?.data?.order?.order_status    || body?.order_status;
   const paymentStatus = body?.data?.payment?.payment_status || body?.payment_status;
-  const orderId       = body?.data?.order?.order_id        || body?.order_id;
+  const orderId       = body?.data?.order?.order_id         || body?.order_id;
+
+  console.log('[webhook] orderId:', orderId, '| orderStatus:', orderStatus, '| paymentStatus:', paymentStatus);
 
   if (orderStatus === 'PAID' || paymentStatus === 'SUCCESS') {
-    console.log('[webhook] ✅ Payment success for order:', orderId);
-    // TODO: Call Firebase Admin SDK here to update
-    // orders/{orderId}.paymentStatus = 'paid'
-    // Example (once Firebase Admin is wired up):
-    // await db.collection('orders').doc(orderId).update({ paymentStatus: 'paid' });
+    console.log('[webhook] Payment SUCCESS for order:', orderId);
+    // TODO: strip timestamp suffix and update Firestore
+    // const firestoreId = orderId.split('_').slice(0,-1).join('_');
+    // await db.collection('orders').doc(firestoreId).update({ paymentStatus: 'paid' });
+  } else if (paymentStatus === 'FAILED') {
+    console.log('[webhook] Payment FAILED for order:', orderId);
+  } else if (paymentStatus === 'USER_DROPPED') {
+    console.log('[webhook] User DROPPED payment for order:', orderId);
   } else if (orderStatus === 'ACTIVE') {
-    console.log('[webhook] ⏳ Payment pending for order:', orderId);
-  } else if (paymentStatus === 'FAILED' || paymentStatus === 'USER_DROPPED') {
-    console.log('[webhook] ❌ Payment failed/dropped for order:', orderId, '| Status:', paymentStatus);
+    console.log('[webhook] Payment PENDING for order:', orderId);
   } else {
-    console.log('[webhook] ℹ️ Unhandled status — orderStatus:', orderStatus, '| paymentStatus:', paymentStatus);
+    console.log('[webhook] Unhandled status — orderStatus:', orderStatus, 'paymentStatus:', paymentStatus);
   }
 
-  // Always return 200 to acknowledge receipt — Cashfree retries on non-200
   res.status(200).json({ received: true });
 });
 
-// ─── 404 handler ─────────────────────────────────────────────────────────────
+// ─── 404 ─────────────────────────────────────────────────────────────────────
 app.use((req, res) => {
   res.status(404).json({ error: `Route ${req.method} ${req.path} not found.` });
 });
@@ -162,46 +219,55 @@ app.use((err, req, res, next) => {
   res.status(500).json({ error: 'Internal server error.' });
 });
 
-// ─── Start server ─────────────────────────────────────────────────────────────
+// ─── Start ────────────────────────────────────────────────────────────────────
 app.listen(PORT, () => {
   console.log(`[Server] Running on port ${PORT}`);
-  console.log(`[Server] Health check: GET /`);
-  console.log(`[Server] Create order: POST /create-order`);
-  console.log(`[Server] Webhook:      POST /webhook`);
+  console.log(`[Server]   GET  /             → health check`);
+  console.log(`[Server]   POST /create-order → Cashfree order creation`);
+  console.log(`[Server]   POST /webhook      → payment status callback`);
 });
 
-// ─── Cashfree API helper — native https (no extra deps) ──────────────────────
+// ─── Cashfree HTTPS helper ────────────────────────────────────────────────────
+// FIX 5: Uses CF_HOST — sandbox.cashfree.com OR api.cashfree.com
 function cashfreeRequest(payload) {
   return new Promise((resolve, reject) => {
     const options = {
-      hostname: 'api.cashfree.com',
+      hostname: CF_HOST,
       path:     '/pg/orders',
       method:   'POST',
       headers: {
         'Content-Type':    'application/json',
         'x-api-version':   '2023-08-01',
-        'x-client-id':     process.env.APP_ID,      // from .env — never sent to browser
-        'x-client-secret': process.env.SECRET_KEY,  // from .env — never sent to browser
+        'x-client-id':     process.env.APP_ID,
+        'x-client-secret': process.env.SECRET_KEY,
         'Content-Length':  Buffer.byteLength(payload),
       },
     };
 
+    console.log('[cashfreeRequest] Host:', options.hostname, '| Path:', options.path);
+
     const req = https.request(options, (cfRes) => {
+      console.log('[cashfreeRequest] HTTP status from Cashfree:', cfRes.statusCode);
       let data = '';
       cfRes.on('data', chunk => { data += chunk; });
       cfRes.on('end', () => {
         try {
           resolve(JSON.parse(data));
         } catch (e) {
-          reject(new Error(`Failed to parse Cashfree response: ${data}`));
+          console.error('[cashfreeRequest] Non-JSON response:', data.slice(0, 300));
+          reject(new Error(`Non-JSON from Cashfree: ${data.slice(0, 200)}`));
         }
       });
     });
 
-    req.on('error', reject);
-    req.setTimeout(10000, () => {
+    req.on('error', (err) => {
+      console.error('[cashfreeRequest] Network error:', err.message);
+      reject(err);
+    });
+
+    req.setTimeout(15000, () => {
       req.destroy();
-      reject(new Error('Cashfree API request timed out after 10s'));
+      reject(new Error('Cashfree API timed out after 15s'));
     });
 
     req.write(payload);
