@@ -535,17 +535,26 @@ const CafeOrderingPremium = () => {
             });
 
             const data = await resp.json();
-            console.log('[Payment] Backend response:', { status: resp.status, hasLink: !!data?.payment_link });
+            console.log('[Payment] Backend response:', {
+              status:             resp.status,
+              has_session_id:     !!data?.payment_session_id,
+              payment_session_id: data?.payment_session_id || 'MISSING',
+            });
 
-            if (data?.payment_link) {
-              console.log('[Payment] Redirecting to payment page for order', orderRef.id);
-              window.location.href = data.payment_link;
-              return;
-            } else if (data?.payment_session_id) {
-              window.location.href = `https://payments.cashfree.com/order/#${data.payment_session_id}`;
+            if (data?.payment_session_id) {
+              const sessionId = data.payment_session_id;
+
+              // Confirm session before using
+              console.log('[Payment] Session confirmed — launching Cashfree SDK');
+              console.log('[Payment] payment_session_id:', sessionId);
+              console.log('[Payment] orderId:', orderRef.id);
+
+              // Use Cashfree JS SDK immediately — no stale session, no delay
+              const cashfree = window.Cashfree({ mode: 'production' });
+              cashfree.checkout({ paymentSessionId: sessionId });
               return;
             } else {
-              console.error('[Payment] No payment link returned:', data?.error || data);
+              console.error('[Payment] No payment_session_id in response:', data?.error || data);
               toast.error('Payment gateway error. Please pay at counter.');
             }
           }
