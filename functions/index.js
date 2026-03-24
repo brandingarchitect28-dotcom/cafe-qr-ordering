@@ -602,3 +602,125 @@ exports.validateCafeAccess = functions.https.onCall(async (data, context) => {
 
   throw new functions.https.HttpsError('permission-denied', 'Access denied to this café');
 });
+
+// ═══════════════════════════════════════════════════════════════════════════
+// TASK 1: AI TEXT ASSISTANT
+// Cloud Function: aiQuery
+// - API key stored ONLY in backend (never exposed to client)
+// - Uses OpenAI GPT-4o-mini for cost efficiency
+// - Falls back to Gemini if OpenAI key not configured
+// ═══════════════════════════════════════════════════════════════════════════
+
+exports.aiQuery = functions.https.onCall(async (data, context) => {
+  // Auth check
+  if (!context.auth) {
+    throw new functions.https.HttpsError('unauthenticated', 'Login required');
+  }
+
+  const { cafeId, question, context: cafeContext } = data;
+  if (!cafeId || !question) {
+    throw new functions.https.HttpsError('invalid-argument', 'cafeId and question are required');
+  }
+
+  // Verify caller owns this café
+  const userDoc = await db.collection('users').doc(context.auth.uid).get();
+  if (!userDoc.exists) {
+    throw new functions.https.HttpsError('not-found', 'User not found');
+  }
+  const userData = userDoc.data();
+  if (userData.role !== 'admin' && userData.cafeId !== cafeId) {
+    throw new functions.https.HttpsError('permission-denied', 'Access denied');
+  }
+
+  // Build structured prompt
+  const systemPrompt = `You are a café business assistant. Analyze the provided café data and give clear, actionable, specific insights. Keep answers concise (3-5 sentences max). Use ₹ for currency.`;
+
+  const userPrompt = `Café Data:
+- Total Orders: ${cafeContext?.totalOrders || 0}
+- Total Revenue: ₹${cafeContext?.totalRevenue || 0}
+- Paid Orders: ${cafeContext?.paidOrders || 0}
+- Average Order Value: ₹${cafeContext?.avgOrderValue || 0}
+- Today Revenue: ₹${cafeContext?.todayRevenue || 0}
+- Today Orders: ${cafeContext?.todayOrders || 0}
+- Top Items: ${JSON.stringify(cafeContext?.topItems || [])}
+- Payment Methods: ${JSON.stringify(cafeContext?.paymentBreakdown || {})}
+- Order Status: ${JSON.stringify(cafeContext?.orderStatus || {})}
+- Menu Items Count: ${cafeContext?.totalMenuItems || 0}
+
+Question: ${question}`;
+
+  // Try OpenAI first
+  const openaiKey = process.env.OPENAI_API_KEY || functions.config().openai?.api_key;
+
+  if (openaiKey) {
+    try {
+      const https = require('https');
+      const payload = JSON.stringify({
+        model: 'gpt-4o-mini',
+        messages: [
+          { role: 'system', content: systemPrompt },
+          { role: 'user',   content: userPrompt   },
+        ],
+        max_tokens: 300,
+        temperature: 0.7,
+      });
+
+      const answer = await new Promise((resolve, reject) => {
+        const req = https.request({
+          hostname: 'api.openai.com',
+          path: '/v1/chat/completions',
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${openaiKey}`,
+            'Content-Length': Buffer.byteLength(payload),
+          },
+        }, (res) => {
+          let body = '';
+          res.on('data', chunk => body += chunk);
+          res.on('end', () => {
+            try {
+              const parsed = JSON.parse(body);
+              if (parsed.error) reject(new Error(parsed.error.message));
+              else resolve(parsed.choices?.[0]?.message?.content || 'No response');
+            } catch (e) { reject(e); }
+          });
+        });
+        req.on('error', reject);
+        req.write(payload);
+        req.end();
+      });
+
+      console.log('[aiQuery] OpenAI response received');
+      return { answer, source: 'openai' };
+    } catch (openaiErr) {
+      console.warn('[aiQuery] OpenAI failed, trying Gemini:', openaiErr.message);
+    }
+  }
+
+  // Fallback: Gemini (already configured)
+  try {
+    const configSnap  = await db.collection('systemConfig').doc('apiKeys').get();
+    const encrypted   = configSnap.data()?.geminiKey;
+    if (!encrypted) throw new Error('No AI API key configured');
+
+    const salt    = process.env.ENCRYPT_SALT || functions.config().app?.encrypt_salt || 'default_salt';
+    const geminiKey = Buffer.from(encrypted, 'base64').toString('utf8').split('').map((c, i) =>
+      String.fromCharCode(c.charCodeAt(0) ^ salt.charCodeAt(i % salt.length))
+    ).join('');
+
+    const { GoogleGenerativeAI } = require('@google/generative-ai');
+    const genAI = new GoogleGenerativeAI(geminiKey);
+    const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
+    const result = await model.generateContent(`${systemPrompt}\n\n${userPrompt}`);
+    const answer = result.response.text();
+    console.log('[aiQuery] Gemini response received');
+    return { answer, source: 'gemini' };
+  } catch (geminiErr) {
+    console.error('[aiQuery] Both AI providers failed:', geminiErr.message);
+    throw new functions.https.HttpsError(
+      'internal',
+      'AI service unavailable. Please add an OpenAI API key in Functions config or Gemini key in Admin Panel.'
+    );
+  }
+});

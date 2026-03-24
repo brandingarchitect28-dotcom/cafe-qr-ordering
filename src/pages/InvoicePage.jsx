@@ -153,7 +153,8 @@ const InvoicePage = () => {
       `Invoice No: ${invoice.invoiceNumber}\n` +
       `Amount: ${cur}${fmt(invoice.totalAmount)}\n\n` +
       `View invoice: ${url}`;
-    window.open(`https://wa.me/?text=${encodeURIComponent(msg)}`, '_blank');
+    // iOS-safe WA redirect
+    window.location.href = `https://wa.me/?text=${encodeURIComponent(msg)}`;
   };
 
   if (loading) return (

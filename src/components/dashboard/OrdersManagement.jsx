@@ -811,8 +811,33 @@ const OrdersManagement = () => {
                             className="flex-1 flex items-center justify-center gap-2 py-2.5 bg-white/5 hover:bg-white/10 border border-white/10 text-[#A3A3A3] hover:text-white rounded text-sm font-medium transition-all disabled:opacity-50"
                           >
                             <FileText className="w-4 h-4" />
-                            Download PDF
+                            PDF
                           </button>
+                          {/* WhatsApp Send Invoice — mobile */}
+                          {order.customerPhone && (
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                const phone = order.customerPhone.replace(/\D/g,'');
+                                const cur   = order.currencySymbol || cafeCurrency || '₹';
+                                const items = (order.items||[]).map(i => `• ${i.name} x${i.quantity} — ${cur}${(i.price*i.quantity).toFixed(2)}`).join('\n');
+                                const msg =
+                                  `🧾 *Invoice — Order #${String(order.orderNumber||'').padStart(3,'0')}*\n\n` +
+                                  `*Customer:* ${order.customerName||''}\n` +
+                                  `*Items:*\n${items}\n\n` +
+                                  (order.gstAmount > 0 ? `*GST:* ${cur}${(order.gstAmount||0).toFixed(2)}\n` : '') +
+                                  (order.serviceChargeAmount > 0 ? `*Service Charge:* ${cur}${(order.serviceChargeAmount||0).toFixed(2)}\n` : '') +
+                                  `*Total:* ${cur}${(order.totalAmount||order.total||0).toFixed(2)}\n` +
+                                  `*Payment:* ${order.paymentStatus === 'paid' ? '✅ Paid' : '⏳ Pending'}`;
+                                window.location.href = `https://wa.me/${phone}?text=${encodeURIComponent(msg)}`;
+                              }}
+                              className="flex items-center justify-center gap-1 px-3 py-2.5 bg-green-500/10 hover:bg-green-500/20 border border-green-500/20 text-green-400 rounded text-sm font-medium transition-all"
+                              title="Send Invoice via WhatsApp"
+                            >
+                              <MessageSquare className="w-4 h-4" />
+                              WA
+                            </button>
+                          )}
                         </>
                       ) : (
                         <p className="text-[#555] text-xs italic py-2">

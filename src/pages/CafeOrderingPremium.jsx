@@ -488,6 +488,58 @@ const CafeOrderingPremium = () => {
       deductStockForOrder(cafeId, orderData.items, menuItems).catch(console.error);
       deductStockByRecipe(cafeId, orderData.items, menuItems).catch(console.error);
 
+      // ── Cashfree payment redirect ───────────────────────────────────────
+      if (
+        paymentMode === 'online' &&
+        cafe?.paymentSettings?.enabled &&
+        cafe?.paymentSettings?.gateway === 'cashfree' &&
+        cafe?.paymentSettings?.keyId &&
+        cafe?.paymentSettings?.keySecret
+      ) {
+        try {
+          console.log('[Cashfree Premium] Initiating payment for order', orderRef.id);
+          const cfBody = {
+            order_id:       orderRef.id,
+            order_amount:   total,
+            order_currency: cafe?.currencyCode || 'INR',
+            customer_details: {
+              customer_id:    customerPhone.replace(/\D/g, '') || orderRef.id.slice(0, 10),
+              customer_name:  customerName,
+              customer_phone: customerPhone,
+            },
+            order_meta: {
+              return_url: `${window.location.origin}/track/${orderRef.id}`,
+            },
+          };
+          console.log('[Cashfree Premium] Request body:', cfBody);
+          const cfResp = await fetch('https://api.cashfree.com/pg/orders', {
+            method: 'POST',
+            headers: {
+              'Content-Type':    'application/json',
+              'x-api-version':   '2023-08-01',
+              'x-client-id':     cafe.paymentSettings.keyId,
+              'x-client-secret': cafe.paymentSettings.keySecret,
+            },
+            body: JSON.stringify(cfBody),
+          });
+          const cfData = await cfResp.json();
+          console.log('[Cashfree Premium] Response:', cfData);
+          if (cfData?.payment_session_id) {
+            window.location.href = `https://payments.cashfree.com/order/#${cfData.payment_session_id}`;
+            return;
+          } else if (cfData?.payment_link) {
+            window.location.href = cfData.payment_link;
+            return;
+          } else {
+            console.error('[Cashfree Premium] No payment link:', cfData);
+            toast.error('Payment gateway error. Please use another payment method.');
+          }
+        } catch (cfErr) {
+          console.error('[Cashfree Premium] Failed:', cfErr);
+          toast.error('Payment gateway unavailable. Order saved — please pay at counter.');
+        }
+      }
+
       // ── WhatsApp redirect (same as basic page) ──────────────────────────
       const formattedNum = String(oNum).padStart(3, '0');
       const cur = cafe?.currencySymbol || '₹';

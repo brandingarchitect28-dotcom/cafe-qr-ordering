@@ -3,7 +3,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { signOut } from 'firebase/auth';
 import { auth } from '../lib/firebase';
 import { useNavigate } from 'react-router-dom';
-import { LayoutDashboard, ShoppingBag, Menu as MenuIcon, Gift, BarChart3, Settings as SettingsIcon, QrCode, LogOut, X, UtensilsCrossed, ExternalLink, Boxes, Sparkles, Upload, TrendingUp, MessageSquare } from 'lucide-react';
+import { LayoutDashboard, ShoppingBag, Menu as MenuIcon, Gift, BarChart3, Settings as SettingsIcon, QrCode, LogOut, X, UtensilsCrossed, ExternalLink, Boxes, Sparkles, Upload, TrendingUp, MessageSquare, Bot, FileText } from 'lucide-react';
 import Overview from '../components/dashboard/Overview';
 import OrdersManagement from '../components/dashboard/OrdersManagement';
 import MenuManagement from '../components/dashboard/MenuManagement';
@@ -17,6 +17,8 @@ import InventoryManagement from '../components/dashboard/InventoryManagement';
 import AIInsights from '../components/dashboard/AIInsights';
 import AIMenuUpload from '../components/dashboard/AIMenuUpload';
 import WhatsAppMarketing from '../components/dashboard/WhatsAppMarketing';
+import AskAI from '../components/dashboard/AskAI';
+import InvoicesTab from '../components/dashboard/InvoicesTab';
 
 const Dashboard = () => {
   const { user } = useAuth();
@@ -36,11 +38,13 @@ const Dashboard = () => {
   const menuItems = [
     { id: 'overview',   label: 'Overview',    icon: LayoutDashboard },
     { id: 'orders',     label: 'Orders',      icon: ShoppingBag     },
+    { id: 'invoices',   label: 'Invoices',    icon: FileText        },
     { id: 'menu',       label: 'Menu',        icon: MenuIcon        },
     { id: 'offers',     label: 'Offers',      icon: Gift            },
     { id: 'analytics',  label: 'Analytics',   icon: BarChart3       },
     { id: 'advanced',   label: 'Reports',     icon: TrendingUp      },
     { id: 'marketing',  label: 'Marketing',   icon: MessageSquare   },
+    { id: 'askai',      label: 'Ask AI',       icon: Bot             },
     { id: 'kitchen',    label: 'Kitchen',     icon: UtensilsCrossed },
     { id: 'inventory',  label: 'Inventory',   icon: Boxes           },
     { id: 'ai',         label: 'AI Insights', icon: Sparkles        },
@@ -134,11 +138,13 @@ const Dashboard = () => {
         <main className="p-6">
           {activeTab === 'overview'   && <Overview />}
           {activeTab === 'orders'     && <OrdersManagement />}
+          {activeTab === 'invoices'   && <InvoicesTab />}
           {activeTab === 'menu'       && <MenuManagement />}
           {activeTab === 'offers'     && <OffersManagement />}
           {activeTab === 'analytics'  && <Analytics />}
           {activeTab === 'advanced'   && <AdvancedAnalytics />}
           {activeTab === 'marketing'  && <WhatsAppMarketing />}
+          {activeTab === 'askai'      && <AskAI />}
           {activeTab === 'kitchen'    && <KitchenDashboardTab />}
           {activeTab === 'inventory'  && <InventoryManagement />}
           {activeTab === 'ai'         && <AIInsights />}
