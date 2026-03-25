@@ -17,6 +17,7 @@ import { collection, query, where, onSnapshot, orderBy } from 'firebase/firestor
 import { db } from '../../lib/firebase';
 import { useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { generateInvoiceMessage } from '../../services/invoiceService';
 import {
   FileText, Search, MessageSquare, Eye, Filter,
   IndianRupee, CheckCircle, Clock, AlertCircle,
@@ -89,28 +90,11 @@ const InvoicesTab = () => {
     });
   }, [invoices, search, statusFilter]);
 
-  // Send invoice via WhatsApp (Task 5, iOS-safe)
+  // Send invoice via WhatsApp — uses shared generateInvoiceMessage for consistency
   const handleSendWA = (inv) => {
     const phone = (inv.customerPhone || '').replace(/\D/g, '');
     if (!phone) { toast.error('No customer phone number on this invoice'); return; }
-
-    const items = (inv.items || [])
-      .map(i => `• ${i.name} × ${i.quantity} — ${CUR}${fmt(i.price * i.quantity)}`)
-      .join('\n');
-
-    let msg = `🧾 *Invoice ${inv.invoiceNumber || ''}*\n`;
-    msg += `*Order #${String(inv.orderNumber || '').padStart(3, '0')}*\n`;
-    if (inv.customerName) msg += `*Customer:* ${inv.customerName}\n`;
-    msg += `\n*Items:*\n${items}\n\n`;
-    if (inv.subtotalAmount)      msg += `*Subtotal:* ${CUR}${fmt(inv.subtotalAmount)}\n`;
-    if (inv.gstAmount > 0)       msg += `*GST (${inv.gstRate || ''}%):* ${CUR}${fmt(inv.gstAmount)}\n`;
-    if (inv.serviceChargeAmount > 0) msg += `*Service Charge:* ${CUR}${fmt(inv.serviceChargeAmount)}\n`;
-    msg += `*Total:* ${CUR}${fmt(inv.totalAmount)}\n`;
-    msg += `*Payment:* ${inv.paymentStatus === 'paid' ? '✅ Paid' : '⏳ Pending'}\n`;
-    if (inv.paymentMode) msg += `*Mode:* ${inv.paymentMode}\n`;
-    msg += `\nThank you for visiting ${inv.cafeName || ''} ☕`;
-
-    // iOS-safe redirect
+    const msg = generateInvoiceMessage(inv, { name: inv.cafeName, currencySymbol: CUR });
     window.location.href = `https://wa.me/${phone}?text=${encodeURIComponent(msg)}`;
   };
 

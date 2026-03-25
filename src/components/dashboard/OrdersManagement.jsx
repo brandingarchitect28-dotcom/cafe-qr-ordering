@@ -6,6 +6,7 @@ import { db } from '../../lib/firebase';
 import { AlertCircle, Search, Download, Phone, MapPin, Clock, Bell, Volume2, X, FileText, Eye, PlusCircle, MessageSquare } from 'lucide-react';
 import { toast } from 'sonner';
 import { CSVLink } from 'react-csv';
+import { generateInvoiceMessage } from '../../services/invoiceService';
 import { motion, AnimatePresence } from 'framer-motion';
 import InvoiceModal from './InvoiceModal';
 import { getInvoiceByOrderId, getInvoiceById, ensureInvoiceForOrder } from '../../services/invoiceService';
@@ -610,17 +611,7 @@ const OrdersManagement = () => {
                                       onClick={(e) => {
                                         e.stopPropagation();
                                         const phone = order.customerPhone.replace(/\D/g,'');
-                                        const cur   = order.currencySymbol || cafeCurrency || '₹';
-                                        const items = (order.items||[]).map(i => `• ${i.name} x${i.quantity} — ${cur}${(i.price*i.quantity).toFixed(2)}`).join('\n');
-                                        const msg =
-                                          `🧾 *Invoice — Order #${String(order.orderNumber||'').padStart(3,'0')}*\n\n` +
-                                          `*Customer:* ${order.customerName||''}\n` +
-                                          `*Items:*\n${items}\n\n` +
-                                          (order.gstAmount > 0 ? `*GST:* ${cur}${(order.gstAmount||0).toFixed(2)}\n` : '') +
-                                          (order.serviceChargeAmount > 0 ? `*Service Charge:* ${cur}${(order.serviceChargeAmount||0).toFixed(2)}\n` : '') +
-                                          `*Total:* ${cur}${(order.totalAmount||order.total||0).toFixed(2)}\n` +
-                                          `*Payment:* ${order.paymentStatus === 'paid' ? '✅ Paid' : '⏳ Pending'}\n` +
-                                          `*Mode:* ${order.paymentMode||'counter'}`;
+                                        const msg = generateInvoiceMessage(order, { currencySymbol: order.currencySymbol || cafeCurrency });
                                         window.location.href = `https://wa.me/${phone}?text=${encodeURIComponent(msg)}`;
                                       }}
                                       data-testid={`wa-invoice-${order.id}`}
@@ -835,16 +826,7 @@ const OrdersManagement = () => {
                               onClick={(e) => {
                                 e.stopPropagation();
                                 const phone = order.customerPhone.replace(/\D/g,'');
-                                const cur   = order.currencySymbol || cafeCurrency || '₹';
-                                const items = (order.items||[]).map(i => `• ${i.name} x${i.quantity} — ${cur}${(i.price*i.quantity).toFixed(2)}`).join('\n');
-                                const msg =
-                                  `🧾 *Invoice — Order #${String(order.orderNumber||'').padStart(3,'0')}*\n\n` +
-                                  `*Customer:* ${order.customerName||''}\n` +
-                                  `*Items:*\n${items}\n\n` +
-                                  (order.gstAmount > 0 ? `*GST:* ${cur}${(order.gstAmount||0).toFixed(2)}\n` : '') +
-                                  (order.serviceChargeAmount > 0 ? `*Service Charge:* ${cur}${(order.serviceChargeAmount||0).toFixed(2)}\n` : '') +
-                                  `*Total:* ${cur}${(order.totalAmount||order.total||0).toFixed(2)}\n` +
-                                  `*Payment:* ${order.paymentStatus === 'paid' ? '✅ Paid' : '⏳ Pending'}`;
+                                const msg = generateInvoiceMessage(order, { currencySymbol: order.currencySymbol || cafeCurrency });
                                 window.location.href = `https://wa.me/${phone}?text=${encodeURIComponent(msg)}`;
                               }}
                               className="flex items-center justify-center gap-1 px-3 py-2.5 bg-green-500/10 hover:bg-green-500/20 border border-green-500/20 text-green-400 rounded text-sm font-medium transition-all"
