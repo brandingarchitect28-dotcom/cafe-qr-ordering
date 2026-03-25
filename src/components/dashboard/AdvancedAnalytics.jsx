@@ -172,7 +172,7 @@ const AdvancedAnalytics = () => {
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <div>
             <h2 className="text-white font-bold text-2xl" style={{ fontFamily:'Playfair Display,serif' }}>Advanced Analytics</h2>
-            {lastFetch && <p className="text-[#555] text-xs mt-1">Updated {lastFetch.toLocaleTimeString()} · auto-refreshes every 60s</p>}
+            {lastFetch && <p className="text-[#555] text-xs mt-1">Last updated: {lastFetch.toLocaleTimeString()}</p>}
           </div>
           <div className="flex items-center gap-2 flex-wrap">
             <button onClick={refresh} disabled={loading} className="flex items-center gap-1.5 px-3 h-9 bg-white/5 hover:bg-white/10 border border-white/10 text-[#A3A3A3] hover:text-white rounded-sm text-sm transition-all disabled:opacity-50">

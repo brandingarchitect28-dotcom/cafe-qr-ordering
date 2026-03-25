@@ -1,23 +1,21 @@
 /**
  * useAdvancedAnalytics.js
  * Updated: supports custom fromDate/toDate range (Feature 1)
- * Still no real-time — one-shot getDocs + 60s auto-refresh
+ * No automatic refresh — data is fetched once on mount (or when date range changes).
+ * User triggers re-fetch manually via the Refresh button in AdvancedAnalytics.
  */
 
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { doc, getDoc } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import { getAnalyticsData } from '../services/dataLayer';
 import { buildAnalyticsSnapshot } from '../services/analyticsEngine';
-
-const REFRESH_INTERVAL = 60_000;
 
 export const useAdvancedAnalytics = (cafeId, fromDate = null, toDate = null) => {
   const [data,      setData     ] = useState(null);
   const [loading,   setLoading  ] = useState(false);
   const [error,     setError    ] = useState(null);
   const [lastFetch, setLastFetch] = useState(null);
-  const timerRef = useRef(null);
 
   const fetch = useCallback(async () => {
     if (!cafeId) return;
@@ -51,11 +49,11 @@ export const useAdvancedAnalytics = (cafeId, fromDate = null, toDate = null) => 
     }
   }, [cafeId, fromDate, toDate]);
 
+  // Fetch once on mount and whenever cafeId or date range changes.
+  // No setInterval — refresh is manual only.
   useEffect(() => {
     if (!cafeId) return;
     fetch();
-    timerRef.current = setInterval(fetch, REFRESH_INTERVAL);
-    return () => clearInterval(timerRef.current);
   }, [fetch]);
 
   return { data, loading, error, lastFetch, refresh: fetch };
