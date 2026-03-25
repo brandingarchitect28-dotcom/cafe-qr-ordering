@@ -3,7 +3,9 @@ import { useAuth } from '../contexts/AuthContext';
 import { signOut } from 'firebase/auth';
 import { auth } from '../lib/firebase';
 import { useNavigate } from 'react-router-dom';
-import { LayoutDashboard, ShoppingBag, Menu as MenuIcon, Gift, BarChart3, Settings as SettingsIcon, QrCode, LogOut, X, UtensilsCrossed, ExternalLink, Boxes, Sparkles, Upload, TrendingUp, MessageSquare, Bot, FileText, Users } from 'lucide-react';
+import { useDocument } from '../hooks/useFirestore';
+import { LayoutDashboard, ShoppingBag, Menu as MenuIcon, Gift, BarChart3, Settings as SettingsIcon, QrCode, LogOut, X, UtensilsCrossed, ExternalLink, Boxes, Sparkles, Upload, TrendingUp, MessageSquare, Bot, FileText, Users, Lock } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
 import Overview from '../components/dashboard/Overview';
 import OrdersManagement from '../components/dashboard/OrdersManagement';
 import MenuManagement from '../components/dashboard/MenuManagement';
@@ -21,11 +23,45 @@ import AskAI from '../components/dashboard/AskAI';
 import InvoicesTab from '../components/dashboard/InvoicesTab';
 import StaffManagement from '../components/dashboard/StaffManagement';
 
+// ─── LockedFeature — shown in content area when feature is disabled ────────────
+// Safe: only renders instead of the real component. Real component is never mounted.
+const LockedFeature = ({ label, icon: Icon }) => (
+  <div className="flex flex-col items-center justify-center py-24 text-center select-none">
+    <div className="w-20 h-20 rounded-2xl bg-white/3 border border-white/8 flex items-center justify-center mb-5 relative">
+      {Icon && <Icon className="w-9 h-9 text-[#333]" />}
+      <div className="absolute -bottom-2 -right-2 w-7 h-7 rounded-full bg-[#0F0F0F] border border-white/10 flex items-center justify-center">
+        <Lock className="w-3.5 h-3.5 text-[#555]" />
+      </div>
+    </div>
+    <h2 className="text-white font-bold text-xl mb-2" style={{ fontFamily: 'Playfair Display, serif' }}>
+      {label} is Locked
+    </h2>
+    <p className="text-[#555] text-sm max-w-xs leading-relaxed">
+      This feature is not enabled for your plan.<br />
+      Contact your admin to unlock access.
+    </p>
+    <div className="mt-6 px-5 py-2.5 rounded-lg border border-white/8 text-[#555] text-xs">
+      🔒 Upgrade your plan to access {label}
+    </div>
+  </div>
+);
+
 const Dashboard = () => {
   const { user } = useAuth();
-  const navigate = useNavigate();
-  const [activeTab, setActiveTab] = useState('overview');
-  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const navigate  = useNavigate();
+  const [activeTab,    setActiveTab   ] = useState('overview');
+  const [sidebarOpen,  setSidebarOpen ] = useState(false);
+  const [upgradePopup, setUpgradePopup] = useState(null); // label of locked feature
+
+  // Load cafe doc to read feature flags — additive, does not affect existing logic
+  const { data: cafe } = useDocument('cafes', user?.cafeId);
+
+  // Safe feature resolver: defaults ALL features to true if missing (backward compat)
+  const features = {
+    staff:        cafe?.features?.staffManagementEnabled    !== false,
+    aiAssistant:  cafe?.features?.aiAssistantEnabled        !== false,
+    marketing:    cafe?.features?.marketingWhatsappEnabled  !== false,
+  };
 
   const handleLogout = async () => {
     try {
@@ -44,14 +80,14 @@ const Dashboard = () => {
     { id: 'offers',     label: 'Offers',      icon: Gift            },
     { id: 'analytics',  label: 'Analytics',   icon: BarChart3       },
     { id: 'advanced',   label: 'Reports',     icon: TrendingUp      },
-    { id: 'marketing',  label: 'Marketing',   icon: MessageSquare   },
-    { id: 'askai',      label: 'Ask AI',       icon: Bot             },
+    { id: 'marketing',  label: 'Marketing',   icon: MessageSquare,  featureKey: 'marketing'    },
+    { id: 'askai',      label: 'Ask AI',      icon: Bot,            featureKey: 'aiAssistant'  },
     { id: 'kitchen',    label: 'Kitchen',     icon: UtensilsCrossed },
     { id: 'inventory',  label: 'Inventory',   icon: Boxes           },
     { id: 'ai',         label: 'AI Insights', icon: Sparkles        },
     { id: 'aimenu',     label: 'AI Menu',     icon: Upload          },
     { id: 'qr',         label: 'QR Code',     icon: QrCode          },
-    { id: 'staff',      label: 'Staff',       icon: Users           },
+    { id: 'staff',      label: 'Staff',       icon: Users,          featureKey: 'staff'        },
     { id: 'settings',   label: 'Settings',    icon: SettingsIcon    },
   ];
 
@@ -64,6 +100,40 @@ const Dashboard = () => {
           onClick={() => setSidebarOpen(false)}
         />
       )}
+
+      {/* Upgrade popup — shown when locked feature is clicked */}
+      <AnimatePresence>
+        {upgradePopup && (
+          <motion.div
+            className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm"
+            initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+            onClick={() => setUpgradePopup(null)}
+          >
+            <motion.div
+              className="bg-[#0F0F0F] border border-white/10 rounded-2xl p-7 w-full max-w-sm text-center"
+              initial={{ scale: 0.93, y: 10 }} animate={{ scale: 1, y: 0 }}
+              onClick={e => e.stopPropagation()}
+            >
+              <div className="w-14 h-14 rounded-2xl bg-[#D4AF37]/10 flex items-center justify-center mx-auto mb-4">
+                <Lock className="w-7 h-7 text-[#D4AF37]" />
+              </div>
+              <h3 className="text-white font-bold text-xl mb-2" style={{ fontFamily: 'Playfair Display, serif' }}>
+                Unlock {upgradePopup}
+              </h3>
+              <p className="text-[#A3A3A3] text-sm mb-6 leading-relaxed">
+                This feature is not enabled for your current plan.<br />
+                Contact your admin or upgrade your plan to get access.
+              </p>
+              <button
+                onClick={() => setUpgradePopup(null)}
+                className="w-full py-3 bg-[#D4AF37] hover:bg-[#C5A059] text-black font-bold rounded-xl text-sm transition-all"
+              >
+                Got it
+              </button>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* Sidebar */}
       <aside className={`fixed top-0 left-0 h-screen w-64 bg-[#050505] border-r border-white/5 flex flex-col z-50 transform transition-transform lg:translate-x-0 ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'}`}>
@@ -81,23 +151,34 @@ const Dashboard = () => {
         {/* Scrollable nav */}
         <nav className="flex-1 overflow-y-auto px-4 pb-2 space-y-1 scrollbar-thin scrollbar-thumb-white/10 scrollbar-track-transparent">
           {menuItems.map((item) => {
-            const Icon = item.icon;
+            const Icon    = item.icon;
+            const isActive = activeTab === item.id;
+            // Safe: if featureKey present, check features map (defaults true if missing)
+            const locked  = item.featureKey ? features[item.featureKey] === false : false;
             return (
               <button
                 key={item.id}
                 data-testid={`nav-${item.id}`}
                 onClick={() => {
+                  if (locked) {
+                    setUpgradePopup(item.label);
+                    setSidebarOpen(false);
+                    return;
+                  }
                   setActiveTab(item.id);
                   setSidebarOpen(false);
                 }}
                 className={`w-full flex items-center gap-3 px-4 py-3 rounded-sm transition-all ${
-                  activeTab === item.id
+                  isActive && !locked
                     ? 'bg-[#D4AF37] text-black font-semibold'
+                    : locked
+                    ? 'text-[#333] cursor-pointer hover:text-[#555] hover:bg-white/2'
                     : 'text-[#A3A3A3] hover:text-white hover:bg-white/5'
                 }`}
               >
                 <Icon className="w-5 h-5 flex-shrink-0" />
-                {item.label}
+                <span className="flex-1 text-left">{item.label}</span>
+                {locked && <Lock className="w-3 h-3 flex-shrink-0 opacity-50" />}
               </button>
             );
           })}
@@ -145,14 +226,14 @@ const Dashboard = () => {
           {activeTab === 'offers'     && <OffersManagement />}
           {activeTab === 'analytics'  && <Analytics />}
           {activeTab === 'advanced'   && <AdvancedAnalytics />}
-          {activeTab === 'marketing'  && <WhatsAppMarketing />}
-          {activeTab === 'askai'      && <AskAI />}
+          {activeTab === 'marketing'  && (features.marketing    ? <WhatsAppMarketing /> : <LockedFeature label="Marketing"    icon={MessageSquare} />)}
+          {activeTab === 'askai'      && (features.aiAssistant  ? <AskAI />             : <LockedFeature label="Ask AI"       icon={Bot}           />)}
           {activeTab === 'kitchen'    && <KitchenDashboardTab />}
           {activeTab === 'inventory'  && <InventoryManagement />}
           {activeTab === 'ai'         && <AIInsights />}
           {activeTab === 'aimenu'     && <AIMenuUpload onClose={() => setActiveTab('menu')} />}
           {activeTab === 'qr'         && <QRGenerator />}
-          {activeTab === 'staff'      && <StaffManagement />}
+          {activeTab === 'staff'      && (features.staff        ? <StaffManagement />   : <LockedFeature label="Staff"        icon={Users}         />)}
           {activeTab === 'settings'   && <Settings />}
         </main>
       </div>
