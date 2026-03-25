@@ -339,18 +339,6 @@ app.get('/webhook', (req, res) => {
 app.post('/webhook/cashfree', handleCashfreeWebhook);
 app.post('/webhook',          handleCashfreeWebhook);
 
-
-// ─── 404 ─────────────────────────────────────────────────────────────────────
-app.use((req, res) => {
-  res.status(404).json({ error: `Route ${req.method} ${req.path} not found.` });
-});
-
-// ─── Global error handler ─────────────────────────────────────────────────────
-app.use((err, req, res, next) => {
-  console.error('[Error]', err.message);
-  res.status(500).json({ error: 'Internal server error.' });
-});
-
 // ─── POST /api/ai-menu-upload ─────────────────────────────────────────────────
 // Accepts an image/PDF as base64 JSON, sends to Gemini, returns parsed menu items.
 // No multer needed — frontend sends base64 string to keep it simple.
@@ -538,6 +526,17 @@ app.get('/test-gemini', async (req, res) => {
     console.error('[test-gemini] Unexpected error:', error.message);
     return res.status(500).json({ success: false, error: error.message });
   }
+});
+
+// ─── 404 — must be AFTER all routes ─────────────────────────────────────────
+app.use((req, res) => {
+  res.status(404).json({ error: `Route ${req.method} ${req.path} not found.` });
+});
+
+// ─── Global error handler — must be AFTER all routes ────────────────────────
+app.use((err, req, res, next) => {
+  console.error('[Error]', err.message);
+  res.status(500).json({ error: 'Internal server error.' });
 });
 
 // ─── Start ────────────────────────────────────────────────────────────────────
