@@ -768,7 +768,7 @@ const CafeOrdering = () => {
         : `https://wa.me/?text=${encodeURIComponent(orderSummary)}`;
       
       toast.success(`Order #${formattedOrderNumber} placed successfully!`);
-      
+
       setCart([]);
       setCustomerName('');
       setCustomerPhone('');
@@ -779,10 +779,8 @@ const CafeOrdering = () => {
       setSpecialInstructions('');
       setShowCheckout(false);
 
-      // iOS-compatible WhatsApp redirect (window.open blocked by Safari)
-      window.location.href = whatsappUrl;
-
-      // Navigate customer to live order tracking
+      // Navigate customer to in-app order tracking (no WhatsApp redirect — stays in app)
+      // Owner is notified via their WhatsApp from the dashboard order notification system.
       navigate(`/track/${orderDocRef.id}`);
       
     } catch (error) {

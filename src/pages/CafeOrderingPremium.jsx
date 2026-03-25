@@ -667,9 +667,7 @@ const CafeOrderingPremium = () => {
         ? `https://wa.me/${waNumber}?text=${encodeURIComponent(msg)}`
         : `https://wa.me/?text=${encodeURIComponent(msg)}`;
 
-      // Reset state before redirect
-      const formattedForDisplay = formattedNum;
-      setOrderNumber(formattedForDisplay);
+      setOrderNumber(formattedNum);
       setCart([]);
       setCustomerName('');
       setCustomerPhone('');
@@ -679,10 +677,7 @@ const CafeOrderingPremium = () => {
       setPaymentMode('counter');
       setShowCheckout(false);
 
-      // iOS-compatible WhatsApp redirect (window.open blocked by Safari)
-      window.location.href = waUrl;
-
-      // Navigate customer to live order tracking
+      // Navigate customer to in-app order tracking
       navigate(`/track/${orderRef.id}`);
     } catch (err) {
       toast.error('Failed to place order. Please try again.');
