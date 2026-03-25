@@ -27,7 +27,7 @@ export const calcPaymentBreakdown = (orders = []) => {
   const revenue = { upi: 0, cash: 0, card: 0, online: 0, counter: 0, other: 0 };
 
   paid.forEach(o => {
-    const mode = (o.paymentMode || 'other').toLowerCase();
+    const mode = (typeof o.paymentMode === 'string' ? o.paymentMode : 'other').toLowerCase();
     const key = ['upi', 'cash', 'card', 'online', 'counter', 'prepaid'].includes(mode)
       ? (mode === 'prepaid' ? 'upi' : mode)
       : 'other';
@@ -54,7 +54,7 @@ export const calcOrderSource = (orders = []) => {
   });
   const total = orders.length || 1;
   return Object.entries(map).map(([source, count]) => ({
-    source: source.toUpperCase(),
+    source: typeof source === 'string' ? source.toUpperCase() : String(source),
     count,
     pct: parseFloat(((count / total) * 100).toFixed(1)),
   })).sort((a, b) => b.count - a.count);
@@ -64,11 +64,12 @@ export const calcOrderSource = (orders = []) => {
 
 export const calcPeakHours = (orders = []) => {
   const hours = Array.from({ length: 24 }, (_, h) => ({ hour: h, count: 0, revenue: 0 }));
-  orders.forEach(o => {
+  // Count and revenue from PAID orders only
+  orders.filter(o => o.paymentStatus === 'paid').forEach(o => {
     const h = o.createdAt?.toDate?.()?.getHours?.();
     if (h !== undefined) {
       hours[h].count++;
-      if (o.paymentStatus === 'paid') hours[h].revenue += (o.totalAmount || 0);
+      hours[h].revenue += (o.totalAmount || 0);
     }
   });
   return hours.map(h => ({
@@ -81,7 +82,8 @@ export const calcPeakHours = (orders = []) => {
 
 export const calcItemPerformance = (orders = [], menuItems = []) => {
   const map = {};
-  orders.forEach(o => {
+  // Only count items from PAID orders — qty and revenue both accurate
+  orders.filter(o => o.paymentStatus === 'paid').forEach(o => {
     (o.items || []).forEach(item => {
       if (!map[item.name]) {
         const menuItem = menuItems.find(m => m.name === item.name);
@@ -94,9 +96,7 @@ export const calcItemPerformance = (orders = [], menuItems = []) => {
         };
       }
       map[item.name].qty += item.quantity || 1;
-      if (o.paymentStatus === 'paid') {
-        map[item.name].revenue += (item.price || 0) * (item.quantity || 1);
-      }
+      map[item.name].revenue += (item.price || 0) * (item.quantity || 1);
     });
   });
   const sorted = Object.values(map).sort((a, b) => b.revenue - a.revenue);
@@ -235,15 +235,17 @@ export const calcRevenueByDay = (orders = [], days = 7) => {
     return { date: d, label: d.toLocaleDateString('en-IN', { day: '2-digit', month: 'short' }), revenue: 0, orders: 0 };
   });
 
-  orders.forEach(o => {
-    const t = o.createdAt?.toDate?.() || new Date(0);
+  // Paid orders only — use paidAt if available, fall back to createdAt
+  orders.filter(o => o.paymentStatus === 'paid').forEach(o => {
+    const raw = o.paidAt || o.createdAt;
+    const t = raw?.toDate?.() || (raw ? new Date(raw) : new Date(0));
     const idx = result.findIndex(r => {
       const next = new Date(r.date); next.setDate(next.getDate() + 1);
       return t >= r.date && t < next;
     });
     if (idx >= 0) {
       result[idx].orders++;
-      if (o.paymentStatus === 'paid') result[idx].revenue += (o.totalAmount || 0);
+      result[idx].revenue += (o.totalAmount || 0);
     }
   });
 

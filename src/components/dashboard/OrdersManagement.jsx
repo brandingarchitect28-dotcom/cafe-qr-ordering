@@ -3,7 +3,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import { useCollection, useDocument } from '../../hooks/useFirestore';
 import { where, doc, updateDoc, getDoc } from 'firebase/firestore';
 import { db } from '../../lib/firebase';
-import { AlertCircle, Search, Download, Phone, MapPin, Clock, Bell, Volume2, X, FileText, Eye, PlusCircle, MessageSquare } from 'lucide-react';
+import { AlertCircle, Search, Download, Phone, MapPin, Clock, Bell, Volume2, X, FileText, Eye, PlusCircle, MessageSquare, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { CSVLink } from 'react-csv';
 import { generateInvoiceMessage } from '../../services/invoiceService';
@@ -29,6 +29,9 @@ const OrdersManagement = () => {
   const [soundEnabled, setSoundEnabled] = useState(true);
   const previousOrdersRef = useRef([]);
   const audioRef = useRef(null);
+  // Fix 3: soft-delete state
+  const [deleteConfirmId, setDeleteConfirmId] = useState(null);
+  const [deleting, setDeleting] = useState(false);
 
   // ── Feature 1: Invoice state ──
   const [viewingInvoice, setViewingInvoice] = useState(null);   // invoice object
@@ -166,8 +169,28 @@ const OrdersManagement = () => {
     }
   };
 
+  // Fix 3: Soft-delete — marks isDeleted:true, hides from list, preserves data
+  const handleSoftDelete = async (orderId) => {
+    setDeleting(true);
+    try {
+      await updateDoc(doc(db, 'orders', orderId), {
+        isDeleted: true,
+        deletedAt: new Date().toISOString(),
+      });
+      toast.success('Order removed');
+      setDeleteConfirmId(null);
+      if (expandedOrder === orderId) setExpandedOrder(null);
+    } catch (err) {
+      console.error('Delete error:', err);
+      toast.error('Failed to remove order');
+    } finally {
+      setDeleting(false);
+    }
+  };
+
   const filteredOrders = useMemo(() => {
-    let filtered = sortedOrders;
+    // Hide soft-deleted orders
+    let filtered = (sortedOrders || []).filter(o => !o.isDeleted);
     
     if (statusFilter !== 'all') {
       filtered = filtered.filter(order => order.orderStatus === statusFilter);
@@ -326,6 +349,50 @@ const OrdersManagement = () => {
 
   return (
     <div className="space-y-6 relative">
+      {/* Delete confirmation modal */}
+      <AnimatePresence>
+        {deleteConfirmId && (
+          <motion.div
+            className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm"
+            initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+            onClick={() => setDeleteConfirmId(null)}
+          >
+            <motion.div
+              className="bg-[#0F0F0F] border border-white/10 rounded-xl p-6 w-full max-w-sm"
+              initial={{ scale: 0.95, y: 10 }} animate={{ scale: 1, y: 0 }}
+              onClick={e => e.stopPropagation()}
+            >
+              <div className="flex items-center gap-3 mb-3">
+                <div className="w-10 h-10 rounded-full bg-red-500/15 flex items-center justify-center flex-shrink-0">
+                  <Trash2 className="w-5 h-5 text-red-400" />
+                </div>
+                <h3 className="text-white font-bold text-lg">Delete Order?</h3>
+              </div>
+              <p className="text-[#A3A3A3] text-sm mb-5">
+                This order will be hidden from the dashboard. All data is preserved.
+              </p>
+              <div className="flex gap-3">
+                <button
+                  onClick={() => setDeleteConfirmId(null)}
+                  className="flex-1 py-2.5 border border-white/10 text-[#A3A3A3] hover:text-white rounded-lg text-sm font-semibold transition-all"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={() => handleSoftDelete(deleteConfirmId)}
+                  disabled={deleting}
+                  className="flex-1 py-2.5 bg-red-500 hover:bg-red-600 text-white rounded-lg text-sm font-bold transition-all disabled:opacity-50 flex items-center justify-center gap-1.5"
+                >
+                  {deleting
+                    ? <><div className="w-4 h-4 rounded-full border-2 border-white/30 border-t-white animate-spin" />Deleting…</>
+                    : <><Trash2 className="w-4 h-4" />Delete</>
+                  }
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
       {/* ── Feature 1: Invoice Modal ── */}
       {viewingInvoice && (
         <InvoiceModal
@@ -622,6 +689,14 @@ const OrdersManagement = () => {
                                       WA
                                     </button>
                                   )}
+                                  {/* Delete order */}
+                                  <button
+                                    onClick={(e) => { e.stopPropagation(); setDeleteConfirmId(order.id); }}
+                                    className="flex items-center gap-1 px-2.5 py-1.5 bg-red-500/10 hover:bg-red-500/20 border border-red-500/20 text-red-400 rounded text-xs font-medium transition-all"
+                                    title="Delete order"
+                                  >
+                                    <Trash2 className="w-3 h-3" />
+                                  </button>
                                 </>
                               ) : (
                                 <span className="text-[#555] text-xs italic px-1 py-1.5">
@@ -836,6 +911,14 @@ const OrdersManagement = () => {
                               WA
                             </button>
                           )}
+                          {/* Delete order — mobile */}
+                          <button
+                            onClick={(e) => { e.stopPropagation(); setDeleteConfirmId(order.id); }}
+                            className="flex items-center justify-center gap-1 px-3 py-2.5 bg-red-500/10 hover:bg-red-500/20 border border-red-500/20 text-red-400 rounded text-sm font-medium transition-all"
+                            title="Delete order"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
                         </>
                       ) : (
                         <p className="text-[#555] text-xs italic py-2">

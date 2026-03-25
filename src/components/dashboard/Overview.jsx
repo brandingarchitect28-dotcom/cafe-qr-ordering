@@ -68,7 +68,7 @@ const RecentOrderCard = React.memo(({ order, isNew, CUR }) => {
   const [lit, setLit] = useState(isNew);
   const st         = getStatus(order.orderStatus);
   const src        = order.source && order.source !== 'qr' && order.source !== 'direct'
-                       ? SOURCE_BADGE[order.source?.toLowerCase()] || { label: order.source.toUpperCase(), cls: 'bg-purple-500/20 text-purple-400 border-purple-500/30' }
+                       ? SOURCE_BADGE[typeof order.source === 'string' ? order.source.toLowerCase() : ''] || { label: typeof order.source === 'string' ? order.source.toUpperCase() : String(order.source), cls: 'bg-purple-500/20 text-purple-400 border-purple-500/30' }
                        : null;
   const pay        = getPayment(order.paymentMode);
   const totalItems = order.items?.reduce((s, i) => s + (i.quantity || 1), 0) ?? 0;
@@ -277,13 +277,16 @@ const Overview = () => {
   const stats = useMemo(() => {
     if (!orders) return { todayRevenue: 0, ordersToday: 0, avgOrderValue: 0, activeOrders: 0 };
     const today = new Date(); today.setHours(0, 0, 0, 0);
+    // todayOrders: all orders created today (used for "Orders Today" counter)
     const todayOrders  = orders.filter(o => (o.createdAt?.toDate?.() || new Date(0)) >= today);
-    const paid         = todayOrders.filter(o => o.orderStatus === 'completed' && o.paymentStatus === 'paid');
+    // Revenue: ONLY paymentStatus === 'paid' — no orderStatus condition (paid orders may not be 'completed' yet)
+    const paid         = todayOrders.filter(o => o.paymentStatus === 'paid');
     const todayRevenue = paid.reduce((s, o) => s + (o.totalAmount || o.total || 0), 0);
     return {
       todayRevenue,
       ordersToday:   todayOrders.length,
-      avgOrderValue: todayOrders.length > 0 ? todayRevenue / todayOrders.length : 0,
+      // avgOrderValue over paid orders only — avoids dilution from pending/cancelled
+      avgOrderValue: paid.length > 0 ? todayRevenue / paid.length : 0,
       activeOrders:  orders.filter(o => o.orderStatus !== 'completed').length,
     };
   }, [orders]);

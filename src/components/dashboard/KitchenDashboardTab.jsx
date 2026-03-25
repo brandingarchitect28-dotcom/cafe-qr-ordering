@@ -41,7 +41,7 @@ const KitchenDashboardTab = () => {
   // Kitchen URL — same cafeId used for the QR ordering page
   const kitchenUrl = cafeId ? `${window.location.origin}/kitchen/${cafeId}` : '';
 
-  // Active (non-completed, non-cancelled) orders sorted oldest first
+  // Active (non-completed, non-cancelled) orders sorted newest first
   const activeOrders = useMemo(() => {
     if (!orders) return [];
     return orders
@@ -49,7 +49,7 @@ const KitchenDashboardTab = () => {
       .sort((a, b) => {
         const ta = a.createdAt?.toDate?.() || new Date(0);
         const tb = b.createdAt?.toDate?.() || new Date(0);
-        return ta - tb;
+        return tb - ta; // newest first
       });
   }, [orders]);
 

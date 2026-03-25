@@ -7,7 +7,7 @@
  * 3. No real-time listeners changed
  */
 
-import React, { useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
 import { useCollection, useDocument } from '../../hooks/useFirestore';
 import { where } from 'firebase/firestore';
@@ -15,6 +15,105 @@ import {
   BarChart, Bar, LineChart, Line, PieChart, Pie, Cell,
   XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
 } from 'recharts';
+import { motion, AnimatePresence } from 'framer-motion';
+import { X } from 'lucide-react';
+
+// ─── Chart Drill-Down Modal ───────────────────────────────────────────────────
+// Opens when user clicks a chart card. Shows full breakdown table.
+const ChartModal = ({ chart, onClose, CUR = '₹' }) => {
+  if (!chart) return null;
+  const fmt = (n) => (parseFloat(n) || 0).toFixed(2);
+  const total = chart.data.reduce((s, d) => s + (d.value || d.revenue || d.count || 0), 0) || 1;
+
+  return (
+    <AnimatePresence>
+      <motion.div
+        className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm"
+        initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+        onClick={onClose}
+      >
+        <motion.div
+          className="bg-[#0F0F0F] border border-white/10 rounded-2xl w-full max-w-md max-h-[80vh] flex flex-col overflow-hidden"
+          initial={{ scale: 0.95, y: 12 }} animate={{ scale: 1, y: 0 }}
+          onClick={e => e.stopPropagation()}
+        >
+          {/* Header */}
+          <div className="flex items-center justify-between px-5 py-4 border-b border-white/5">
+            <h3 className="text-white font-bold text-base" style={{ fontFamily: 'Playfair Display, serif' }}>
+              {chart.title}
+            </h3>
+            <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-white/10 text-[#A3A3A3] transition-all">
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+
+          {/* Table */}
+          <div className="overflow-y-auto flex-1">
+            <table className="w-full text-sm">
+              <thead className="sticky top-0 bg-[#0A0A0A]">
+                <tr>
+                  <th className="px-5 py-3 text-left text-[#555] text-xs uppercase tracking-wide font-semibold">
+                    {chart.labelKey}
+                  </th>
+                  {chart.valueLabel && (
+                    <th className="px-5 py-3 text-right text-[#555] text-xs uppercase tracking-wide font-semibold">
+                      {chart.valueLabel}
+                    </th>
+                  )}
+                  <th className="px-5 py-3 text-right text-[#555] text-xs uppercase tracking-wide font-semibold">
+                    Share
+                  </th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-white/5">
+                {chart.data.map((row, i) => {
+                  const val    = row.value ?? row.revenue ?? row.count ?? 0;
+                  const pct    = ((val / total) * 100).toFixed(1);
+                  const isRev  = chart.valueLabel?.toLowerCase().includes('revenue');
+                  const color  = row.color || ['#D4AF37','#10B981','#3B82F6','#F59E0B','#EF4444'][i % 5];
+                  return (
+                    <tr key={i} className="hover:bg-white/2 transition-colors">
+                      <td className="px-5 py-3">
+                        <div className="flex items-center gap-2.5">
+                          <span className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ background: color }} />
+                          <span className="text-white">{row.name || row.method || row.source || '—'}</span>
+                        </div>
+                      </td>
+                      {chart.valueLabel && (
+                        <td className="px-5 py-3 text-right font-semibold" style={{ color: '#D4AF37' }}>
+                          {isRev ? `${CUR}${fmt(val)}` : val.toLocaleString('en-IN')}
+                        </td>
+                      )}
+                      <td className="px-5 py-3 text-right">
+                        <div className="flex items-center justify-end gap-2">
+                          <div className="w-16 h-1.5 rounded-full bg-white/5 overflow-hidden">
+                            <div className="h-full rounded-full" style={{ width: `${pct}%`, background: color }} />
+                          </div>
+                          <span className="text-[#A3A3A3] text-xs w-10 text-right">{pct}%</span>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+
+          {/* Footer total */}
+          <div className="px-5 py-3 border-t border-white/5 flex justify-between text-sm">
+            <span className="text-[#555]">Total</span>
+            <span className="text-white font-bold">
+              {chart.valueLabel?.toLowerCase().includes('revenue')
+                ? `${CUR}${fmt(total)}`
+                : total.toLocaleString('en-IN')
+              }
+            </span>
+          </div>
+        </motion.div>
+      </motion.div>
+    </AnimatePresence>
+  );
+};
 
 // ─── Fixed tooltip — white text, dark bg, high contrast ──────────────────────
 const DarkTooltip = ({ active, payload, label, prefix = '' }) => {
@@ -59,6 +158,7 @@ const Analytics = () => {
   const { data: orders } = useCollection('orders', cafeId ? [where('cafeId', '==', cafeId)] : []);
   const { data: cafe   } = useDocument('cafes', cafeId);
   const CUR = cafe?.currencySymbol || '₹';
+  const [activeChart, setActiveChart] = useState(null); // drill-down modal
 
   const analytics = useMemo(() => {
     if (!orders || orders.length === 0) return null;
@@ -70,9 +170,12 @@ const Analytics = () => {
     });
     const revenueByDay = last7Days.map(day => {
       const nextDay = new Date(day); nextDay.setDate(nextDay.getDate() + 1);
+      // Use paidAt if available (more accurate), fall back to createdAt
       const dayOrders = orders.filter(o => {
-        const t = o.createdAt?.toDate?.() || new Date(0);
-        return t >= day && t < nextDay && o.paymentStatus === 'paid';
+        if (o.paymentStatus !== 'paid') return false;
+        const raw = o.paidAt || o.createdAt;
+        const t = raw?.toDate?.() || (raw ? new Date(raw) : new Date(0));
+        return t >= day && t < nextDay;
       });
       return {
         date:    day.toLocaleDateString('en-US', { weekday: 'short' }),
@@ -82,8 +185,9 @@ const Analytics = () => {
     });
 
     // ── Best selling items ────────────────────────────────────────────────
+    // ── Best selling items — paid orders only ─────────────────────────────
     const itemCounts = {};
-    orders.forEach(o => o.items?.forEach(item => {
+    orders.filter(o => o.paymentStatus === 'paid').forEach(o => o.items?.forEach(item => {
       itemCounts[item.name] = (itemCounts[item.name] || 0) + (item.quantity || 1);
     }));
     const topItems = Object.entries(itemCounts)
@@ -123,7 +227,8 @@ const Analytics = () => {
       .map(([src, count]) => ({ name: SOURCE_LABELS[src] || src, value: count, color: SOURCE_COLORS[src] || '#A3A3A3' }))
       .sort((a, b) => b.value - a.value);
     const revenueBySource = Object.entries(
-      orders.reduce((acc, o) => {
+      // Revenue from PAID orders only — cancelled/pending excluded
+      orders.filter(o => o.paymentStatus === 'paid').reduce((acc, o) => {
         const src = o.orderSource || (o.externalOrder ? 'other' : 'direct');
         acc[src] = (acc[src] || 0) + (o.totalAmount || o.total || 0);
         return acc;
@@ -184,6 +289,8 @@ const Analytics = () => {
 
   return (
     <div className="space-y-6">
+      {/* Chart drill-down modal */}
+      <ChartModal chart={activeChart} onClose={() => setActiveChart(null)} CUR={CUR} />
 
       {/* ── Revenue Chart ──────────────────────────────────────────────────── */}
       <div className="bg-[#0F0F0F] border border-white/5 rounded-sm p-6">
@@ -241,7 +348,10 @@ const Analytics = () => {
         </div>
 
         {/* ── Payment Status ─────────────────────────────────────────────── */}
-        <div className="bg-[#0F0F0F] border border-white/5 rounded-sm p-6">
+        <div className="bg-[#0F0F0F] border border-white/5 rounded-sm p-6 cursor-pointer hover:border-white/10 transition-colors"
+          onClick={() => setActiveChart({ title: 'Payment Status Breakdown', labelKey: 'Status', valueLabel: 'Orders', data: analytics.paymentSplit })}
+          title="Click for breakdown"
+        >
           <h3 className="text-xl font-semibold text-white mb-6" style={{ fontFamily: 'Playfair Display, serif' }}>
             Payment Status
           </h3>
@@ -268,7 +378,10 @@ const Analytics = () => {
       </div>
 
       {/* ── Order Status Distribution ─────────────────────────────────────── */}
-      <div className="bg-[#0F0F0F] border border-white/5 rounded-sm p-6">
+      <div className="bg-[#0F0F0F] border border-white/5 rounded-sm p-6 cursor-pointer hover:border-white/10 transition-colors"
+        onClick={() => setActiveChart({ title: 'Order Status Distribution', labelKey: 'Status', valueLabel: 'Orders', data: analytics.orderStatusSplit })}
+        title="Click for breakdown"
+      >
         <h3 className="text-xl font-semibold text-white mb-6" style={{ fontFamily: 'Playfair Display, serif' }}>
           Order Status Distribution
         </h3>
@@ -297,7 +410,10 @@ const Analytics = () => {
       {analytics.orderSourceSplit.length > 0 && (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
 
-          <div className="bg-[#0F0F0F] border border-white/5 rounded-sm p-6">
+          <div className="bg-[#0F0F0F] border border-white/5 rounded-sm p-6 cursor-pointer hover:border-white/10 transition-colors"
+            onClick={() => setActiveChart({ title: 'Orders by Source', labelKey: 'Source', valueLabel: 'Orders', data: analytics.orderSourceSplit.map(d => ({ ...d, value: d.value })) })}
+            title="Click for breakdown"
+          >
             <h3 className="text-xl font-semibold text-white mb-2" style={{ fontFamily: 'Playfair Display, serif' }}>
               Orders by Source
             </h3>
@@ -324,7 +440,10 @@ const Analytics = () => {
             <Insight lines={analytics.insights.source} />
           </div>
 
-          <div className="bg-[#0F0F0F] border border-white/5 rounded-sm p-6">
+          <div className="bg-[#0F0F0F] border border-white/5 rounded-sm p-6 cursor-pointer hover:border-white/10 transition-colors"
+            onClick={() => setActiveChart({ title: 'Revenue by Source', labelKey: 'Source', valueLabel: 'Revenue', data: analytics.revenueBySource.map(d => ({ ...d, value: d.revenue })) })}
+            title="Click for breakdown"
+          >
             <h3 className="text-xl font-semibold text-white mb-2" style={{ fontFamily: 'Playfair Display, serif' }}>
               Revenue by Source
             </h3>
