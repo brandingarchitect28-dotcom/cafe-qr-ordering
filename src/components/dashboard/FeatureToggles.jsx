@@ -18,7 +18,7 @@ import { doc, updateDoc } from 'firebase/firestore';
 import { useDocument } from '../../hooks/useFirestore';
 import { motion } from 'framer-motion';
 import { toast } from 'sonner';
-import { Sparkles, Video, MessageSquare, Cpu, ToggleLeft, ToggleRight } from 'lucide-react';
+import { Sparkles, Video, MessageSquare, Cpu, Users, Bot } from 'lucide-react';
 
 const FEATURES = [
   {
@@ -48,6 +48,28 @@ const FEATURES = [
     description: 'Send invoices and daily reports via WhatsApp API',
     icon:        MessageSquare,
     color:       '#25D366',
+  },
+  // ── New toggles (Feature 3) ────────────────────────────────────────────────
+  {
+    key:         'marketingWhatsappEnabled',
+    label:       'WhatsApp Marketing',
+    description: 'Bulk promotional messages and campaign tools for customers',
+    icon:        MessageSquare,
+    color:       '#F97316',
+  },
+  {
+    key:         'staffManagementEnabled',
+    label:       'Staff Management',
+    description: 'Attendance, salary, and QR check-in system for café staff',
+    icon:        Users,
+    color:       '#10B981',
+  },
+  {
+    key:         'aiAssistantEnabled',
+    label:       'AI Text Assistant',
+    description: 'Natural language Q&A powered by Gemini / OpenAI',
+    icon:        Bot,
+    color:       '#A855F7',
   },
 ];
 

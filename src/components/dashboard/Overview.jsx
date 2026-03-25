@@ -209,6 +209,27 @@ const Overview = () => {
   const { data: cafe } = useDocument('cafes', cafeId);
   const CUR = cafe?.currencySymbol || '₹';
 
+  // ── Sound notification — plays once per genuinely new order ──────────────
+  // Same two-tone chime as KitchenDisplay. Uses Web Audio API (no files needed).
+  // AudioContext is created fresh each time to avoid suspended-context issues.
+  const playNotify = () => {
+    try {
+      const ctx = new (window.AudioContext || window.webkitAudioContext)();
+      [0, 220].forEach((delay, i) => {
+        const osc  = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.frequency.value = i === 0 ? 880 : 1100;
+        osc.type = 'sine';
+        gain.gain.setValueAtTime(0.35, ctx.currentTime + delay / 1000);
+        gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + delay / 1000 + 0.45);
+        osc.start(ctx.currentTime + delay / 1000);
+        osc.stop(ctx.currentTime + delay / 1000 + 0.5);
+      });
+    } catch (_) { /* audio blocked by browser policy — silent fallback */ }
+  };
+
   // ── new-order detection ────────────────────────────────────────────────
   const seenRef  = useRef(new Set());
   const [newIds, setNewIds] = useState(new Set());
@@ -226,6 +247,7 @@ const Overview = () => {
     incoming.forEach(id => { if (!seenRef.current.has(id)) fresh.add(id); });
 
     if (fresh.size > 0) {
+      playNotify(); // Feature 1: sound on new order
       setNewIds(prev => new Set([...prev, ...fresh]));
       setTimeout(() => {
         setNewIds(prev => {

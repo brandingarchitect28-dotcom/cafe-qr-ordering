@@ -249,7 +249,12 @@ const Analytics = () => {
             <PieChart>
               <Pie data={analytics.paymentSplit} cx="50%" cy="50%"
                 labelLine={false}
-                label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(0)}%`}
+                label={({ name, percent, x, y }) => (
+                  <text x={x} y={y} fill="#A3A3A3" fontSize={11} textAnchor="middle"
+                    dominantBaseline="central" style={{ pointerEvents: 'none' }}>
+                    {`${name}: ${(percent * 100).toFixed(0)}%`}
+                  </text>
+                )}
                 outerRadius={95} dataKey="value">
                 {analytics.paymentSplit.map((_, i) => (
                   <Cell key={i} fill={COLORS[i % COLORS.length]} />
@@ -271,7 +276,12 @@ const Analytics = () => {
           <PieChart>
             <Pie data={analytics.orderStatusSplit} cx="50%" cy="50%"
               labelLine={false}
-              label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(0)}%`}
+              label={({ name, percent, x, y }) => (
+                <text x={x} y={y} fill="#A3A3A3" fontSize={11} textAnchor="middle"
+                  dominantBaseline="central" style={{ pointerEvents: 'none' }}>
+                  {`${name}: ${(percent * 100).toFixed(0)}%`}
+                </text>
+              )}
               outerRadius={95} dataKey="value">
               {analytics.orderStatusSplit.map((_, i) => (
                 <Cell key={i} fill={COLORS[i % COLORS.length]} />
@@ -296,7 +306,12 @@ const Analytics = () => {
               <PieChart>
                 <Pie data={analytics.orderSourceSplit} cx="50%" cy="50%"
                   labelLine={false}
-                  label={({ name, percent }) => percent > 0.05 ? `${name}: ${(percent*100).toFixed(0)}%` : ''}
+                  label={({ name, percent, x, y }) => percent > 0.05 ? (
+                    <text x={x} y={y} fill="#A3A3A3" fontSize={11} textAnchor="middle"
+                      dominantBaseline="central" style={{ pointerEvents: 'none' }}>
+                      {`${name}: ${(percent*100).toFixed(0)}%`}
+                    </text>
+                  ) : null}
                   outerRadius={90} dataKey="value">
                   {analytics.orderSourceSplit.map((entry, i) => (
                     <Cell key={i} fill={entry.color} />

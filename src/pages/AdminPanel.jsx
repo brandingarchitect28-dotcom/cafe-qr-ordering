@@ -1,16 +1,16 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { useCollection } from '../hooks/useFirestore';
 import { signOut, createUserWithEmailAndPassword, getAuth } from 'firebase/auth';
 import { initializeApp, getApps } from 'firebase/app';
 import { auth, db } from '../lib/firebase';
-import { collection, addDoc, doc, updateDoc, setDoc } from 'firebase/firestore';
+import { collection, addDoc, doc, updateDoc, setDoc, deleteDoc } from 'firebase/firestore';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { toast } from 'sonner';
 import {
   Building2, DollarSign, Plus, LogOut, X,
   Key, Power, PowerOff, ChevronDown, ChevronUp,
-  Sparkles, Shield, Crown, Star,
+  Sparkles, Shield, Crown, Star, Search, Trash2,
 } from 'lucide-react';
 import FeatureToggles from '../components/dashboard/FeatureToggles';
 import AdminApiSettings from '../components/dashboard/AdminApiSettings';
@@ -41,6 +41,8 @@ const CafeRow = ({ cafe, allOrders }) => {
   const [expanded,    setExpanded ] = useState(false);
   const [toggling,    setToggling ] = useState(false);
   const [activePanel, setPanel    ] = useState('features');
+  const [confirmDel,  setConfirmDel] = useState(false); // Feature 5: delete confirm
+  const [deleting,    setDeleting ] = useState(false);
 
   const cafeOrders  = allOrders?.filter(o => o.cafeId === cafe.id) || [];
   const cafeRevenue = cafeOrders
@@ -58,6 +60,24 @@ const CafeRow = ({ cafe, allOrders }) => {
       toast.success(`${cafe.name} ${!isActive ? 'enabled' : 'disabled'}`);
     } catch { toast.error('Failed to update'); }
     finally { setToggling(false); }
+  };
+
+  // Feature 5: soft-delete — marks isDeleted so data is preserved
+  const handleDelete = async () => {
+    setDeleting(true);
+    try {
+      await updateDoc(doc(db, 'cafes', cafe.id), {
+        isDeleted:   true,
+        isActive:    false,
+        deletedAt:   new Date().toISOString(),
+      });
+      toast.success(`${cafe.name} removed`);
+      setConfirmDel(false);
+    } catch (err) {
+      toast.error('Delete failed: ' + err.message);
+    } finally {
+      setDeleting(false);
+    }
   };
 
   return (
@@ -94,9 +114,45 @@ const CafeRow = ({ cafe, allOrders }) => {
             }
             {isActive ? 'Disable' : 'Enable'}
           </button>
+          {/* Feature 5: Delete button */}
+          <button
+            onClick={(e) => { e.stopPropagation(); setConfirmDel(true); }}
+            className="p-1.5 rounded-sm text-[#555] hover:text-red-400 hover:bg-red-500/10 transition-all"
+            title="Delete café"
+          >
+            <Trash2 className="w-3.5 h-3.5" />
+          </button>
           {expanded ? <ChevronUp className="w-4 h-4 text-[#A3A3A3]" /> : <ChevronDown className="w-4 h-4 text-[#A3A3A3]" />}
         </div>
       </div>
+
+      {/* Feature 5: Delete confirmation dialog */}
+      <AnimatePresence>
+        {confirmDel && (
+          <motion.div
+            initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }}
+            exit={{ opacity: 0, height: 0 }}
+            className="border-t border-red-500/20 bg-red-500/5 px-4 py-3 overflow-hidden"
+            onClick={e => e.stopPropagation()}
+          >
+            <p className="text-red-400 text-sm font-semibold mb-1">Delete {cafe.name}?</p>
+            <p className="text-[#A3A3A3] text-xs mb-3">
+              This soft-deletes the café — data is preserved but it will be hidden from the panel.
+            </p>
+            <div className="flex gap-2">
+              <button onClick={() => setConfirmDel(false)}
+                className="flex-1 py-1.5 border border-white/10 text-[#A3A3A3] hover:text-white rounded text-xs font-semibold transition-all">
+                Cancel
+              </button>
+              <button onClick={handleDelete} disabled={deleting}
+                className="flex-1 py-1.5 bg-red-500 hover:bg-red-600 text-white rounded text-xs font-bold transition-all disabled:opacity-50 flex items-center justify-center gap-1">
+                {deleting ? <div className="w-3 h-3 rounded-full border-2 border-white/30 border-t-white animate-spin" /> : <Trash2 className="w-3 h-3" />}
+                Delete
+              </button>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* Expanded */}
       <AnimatePresence>
@@ -129,6 +185,7 @@ const AdminPanel = () => {
   const [showCafeForm, setShowCafeForm] = useState(false);
   const [creating,     setCreating    ] = useState(false);
   const [activeTab,    setActiveTab   ] = useState('cafes');
+  const [searchQuery,  setSearchQuery ] = useState('');     // Feature 4: search
   const [cafeFormData, setForm        ] = useState({
     name: '', logo: '', email: '', password: '',
     primaryColor: '#D4AF37', secondaryColor: '#E5E5E5',
@@ -141,6 +198,19 @@ const AdminPanel = () => {
   const totalRevenue = allOrders?.filter(o => o.paymentStatus === 'paid').reduce((s, o) => s + (o.totalAmount || o.total || 0), 0) || 0;
   const activeCafes  = cafes?.filter(c => c.isActive !== false).length || 0;
   const premiumCafes = cafes?.filter(c => c.planType === 'premium').length || 0;
+
+  // Feature 4: client-side search filter — fast, no extra query
+  const filteredCafes = useMemo(() => {
+    if (!cafes) return [];
+    const q = searchQuery.trim().toLowerCase();
+    if (!q) return cafes;
+    return cafes.filter(c =>
+      (c.name  || '').toLowerCase().includes(q) ||
+      (c.id    || '').toLowerCase().includes(q) ||
+      (c.phone || '').includes(q) ||
+      (c.whatsappNumber || '').includes(q)
+    );
+  }, [cafes, searchQuery]);
 
   const set = (k, v) => setForm(p => ({ ...p, [k]: v }));
 
@@ -301,17 +371,37 @@ const AdminPanel = () => {
               )}
             </AnimatePresence>
 
+            {/* Feature 4: Search bar */}
+            <div className="relative mb-4">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[#555]" />
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={e => setSearchQuery(e.target.value)}
+                placeholder="Search by café name, ID, or phone..."
+                className="w-full bg-black/20 border border-white/10 text-white placeholder:text-neutral-600 focus:border-[#D4AF37] focus:ring-1 focus:ring-[#D4AF37] rounded-sm h-11 pl-9 pr-4 text-sm outline-none transition-all"
+              />
+              {searchQuery && (
+                <button onClick={() => setSearchQuery('')}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-[#555] hover:text-white transition-colors">
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              )}
+            </div>
+
             {/* Cafés list */}
             <div className="space-y-3">
-              {cafes?.map((cafe, i) => (
+              {filteredCafes.filter(c => !c.isDeleted).map((cafe, i) => (
                 <motion.div key={cafe.id} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.04 }}>
                   <CafeRow cafe={cafe} allOrders={allOrders} />
                 </motion.div>
               ))}
-              {(!cafes || cafes.length === 0) && (
+              {filteredCafes.filter(c => !c.isDeleted).length === 0 && (
                 <div className="bg-[#0F0F0F] border border-white/5 rounded-xl p-12 text-center">
                   <Building2 className="w-10 h-10 text-[#A3A3A3]/30 mx-auto mb-3" />
-                  <p className="text-[#A3A3A3]">No cafés yet. Create your first one above.</p>
+                  <p className="text-[#A3A3A3]">
+                    {searchQuery ? `No cafés match "${searchQuery}"` : 'No cafés yet. Create your first one above.'}
+                  </p>
                 </div>
               )}
             </div>
