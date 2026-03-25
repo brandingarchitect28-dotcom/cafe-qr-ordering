@@ -86,3 +86,268 @@ code {
   0%   { transform: translateX(-100%); }
   100% { transform: translateX(100%); }
 }
+
+/* ============================================================
+   SMOOTH SCROLL
+   ============================================================ */
+html {
+  scroll-behavior: smooth;
+}
+
+/* ============================================================
+   THEME TRANSITIONS
+   Runs on all elements when light-mode class is toggled.
+   Uses will-change: auto to avoid promoting every element.
+   ============================================================ */
+*,
+*::before,
+*::after {
+  transition-property: background-color, border-color, color, box-shadow;
+  transition-duration: 250ms;
+  transition-timing-function: ease;
+}
+
+/* Opt-out: elements where colour transition would look wrong */
+[data-no-theme-transition],
+[data-no-theme-transition] * {
+  transition: none !important;
+}
+
+/* ============================================================
+   LIGHT MODE OVERRIDES
+   Applied when <html class="light-mode"> is set by Dashboard.jsx
+   Only overrides backgrounds/borders/text — layout unchanged.
+   ============================================================ */
+html.light-mode,
+html.light-mode body,
+html.light-mode #root {
+  background-color: #F8F6F1;
+  color: #1A1A1A;
+}
+
+/* Sidebar */
+html.light-mode aside {
+  background-color: #FFFFFF !important;
+  border-color: rgba(0,0,0,0.08) !important;
+}
+
+/* Main header */
+html.light-mode header {
+  background-color: rgba(255,255,255,0.85) !important;
+  border-color: rgba(0,0,0,0.07) !important;
+}
+
+/* Cards — all dark panels become white */
+html.light-mode .bg-\[#0F0F0F\],
+html.light-mode .bg-\[#0A0A0A\],
+html.light-mode .bg-\[#050505\] {
+  background-color: #FFFFFF !important;
+}
+
+html.light-mode .bg-black\/20,
+html.light-mode .bg-black\/30,
+html.light-mode .bg-white\/3,
+html.light-mode .bg-white\/4,
+html.light-mode .bg-white\/5 {
+  background-color: rgba(0,0,0,0.04) !important;
+}
+
+/* Borders */
+html.light-mode .border-white\/5,
+html.light-mode .border-white\/8,
+html.light-mode .border-white\/10 {
+  border-color: rgba(0,0,0,0.09) !important;
+}
+
+/* Text */
+html.light-mode .text-white  { color: #1A1A1A !important; }
+html.light-mode .text-\[#A3A3A3\] { color: #666666 !important; }
+html.light-mode .text-\[#555\]    { color: #999999 !important; }
+html.light-mode .text-\[#333\]    { color: #BBBBBB !important; }
+
+/* Input fields */
+html.light-mode input,
+html.light-mode textarea,
+html.light-mode select {
+  background-color: #FFFFFF !important;
+  border-color: rgba(0,0,0,0.12) !important;
+  color: #1A1A1A !important;
+}
+
+html.light-mode input::placeholder,
+html.light-mode textarea::placeholder {
+  color: #AAAAAA !important;
+}
+
+/* Scrollbar in light mode */
+html.light-mode ::-webkit-scrollbar-track  { background: #F0EDE8; }
+html.light-mode ::-webkit-scrollbar-thumb  { background: #C5A059; }
+
+/* ============================================================
+   MICRO-INTERACTIONS — BUTTONS
+   Applied globally via attribute selectors + utility classes.
+   Components already have whileHover/whileTap from framer-motion
+   for individual buttons. These CSS rules add a smooth baseline
+   for any button not already animated.
+   ============================================================ */
+button:not([disabled]):not([data-no-anim]) {
+  transition: transform 150ms ease, box-shadow 150ms ease, opacity 150ms ease;
+}
+button:not([disabled]):not([data-no-anim]):hover {
+  transform: translateY(-1px);
+}
+button:not([disabled]):not([data-no-anim]):active {
+  transform: scale(0.97) translateY(0);
+}
+
+/* ============================================================
+   CARD HOVER ELEVATION
+   Utility class .card-hover adds lift on hover.
+   ============================================================ */
+.card-hover {
+  transition: transform 200ms ease, box-shadow 200ms ease;
+}
+.card-hover:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 8px 32px rgba(0,0,0,0.18);
+}
+
+/* ============================================================
+   INPUT FOCUS GLOW
+   Applied globally to all inputs/textareas/selects.
+   Complements the existing Tailwind focus:ring classes.
+   ============================================================ */
+input:not([type="checkbox"]):not([type="radio"]):not([type="range"]),
+textarea,
+select {
+  transition: border-color 180ms ease, box-shadow 180ms ease;
+}
+input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):focus,
+textarea:focus,
+select:focus {
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(212,175,55,0.15);
+}
+
+/* ============================================================
+   STAGGERED LIST FADE-IN
+   Add class .stagger-list to a <ul>/<div>, children get
+   staggered entrance without any JS.
+   ============================================================ */
+.stagger-list > * {
+  animation: stagger-fade 240ms ease both;
+}
+.stagger-list > *:nth-child(1)  { animation-delay:  0ms; }
+.stagger-list > *:nth-child(2)  { animation-delay: 40ms; }
+.stagger-list > *:nth-child(3)  { animation-delay: 80ms; }
+.stagger-list > *:nth-child(4)  { animation-delay:120ms; }
+.stagger-list > *:nth-child(5)  { animation-delay:160ms; }
+.stagger-list > *:nth-child(6)  { animation-delay:200ms; }
+.stagger-list > *:nth-child(7)  { animation-delay:240ms; }
+.stagger-list > *:nth-child(8)  { animation-delay:280ms; }
+.stagger-list > *:nth-child(9)  { animation-delay:320ms; }
+.stagger-list > *:nth-child(10) { animation-delay:360ms; }
+
+@keyframes stagger-fade {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: translateY(0);   }
+}
+
+/* ============================================================
+   PAGE FADE-IN
+   Any top-level route wrapper gets a smooth entrance.
+   ============================================================ */
+.page-enter {
+  animation: page-in 280ms ease both;
+}
+@keyframes page-in {
+  from { opacity: 0; transform: translateY(10px); }
+  to   { opacity: 1; transform: translateY(0);    }
+}
+
+/* ============================================================
+   PULSE — NEW ORDER BADGE
+   Utility for pulsing ring on new orders in kitchen/dashboard.
+   ============================================================ */
+.pulse-ring {
+  position: relative;
+}
+.pulse-ring::after {
+  content: '';
+  position: absolute;
+  inset: -4px;
+  border-radius: inherit;
+  border: 2px solid rgba(212,175,55,0.6);
+  animation: pulse-out 1.6s ease-out infinite;
+}
+@keyframes pulse-out {
+  0%   { opacity: 0.8; transform: scale(1);    }
+  100% { opacity: 0;   transform: scale(1.12); }
+}
+
+/* ============================================================
+   SHIMMER SKELETON UTILITY
+   Usage: <div class="skeleton">...</div>
+   ============================================================ */
+.skeleton {
+  position: relative;
+  overflow: hidden;
+  background: rgba(255,255,255,0.05);
+  border-radius: 6px;
+}
+.skeleton::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(255,255,255,0.07) 50%,
+    transparent 100%
+  );
+  animation: shimmer 1.6s ease-in-out infinite;
+}
+html.light-mode .skeleton {
+  background: rgba(0,0,0,0.05);
+}
+html.light-mode .skeleton::after {
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(0,0,0,0.06) 50%,
+    transparent 100%
+  );
+}
+
+/* ============================================================
+   MODAL BACKDROP
+   Utility: apply to modal overlay <div class="modal-backdrop">
+   ============================================================ */
+.modal-backdrop {
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+}
+
+/* ============================================================
+   SMOOTH TOGGLE SWITCH
+   For Settings mode toggles and feature toggle buttons.
+   ============================================================ */
+.toggle-thumb {
+  transition: transform 200ms cubic-bezier(0.34,1.56,0.64,1);
+}
+
+/* ============================================================
+   REDUCED MOTION — respect user accessibility preference
+   ============================================================ */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+  html {
+    scroll-behavior: auto;
+  }
+}

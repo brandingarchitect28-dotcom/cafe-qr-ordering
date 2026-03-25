@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { signOut } from 'firebase/auth';
 import { auth } from '../lib/firebase';
@@ -55,6 +55,13 @@ const Dashboard = () => {
 
   // Load cafe doc to read feature flags — additive, does not affect existing logic
   const { data: cafe } = useDocument('cafes', user?.cafeId);
+
+  // Apply light/dark class to <html> whenever cafe.mode changes.
+  // The class drives CSS variables in index.css — zero component changes needed.
+  useEffect(() => {
+    const mode = cafe?.mode || 'dark'; // default dark (existing look)
+    document.documentElement.classList.toggle('light-mode', mode === 'light');
+  }, [cafe?.mode]);
 
   // Safe feature resolver: defaults ALL features to true if missing (backward compat)
   const features = {
