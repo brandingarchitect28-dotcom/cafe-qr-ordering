@@ -18,7 +18,7 @@ import React, {
 } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
-  collection, query, where, doc, addDoc,
+  collection, query, where, doc, addDoc, updateDoc,
   serverTimestamp, runTransaction, onSnapshot,
 } from 'firebase/firestore';
 import { db } from '../lib/firebase';
@@ -537,6 +537,8 @@ const CafeOrderingPremium = () => {
         paymentStatus: 'pending',
         paymentMode,
         orderStatus: 'new',
+        // calculationStatus: 'pending' → set to 'done' right after addDoc (background)
+        calculationStatus: 'pending',
         orderType,
         customerName,
         customerPhone,
@@ -547,6 +549,9 @@ const CafeOrderingPremium = () => {
       };
 
       const orderRef = await addDoc(collection(db, 'orders'), orderData);
+
+      // Mark calculationStatus:'done' — non-blocking background flag.
+      updateDoc(orderRef, { calculationStatus: 'done' }).catch(() => {});
 
       createInvoiceForOrder({ ...orderData, orderNumber: oNum }, orderRef.id, cafe)
         .catch(console.error);

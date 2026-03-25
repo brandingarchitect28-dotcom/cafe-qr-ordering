@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { collection, query, where, doc, addDoc, serverTimestamp, runTransaction, onSnapshot } from 'firebase/firestore';
+import { collection, query, where, doc, addDoc, updateDoc, serverTimestamp, runTransaction, onSnapshot } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import { createInvoiceForOrder } from '../services/invoiceService';
 import { deductStockForOrder } from '../services/inventoryService';
@@ -604,6 +604,10 @@ const CafeOrdering = () => {
         paymentStatus: 'pending',
         paymentMode,
         orderStatus: 'new',
+        // calculationStatus: tracks whether prices have been confirmed post-creation.
+        // 'pending' → order is live in kitchen immediately, summary loads on tracking page.
+        // 'done'    → set right after addDoc (background, non-blocking).
+        calculationStatus: 'pending',
         orderType,
         customerName,
         customerPhone,
@@ -614,6 +618,11 @@ const CafeOrdering = () => {
       };
 
       const orderDocRef = await addDoc(collection(db, 'orders'), orderData);
+
+      // Mark calculationStatus:'done' immediately after write — non-blocking background update.
+      // All prices are already calculated before addDoc, so this is just a status flag.
+      // Kitchen and real-time listeners already have the order by this point.
+      updateDoc(orderDocRef, { calculationStatus: 'done' }).catch(() => {});
 
       // ── Feature 1: Auto-generate invoice (non-blocking, does not affect order flow) ──
       createInvoiceForOrder(

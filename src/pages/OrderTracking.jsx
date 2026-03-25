@@ -207,7 +207,10 @@ const OrderTracking = () => {
   const fmt         = (n) => (parseFloat(n) || 0).toFixed(2);
   const items       = order?.items || [];
   const payStatus   = order?.paymentStatus || 'pending';
+  const calcStatus  = order?.calculationStatus || 'done'; // 'done' default = backward compat
   const orderType   = order?.orderType || 'dine-in';
+  const isPaid      = payStatus === 'paid';
+  const isFailed    = payStatus === 'failed';
 
   const orderTypeLabel = {
     'dine-in':  `Dine-In${order?.tableNumber ? ` · Table ${order.tableNumber}` : ''}`,
@@ -360,71 +363,101 @@ const OrderTracking = () => {
             <p className="text-[#444] text-xs uppercase tracking-widest font-semibold mb-3">
               Your Order
             </p>
-            <div className="space-y-2">
-              {items.map((item, i) => {
-                const basePrice  = parseFloat(item.basePrice ?? item.price) || 0;
-                const qty        = parseInt(item.quantity) || 1;
-                const addons     = Array.isArray(item.addons) ? item.addons : [];
-                const addonAmt   = addons.reduce((s, a) => s + (parseFloat(a.price) || 0), 0);
-                const lineTotal  = (basePrice + addonAmt) * qty;
 
-                return (
-                  <div key={i} className="space-y-0.5">
-                    <div className="flex justify-between text-sm">
-                      <span className="text-[#D0D0D0] font-medium">
-                        {item.name} × {qty}
-                      </span>
-                      <span className="text-white font-semibold">{CUR}{fmt(lineTotal)}</span>
-                    </div>
-                    {/* Add-ons indented */}
-                    {addons.map((a, ai) => (
-                      <div key={ai} className="flex justify-between text-xs pl-3">
-                        <span className="text-[#555]">╰ {a.name}</span>
-                        <span className="text-[#666]">+{CUR}{fmt(parseFloat(a.price) || 0)}</span>
-                      </div>
-                    ))}
+            {/* calculationStatus === 'pending': shimmer placeholder */}
+            {calcStatus === 'pending' ? (
+              <AnimatePresence>
+                <motion.div
+                  initial={{ opacity: 0 }} animate={{ opacity: 1 }}
+                  className="space-y-3 pb-4"
+                >
+                  <div className="flex items-center gap-2 text-[#555] text-xs">
+                    <motion.div
+                      animate={{ rotate: 360 }}
+                      transition={{ duration: 1, repeat: Infinity, ease: 'linear' }}
+                      className="w-3.5 h-3.5 rounded-full border-2 border-t-transparent flex-shrink-0"
+                      style={{ borderColor: `${primary}40`, borderTopColor: primary }}
+                    />
+                    Processing your order summary…
                   </div>
-                );
-              })}
-            </div>
+                  {/* Skeleton rows */}
+                  {[80, 60, 70].map((w, i) => (
+                    <div key={i} className="flex justify-between items-center">
+                      <div className="h-3 rounded bg-white/5 animate-pulse" style={{ width: `${w}%` }} />
+                      <div className="h-3 w-12 rounded bg-white/5 animate-pulse" />
+                    </div>
+                  ))}
+                </motion.div>
+              </AnimatePresence>
+            ) : (
+              /* calculationStatus === 'done': full breakdown */
+              <div className="space-y-2">
+                {items.map((item, i) => {
+                  const basePrice  = parseFloat(item.basePrice ?? item.price) || 0;
+                  const qty        = parseInt(item.quantity) || 1;
+                  const addons     = Array.isArray(item.addons) ? item.addons : [];
+                  const addonAmt   = addons.reduce((s, a) => s + (parseFloat(a.price) || 0), 0);
+                  const lineTotal  = (basePrice + addonAmt) * qty;
 
-            {/* Bill summary */}
-            <div className="mt-4 pt-3 border-t border-white/5 space-y-1.5">
-              {order.subtotalAmount > 0 && order.subtotalAmount !== order.totalAmount && (
-                <div className="flex justify-between text-xs text-[#555]">
-                  <span>Subtotal</span>
-                  <span>{CUR}{fmt(order.subtotalAmount)}</span>
-                </div>
-              )}
-              {(order.gstAmount || 0) > 0 && (
-                <div className="flex justify-between text-xs text-[#555]">
-                  <span>GST</span>
-                  <span>+{CUR}{fmt(order.gstAmount)}</span>
-                </div>
-              )}
-              {(order.taxAmount || 0) > 0 && (
-                <div className="flex justify-between text-xs text-[#555]">
-                  <span>Tax</span>
-                  <span>+{CUR}{fmt(order.taxAmount)}</span>
-                </div>
-              )}
-              {(order.serviceChargeAmount || 0) > 0 && (
-                <div className="flex justify-between text-xs text-[#555]">
-                  <span>Service Charge</span>
-                  <span>+{CUR}{fmt(order.serviceChargeAmount)}</span>
-                </div>
-              )}
-              {(order.platformFeeAmount || 0) > 0 && (
-                <div className="flex justify-between text-xs text-[#555]">
-                  <span>Platform Fee</span>
-                  <span>+{CUR}{fmt(order.platformFeeAmount)}</span>
-                </div>
-              )}
-              <div className="flex justify-between font-black text-sm pt-1">
-                <span className="text-white">Total</span>
-                <span style={{ color: primary }}>{CUR}{fmt(order.totalAmount)}</span>
+                  return (
+                    <div key={i} className="space-y-0.5">
+                      <div className="flex justify-between text-sm">
+                        <span className="text-[#D0D0D0] font-medium">
+                          {item.name} × {qty}
+                        </span>
+                        <span className="text-white font-semibold">{CUR}{fmt(lineTotal)}</span>
+                      </div>
+                      {addons.map((a, ai) => (
+                        <div key={ai} className="flex justify-between text-xs pl-3">
+                          <span className="text-[#555]">╰ {a.name}</span>
+                          <span className="text-[#666]">+{CUR}{fmt(parseFloat(a.price) || 0)}</span>
+                        </div>
+                      ))}
+                    </div>
+                  );
+                })}
               </div>
-            </div>
+            )}
+
+            {/* Bill summary — only show when calculation done */}
+            {calcStatus === 'done' && (
+              <div className="mt-4 pt-3 border-t border-white/5 space-y-1.5">
+                {order.subtotalAmount > 0 && order.subtotalAmount !== order.totalAmount && (
+                  <div className="flex justify-between text-xs text-[#555]">
+                    <span>Subtotal</span>
+                    <span>{CUR}{fmt(order.subtotalAmount)}</span>
+                  </div>
+                )}
+                {(order.gstAmount || 0) > 0 && (
+                  <div className="flex justify-between text-xs text-[#555]">
+                    <span>GST</span>
+                    <span>+{CUR}{fmt(order.gstAmount)}</span>
+                  </div>
+                )}
+                {(order.taxAmount || 0) > 0 && (
+                  <div className="flex justify-between text-xs text-[#555]">
+                    <span>Tax</span>
+                    <span>+{CUR}{fmt(order.taxAmount)}</span>
+                  </div>
+                )}
+                {(order.serviceChargeAmount || 0) > 0 && (
+                  <div className="flex justify-between text-xs text-[#555]">
+                    <span>Service Charge</span>
+                    <span>+{CUR}{fmt(order.serviceChargeAmount)}</span>
+                  </div>
+                )}
+                {(order.platformFeeAmount || 0) > 0 && (
+                  <div className="flex justify-between text-xs text-[#555]">
+                    <span>Platform Fee</span>
+                    <span>+{CUR}{fmt(order.platformFeeAmount)}</span>
+                  </div>
+                )}
+                <div className="flex justify-between font-black text-sm pt-1">
+                  <span className="text-white">Total</span>
+                  <span style={{ color: primary }}>{CUR}{fmt(order.totalAmount)}</span>
+                </div>
+              </div>
+            )}
 
             {/* Payment mode */}
             <div className="mt-3 flex items-center justify-between text-xs pb-5">
@@ -438,6 +471,64 @@ const OrderTracking = () => {
                 </p>
               )}
             </div>
+
+            {/* ── Payment action area (shown only when calculation is done) ── */}
+            <AnimatePresence>
+              {calcStatus === 'done' && !isPaid && order.orderStatus !== 'cancelled' && (
+                <motion.div
+                  initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: 6 }}
+                  className="mb-4 space-y-2"
+                >
+                  {/* Failed payment state */}
+                  {isFailed && (
+                    <div className="flex items-center gap-2 p-3 rounded-xl text-xs text-red-400"
+                      style={{ background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.2)' }}>
+                      ❌ Payment failed — please retry or pay at counter
+                    </div>
+                  )}
+
+                  {/* Online payment button — only if cafe supports it */}
+                  {order.paymentMode === 'online' && (
+                    <motion.button
+                      whileTap={{ scale: 0.97 }}
+                      onClick={() => navigate(`/cafe/${order.cafeId}`)}
+                      className="w-full py-3 rounded-xl font-bold text-sm text-black transition-all"
+                      style={{ background: `linear-gradient(135deg, ${primary}, ${primary}cc)` }}
+                    >
+                      {isFailed ? '🔄 Retry Payment' : '💳 Pay Now'}
+                    </motion.button>
+                  )}
+
+                  {/* Pay at Counter option (for non-prepaid orders) */}
+                  {order.paymentMode !== 'prepaid' && order.paymentMode !== 'online' && (
+                    <div className="p-3 rounded-xl text-center text-xs text-[#A3A3A3]"
+                      style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)' }}>
+                      🏪 Pay at counter when ready — staff will confirm your payment
+                    </div>
+                  )}
+
+                  {/* For failed online payments, offer counter fallback */}
+                  {isFailed && order.paymentMode === 'online' && (
+                    <div className="p-3 rounded-xl text-center text-xs text-[#555]"
+                      style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.05)' }}>
+                      Or pay at counter — your order is saved
+                    </div>
+                  )}
+                </motion.div>
+              )}
+
+              {/* Paid confirmation */}
+              {isPaid && (
+                <motion.div
+                  initial={{ opacity: 0, scale: 0.97 }} animate={{ opacity: 1, scale: 1 }}
+                  className="mb-4 p-3 rounded-xl text-center text-xs font-semibold text-green-400"
+                  style={{ background: 'rgba(16,185,129,0.08)', border: '1px solid rgba(16,185,129,0.2)' }}
+                >
+                  ✅ Payment confirmed — enjoy your order!
+                </motion.div>
+              )}
+            </AnimatePresence>
           </div>
         </motion.div>
 
@@ -456,8 +547,8 @@ const OrderTracking = () => {
             </motion.button>
           )}
 
-          {/* Send invoice on WhatsApp — optional, not auto-redirect */}
-          {order.customerPhone && (
+          {/* Invoice button — ONLY shown when paymentStatus === 'paid' */}
+          {isPaid && order.customerPhone && (
             <motion.button
               whileHover={{ scale: 1.03 }} whileTap={{ scale: 0.97 }}
               onClick={handleSendInvoice}
