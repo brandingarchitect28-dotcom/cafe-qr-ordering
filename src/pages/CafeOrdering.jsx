@@ -7,6 +7,7 @@ import { deductStockForOrder } from '../services/inventoryService';
 import { deductStockByRecipe } from '../services/recipeService';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ShoppingCart, Plus, Minus, X, Search, Coffee, Package, ChevronDown, RefreshCw, AlertCircle } from 'lucide-react';
+import AddOnModal from '../components/AddOnModal';
 import { toast } from 'sonner';
 import { QRCodeSVG } from 'qrcode.react';
 
@@ -122,6 +123,7 @@ const CafeOrdering = () => {
   const [menuItems, setMenuItems] = useState([]);
   const [offers, setOffers] = useState([]);
   const [cart, setCart] = useState([]);
+  const [addonModal, setAddonModal] = useState(null); // item waiting for add-on selection
   const [loading, setLoading] = useState(true);
   const [menuLoading, setMenuLoading] = useState(true);
   const [offersLoading, setOffersLoading] = useState(true);
@@ -334,17 +336,32 @@ const CafeOrdering = () => {
   }, [cafeId]);
 
   // Cart functions
+  // Items with add-ons → open AddOnModal first (no change for items without add-ons)
   const addToCart = (item) => {
-    setAddingItemId(item.id);
-    setTimeout(() => setAddingItemId(null), 600);
-    
-    const existingItem = cart.find(i => i.id === item.id);
-    if (existingItem) {
-      setCart(cart.map(i => i.id === item.id ? { ...i, quantity: i.quantity + 1 } : i));
-    } else {
-      setCart([...cart, { ...item, quantity: 1 }]);
+    if (item.addons?.length > 0) {
+      setAddonModal(item);
+      return;
     }
-    toast.success(`${item.name} added to cart`, { duration: 2000 });
+    directAddToCart({ ...item, quantity: 1, addons: [], addonTotal: 0 });
+  };
+
+  const directAddToCart = (cartEntry) => {
+    setAddingItemId(cartEntry.id);
+    setTimeout(() => setAddingItemId(null), 600);
+    // Items with add-ons always get their own cart row (different selection = different entry)
+    if (cartEntry.addons?.length > 0) {
+      setCart(prev => [...prev, cartEntry]);
+    } else {
+      const existingItem = cart.find(i => i.id === cartEntry.id && !i.addons?.length);
+      if (existingItem) {
+        setCart(cart.map(i =>
+          i.id === cartEntry.id && !i.addons?.length ? { ...i, quantity: i.quantity + 1 } : i
+        ));
+      } else {
+        setCart([...cart, cartEntry]);
+      }
+    }
+    toast.success(`${cartEntry.name} added to cart`, { duration: 2000 });
   };
 
   const updateQuantity = (itemId, change) => {
@@ -566,7 +583,13 @@ const CafeOrdering = () => {
       const orderData = {
         cafeId,
         orderNumber,
-        items: cart.map(item => ({ name: item.name, price: item.price, quantity: item.quantity })),
+        items: cart.map(item => ({
+          name:       item.name,
+          price:      item.basePrice ?? item.price,  // base price (without add-ons)
+          quantity:   item.quantity,
+          addons:     item.addons     || [],
+          addonTotal: item.addonTotal || 0,
+        })),
         subtotalAmount:      subtotal,
         taxAmount:           taxAmount,
         serviceChargeAmount: serviceChargeAmount,
@@ -1239,7 +1262,12 @@ const CafeOrdering = () => {
                       )}
                       <div className="flex-1">
                         <h4 className="font-semibold" style={{ color: COLORS.text }}>{item.name}</h4>
-                        <p className="text-sm" style={{ color: COLORS.primary }}>{CUR}{parseFloat(item.price).toFixed(2)} each</p>
+                        <p className="text-sm" style={{ color: COLORS.primary }}>{CUR}{parseFloat(item.basePrice ?? item.price).toFixed(2)} each</p>
+                        {item.addons?.length > 0 && (
+                          <p className="text-xs mt-0.5" style={{ color: COLORS.textMuted }}>
+                            + {item.addons.map(a => a.name).join(', ')}
+                          </p>
+                        )}
                         {item.isFreeItem && <span className="text-xs text-green-500 font-bold">FREE!</span>}
                       </div>
                       <div className="flex items-center gap-2">
@@ -1460,6 +1488,18 @@ const CafeOrdering = () => {
           </motion.div>
         )}
       </AnimatePresence>
+
+      {/* Add-on selection modal — shown when customer taps item with add-ons */}
+      {addonModal && (
+        <AddOnModal
+          item={addonModal}
+          onConfirm={(entry) => { directAddToCart(entry); setAddonModal(null); }}
+          onClose={() => setAddonModal(null)}
+          currencySymbol={CUR}
+          primaryColor={cafe?.primaryColor}
+          theme={cafe?.mode}
+        />
+      )}
     </div>
   );
 };

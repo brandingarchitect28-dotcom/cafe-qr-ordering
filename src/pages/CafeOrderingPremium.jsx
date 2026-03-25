@@ -31,6 +31,7 @@ import {
   ChevronDown, AlertCircle, Sparkles, Gift, Star,
 } from 'lucide-react';
 import { toast } from 'sonner';
+import AddOnModal from '../components/AddOnModal';
 import { QRCodeSVG } from 'qrcode.react';
 import { MediaPreview, getMediaType } from '../components/MediaUpload';
 
@@ -295,6 +296,7 @@ const CafeOrderingPremium = () => {
   const [menuItems,     setMenuItems    ] = useState([]);
   const [offers,        setOffers       ] = useState([]);
   const [cart,          setCart         ] = useState([]);
+  const [addonModal,    setAddonModal   ] = useState(null);
   const [loading,       setLoading      ] = useState(true);
   const [cafeNotFound,  setCafeNotFound ] = useState(false);
   const [searchQuery,   setSearchQuery  ] = useState('');
@@ -420,13 +422,27 @@ const CafeOrderingPremium = () => {
     console.log('────────────────────────────────');
   };
 
-  const addToCart = useCallback((item) => {
+  const directAddToCart = useCallback((cartEntry) => {
     setCart(prev => {
-      const ex = prev.find(i => i.id === item.id);
-      if (ex) return prev.map(i => i.id === item.id ? { ...i, quantity: i.quantity + 1 } : i);
-      return [...prev, { ...item, quantity: 1 }];
+      if (cartEntry.addons?.length > 0) {
+        // Items with add-ons always get their own row
+        return [...prev, cartEntry];
+      }
+      const ex = prev.find(i => i.id === cartEntry.id && !i.addons?.length);
+      if (ex) return prev.map(i =>
+        i.id === cartEntry.id && !i.addons?.length ? { ...i, quantity: i.quantity + 1 } : i
+      );
+      return [...prev, cartEntry];
     });
   }, []);
+
+  const addToCart = useCallback((item) => {
+    if (item.addons?.length > 0) {
+      setAddonModal(item);
+      return;
+    }
+    directAddToCart({ ...item, quantity: 1, addons: [], addonTotal: 0 });
+  }, [directAddToCart]);
 
   const removeFromCart = useCallback((id) => {
     setCart(prev => {
@@ -502,7 +518,13 @@ const CafeOrderingPremium = () => {
       const orderData = {
         cafeId,
         orderNumber: oNum,
-        items: cart.map(i => ({ name: i.name, price: i.price, quantity: i.quantity })),
+        items: cart.map(i => ({
+          name:       i.name,
+          price:      i.basePrice ?? i.price,
+          quantity:   i.quantity,
+          addons:     i.addons     || [],
+          addonTotal: i.addonTotal || 0,
+        })),
         subtotalAmount: subtotal,
         taxAmount,
         serviceChargeAmount: scAmount,
@@ -970,9 +992,9 @@ const CafeOrderingPremium = () => {
                       <ShoppingCart className="w-12 h-12 mx-auto mb-3" style={{ color: T.textMuted, opacity: 0.3 }} />
                       <p style={{ color: T.textMuted }}>Your cart is empty</p>
                     </motion.div>
-                  ) : cart.map(item => (
+                  ) : cart.map((item, idx) => (
                     <motion.div
-                      key={item.id}
+                      key={`${item.id}-${idx}`}
                       layout
                       initial={{ opacity: 0, x: 20 }}
                       animate={{ opacity: 1, x: 0 }}
@@ -987,7 +1009,12 @@ const CafeOrderingPremium = () => {
                       )}
                       <div className="flex-1 min-w-0">
                         <p className="text-sm font-medium truncate" style={{ color: T.text }}>{item.name}</p>
-                        <p className="text-xs" style={{ color: T.textMuted }}>{CUR}{fmt(item.price)}</p>
+                        <p className="text-xs" style={{ color: T.textMuted }}>{CUR}{fmt(item.basePrice ?? item.price)}</p>
+                        {item.addons?.length > 0 && (
+                          <p className="text-xs mt-0.5 truncate" style={{ color: T.textMuted }}>
+                            + {item.addons.map(a => a.name).join(', ')}
+                          </p>
+                        )}
                       </div>
                       <div className="flex items-center gap-2 flex-shrink-0">
                         <button onClick={() => removeFromCart(item.id)}
@@ -1180,10 +1207,17 @@ const CafeOrderingPremium = () => {
                 {/* Order summary — always shows full transparent breakdown */}
                 <div className="p-4 rounded-xl space-y-2" style={{ background: `${primary}08`, border: `1px solid ${primary}20` }}>
                   <p className="font-semibold text-sm mb-3" style={{ color: T.text }}>Order Summary</p>
-                  {cart.map(item => (
-                    <div key={item.id} className="flex justify-between text-sm">
-                      <span style={{ color: T.textMuted }}>{item.name} × {item.quantity}</span>
-                      <span style={{ color: T.text }}>{CUR}{fmt(item.price * item.quantity)}</span>
+                  {cart.map((item, idx) => (
+                    <div key={`${item.id}-${idx}`} className="text-sm">
+                      <div className="flex justify-between">
+                        <span style={{ color: T.textMuted }}>{item.name} × {item.quantity}</span>
+                        <span style={{ color: T.text }}>{CUR}{fmt(item.price * item.quantity)}</span>
+                      </div>
+                      {item.addons?.length > 0 && (
+                        <p className="text-xs ml-2 mt-0.5" style={{ color: T.textFaint || T.textMuted }}>
+                          + {item.addons.map(a => a.name).join(', ')}
+                        </p>
+                      )}
                     </div>
                   ))}
                   <div className="border-t pt-2 mt-1 space-y-1" style={{ borderColor: T.borderLight }}>
@@ -1272,6 +1306,18 @@ const CafeOrderingPremium = () => {
           </motion.div>
         )}
       </AnimatePresence>
+
+      {/* Add-on selection modal */}
+      {addonModal && (
+        <AddOnModal
+          item={addonModal}
+          onConfirm={(entry) => { directAddToCart(entry); setAddonModal(null); }}
+          onClose={() => setAddonModal(null)}
+          currencySymbol={CUR}
+          primaryColor={primary}
+          theme={cafe?.mode}
+        />
+      )}
     </div>
   );
 };

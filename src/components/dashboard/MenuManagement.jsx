@@ -6,6 +6,7 @@ import { db } from '../../lib/firebase';
 import { Plus, Edit, Trash2, X, RefreshCw } from 'lucide-react';
 import { toast } from 'sonner';
 import MediaUpload, { MediaPreview } from '../MediaUpload';
+import AddOnEditor from './AddOnEditor';
 
 const MenuManagement = () => {
   const { user } = useAuth();
@@ -17,7 +18,7 @@ const MenuManagement = () => {
   const [saving, setSaving] = useState(false);
 
   const [formData, setFormData] = useState({
-    name: '', price: '', category: '', image: '', available: true
+    name: '', price: '', category: '', image: '', available: true, addons: []
   });
 
   const { data: menuItems, loading } = useCollection(
@@ -38,6 +39,7 @@ const MenuManagement = () => {
         category:  formData.category,
         image:     formData.image,
         available: formData.available,
+        addons:    formData.addons || [],   // [] = no add-ons; backward-compatible
         cafeId,
       };
 
@@ -65,6 +67,7 @@ const MenuManagement = () => {
       category:  item.category || '',
       image:     item.image || '',
       available: item.available,
+      addons:    item.addons || [],
     });
     setShowForm(true);
   };
@@ -88,7 +91,7 @@ const MenuManagement = () => {
   };
 
   const resetForm = () => {
-    setFormData({ name: '', price: '', category: '', image: '', available: true });
+    setFormData({ name: '', price: '', category: '', image: '', available: true, addons: [] });
     setEditingItem(null);
     setSaving(false);
     setShowForm(false);
@@ -176,6 +179,14 @@ const MenuManagement = () => {
               disabled={saving}
             />
 
+            {/* Add-ons / Customisations */}
+            <AddOnEditor
+              addons={formData.addons}
+              onChange={(addons) => setFormData(prev => ({ ...prev, addons }))}
+              currencySymbol={CUR}
+              disabled={saving}
+            />
+
             {/* Available checkbox */}
             <div className="flex items-center gap-3">
               <input
@@ -239,6 +250,11 @@ const MenuManagement = () => {
                   <div className={`px-2 py-1 rounded-sm text-xs font-medium ${item.available ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-red-400'}`}>
                     {item.available ? 'Available' : 'Unavailable'}
                   </div>
+                  {item.addons?.length > 0 && (
+                    <div className="px-2 py-1 rounded-sm text-xs font-medium bg-[#D4AF37]/15 text-[#D4AF37]">
+                      {item.addons.length} add-on{item.addons.length !== 1 ? 's' : ''}
+                    </div>
+                  )}
                 </div>
                 <div className="flex gap-2">
                   <button onClick={() => handleEdit(item)} className="flex-1 bg-white/5 hover:bg-white/10 text-white rounded-sm px-4 py-2 transition-all flex items-center justify-center gap-2">
