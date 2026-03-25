@@ -649,9 +649,17 @@ const OrdersManagement = () => {
                                 <h4 className="text-[#D4AF37] font-semibold mb-3">Order Items</h4>
                                 <div className="space-y-2">
                                   {order.items?.map((item, idx) => (
-                                    <div key={idx} className="flex justify-between text-sm">
-                                      <span className="text-white">{item.name} x{item.quantity}</span>
-                                      <span className="text-[#D4AF37]">{order.currencySymbol || cafeCurrency}{(item.price * item.quantity).toFixed(2)}</span>
+                                    <div key={idx} className="space-y-0.5">
+                                      <div className="flex justify-between text-sm">
+                                        <span className="text-white">{item.name} x{item.quantity}</span>
+                                        <span className="text-[#D4AF37]">{order.currencySymbol || cafeCurrency}{(item.price * item.quantity).toFixed(2)}</span>
+                                      </div>
+                                      {item.addons?.map((a, ai) => (
+                                        <div key={ai} className="flex justify-between text-xs pl-3">
+                                          <span className="text-[#555]">↳ {a.name}</span>
+                                          <span className="text-[#A3A3A3]">+{order.currencySymbol || cafeCurrency}{(a.price || 0).toFixed(2)}</span>
+                                        </div>
+                                      ))}
                                     </div>
                                   ))}
                                   <div className="border-t border-white/10 pt-2 mt-2 flex justify-between font-bold">
@@ -757,9 +765,17 @@ const OrdersManagement = () => {
                       <h4 className="text-[#D4AF37] font-semibold mb-2 text-sm">Items</h4>
                       <div className="space-y-1">
                         {order.items?.map((item, idx) => (
-                          <div key={idx} className="flex justify-between text-sm">
-                            <span className="text-white">{item.name} x{item.quantity}</span>
-                            <span className="text-[#D4AF37]">{order.currencySymbol || cafeCurrency}{(item.price * item.quantity).toFixed(2)}</span>
+                          <div key={idx} className="space-y-0.5">
+                            <div className="flex justify-between text-sm">
+                              <span className="text-white">{item.name} x{item.quantity}</span>
+                              <span className="text-[#D4AF37]">{order.currencySymbol || cafeCurrency}{(item.price * item.quantity).toFixed(2)}</span>
+                            </div>
+                            {item.addons?.map((a, ai) => (
+                              <div key={ai} className="flex justify-between text-xs pl-3">
+                                <span className="text-[#555]">↳ {a.name}</span>
+                                <span className="text-[#A3A3A3]">+{order.currencySymbol || cafeCurrency}{(a.price || 0).toFixed(2)}</span>
+                              </div>
+                            ))}
                           </div>
                         ))}
                       </div>

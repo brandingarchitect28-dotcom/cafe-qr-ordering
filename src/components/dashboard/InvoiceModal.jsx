@@ -44,13 +44,23 @@ const buildPrintHTML = (inv) => {
 
   const itemRows = (inv.items || [])
     .map(
-      (item) => `
+      (item) => {
+        const addonRows = (item.addons || []).map(a =>
+          `<tr class="addon-row">
+            <td style="padding-left:20px;color:#A3A3A3">↳ ${a.name}</td>
+            <td class="center" style="color:#A3A3A3">—</td>
+            <td class="right" style="color:#A3A3A3">+${cur}${fmt(a.price || 0)}</td>
+            <td class="right" style="color:#A3A3A3">+${cur}${fmt(a.price || 0)}</td>
+          </tr>`
+        ).join('');
+        return `
     <tr>
       <td>${item.name}</td>
       <td class="center">${item.quantity}</td>
-      <td class="right">${cur}${fmt(item.price)}</td>
+      <td class="right">${cur}${fmt(item.basePrice ?? item.price)}</td>
       <td class="right">${cur}${fmt(item.price * item.quantity)}</td>
-    </tr>`
+    </tr>${addonRows}`;
+      }
     )
     .join('');
 
@@ -372,19 +382,26 @@ const InvoiceModal = ({ invoice, onClose }) => {
                 </thead>
                 <tbody>
                   {(invoice.items || []).map((item, idx) => (
-                    <tr
-                      key={idx}
-                      className={`border-b border-white/5 ${idx % 2 === 0 ? 'bg-black/10' : ''}`}
-                    >
-                      <td className="px-4 py-3 text-white">{item.name}</td>
-                      <td className="px-3 py-3 text-center text-[#A3A3A3]">{item.quantity}</td>
-                      <td className="px-3 py-3 text-right text-[#A3A3A3]">
-                        {cur}{fmt(item.price)}
-                      </td>
-                      <td className="px-4 py-3 text-right text-white font-medium">
-                        {cur}{fmt(item.price * item.quantity)}
-                      </td>
-                    </tr>
+                    <React.Fragment key={idx}>
+                      <tr className={`border-b border-white/5 ${idx % 2 === 0 ? 'bg-black/10' : ''}`}>
+                        <td className="px-4 py-3 text-white">{item.name}</td>
+                        <td className="px-3 py-3 text-center text-[#A3A3A3]">{item.quantity}</td>
+                        <td className="px-3 py-3 text-right text-[#A3A3A3]">
+                          {cur}{fmt(item.basePrice ?? item.price)}
+                        </td>
+                        <td className="px-4 py-3 text-right text-white font-medium">
+                          {cur}{fmt(item.price * item.quantity)}
+                        </td>
+                      </tr>
+                      {item.addons?.map((a, ai) => (
+                        <tr key={`${idx}-addon-${ai}`} className="border-b border-white/3">
+                          <td className="px-4 py-1.5 text-[#555] text-xs pl-8">↳ {a.name}</td>
+                          <td className="px-3 py-1.5 text-center text-[#555] text-xs">—</td>
+                          <td className="px-3 py-1.5 text-right text-[#555] text-xs">+{cur}{fmt(a.price || 0)}</td>
+                          <td className="px-4 py-1.5 text-right text-[#555] text-xs">+{cur}{fmt(a.price || 0)}</td>
+                        </tr>
+                      ))}
+                    </React.Fragment>
                   ))}
                 </tbody>
               </table>

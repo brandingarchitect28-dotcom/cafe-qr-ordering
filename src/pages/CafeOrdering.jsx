@@ -730,7 +730,14 @@ const CafeOrdering = () => {
       
       orderSummary += `\n*Items:*\n`;
       cart.forEach(item => {
-        orderSummary += `• ${item.name} x${item.quantity} ${cur}${(item.price * item.quantity).toFixed(2)}\n`;
+        const basePrice = item.basePrice ?? item.price;
+        const lineTotal = (item.price * item.quantity).toFixed(2); // item.price already = base + addons
+        orderSummary += `• ${item.name} x${item.quantity} ${cur}${lineTotal}\n`;
+        if (item.addons?.length > 0) {
+          item.addons.forEach(a => {
+            orderSummary += `   ↳ ${a.name}: +${cur}${(a.price || 0).toFixed(2)}\n`;
+          });
+        }
       });
 
       const hasExtras = (cafe?.taxEnabled && taxAmount > 0) || (cafe?.serviceChargeEnabled && serviceChargeAmount > 0) || (cafe?.gstEnabled && gstAmount > 0);

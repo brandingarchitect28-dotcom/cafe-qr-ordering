@@ -644,7 +644,14 @@ const CafeOrderingPremium = () => {
       if (orderType === 'dine-in' && tableNumber) msg += `*Table:* ${tableNumber}\n`;
       if (orderType === 'delivery' && deliveryAddress) msg += `*Address:* ${deliveryAddress}\n`;
       msg += `\n*Items:*\n`;
-      cart.forEach(i => { msg += `• ${i.name} x${i.quantity} — ${cur}${(i.price * i.quantity).toFixed(2)}\n`; });
+      cart.forEach(i => {
+        msg += `• ${i.name} x${i.quantity} — ${cur}${(i.price * i.quantity).toFixed(2)}\n`;
+        if (i.addons?.length > 0) {
+          i.addons.forEach(a => {
+            msg += `   ↳ ${a.name}: +${cur}${(a.price || 0).toFixed(2)}\n`;
+          });
+        }
+      });
       if (hasExtras) {
         msg += `\n*Subtotal:* ${cur}${subtotal.toFixed(2)}\n`;
         if (cafe?.taxEnabled && taxAmount > 0) msg += `*${cafe.taxName || 'Tax'} (${cafe.taxRate}%):* ${cur}${taxAmount.toFixed(2)}\n`;
