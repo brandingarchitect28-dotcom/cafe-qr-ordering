@@ -492,6 +492,54 @@ Rules:
   }
 });
 
+// ─── GET /test-gemini ─────────────────────────────────────────────────────────
+// Verifies the GEMINI_API_KEY env var is set and the Gemini API responds.
+// Uses the same native fetch pattern as /api/ai-menu-upload — no extra SDK needed.
+// Zero impact on existing routes or payment logic.
+
+app.get('/test-gemini', async (req, res) => {
+  try {
+    const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
+    if (!GEMINI_API_KEY) {
+      return res.status(500).json({
+        success: false,
+        error: 'GEMINI_API_KEY not set. Add it in Render → Environment Variables.',
+      });
+    }
+
+    const geminiRes = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${GEMINI_API_KEY}`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contents: [{ parts: [{ text: 'Say hello from SmartCafe AI' }] }],
+          generationConfig: { maxOutputTokens: 64 },
+        }),
+      }
+    );
+
+    if (!geminiRes.ok) {
+      const errText = await geminiRes.text();
+      console.error('[test-gemini] Gemini API error:', geminiRes.status, errText.slice(0, 200));
+      return res.status(502).json({
+        success: false,
+        error: `Gemini API returned ${geminiRes.status}. Check your API key is valid.`,
+      });
+    }
+
+    const data = await geminiRes.json();
+    const text = data?.candidates?.[0]?.content?.parts?.[0]?.text || '(no text)';
+
+    console.log('[test-gemini] Success:', text.slice(0, 80));
+    return res.json({ success: true, message: text });
+
+  } catch (error) {
+    console.error('[test-gemini] Unexpected error:', error.message);
+    return res.status(500).json({ success: false, error: error.message });
+  }
+});
+
 // ─── Start ────────────────────────────────────────────────────────────────────
 app.listen(PORT, () => {
   console.log(`[Server] Running on port ${PORT}`);
@@ -499,6 +547,7 @@ app.listen(PORT, () => {
   console.log(`[Server]   POST /create-order → Cashfree order creation`);
   console.log(`[Server]   POST /webhook      → payment status callback`);
   console.log(`[Server]   POST /api/ai-menu-upload → AI menu extraction`);
+  console.log(`[Server]   GET  /test-gemini  → Gemini API key verification`);
 });
 
 // ─── Cashfree HTTPS helper ────────────────────────────────────────────────────
