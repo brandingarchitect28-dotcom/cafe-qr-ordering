@@ -1486,17 +1486,40 @@ const CafeOrdering = () => {
                 )}
 
                 {/* Place Order Button */}
-                <motion.button
-                  whileHover={{ scale: 1.02 }}
-                  whileTap={{ scale: 0.98 }}
-                  onClick={confirmOrder}
-                  disabled={!customerName || !customerPhone || orderPlacing}
-                  className="w-full py-4 rounded-xl text-white font-semibold text-lg shadow-lg disabled:opacity-50 disabled:cursor-not-allowed transition-all"
-                  style={{ backgroundColor: COLORS.primary }}
-                  data-testid="place-order-btn"
-                >
-                  {orderPlacing ? 'Placing Order...' : `Place Order — ${CUR}${calculateTotal().toFixed(0)}`}
-                </motion.button>
+                <div className="relative">
+                  {/* Pulse ring — visible only while placing */}
+                  {orderPlacing && (
+                    <motion.span
+                      className="absolute inset-0 rounded-xl pointer-events-none"
+                      initial={{ opacity: 0.7, scale: 1 }}
+                      animate={{ opacity: 0, scale: 1.06 }}
+                      transition={{ duration: 0.9, repeat: Infinity, ease: 'easeOut' }}
+                      style={{ background: 'transparent', border: `2px solid ${COLORS.primary}`, borderRadius: 12 }}
+                    />
+                  )}
+                  <motion.button
+                    whileHover={!orderPlacing ? { scale: 1.02 } : {}}
+                    whileTap={!orderPlacing ? { scale: 0.96 } : {}}
+                    onClick={confirmOrder}
+                    disabled={!customerName || !customerPhone || orderPlacing}
+                    className="w-full py-4 rounded-xl text-white font-semibold text-lg shadow-lg disabled:opacity-50 disabled:cursor-not-allowed transition-all flex items-center justify-center gap-2.5"
+                    style={{ backgroundColor: COLORS.primary }}
+                    data-testid="place-order-btn"
+                  >
+                    {orderPlacing ? (
+                      <>
+                        <motion.span
+                          className="w-5 h-5 rounded-full border-2 border-white/30 border-t-white block flex-shrink-0"
+                          animate={{ rotate: 360 }}
+                          transition={{ duration: 0.8, repeat: Infinity, ease: 'linear' }}
+                        />
+                        Placing Order…
+                      </>
+                    ) : (
+                      `Place Order — ${CUR}${calculateTotal().toFixed(0)}`
+                    )}
+                  </motion.button>
+                </div>
               </div>
             </motion.div>
           </motion.div>

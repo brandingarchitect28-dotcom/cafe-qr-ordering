@@ -1270,17 +1270,34 @@ const CafeOrderingPremium = () => {
                 </div>
               </div>
 
-              <div className="px-5 py-4 border-t flex-shrink-0" style={{ borderColor: T.borderLight }}>
+              <div className="px-5 py-4 border-t flex-shrink-0 relative" style={{ borderColor: T.borderLight }}>
+                {/* Pulse ring — fires on tap, guides eye to the action */}
+                {orderPlacing && (
+                  <motion.span
+                    className="absolute inset-x-5 rounded-xl pointer-events-none"
+                    style={{ top: 16, bottom: 16, border: `2px solid ${primary}`, borderRadius: 12 }}
+                    initial={{ opacity: 0.8, scale: 1 }}
+                    animate={{ opacity: 0, scale: 1.05 }}
+                    transition={{ duration: 0.9, repeat: Infinity, ease: 'easeOut' }}
+                  />
+                )}
                 <motion.button
-                  whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}
+                  whileHover={!orderPlacing ? { scale: 1.02 } : {}}
+                  whileTap={!orderPlacing ? { scale: 0.96 } : {}}
                   onClick={handlePlaceOrder}
                   disabled={orderPlacing}
                   className="w-full py-4 rounded-xl text-black font-bold text-base disabled:opacity-60 flex items-center justify-center gap-2"
-                  style={{ background: `linear-gradient(135deg, ${primary}, ${primary}cc)`, boxShadow: `0 4px 24px ${glow}` }}
+                  style={{ background: `linear-gradient(135deg, ${primary}, ${primary}cc)`, boxShadow: orderPlacing ? 'none' : `0 4px 24px ${glow}` }}
                 >
                   {orderPlacing
-                    ? <><motion.div animate={{ rotate: 360 }} transition={{ duration: 1, repeat: Infinity, ease: 'linear' }}
-                        className="w-5 h-5 rounded-full border-2 border-black/30 border-t-black" />Placing Order…</>
+                    ? <>
+                        <motion.span
+                          className="w-5 h-5 rounded-full border-2 border-black/30 border-t-black block flex-shrink-0"
+                          animate={{ rotate: 360 }}
+                          transition={{ duration: 0.8, repeat: Infinity, ease: 'linear' }}
+                        />
+                        Placing Order…
+                      </>
                     : `Place Order • ${CUR}${fmt(totalWithCharges)}`
                   }
                 </motion.button>

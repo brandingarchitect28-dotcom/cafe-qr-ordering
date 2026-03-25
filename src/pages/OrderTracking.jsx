@@ -15,7 +15,7 @@
  * - Estimated time hint per status
  */
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { doc, onSnapshot } from 'firebase/firestore';
 import { db } from '../lib/firebase';
@@ -26,6 +26,45 @@ import {
   MapPin, Phone, User, CreditCard,
 } from 'lucide-react';
 import { generateInvoiceMessage } from '../services/invoiceService';
+
+// ─── Loading text sequence — cycles through reassuring messages ───────────────
+// Pure display component, zero side effects, no data fetching.
+const LOADING_STEPS = [
+  'Confirming your order…',
+  'Preparing your summary…',
+  'Almost ready…',
+];
+const LoadingTextSequence = ({ primary }) => {
+  const [step, setStep] = useState(0);
+  useEffect(() => {
+    const timers = [
+      setTimeout(() => setStep(1), 800),
+      setTimeout(() => setStep(2), 1800),
+    ];
+    return () => timers.forEach(clearTimeout);
+  }, []);
+  return (
+    <AnimatePresence mode="wait">
+      <motion.div
+        key={step}
+        initial={{ opacity: 0, y: 4 }}
+        animate={{ opacity: 1, y: 0 }}
+        exit={{ opacity: 0, y: -4 }}
+        transition={{ duration: 0.2 }}
+        className="flex items-center gap-2 text-xs"
+        style={{ color: primary }}
+      >
+        <motion.span
+          className="w-3.5 h-3.5 rounded-full border-2 border-t-transparent flex-shrink-0 block"
+          style={{ borderColor: `${primary}40`, borderTopColor: primary }}
+          animate={{ rotate: 360 }}
+          transition={{ duration: 0.9, repeat: Infinity, ease: 'linear' }}
+        />
+        {LOADING_STEPS[step]}
+      </motion.div>
+    </AnimatePresence>
+  );
+};
 
 // ─── Status config ────────────────────────────────────────────────────────────
 
@@ -364,34 +403,69 @@ const OrderTracking = () => {
               Your Order
             </p>
 
-            {/* calculationStatus === 'pending': shimmer placeholder */}
+            {/* calculationStatus === 'pending': premium skeleton + loading sequence */}
             {calcStatus === 'pending' ? (
-              <AnimatePresence>
-                <motion.div
-                  initial={{ opacity: 0 }} animate={{ opacity: 1 }}
-                  className="space-y-3 pb-4"
-                >
-                  <div className="flex items-center gap-2 text-[#555] text-xs">
-                    <motion.div
-                      animate={{ rotate: 360 }}
-                      transition={{ duration: 1, repeat: Infinity, ease: 'linear' }}
-                      className="w-3.5 h-3.5 rounded-full border-2 border-t-transparent flex-shrink-0"
-                      style={{ borderColor: `${primary}40`, borderTopColor: primary }}
-                    />
-                    Processing your order summary…
-                  </div>
-                  {/* Skeleton rows */}
-                  {[80, 60, 70].map((w, i) => (
-                    <div key={i} className="flex justify-between items-center">
-                      <div className="h-3 rounded bg-white/5 animate-pulse" style={{ width: `${w}%` }} />
-                      <div className="h-3 w-12 rounded bg-white/5 animate-pulse" />
+              <motion.div
+                key="skeleton"
+                initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+                className="space-y-4 pb-4"
+              >
+                {/* Animated loading text sequence */}
+                <LoadingTextSequence primary={primary} />
+
+                {/* Animated progress bar */}
+                <div className="h-1 rounded-full overflow-hidden" style={{ background: 'rgba(255,255,255,0.06)' }}>
+                  <motion.div
+                    className="h-full rounded-full"
+                    style={{ background: `linear-gradient(90deg, ${primary}80, ${primary})` }}
+                    initial={{ x: '-100%' }}
+                    animate={{ x: '100%' }}
+                    transition={{ duration: 1.4, repeat: Infinity, ease: 'easeInOut' }}
+                  />
+                </div>
+
+                {/* Shimmer skeleton rows — mimic real item layout */}
+                {[
+                  { nameW: '55%', priceW: '18%' },
+                  { nameW: '45%', priceW: '16%' },
+                  { nameW: '60%', priceW: '20%' },
+                ].map((row, i) => (
+                  <motion.div
+                    key={i}
+                    initial={{ opacity: 0, y: 4 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: i * 0.08 }}
+                    className="flex justify-between items-center gap-3"
+                  >
+                    <div className="h-3 rounded-md" style={{ width: row.nameW, background: 'rgba(255,255,255,0.06)' }}>
+                      <motion.div className="h-full w-full rounded-md overflow-hidden">
+                        <motion.div
+                          className="h-full w-1/3 rounded-md"
+                          style={{ background: 'rgba(255,255,255,0.1)' }}
+                          animate={{ x: ['-100%', '400%'] }}
+                          transition={{ duration: 1.6, repeat: Infinity, ease: 'easeInOut', delay: i * 0.2 }}
+                        />
+                      </motion.div>
                     </div>
-                  ))}
-                </motion.div>
-              </AnimatePresence>
+                    <div className="h-3 rounded-md flex-shrink-0" style={{ width: row.priceW, background: 'rgba(255,255,255,0.06)' }} />
+                  </motion.div>
+                ))}
+
+                {/* Skeleton total row */}
+                <div className="pt-3 border-t border-white/5 flex justify-between items-center">
+                  <div className="h-3 w-10 rounded-md" style={{ background: 'rgba(255,255,255,0.06)' }} />
+                  <div className="h-4 w-20 rounded-md" style={{ background: 'rgba(255,255,255,0.06)' }} />
+                </div>
+              </motion.div>
             ) : (
-              /* calculationStatus === 'done': full breakdown */
-              <div className="space-y-2">
+              /* calculationStatus === 'done': fade+slide in real data */
+              <motion.div
+                key="real-data"
+                initial={{ opacity: 0, y: 6 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.25, ease: 'easeOut' }}
+                className="space-y-2"
+              >
                 {items.map((item, i) => {
                   const basePrice  = parseFloat(item.basePrice ?? item.price) || 0;
                   const qty        = parseInt(item.quantity) || 1;
@@ -416,7 +490,7 @@ const OrderTracking = () => {
                     </div>
                   );
                 })}
-              </div>
+              </motion.div>
             )}
 
             {/* Bill summary — only show when calculation done */}
@@ -491,10 +565,17 @@ const OrderTracking = () => {
                   {/* Online payment button — only if cafe supports it */}
                   {order.paymentMode === 'online' && (
                     <motion.button
+                      initial={{ opacity: 0, scale: 0.95, y: 4 }}
+                      animate={{ opacity: 1, scale: 1, y: 0 }}
+                      transition={{ type: 'spring', stiffness: 380, damping: 22 }}
+                      whileHover={{ scale: 1.02, boxShadow: `0 6px 28px ${primary}50` }}
                       whileTap={{ scale: 0.97 }}
                       onClick={() => navigate(`/cafe/${order.cafeId}`)}
-                      className="w-full py-3 rounded-xl font-bold text-sm text-black transition-all"
-                      style={{ background: `linear-gradient(135deg, ${primary}, ${primary}cc)` }}
+                      className="w-full py-3.5 rounded-xl font-bold text-sm text-black transition-shadow"
+                      style={{
+                        background: `linear-gradient(135deg, ${primary}, ${primary}cc)`,
+                        boxShadow: `0 4px 20px ${primary}40`,
+                      }}
                     >
                       {isFailed ? '🔄 Retry Payment' : '💳 Pay Now'}
                     </motion.button>
@@ -518,14 +599,28 @@ const OrderTracking = () => {
                 </motion.div>
               )}
 
-              {/* Paid confirmation */}
+              {/* Paid confirmation — scale bounce + green glow */}
               {isPaid && (
                 <motion.div
-                  initial={{ opacity: 0, scale: 0.97 }} animate={{ opacity: 1, scale: 1 }}
-                  className="mb-4 p-3 rounded-xl text-center text-xs font-semibold text-green-400"
-                  style={{ background: 'rgba(16,185,129,0.08)', border: '1px solid rgba(16,185,129,0.2)' }}
+                  initial={{ opacity: 0, scale: 0.88, y: 4 }}
+                  animate={{ opacity: 1, scale: 1, y: 0 }}
+                  transition={{ type: 'spring', stiffness: 420, damping: 20 }}
+                  className="mb-4 p-4 rounded-xl text-center font-bold text-sm text-green-400"
+                  style={{
+                    background: 'rgba(16,185,129,0.08)',
+                    border: '1px solid rgba(16,185,129,0.25)',
+                    boxShadow: '0 0 20px rgba(16,185,129,0.12)',
+                  }}
                 >
-                  ✅ Payment confirmed — enjoy your order!
+                  <motion.span
+                    initial={{ scale: 0 }}
+                    animate={{ scale: 1 }}
+                    transition={{ delay: 0.1, type: 'spring', stiffness: 500, damping: 18 }}
+                    className="text-xl block mb-1"
+                  >
+                    ✅
+                  </motion.span>
+                  Payment confirmed — enjoy your order!
                 </motion.div>
               )}
             </AnimatePresence>
