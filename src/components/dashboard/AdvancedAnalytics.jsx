@@ -29,6 +29,14 @@ import { downloadPDFReport, downloadGSTCSV, buildWhatsAppReport } from '../../se
 const COLORS = ['#D4AF37','#10B981','#3B82F6','#F59E0B','#EF4444','#8B5CF6','#EC4899','#14B8A6'];
 
 // ─── Fixed tooltip with white text ────────────────────────────────────────────
+// ─── Safe string helper — prevents TypeError: x.toLowerCase is not a function ─
+// Handles null, undefined, numbers, objects — always returns a string.
+const safeLower = (v) => {
+  if (typeof v === 'string') return v.toLowerCase();
+  if (v === null || v === undefined) return '';
+  return String(v).toLowerCase();
+};
+
 const CustomTooltip = ({ active, payload, label, CUR = '₹' }) => {
   if (!active || !payload?.length) return null;
   return (
@@ -37,7 +45,7 @@ const CustomTooltip = ({ active, payload, label, CUR = '₹' }) => {
       {payload.map((p, i) => (
         <p key={i} style={{ color:'#fff', fontSize:12, margin:'2px 0' }}>
           <span style={{ color: p.color || '#D4AF37' }}>●</span>{' '}
-          {p.name}: <strong>{typeof p.value === 'number' && p.name?.toLowerCase().includes('revenue') ? `${CUR}${p.value.toFixed(2)}` : p.value}</strong>
+          {p.name}: <strong>{typeof p.value === 'number' && safeLower(p.name).includes('revenue') ? `${CUR}${p.value.toFixed(2)}` : p.value}</strong>
         </p>
       ))}
     </div>
@@ -169,6 +177,15 @@ const AdvancedAnalytics = () => {
           <div className="flex items-center gap-2 flex-wrap">
             <button onClick={refresh} disabled={loading} className="flex items-center gap-1.5 px-3 h-9 bg-white/5 hover:bg-white/10 border border-white/10 text-[#A3A3A3] hover:text-white rounded-sm text-sm transition-all disabled:opacity-50">
               <RefreshCw className={`w-3.5 h-3.5 ${loading?'animate-spin':''}`} />Refresh
+            </button>
+            {/* Reset Analytics — clears date range back to 30 days and forces fresh fetch */}
+            <button
+              onClick={() => { applyPreset('30'); setTimeout(refresh, 50); }}
+              disabled={loading}
+              title="Recalculate analytics from scratch using only paid orders"
+              className="flex items-center gap-1.5 px-3 h-9 bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/20 text-amber-400 rounded-sm text-sm transition-all disabled:opacity-50"
+            >
+              <RefreshCw className="w-3.5 h-3.5" />Reset
             </button>
             <button onClick={handleGST} className="flex items-center gap-1.5 px-3 h-9 bg-emerald-600 hover:bg-emerald-700 text-white rounded-sm text-sm transition-all">
               <FileText className="w-3.5 h-3.5" />GST CSV

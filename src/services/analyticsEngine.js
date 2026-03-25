@@ -7,6 +7,15 @@
  * Refresh every 60 seconds via useAdvancedAnalytics hook.
  */
 
+
+// ─── Safe string helper — prevents TypeError on non-string fields ─────────────
+const safeLower = (v) => {
+  if (typeof v === 'string') return v.toLowerCase();
+  if (v === null || v === undefined) return '';
+  return String(v).toLowerCase();
+};
+
+
 // ─── Revenue ──────────────────────────────────────────────────────────────────
 
 export const calcRevenue = (orders = []) => {
@@ -27,7 +36,7 @@ export const calcPaymentBreakdown = (orders = []) => {
   const revenue = { upi: 0, cash: 0, card: 0, online: 0, counter: 0, other: 0 };
 
   paid.forEach(o => {
-    const mode = (typeof o.paymentMode === 'string' ? o.paymentMode : 'other').toLowerCase();
+    const mode = safeLower(o.paymentMode || 'other');
     const key = ['upi', 'cash', 'card', 'online', 'counter', 'prepaid'].includes(mode)
       ? (mode === 'prepaid' ? 'upi' : mode)
       : 'other';
@@ -54,7 +63,7 @@ export const calcOrderSource = (orders = []) => {
   });
   const total = orders.length || 1;
   return Object.entries(map).map(([source, count]) => ({
-    source: typeof source === 'string' ? source.toUpperCase() : String(source),
+    source: String(source || '').toUpperCase(),
     count,
     pct: parseFloat(((count / total) * 100).toFixed(1)),
   })).sort((a, b) => b.count - a.count);

@@ -18,6 +18,13 @@ import {
 import { motion, AnimatePresence } from 'framer-motion';
 import { X } from 'lucide-react';
 
+// ─── Safe string helper — prevents TypeError: x.toLowerCase is not a function ─
+const safeLower = (v) => {
+  if (typeof v === 'string') return v.toLowerCase();
+  if (v === null || v === undefined) return '';
+  return String(v).toLowerCase();
+};
+
 // ─── Chart Drill-Down Modal ───────────────────────────────────────────────────
 // Opens when user clicks a chart card. Shows full breakdown table.
 const ChartModal = ({ chart, onClose, CUR = '₹' }) => {
@@ -69,7 +76,7 @@ const ChartModal = ({ chart, onClose, CUR = '₹' }) => {
                 {chart.data.map((row, i) => {
                   const val    = row.value ?? row.revenue ?? row.count ?? 0;
                   const pct    = ((val / total) * 100).toFixed(1);
-                  const isRev  = chart.valueLabel?.toLowerCase().includes('revenue');
+                  const isRev  = safeLower(chart.valueLabel).includes('revenue');
                   const color  = row.color || ['#D4AF37','#10B981','#3B82F6','#F59E0B','#EF4444'][i % 5];
                   return (
                     <tr key={i} className="hover:bg-white/2 transition-colors">
@@ -103,7 +110,7 @@ const ChartModal = ({ chart, onClose, CUR = '₹' }) => {
           <div className="px-5 py-3 border-t border-white/5 flex justify-between text-sm">
             <span className="text-[#555]">Total</span>
             <span className="text-white font-bold">
-              {chart.valueLabel?.toLowerCase().includes('revenue')
+              {safeLower(chart.valueLabel).includes('revenue')
                 ? `${CUR}${fmt(total)}`
                 : total.toLocaleString('en-IN')
               }
