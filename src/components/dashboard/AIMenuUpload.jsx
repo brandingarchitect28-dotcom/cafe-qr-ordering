@@ -11,7 +11,6 @@ import { useAuth } from '../../contexts/AuthContext';
 import { useDocument } from '../../hooks/useFirestore';
 import { db } from '../../lib/firebase';
 import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
-import { getFunctions, httpsCallable } from 'firebase/functions';
 import { motion, AnimatePresence } from 'framer-motion';
 import { toast } from 'sonner';
 import {
@@ -145,7 +144,7 @@ const AIMenuUpload = ({ onClose }) => {
       setPreview(null);
     }
 
-    // Convert to base64 and send to Cloud Function
+    // Convert to base64 and send to Render backend → Gemini
     setLoading(true);
     try {
       const base64 = await new Promise((res, rej) => {
@@ -155,18 +154,33 @@ const AIMenuUpload = ({ onClose }) => {
         reader.readAsDataURL(selectedFile);
       });
 
-      const fns     = getFunctions();
-      const extract = httpsCallable(fns, 'extractMenuFromImage');
-      const result  = await extract({
-        cafeId,
-        imageBase64: base64,
-        mimeType: selectedFile.type,
+      // Use the backendUrl already configured in café payment settings
+      const backendUrl = cafe?.paymentSettings?.backendUrl?.replace(/\/$/, '');
+      if (!backendUrl) {
+        toast.error('Backend URL not set. Go to Settings → Payment to add your Render URL.');
+        return;
+      }
+
+      const response = await fetch(`${backendUrl}/api/ai-menu-upload`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          cafeId,
+          imageBase64: base64,
+          mimeType: selectedFile.type,
+        }),
       });
 
-      if (result.data?.success && result.data.items?.length > 0) {
-        setItems(result.data.items);
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(result.error || 'Extraction failed');
+      }
+
+      if (result.success && result.items?.length > 0) {
+        setItems(result.items);
         setStep('preview');
-        toast.success(`${result.data.items.length} items extracted ✨`);
+        toast.success(`${result.items.length} items extracted ✨`);
       } else {
         toast.error('No menu items found. Try a clearer image.');
       }

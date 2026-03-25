@@ -351,12 +351,154 @@ app.use((err, req, res, next) => {
   res.status(500).json({ error: 'Internal server error.' });
 });
 
+// ─── POST /api/ai-menu-upload ─────────────────────────────────────────────────
+// Accepts an image/PDF as base64 JSON, sends to Gemini, returns parsed menu items.
+// No multer needed — frontend sends base64 string to keep it simple.
+// GEMINI_API_KEY must be set in Render → Environment Variables.
+
+app.post('/api/ai-menu-upload', async (req, res) => {
+  try {
+    const { cafeId, imageBase64, mimeType } = req.body;
+
+    if (!cafeId)       return res.status(400).json({ error: 'cafeId is required' });
+    if (!imageBase64)  return res.status(400).json({ error: 'imageBase64 is required' });
+    if (!mimeType)     return res.status(400).json({ error: 'mimeType is required' });
+
+    const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
+    if (!GEMINI_API_KEY) {
+      console.error('[AI Menu] GEMINI_API_KEY not set in environment');
+      return res.status(500).json({ error: 'AI service not configured. Add GEMINI_API_KEY in Render environment.' });
+    }
+
+    // Validate file size — base64 is ~33% larger than binary, so 7MB base64 ≈ 5MB file
+    const approxBytes = (imageBase64.length * 3) / 4;
+    if (approxBytes > 7 * 1024 * 1024) {
+      return res.status(400).json({ error: 'File too large. Maximum 5MB.' });
+    }
+
+    // Validate mime type
+    const allowed = ['image/jpeg', 'image/png', 'image/webp', 'application/pdf'];
+    if (!allowed.includes(mimeType)) {
+      return res.status(400).json({ error: 'Invalid file type. Use JPG, PNG, WebP, or PDF.' });
+    }
+
+    console.log(`[AI Menu] Processing for cafeId=${cafeId}, type=${mimeType}, size≈${Math.round(approxBytes/1024)}KB`);
+
+    // ── Call Gemini Vision API directly via fetch ──────────────────────────────
+    const prompt = `You are a restaurant menu extraction AI.
+
+Convert the uploaded menu into structured JSON.
+
+Return ONLY JSON in this format:
+
+[
+  {
+    "name": "",
+    "price": 0,
+    "category": "",
+    "description": "",
+    "available": true
+  }
+]
+
+Rules:
+- Remove currency symbols from prices
+- Price must be a number only (no strings)
+- Auto detect category from context (Beverages, Food, Snacks, Desserts, Main Course, Starters, Other)
+- Clean item names (remove numbering, extra symbols)
+- If price is missing or unclear, use 0
+- No extra text outside the JSON array`;
+
+    const geminiRes = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${GEMINI_API_KEY}`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contents: [{
+            parts: [
+              { text: prompt },
+              {
+                inline_data: {
+                  mime_type: mimeType === 'application/pdf' ? 'application/pdf' : mimeType,
+                  data: imageBase64,
+                },
+              },
+            ],
+          }],
+          generationConfig: {
+            temperature: 0.1,      // low temp = more deterministic JSON output
+            maxOutputTokens: 4096,
+          },
+        }),
+      }
+    );
+
+    if (!geminiRes.ok) {
+      const errText = await geminiRes.text();
+      console.error('[AI Menu] Gemini API error:', geminiRes.status, errText.slice(0, 300));
+      return res.status(502).json({ error: 'AI service error. Check your Gemini API key.' });
+    }
+
+    const geminiData = await geminiRes.json();
+    const rawText = geminiData?.candidates?.[0]?.content?.parts?.[0]?.text || '';
+
+    if (!rawText) {
+      console.error('[AI Menu] Empty response from Gemini');
+      return res.status(502).json({ error: 'No response from AI. Try a clearer image.' });
+    }
+
+    // ── Safe JSON parsing — strip markdown fences if present ──────────────────
+    let items;
+    try {
+      // Gemini sometimes wraps in ```json ... ``` — strip it
+      const cleaned = rawText
+        .replace(/^```json\s*/i, '')
+        .replace(/^```\s*/i, '')
+        .replace(/\s*```$/i, '')
+        .trim();
+      items = JSON.parse(cleaned);
+    } catch (parseErr) {
+      console.error('[AI Menu] JSON parse failed. Raw text:', rawText.slice(0, 500));
+      return res.status(422).json({ error: 'AI returned invalid format. Try a clearer menu image.' });
+    }
+
+    if (!Array.isArray(items) || items.length === 0) {
+      return res.status(422).json({ error: 'No menu items found in the image.' });
+    }
+
+    // ── Sanitise each item ─────────────────────────────────────────────────────
+    const sanitised = items
+      .filter(item => item && typeof item === 'object')
+      .map(item => ({
+        name:        String(item.name        || '').trim().slice(0, 100),
+        price:       Math.max(0, parseFloat(item.price) || 0),
+        category:    String(item.category    || 'Other').trim().slice(0, 50),
+        description: String(item.description || '').trim().slice(0, 300),
+        available:   true,
+      }))
+      .filter(item => item.name.length > 0);   // drop blank-name items
+
+    if (sanitised.length === 0) {
+      return res.status(422).json({ error: 'Could not extract valid items. Try a clearer image.' });
+    }
+
+    console.log(`[AI Menu] Extracted ${sanitised.length} items for cafeId=${cafeId}`);
+    return res.json({ success: true, items: sanitised, count: sanitised.length });
+
+  } catch (err) {
+    console.error('[AI Menu] Unexpected error:', err.message);
+    return res.status(500).json({ error: 'Internal server error. Please try again.' });
+  }
+});
+
 // ─── Start ────────────────────────────────────────────────────────────────────
 app.listen(PORT, () => {
   console.log(`[Server] Running on port ${PORT}`);
   console.log(`[Server]   GET  /             → health check`);
   console.log(`[Server]   POST /create-order → Cashfree order creation`);
   console.log(`[Server]   POST /webhook      → payment status callback`);
+  console.log(`[Server]   POST /api/ai-menu-upload → AI menu extraction`);
 });
 
 // ─── Cashfree HTTPS helper ────────────────────────────────────────────────────
