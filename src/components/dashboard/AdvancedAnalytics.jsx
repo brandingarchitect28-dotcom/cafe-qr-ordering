@@ -141,10 +141,20 @@ const AdvancedAnalytics = () => {
   const { data, loading, error, lastFetch, refresh } = useAdvancedAnalytics(cafeId, fromDate, toDate);
   const explanations = useMemo(() => buildExplanation(data, CUR), [data, CUR]);
 
+  const [pdfLoading, setPdfLoading] = useState(false);
+
   const handlePDF = () => {
-    if (!data) { toast.error('No data'); return; }
-    downloadPDFReport(data, cafe, fromDate, toDate);
-    toast.success('Report opened — print to save as PDF');
+    if (!data) { toast.error('No data to export'); return; }
+    setPdfLoading(true);
+    try {
+      downloadPDFReport(data, cafe, fromDate, toDate);
+      toast.success('Report downloading ✓');
+    } catch (err) {
+      toast.error('Failed to generate report');
+    } finally {
+      // Brief delay so the user sees the generating state
+      setTimeout(() => setPdfLoading(false), 1500);
+    }
   };
   const handleGST = () => {
     if (!data) { toast.error('No data'); return; }
@@ -193,8 +203,11 @@ const AdvancedAnalytics = () => {
             <button onClick={handleWA} className="flex items-center gap-1.5 px-3 h-9 bg-green-600 hover:bg-green-700 text-white rounded-sm text-sm transition-all">
               <MessageSquare className="w-3.5 h-3.5" />WhatsApp
             </button>
-            <button onClick={handlePDF} className="flex items-center gap-1.5 px-4 h-9 bg-[#D4AF37] hover:bg-[#C5A059] text-black font-bold rounded-sm text-sm transition-all">
-              <Download className="w-3.5 h-3.5" />PDF Report
+            <button onClick={handlePDF} disabled={pdfLoading || !data} className="flex items-center gap-1.5 px-4 h-9 bg-[#D4AF37] hover:bg-[#C5A059] text-black font-bold rounded-sm text-sm transition-all disabled:opacity-60 disabled:cursor-not-allowed">
+              {pdfLoading
+                ? <><RefreshCw className="w-3.5 h-3.5 animate-spin" />Generating…</>
+                : <><Download className="w-3.5 h-3.5" />PDF Report</>
+              }
             </button>
           </div>
         </div>

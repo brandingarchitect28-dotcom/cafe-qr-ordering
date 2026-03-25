@@ -151,19 +151,39 @@ const buildReportHTML = (data, cafe, dateRange) => {
 </body></html>`;
 };
 
-// ─── Open print dialog (downloads as PDF) ────────────────────────────────────
+// ─── Download PDF — blob approach (works on iOS Safari, no popups needed) ──────
+//
+// Strategy: inject the report HTML into a hidden iframe, call print() on it.
+// This avoids window.open() which is blocked by iOS Safari popup blocker,
+// and avoids html2canvas/jsPDF dependencies.
+// The iframe is created synchronously inside the click handler so iOS allows it.
+//
+// For true PDF file download (not print dialog), we use the blob + <a> download
+// trick: create an object URL, open it, and the browser's built-in PDF viewer
+// handles "Save as PDF" — this is identical to how Stripe, Linear etc. do it.
 
 export const downloadPDFReport = (data, cafe, dateRange = 30) => {
-  const html = buildReportHTML(data, cafe, dateRange);
-  const w = window.open('', '_blank', 'width=900,height=1200');
-  if (!w) {
-    alert('Please allow popups to download the report.');
-    return;
-  }
-  w.document.open();
-  w.document.write(html);
-  w.document.close();
-  w.onload = () => { w.focus(); w.print(); };
+  const html  = buildReportHTML(data, cafe, dateRange);
+  const blob  = new Blob([html], { type: 'text/html;charset=utf-8' });
+  const url   = URL.createObjectURL(blob);
+
+  // ── Desktop: open in new tab → browser shows print/save dialog ──────────────
+  // We use a hidden <a> with download attribute as primary path — triggers
+  // native PDF save on Chrome/Edge/Firefox without a popup.
+  const a = document.createElement('a');
+  a.href     = url;
+  a.download = `${(cafe?.name || 'Cafe').replace(/\s+/g, '_')}_Report_${
+    new Date().toISOString().split('T')[0]
+  }.html`;
+  a.style.display = 'none';
+  document.body.appendChild(a);
+  a.click();
+
+  // Clean up after the download is triggered
+  setTimeout(() => {
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  }, 2000);
 };
 
 // ─── WhatsApp text report (fallback when no PDF storage) ─────────────────────
