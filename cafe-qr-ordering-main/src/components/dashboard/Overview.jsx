@@ -19,7 +19,10 @@ import { motion, AnimatePresence } from 'framer-motion';
 import {
   IndianRupee, ShoppingBag, TrendingUp, Clock,
   AlertTriangle, Zap, MapPin, Package, ExternalLink,
+  Send, RefreshCw,
 } from 'lucide-react';
+import { toast } from 'sonner';
+import { generateAndSendReport, startDailyReportScheduler, stopDailyReportScheduler } from '../../services/whatsappReportService';
 
 // ─── helpers ──────────────────────────────────────────────────────────────────
 
@@ -206,6 +209,27 @@ const Overview = () => {
   const { data: cafe } = useDocument('cafes', cafeId);
   const CUR = cafe?.currencySymbol || '₹';
 
+  // ── Sound notification — plays once per genuinely new order ──────────────
+  // Same two-tone chime as KitchenDisplay. Uses Web Audio API (no files needed).
+  // AudioContext is created fresh each time to avoid suspended-context issues.
+  const playNotify = () => {
+    try {
+      const ctx = new (window.AudioContext || window.webkitAudioContext)();
+      [0, 220].forEach((delay, i) => {
+        const osc  = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.frequency.value = i === 0 ? 880 : 1100;
+        osc.type = 'sine';
+        gain.gain.setValueAtTime(0.35, ctx.currentTime + delay / 1000);
+        gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + delay / 1000 + 0.45);
+        osc.start(ctx.currentTime + delay / 1000);
+        osc.stop(ctx.currentTime + delay / 1000 + 0.5);
+      });
+    } catch (_) { /* audio blocked by browser policy — silent fallback */ }
+  };
+
   // ── new-order detection ────────────────────────────────────────────────
   const seenRef  = useRef(new Set());
   const [newIds, setNewIds] = useState(new Set());
@@ -223,6 +247,7 @@ const Overview = () => {
     incoming.forEach(id => { if (!seenRef.current.has(id)) fresh.add(id); });
 
     if (fresh.size > 0) {
+      playNotify(); // Feature 1: sound on new order
       setNewIds(prev => new Set([...prev, ...fresh]));
       setTimeout(() => {
         setNewIds(prev => {
@@ -252,13 +277,16 @@ const Overview = () => {
   const stats = useMemo(() => {
     if (!orders) return { todayRevenue: 0, ordersToday: 0, avgOrderValue: 0, activeOrders: 0 };
     const today = new Date(); today.setHours(0, 0, 0, 0);
+    // todayOrders: all orders created today (used for "Orders Today" counter)
     const todayOrders  = orders.filter(o => (o.createdAt?.toDate?.() || new Date(0)) >= today);
-    const paid         = todayOrders.filter(o => o.orderStatus === 'completed' && o.paymentStatus === 'paid');
+    // Revenue: ONLY paymentStatus === 'paid' — no orderStatus condition (paid orders may not be 'completed' yet)
+    const paid         = todayOrders.filter(o => o.paymentStatus === 'paid');
     const todayRevenue = paid.reduce((s, o) => s + (o.totalAmount || o.total || 0), 0);
     return {
       todayRevenue,
       ordersToday:   todayOrders.length,
-      avgOrderValue: todayOrders.length > 0 ? todayRevenue / todayOrders.length : 0,
+      // avgOrderValue over paid orders only — avoids dilution from pending/cancelled
+      avgOrderValue: paid.length > 0 ? todayRevenue / paid.length : 0,
       activeOrders:  orders.filter(o => o.orderStatus !== 'completed').length,
     };
   }, [orders]);
@@ -279,6 +307,36 @@ const Overview = () => {
     { label: 'Avg Order Value', value: `${CUR}${stats.avgOrderValue.toFixed(2)}`, icon: TrendingUp,  color: 'text-[#3B82F6]', accent: '#3B82F6' },
     { label: 'Active Orders',   value: stats.activeOrders,                       icon: Clock,       color: 'text-[#F59E0B]', accent: '#F59E0B' },
   ];
+
+  // ── WhatsApp Daily Report ──────────────────────────────────────────────
+  const [reportSending, setReportSending] = useState(false);
+
+  // Start 11 PM auto-scheduler when cafe data loads
+  useEffect(() => {
+    if (!cafeId || !cafe?.whatsappNumber) return;
+    const stop = startDailyReportScheduler(
+      cafeId,
+      cafe.whatsappNumber,
+      () => toast.success('📊 Daily report sent to WhatsApp!')
+    );
+    return () => stop();
+  }, [cafeId, cafe?.whatsappNumber]);
+
+  const handleSendReport = async () => {
+    if (!cafe?.whatsappNumber) {
+      toast.error('Add your WhatsApp number in Settings first');
+      return;
+    }
+    setReportSending(true);
+    try {
+      await generateAndSendReport(cafeId, cafe.whatsappNumber);
+      toast.success('📊 Report opened in WhatsApp!');
+    } catch (err) {
+      toast.error('Failed to generate report');
+    } finally {
+      setReportSending(false);
+    }
+  };
 
   // ── render ─────────────────────────────────────────────────────────────
   return (
@@ -303,6 +361,143 @@ const Overview = () => {
             </div>
           );
         })}
+      </div>
+
+      {/* ── Daily Smart Report ─────────────────────────────────────────────── */}
+      {(() => {
+        if (!orders?.length) return null;
+        const today = new Date(); today.setHours(0, 0, 0, 0);
+        const todayOrders = orders.filter(o => (o.createdAt?.toDate?.() || new Date(0)) >= today);
+        const paid        = todayOrders.filter(o => o.paymentStatus === 'paid');
+        const pending     = todayOrders.filter(o => o.paymentStatus !== 'paid');
+        const totalRev    = paid.reduce((s, o) => s + (o.totalAmount || o.total || 0), 0);
+        const totalGST    = paid.reduce((s, o) => s + (o.gstAmount || 0), 0);
+        const totalSC     = paid.reduce((s, o) => s + (o.serviceChargeAmount || 0), 0);
+
+        // Top items today
+        const itemMap = {};
+        todayOrders.forEach(o => (o.items||[]).forEach(i => {
+          itemMap[i.name] = (itemMap[i.name] || 0) + (i.quantity || 1);
+        }));
+        const topItems = Object.entries(itemMap).sort((a,b) => b[1]-a[1]).slice(0,3);
+
+        // Category revenue today
+        const catMap = {};
+        paid.forEach(o => (o.items||[]).forEach(i => {
+          const cat = i.category || 'Other';
+          catMap[cat] = (catMap[cat] || 0) + (i.price||0) * (i.quantity||1);
+        }));
+        const topCats = Object.entries(catMap).sort((a,b) => b[1]-a[1]).slice(0,3);
+
+        return (
+          <motion.div
+            initial={{ opacity:0, y:8 }}
+            animate={{ opacity:1, y:0 }}
+            className="bg-[#0F0F0F] border border-[#D4AF37]/20 rounded-xl overflow-hidden"
+          >
+            {/* Header */}
+            <div className="flex items-center justify-between px-5 py-4 border-b border-white/5"
+              style={{ background:'linear-gradient(135deg, rgba(212,175,55,0.08), transparent)' }}>
+              <div className="flex items-center gap-3">
+                <div className="w-8 h-8 rounded-lg bg-[#D4AF37]/15 flex items-center justify-center">
+                  <TrendingUp className="w-4 h-4 text-[#D4AF37]" />
+                </div>
+                <div>
+                  <h3 className="text-white font-bold text-sm" style={{ fontFamily:'Playfair Display,serif' }}>
+                    Today's Business Summary
+                  </h3>
+                  <p className="text-[#555] text-xs">{new Date().toLocaleDateString('en-IN', { weekday:'long', day:'2-digit', month:'long' })}</p>
+                </div>
+              </div>
+              <span className="text-[#D4AF37] text-xs font-semibold px-2 py-1 rounded-full bg-[#D4AF37]/10 border border-[#D4AF37]/20">
+                {todayOrders.length} orders today
+              </span>
+            </div>
+
+            <div className="p-5 grid grid-cols-2 sm:grid-cols-4 gap-4">
+              {/* Revenue */}
+              <div className="space-y-1">
+                <p className="text-[#555] text-xs uppercase tracking-wide">Revenue</p>
+                <p className="text-[#10B981] font-black text-xl">{CUR}{totalRev.toFixed(2)}</p>
+                <p className="text-[#555] text-xs">{paid.length} paid orders</p>
+              </div>
+              {/* Pending */}
+              <div className="space-y-1">
+                <p className="text-[#555] text-xs uppercase tracking-wide">Pending</p>
+                <p className="text-[#F59E0B] font-black text-xl">{pending.length}</p>
+                <p className="text-[#555] text-xs">awaiting payment</p>
+              </div>
+              {/* GST */}
+              <div className="space-y-1">
+                <p className="text-[#555] text-xs uppercase tracking-wide">GST Collected</p>
+                <p className="text-[#8B5CF6] font-black text-xl">{CUR}{totalGST.toFixed(2)}</p>
+                <p className="text-[#555] text-xs">incl. in revenue</p>
+              </div>
+              {/* Service Charge */}
+              <div className="space-y-1">
+                <p className="text-[#555] text-xs uppercase tracking-wide">Service Charge</p>
+                <p className="text-[#3B82F6] font-black text-xl">{CUR}{totalSC.toFixed(2)}</p>
+                <p className="text-[#555] text-xs">collected today</p>
+              </div>
+            </div>
+
+            {/* Top items + categories */}
+            {(topItems.length > 0 || topCats.length > 0) && (
+              <div className="px-5 pb-5 grid grid-cols-1 sm:grid-cols-2 gap-4">
+                {topItems.length > 0 && (
+                  <div className="bg-white/3 rounded-lg p-3">
+                    <p className="text-[#A3A3A3] text-xs uppercase tracking-wide mb-2 flex items-center gap-1">
+                      🏆 Top Selling Items
+                    </p>
+                    {topItems.map(([name, qty], i) => (
+                      <div key={name} className="flex justify-between items-center py-1 text-xs border-b border-white/5 last:border-0">
+                        <span className="text-white flex items-center gap-1.5">
+                          <span className="text-[#D4AF37] font-bold">{i+1}.</span>{name}
+                        </span>
+                        <span className="text-[#A3A3A3]">{qty} sold</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+                {topCats.length > 0 && (
+                  <div className="bg-white/3 rounded-lg p-3">
+                    <p className="text-[#A3A3A3] text-xs uppercase tracking-wide mb-2 flex items-center gap-1">
+                      📊 Category Revenue
+                    </p>
+                    {topCats.map(([cat, rev], i) => (
+                      <div key={cat} className="flex justify-between items-center py-1 text-xs border-b border-white/5 last:border-0">
+                        <span className="text-white flex items-center gap-1.5">
+                          <span className="text-[#D4AF37] font-bold">{i+1}.</span>{cat}
+                        </span>
+                        <span className="text-[#10B981] font-semibold">{CUR}{rev.toFixed(2)}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+          </motion.div>
+        );
+      })()}
+
+      {/* ── WhatsApp Daily Report Button ────────────────────────────────── */}
+      <div className="bg-[#0F0F0F] border border-white/5 rounded-sm px-5 py-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+        <div>
+          <p className="text-white font-semibold text-sm">📊 Daily Analytics Report</p>
+          <p className="text-[#A3A3A3] text-xs mt-0.5">
+            Auto-sends to WhatsApp at 11:00 PM · or send now manually
+          </p>
+        </div>
+        <button
+          onClick={handleSendReport}
+          disabled={reportSending}
+          className="flex items-center gap-2 px-4 py-2 bg-green-600 hover:bg-green-700 text-white font-bold rounded-sm text-sm transition-all disabled:opacity-50 flex-shrink-0"
+        >
+          {reportSending
+            ? <><RefreshCw className="w-4 h-4 animate-spin" /> Generating…</>
+            : <><Send className="w-4 h-4" /> Send Report Now</>
+          }
+        </button>
       </div>
 
       {/* Low Stock Alert */}

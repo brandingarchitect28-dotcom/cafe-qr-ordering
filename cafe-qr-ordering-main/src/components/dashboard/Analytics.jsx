@@ -1,315 +1,348 @@
+/**
+ * Analytics.jsx
+ *
+ * Fixes:
+ * 1. All tooltips now use white text on #111 dark background — clearly readable
+ * 2. Written explanations added below every chart — dynamic based on data
+ * 3. No real-time listeners changed
+ */
+
 import React, { useMemo } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
 import { useCollection, useDocument } from '../../hooks/useFirestore';
 import { where } from 'firebase/firestore';
-import { BarChart, Bar, LineChart, Line, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
+import {
+  BarChart, Bar, LineChart, Line, PieChart, Pie, Cell,
+  XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
+} from 'recharts';
+
+// ─── Fixed tooltip — white text, dark bg, high contrast ──────────────────────
+const DarkTooltip = ({ active, payload, label, prefix = '' }) => {
+  if (!active || !payload?.length) return null;
+  return (
+    <div style={{
+      background: '#111111',
+      border: '1px solid rgba(212,175,55,0.4)',
+      borderRadius: '8px',
+      padding: '10px 14px',
+      boxShadow: '0 4px 20px rgba(0,0,0,0.6)',
+    }}>
+      {label !== undefined && (
+        <p style={{ color: '#D4AF37', fontWeight: 700, marginBottom: '6px', fontSize: '12px' }}>{label}</p>
+      )}
+      {payload.map((p, i) => (
+        <p key={i} style={{ color: '#ffffff', fontSize: '12px', margin: '3px 0', display: 'flex', alignItems: 'center', gap: '6px' }}>
+          <span style={{ display: 'inline-block', width: 8, height: 8, borderRadius: '50%', background: p.color || p.fill || '#D4AF37', flexShrink: 0 }} />
+          <span style={{ color: '#A3A3A3' }}>{p.name}:</span>
+          <strong style={{ color: '#ffffff' }}>{prefix}{typeof p.value === 'number' ? p.value.toLocaleString('en-IN') : p.value}</strong>
+        </p>
+      ))}
+    </div>
+  );
+};
+
+// ─── Written explanation box ──────────────────────────────────────────────────
+const Insight = ({ lines }) => (
+  <div style={{ background: 'rgba(212,175,55,0.05)', border: '1px solid rgba(212,175,55,0.15)', borderRadius: '8px', padding: '12px 16px', marginTop: '16px' }}>
+    <p style={{ color: '#D4AF37', fontSize: '11px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '8px' }}>
+      💡 Insight
+    </p>
+    {lines.filter(Boolean).map((line, i) => (
+      <p key={i} style={{ color: '#A3A3A3', fontSize: '12px', lineHeight: '1.6', margin: '2px 0' }}>• {line}</p>
+    ))}
+  </div>
+);
 
 const Analytics = () => {
   const { user } = useAuth();
-  const cafeId = user?.cafeId;
-
+  const cafeId   = user?.cafeId;
   const { data: orders } = useCollection('orders', cafeId ? [where('cafeId', '==', cafeId)] : []);
-  const { data: cafe } = useDocument('cafes', cafeId);
+  const { data: cafe   } = useDocument('cafes', cafeId);
   const CUR = cafe?.currencySymbol || '₹';
 
   const analytics = useMemo(() => {
     if (!orders || orders.length === 0) return null;
 
-    // Revenue by day (last 7 days)
+    // ── Revenue by day (last 7 days) ──────────────────────────────────────
     const last7Days = Array.from({ length: 7 }, (_, i) => {
-      const date = new Date();
-      date.setDate(date.getDate() - (6 - i));
-      date.setHours(0, 0, 0, 0);
+      const date = new Date(); date.setDate(date.getDate() - (6 - i)); date.setHours(0, 0, 0, 0);
       return date;
     });
-
     const revenueByDay = last7Days.map(day => {
-      const nextDay = new Date(day);
-      nextDay.setDate(nextDay.getDate() + 1);
-      
-      const dayOrders = orders.filter(order => {
-        const orderDate = order.createdAt?.toDate?.() || new Date(0);
-        return orderDate >= day && orderDate < nextDay && order.paymentStatus === 'paid';
+      const nextDay = new Date(day); nextDay.setDate(nextDay.getDate() + 1);
+      // Use paidAt if available (more accurate), fall back to createdAt
+      const dayOrders = orders.filter(o => {
+        if (o.paymentStatus !== 'paid') return false;
+        const raw = o.paidAt || o.createdAt;
+        const t = raw?.toDate?.() || (raw ? new Date(raw) : new Date(0));
+        return t >= day && t < nextDay;
       });
-
-      const revenue = dayOrders.reduce((sum, order) => sum + (order.totalAmount || order.total || 0), 0);
-      
       return {
-        date: day.toLocaleDateString('en-US', { weekday: 'short' }),
-        revenue: parseFloat(revenue.toFixed(2)),
-        orders: dayOrders.length
+        date:    day.toLocaleDateString('en-US', { weekday: 'short' }),
+        revenue: parseFloat(dayOrders.reduce((s, o) => s + (o.totalAmount || o.total || 0), 0).toFixed(2)),
+        orders:  dayOrders.length,
       };
     });
 
-    // Best selling items
+    // ── Best selling items ────────────────────────────────────────────────
+    // ── Best selling items — paid orders only ─────────────────────────────
     const itemCounts = {};
-    orders.forEach(order => {
-      order.items?.forEach(item => {
-        itemCounts[item.name] = (itemCounts[item.name] || 0) + item.quantity;
-      });
-    });
-
+    orders.filter(o => o.paymentStatus === 'paid').forEach(o => o.items?.forEach(item => {
+      itemCounts[item.name] = (itemCounts[item.name] || 0) + (item.quantity || 1);
+    }));
     const topItems = Object.entries(itemCounts)
-      .sort((a, b) => b[1] - a[1])
-      .slice(0, 5)
+      .sort((a, b) => b[1] - a[1]).slice(0, 5)
       .map(([name, count]) => ({ name, count }));
 
-    // Payment status split
-    const paidOrders = orders.filter(o => o.paymentStatus === 'paid').length;
-    const pendingOrders = orders.filter(o => o.paymentStatus === 'pending').length;
+    // ── Payment status split ──────────────────────────────────────────────
+    const paidCount    = orders.filter(o => o.paymentStatus === 'paid').length;
+    const pendingCount = orders.filter(o => o.paymentStatus !== 'paid').length;
     const paymentSplit = [
-      { name: 'Paid', value: paidOrders },
-      { name: 'Pending', value: pendingOrders }
+      { name: 'Paid',    value: paidCount    },
+      { name: 'Pending', value: pendingCount },
     ];
+    const payPct   = orders.length > 0 ? Math.round((paidCount / orders.length) * 100) : 0;
+    const pendPct  = 100 - payPct;
 
-    // Order status split
-    const newOrders       = orders.filter(o => o.orderStatus === 'new').length;
-    const preparingOrders = orders.filter(o => o.orderStatus === 'preparing').length;
-    const readyOrders     = orders.filter(o => o.orderStatus === 'ready').length;
-    const completedOrders = orders.filter(o => o.orderStatus === 'completed').length;
+    // ── Order status split ────────────────────────────────────────────────
+    const statusMap = { new: 0, preparing: 0, ready: 0, completed: 0 };
+    orders.forEach(o => { if (statusMap[o.orderStatus] !== undefined) statusMap[o.orderStatus]++; });
     const orderStatusSplit = [
-      { name: 'New',       value: newOrders       },
-      { name: 'Preparing', value: preparingOrders },
-      { name: 'Ready',     value: readyOrders     },
-      { name: 'Completed', value: completedOrders },
-    ];
+      { name: 'New',       value: statusMap.new       },
+      { name: 'Preparing', value: statusMap.preparing },
+      { name: 'Ready',     value: statusMap.ready     },
+      { name: 'Completed', value: statusMap.completed },
+    ].filter(s => s.value > 0);
+    const topStatus = orderStatusSplit.sort((a, b) => b.value - a.value)[0];
 
-    // Order source breakdown (Feature 7 — External Orders)
-    const sourceCounts = {};
+    // ── Order source ──────────────────────────────────────────────────────
+    const SOURCE_LABELS = { direct:'Direct (QR)', zomato:'Zomato', swiggy:'Swiggy', phone:'Phone', walkin:'Walk-in', other:'Other' };
+    const SOURCE_COLORS = { direct:'#D4AF37', zomato:'#EF4444', swiggy:'#F97316', phone:'#3B82F6', walkin:'#10B981', other:'#8B5CF6' };
+    const sourceCounts  = {};
     orders.forEach(o => {
       const src = o.orderSource || (o.externalOrder ? 'other' : 'direct');
       sourceCounts[src] = (sourceCounts[src] || 0) + 1;
     });
-    const SOURCE_LABELS = {
-      direct: 'Direct (QR)',
-      zomato: 'Zomato',
-      swiggy: 'Swiggy',
-      phone:  'Phone Order',
-      walkin: 'Walk-in',
-      other:  'Other',
-    };
-    const SOURCE_COLORS = {
-      direct: '#D4AF37',
-      zomato: '#EF4444',
-      swiggy: '#F97316',
-      phone:  '#3B82F6',
-      walkin: '#10B981',
-      other:  '#8B5CF6',
-    };
     const orderSourceSplit = Object.entries(sourceCounts)
-      .map(([src, count]) => ({
-        name:  SOURCE_LABELS[src] || src,
-        value: count,
-        color: SOURCE_COLORS[src] || '#A3A3A3',
-      }))
+      .map(([src, count]) => ({ name: SOURCE_LABELS[src] || src, value: count, color: SOURCE_COLORS[src] || '#A3A3A3' }))
       .sort((a, b) => b.value - a.value);
-
-    // Revenue by source
     const revenueBySource = Object.entries(
-      orders.reduce((acc, o) => {
+      // Revenue from PAID orders only — cancelled/pending excluded
+      orders.filter(o => o.paymentStatus === 'paid').reduce((acc, o) => {
         const src = o.orderSource || (o.externalOrder ? 'other' : 'direct');
         acc[src] = (acc[src] || 0) + (o.totalAmount || o.total || 0);
         return acc;
       }, {})
-    ).map(([src, revenue]) => ({
-      name:    SOURCE_LABELS[src] || src,
-      revenue: parseFloat(revenue.toFixed(2)),
-      color:   SOURCE_COLORS[src] || '#A3A3A3',
-    })).sort((a, b) => b.revenue - a.revenue);
+    ).map(([src, rev]) => ({ name: SOURCE_LABELS[src] || src, revenue: parseFloat(rev.toFixed(2)), color: SOURCE_COLORS[src] || '#A3A3A3' }))
+     .sort((a, b) => b.revenue - a.revenue);
 
-    return { revenueByDay, topItems, paymentSplit, orderStatusSplit, orderSourceSplit, revenueBySource, SOURCE_COLORS, SOURCE_LABELS };
-  }, [orders]);
+    // ── Dynamic insights ──────────────────────────────────────────────────
+    const bestDay     = [...revenueByDay].sort((a, b) => b.revenue - a.revenue)[0];
+    const worstDay    = [...revenueByDay].sort((a, b) => a.revenue - b.revenue)[0];
+    const totalRev    = revenueByDay.reduce((s, d) => s + d.revenue, 0);
+    const topSource   = orderSourceSplit[0];
+
+    const insights = {
+      revenue: [
+        bestDay?.revenue > 0  ? `Best day this week: ${bestDay.date} with ${CUR}${bestDay.revenue.toFixed(2)} revenue` : null,
+        worstDay?.revenue === 0 ? `${worstDay.date} had no paid orders — consider promotions on slow days` : null,
+        totalRev > 0 ? `Total revenue this week: ${CUR}${totalRev.toFixed(2)}` : null,
+      ],
+      orders: [
+        `${orders.length} total orders recorded`,
+        revenueByDay.reduce((s,d) => s+d.orders,0) > 0 ? `Average ${(revenueByDay.reduce((s,d) => s+d.orders,0)/7).toFixed(1)} paid orders per day this week` : null,
+      ],
+      items: topItems.length > 0 ? [
+        `"${topItems[0].name}" is your best seller with ${topItems[0].count} units sold`,
+        topItems[1] ? `"${topItems[1].name}" follows with ${topItems[1].count} units` : null,
+        topItems.length >= 3 ? `Consider promoting lower-selling items to boost variety` : null,
+      ] : [],
+      payment: [
+        `${payPct}% of orders are paid, ${pendPct}% are pending`,
+        payPct < 30 ? `High pending rate — consider enabling online payment to collect faster` : null,
+        payPct > 70 ? `Great payment collection! Most customers are paying promptly` : null,
+      ],
+      status: topStatus ? [
+        `Most orders are currently in "${topStatus.name}" stage (${topStatus.value} orders)`,
+        statusMap.preparing > 5 ? `Kitchen may be at high load — ${statusMap.preparing} orders preparing simultaneously` : null,
+        statusMap.new > 3 ? `${statusMap.new} new orders are waiting to be picked up by the kitchen` : null,
+      ] : [],
+      source: topSource ? [
+        `${topSource.name} is your top order source (${topSource.value} orders)`,
+        orderSourceSplit.length > 1 ? `You receive orders from ${orderSourceSplit.length} different channels` : null,
+        revenueBySource[0] ? `Highest revenue platform: ${revenueBySource[0].name} (${CUR}${revenueBySource[0].revenue.toFixed(2)})` : null,
+      ] : [],
+    };
+
+    return { revenueByDay, topItems, paymentSplit, orderStatusSplit, orderSourceSplit, revenueBySource, insights };
+  }, [orders, CUR]);
 
   if (!analytics) {
     return (
       <div className="bg-[#0F0F0F] border border-white/5 rounded-sm p-12 text-center">
-        <p className="text-[#A3A3A3] text-lg">No data available yet. Start receiving orders to see analytics!</p>
+        <p className="text-[#A3A3A3] text-lg">No data yet. Start receiving orders to see analytics!</p>
       </div>
     );
   }
 
-  const COLORS = ['#D4AF37', '#10B981', '#3B82F6', '#F59E0B', '#EF4444'];
+  const COLORS = ['#D4AF37','#10B981','#3B82F6','#F59E0B','#EF4444'];
 
   return (
     <div className="space-y-6">
-      {/* Revenue Chart */}
+
+      {/* ── Revenue Chart ──────────────────────────────────────────────────── */}
       <div className="bg-[#0F0F0F] border border-white/5 rounded-sm p-6">
         <h3 className="text-xl font-semibold text-white mb-6" style={{ fontFamily: 'Playfair Display, serif' }}>
           Revenue (Last 7 Days)
         </h3>
-        <ResponsiveContainer width="100%" height={300}>
+        <ResponsiveContainer width="100%" height={280}>
           <LineChart data={analytics.revenueByDay}>
-            <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.1)" />
-            <XAxis dataKey="date" stroke="#A3A3A3" />
-            <YAxis stroke="#A3A3A3" />
-            <Tooltip 
-              contentStyle={{ backgroundColor: '#0F0F0F', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '4px' }}
-              labelStyle={{ color: '#E5E5E5' }}
-              formatter={(value) => [`${CUR}${value}`, `Revenue (${CUR})`]}
-            />
-            <Legend wrapperStyle={{ color: '#E5E5E5' }} />
-            <Line type="monotone" dataKey="revenue" stroke="#D4AF37" strokeWidth={2} {...{ name: `Revenue (${CUR})` }} />
+            <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.06)" />
+            <XAxis dataKey="date" stroke="#555" fontSize={11} />
+            <YAxis stroke="#555" fontSize={11} />
+            <Tooltip content={<DarkTooltip prefix={CUR} />} />
+            <Legend wrapperStyle={{ color: '#A3A3A3', fontSize: 11 }} />
+            <Line type="monotone" dataKey="revenue" name={`Revenue (${CUR})`} stroke="#D4AF37" strokeWidth={2.5} dot={{ fill: '#D4AF37', r: 4 }} activeDot={{ r: 6 }} />
           </LineChart>
         </ResponsiveContainer>
+        <Insight lines={analytics.insights.revenue} />
       </div>
 
-      {/* Orders per Day */}
+      {/* ── Orders per Day ─────────────────────────────────────────────────── */}
       <div className="bg-[#0F0F0F] border border-white/5 rounded-sm p-6">
         <h3 className="text-xl font-semibold text-white mb-6" style={{ fontFamily: 'Playfair Display, serif' }}>
           Orders (Last 7 Days)
         </h3>
-        <ResponsiveContainer width="100%" height={300}>
+        <ResponsiveContainer width="100%" height={260}>
           <BarChart data={analytics.revenueByDay}>
-            <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.1)" />
-            <XAxis dataKey="date" stroke="#A3A3A3" />
-            <YAxis stroke="#A3A3A3" />
-            <Tooltip 
-              contentStyle={{ backgroundColor: '#0F0F0F', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '4px' }}
-              labelStyle={{ color: '#E5E5E5' }}
-            />
-            <Legend wrapperStyle={{ color: '#E5E5E5' }} />
-            <Bar dataKey="orders" fill="#10B981" name="Orders" />
+            <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.06)" />
+            <XAxis dataKey="date" stroke="#555" fontSize={11} />
+            <YAxis stroke="#555" fontSize={11} />
+            <Tooltip content={<DarkTooltip />} />
+            <Legend wrapperStyle={{ color: '#A3A3A3', fontSize: 11 }} />
+            <Bar dataKey="orders" fill="#10B981" name="Orders" radius={[3,3,0,0]} />
           </BarChart>
         </ResponsiveContainer>
+        <Insight lines={analytics.insights.orders} />
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Top Items */}
+
+        {/* ── Top Items ──────────────────────────────────────────────────── */}
         <div className="bg-[#0F0F0F] border border-white/5 rounded-sm p-6">
           <h3 className="text-xl font-semibold text-white mb-6" style={{ fontFamily: 'Playfair Display, serif' }}>
             Best Selling Items
           </h3>
-          <ResponsiveContainer width="100%" height={300}>
+          <ResponsiveContainer width="100%" height={260}>
             <BarChart data={analytics.topItems} layout="vertical">
-              <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.1)" />
-              <XAxis type="number" stroke="#A3A3A3" />
-              <YAxis type="category" dataKey="name" stroke="#A3A3A3" width={100} />
-              <Tooltip 
-                contentStyle={{ backgroundColor: '#0F0F0F', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '4px' }}
-                labelStyle={{ color: '#E5E5E5' }}
-              />
-              <Bar dataKey="count" fill="#D4AF37" name="Quantity Sold" />
+              <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.06)" />
+              <XAxis type="number" stroke="#555" fontSize={11} />
+              <YAxis type="category" dataKey="name" stroke="#555" width={100} fontSize={11} />
+              <Tooltip content={<DarkTooltip />} />
+              <Bar dataKey="count" fill="#D4AF37" name="Qty Sold" radius={[0,3,3,0]} />
             </BarChart>
           </ResponsiveContainer>
+          <Insight lines={analytics.insights.items} />
         </div>
 
-        {/* Payment Status */}
+        {/* ── Payment Status ─────────────────────────────────────────────── */}
         <div className="bg-[#0F0F0F] border border-white/5 rounded-sm p-6">
           <h3 className="text-xl font-semibold text-white mb-6" style={{ fontFamily: 'Playfair Display, serif' }}>
             Payment Status
           </h3>
-          <ResponsiveContainer width="100%" height={300}>
+          <ResponsiveContainer width="100%" height={260}>
             <PieChart>
-              <Pie
-                data={analytics.paymentSplit}
-                cx="50%"
-                cy="50%"
+              <Pie data={analytics.paymentSplit} cx="50%" cy="50%"
                 labelLine={false}
-                label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(0)}%`}
-                outerRadius={100}
-                fill="#8884d8"
-                dataKey="value"
-              >
-                {analytics.paymentSplit.map((entry, index) => (
-                  <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                label={({ name, percent, x, y }) => (
+                  <text x={x} y={y} fill="#A3A3A3" fontSize={11} textAnchor="middle"
+                    dominantBaseline="central" style={{ pointerEvents: 'none' }}>
+                    {`${name}: ${(percent * 100).toFixed(0)}%`}
+                  </text>
+                )}
+                outerRadius={95} dataKey="value">
+                {analytics.paymentSplit.map((_, i) => (
+                  <Cell key={i} fill={COLORS[i % COLORS.length]} />
                 ))}
               </Pie>
-              <Tooltip 
-                contentStyle={{ backgroundColor: '#0F0F0F', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '4px' }}
-                labelStyle={{ color: '#E5E5E5' }}
-              />
+              <Tooltip content={<DarkTooltip />} />
             </PieChart>
           </ResponsiveContainer>
+          <Insight lines={analytics.insights.payment} />
         </div>
       </div>
 
-      {/* Order Status */}
+      {/* ── Order Status Distribution ─────────────────────────────────────── */}
       <div className="bg-[#0F0F0F] border border-white/5 rounded-sm p-6">
         <h3 className="text-xl font-semibold text-white mb-6" style={{ fontFamily: 'Playfair Display, serif' }}>
           Order Status Distribution
         </h3>
-        <ResponsiveContainer width="100%" height={300}>
+        <ResponsiveContainer width="100%" height={260}>
           <PieChart>
-            <Pie
-              data={analytics.orderStatusSplit}
-              cx="50%"
-              cy="50%"
+            <Pie data={analytics.orderStatusSplit} cx="50%" cy="50%"
               labelLine={false}
-              label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(0)}%`}
-              outerRadius={100}
-              fill="#8884d8"
-              dataKey="value"
-            >
-              {analytics.orderStatusSplit.map((entry, index) => (
-                <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+              label={({ name, percent, x, y }) => (
+                <text x={x} y={y} fill="#A3A3A3" fontSize={11} textAnchor="middle"
+                  dominantBaseline="central" style={{ pointerEvents: 'none' }}>
+                  {`${name}: ${(percent * 100).toFixed(0)}%`}
+                </text>
+              )}
+              outerRadius={95} dataKey="value">
+              {analytics.orderStatusSplit.map((_, i) => (
+                <Cell key={i} fill={COLORS[i % COLORS.length]} />
               ))}
             </Pie>
-            <Tooltip 
-              contentStyle={{ backgroundColor: '#0F0F0F', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '4px' }}
-              labelStyle={{ color: '#E5E5E5' }}
-            />
+            <Tooltip content={<DarkTooltip />} />
           </PieChart>
         </ResponsiveContainer>
+        <Insight lines={analytics.insights.status} />
       </div>
 
-      {/* ── External Orders: Source Breakdown ───────────────────────────── */}
-      {analytics.orderSourceSplit && analytics.orderSourceSplit.length > 0 && (
+      {/* ── Order Source Charts ───────────────────────────────────────────── */}
+      {analytics.orderSourceSplit.length > 0 && (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
 
-          {/* Orders by Source — Pie */}
           <div className="bg-[#0F0F0F] border border-white/5 rounded-sm p-6">
             <h3 className="text-xl font-semibold text-white mb-2" style={{ fontFamily: 'Playfair Display, serif' }}>
               Orders by Source
             </h3>
-            <p className="text-[#A3A3A3] text-xs mb-6">Breakdown of where orders come from</p>
-            <ResponsiveContainer width="100%" height={280}>
+            <p className="text-[#A3A3A3] text-xs mb-6">Where your orders come from</p>
+            <ResponsiveContainer width="100%" height={260}>
               <PieChart>
-                <Pie
-                  data={analytics.orderSourceSplit}
-                  cx="50%"
-                  cy="50%"
+                <Pie data={analytics.orderSourceSplit} cx="50%" cy="50%"
                   labelLine={false}
-                  label={({ name, percent }) => percent > 0.05 ? `${name}: ${(percent * 100).toFixed(0)}%` : ''}
-                  outerRadius={95}
-                  dataKey="value"
-                >
-                  {analytics.orderSourceSplit.map((entry, index) => (
-                    <Cell key={`src-cell-${index}`} fill={entry.color} />
+                  label={({ name, percent, x, y }) => percent > 0.05 ? (
+                    <text x={x} y={y} fill="#A3A3A3" fontSize={11} textAnchor="middle"
+                      dominantBaseline="central" style={{ pointerEvents: 'none' }}>
+                      {`${name}: ${(percent*100).toFixed(0)}%`}
+                    </text>
+                  ) : null}
+                  outerRadius={90} dataKey="value">
+                  {analytics.orderSourceSplit.map((entry, i) => (
+                    <Cell key={i} fill={entry.color} />
                   ))}
                 </Pie>
-                <Tooltip
-                  contentStyle={{ backgroundColor: '#0F0F0F', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '4px' }}
-                  labelStyle={{ color: '#E5E5E5' }}
-                  formatter={(value, name) => [value + ' orders', name]}
-                />
-                <Legend
-                  wrapperStyle={{ color: '#E5E5E5', fontSize: '12px' }}
-                  formatter={(value) => <span style={{ color: '#E5E5E5' }}>{value}</span>}
-                />
+                <Tooltip content={<DarkTooltip />} />
+                <Legend wrapperStyle={{ fontSize: '11px' }} formatter={(v) => <span style={{ color: '#A3A3A3' }}>{v}</span>} />
               </PieChart>
             </ResponsiveContainer>
+            <Insight lines={analytics.insights.source} />
           </div>
 
-          {/* Revenue by Source — Bar */}
           <div className="bg-[#0F0F0F] border border-white/5 rounded-sm p-6">
             <h3 className="text-xl font-semibold text-white mb-2" style={{ fontFamily: 'Playfair Display, serif' }}>
               Revenue by Source
             </h3>
-            <p className="text-[#A3A3A3] text-xs mb-6">Total revenue earned per platform</p>
-            <ResponsiveContainer width="100%" height={280}>
+            <p className="text-[#A3A3A3] text-xs mb-6">Revenue earned per platform</p>
+            <ResponsiveContainer width="100%" height={260}>
               <BarChart data={analytics.revenueBySource} layout="vertical">
-                <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.1)" />
-                <XAxis type="number" stroke="#A3A3A3" fontSize={11}
-                  tickFormatter={v => `${CUR}${v}`} />
-                <YAxis type="category" dataKey="name" stroke="#A3A3A3" width={90} fontSize={11} />
-                <Tooltip
-                  contentStyle={{ backgroundColor: '#0F0F0F', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '4px' }}
-                  labelStyle={{ color: '#E5E5E5' }}
-                  formatter={(value) => [`${CUR}${value.toFixed(2)}`, 'Revenue']}
-                />
-                <Bar dataKey="revenue" radius={[0, 3, 3, 0]}>
-                  {analytics.revenueBySource.map((entry, index) => (
-                    <Cell key={`rev-cell-${index}`} fill={entry.color} />
+                <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.06)" />
+                <XAxis type="number" stroke="#555" fontSize={11} tickFormatter={v => `${CUR}${v}`} />
+                <YAxis type="category" dataKey="name" stroke="#555" width={90} fontSize={11} />
+                <Tooltip content={<DarkTooltip prefix={CUR} />} />
+                <Bar dataKey="revenue" name="Revenue" radius={[0,3,3,0]}>
+                  {analytics.revenueBySource.map((entry, i) => (
+                    <Cell key={i} fill={entry.color} />
                   ))}
                 </Bar>
               </BarChart>
@@ -318,8 +351,8 @@ const Analytics = () => {
         </div>
       )}
 
-      {/* Source summary table */}
-      {analytics.orderSourceSplit && analytics.orderSourceSplit.length > 1 && (
+      {/* ── Source summary table ──────────────────────────────────────────── */}
+      {analytics.orderSourceSplit.length > 1 && (
         <div className="bg-[#0F0F0F] border border-white/5 rounded-sm p-6">
           <h3 className="text-xl font-semibold text-white mb-4" style={{ fontFamily: 'Playfair Display, serif' }}>
             Platform Performance Summary
@@ -328,18 +361,16 @@ const Analytics = () => {
             <table className="w-full">
               <thead>
                 <tr className="border-b border-white/10">
-                  {['Platform', 'Orders', 'Revenue', '% of Orders'].map(h => (
-                    <th key={h} className="text-left px-4 py-3 text-[#D4AF37] font-semibold text-xs uppercase tracking-wide">
-                      {h}
-                    </th>
+                  {['Platform','Orders','Revenue','% of Orders'].map(h => (
+                    <th key={h} className="text-left px-4 py-3 text-[#D4AF37] font-semibold text-xs uppercase tracking-wide">{h}</th>
                   ))}
                 </tr>
               </thead>
               <tbody>
                 {analytics.orderSourceSplit.map((src, idx) => {
-                  const revEntry = analytics.revenueBySource.find(r => r.name === src.name);
-                  const totalOrders = analytics.orderSourceSplit.reduce((s, i) => s + i.value, 0);
-                  const pct = totalOrders > 0 ? ((src.value / totalOrders) * 100).toFixed(1) : '0';
+                  const revEntry  = analytics.revenueBySource.find(r => r.name === src.name);
+                  const totalOrds = analytics.orderSourceSplit.reduce((s, i) => s + i.value, 0);
+                  const pct       = totalOrds > 0 ? ((src.value / totalOrds) * 100).toFixed(1) : '0';
                   return (
                     <tr key={idx} className="border-b border-white/5 hover:bg-white/3 transition-colors">
                       <td className="px-4 py-3">
@@ -355,10 +386,7 @@ const Analytics = () => {
                       <td className="px-4 py-3">
                         <div className="flex items-center gap-2">
                           <div className="flex-1 bg-white/5 rounded-full h-1.5 max-w-[80px]">
-                            <div
-                              className="h-1.5 rounded-full"
-                              style={{ width: `${pct}%`, backgroundColor: src.color }}
-                            />
+                            <div className="h-1.5 rounded-full" style={{ width:`${pct}%`, backgroundColor:src.color }} />
                           </div>
                           <span className="text-[#A3A3A3] text-xs">{pct}%</span>
                         </div>
