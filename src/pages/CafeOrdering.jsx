@@ -1,3 +1,4 @@
+import { formatWhatsAppNumber } from '../utils/whatsapp';
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { collection, query, where, doc, addDoc, updateDoc, serverTimestamp, runTransaction, onSnapshot } from 'firebase/firestore';

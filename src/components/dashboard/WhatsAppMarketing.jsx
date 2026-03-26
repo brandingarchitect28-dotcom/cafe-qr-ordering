@@ -9,6 +9,7 @@
  * - Bulk send via sequential WhatsApp opens
  */
 
+import { formatWhatsAppNumber } from '../../utils/whatsapp';
 import React, { useState, useMemo } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
 import { useCollection, useDocument } from '../../hooks/useFirestore';

@@ -15,6 +15,7 @@
  * - Estimated time hint per status
  */
 
+import { formatWhatsAppNumber } from '../utils/whatsapp';
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { doc, onSnapshot } from 'firebase/firestore';
@@ -231,7 +232,7 @@ const OrderTracking = () => {
   // ── Send invoice to customer via WhatsApp (optional, not auto-redirect) ──────
   const handleSendInvoice = useCallback(() => {
     if (!order) return;
-    const phone = (order.customerPhone || '').replace(/\D/g, '');
+    const phone = (order.customerPhone || '');
     if (!phone) { alert('No phone number on this order.'); return; }
     setWaSending(true);
     const msg = generateInvoiceMessage(order);

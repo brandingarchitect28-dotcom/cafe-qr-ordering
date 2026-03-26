@@ -9,6 +9,7 @@
  * 5. Payment + source breakdown
  */
 
+import { formatWhatsAppNumber } from '../../utils/whatsapp';
 import React, { useState, useMemo } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
 import { useDocument } from '../../hooks/useFirestore';
@@ -164,7 +165,7 @@ const AdvancedAnalytics = () => {
   const handleWA = () => {
     if (!data) { toast.error('No data'); return; }
     const msg = buildWhatsAppReport(data, cafe, fromDate, toDate);
-    const phone = (cafe?.whatsappNumber || '').replace(/\D/g, '');
+    const phone = formatWhatsAppNumber(cafe?.whatsappNumber || '');
     const url = phone
       ? `https://wa.me/${phone}?text=${encodeURIComponent(msg)}`
       : `https://wa.me/?text=${encodeURIComponent(msg)}`;

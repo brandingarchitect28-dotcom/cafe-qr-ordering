@@ -10,6 +10,7 @@
  * - Real-time listener (same pattern as Orders)
  */
 
+import { formatWhatsAppNumber } from '../../utils/whatsapp';
 import React, { useState, useMemo } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
 import { useDocument } from '../../hooks/useFirestore';
@@ -92,7 +93,7 @@ const InvoicesTab = () => {
 
   // Send invoice via WhatsApp — uses shared generateInvoiceMessage for consistency
   const handleSendWA = (inv) => {
-    const phone = (inv.customerPhone || '').replace(/\D/g, '');
+    const phone = (inv.customerPhone || '');
     if (!phone) { toast.error('No customer phone number on this invoice'); return; }
     const msg = generateInvoiceMessage(inv, { name: inv.cafeName, currencySymbol: CUR });
     window.location.href = `https://wa.me/${phone}?text=${encodeURIComponent(msg)}`;

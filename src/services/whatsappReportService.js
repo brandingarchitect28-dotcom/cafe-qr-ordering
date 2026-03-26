@@ -9,6 +9,7 @@ import {
   collection, query, where, getDocs, doc, getDoc,
 } from 'firebase/firestore';
 import { db } from '../lib/firebase';
+import { formatWhatsAppNumber } from '../utils/whatsapp';
 
 // ─── Report Builder ───────────────────────────────────────────────────────────
 
@@ -108,7 +109,7 @@ export const buildDailyReport = async (cafeId, targetDate = new Date()) => {
  * iOS FIX: Uses window.location.href — works on Safari + Chrome on all devices.
  */
 export const sendWhatsAppReport = (phone, message) => {
-  const clean = phone.replace(/\D/g, '');
+  const clean = formatWhatsAppNumber(phone);
   const url   = `https://wa.me/${clean}?text=${encodeURIComponent(message)}`;
   window.location.href = url;
 };

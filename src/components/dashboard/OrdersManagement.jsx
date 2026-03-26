@@ -1,3 +1,4 @@
+import { formatWhatsAppNumber } from '../../utils/whatsapp';
 import React, { useState, useMemo, useEffect, useRef, useCallback } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
 import { useCollection, useDocument } from '../../hooks/useFirestore';
@@ -677,7 +678,7 @@ const OrdersManagement = () => {
                                     <button
                                       onClick={(e) => {
                                         e.stopPropagation();
-                                        const phone = order.customerPhone.replace(/\D/g,'');
+                                        const phone = order.formatWhatsAppNumber(customerPhone);
                                         const msg = generateInvoiceMessage(order, { currencySymbol: order.currencySymbol || cafeCurrency });
                                         window.location.href = `https://wa.me/${phone}?text=${encodeURIComponent(msg)}`;
                                       }}
@@ -900,7 +901,7 @@ const OrdersManagement = () => {
                             <button
                               onClick={(e) => {
                                 e.stopPropagation();
-                                const phone = order.customerPhone.replace(/\D/g,'');
+                                const phone = order.formatWhatsAppNumber(customerPhone);
                                 const msg = generateInvoiceMessage(order, { currencySymbol: order.currencySymbol || cafeCurrency });
                                 window.location.href = `https://wa.me/${phone}?text=${encodeURIComponent(msg)}`;
                               }}

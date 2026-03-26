@@ -13,6 +13,7 @@
  * IMPORTANT: Does NOT modify existing CafeOrdering.jsx
  */
 
+import { formatWhatsAppNumber } from '../utils/whatsapp';
 import React, {
   useState, useEffect, useMemo, useRef, useCallback,
 } from 'react';
