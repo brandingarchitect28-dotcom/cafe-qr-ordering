@@ -342,7 +342,7 @@ app.post('/webhook',          handleCashfreeWebhook);
 // ─── POST /api/ai-menu-upload ─────────────────────────────────────────────────
 // Accepts an image/PDF as base64 JSON, sends to Gemini, returns parsed menu items.
 // No multer needed — frontend sends base64 string to keep it simple.
-// GEMINI_API_KEY must be set in Render → Environment Variables.
+// OPENAI_API_KEY must be set in Render → Environment Variables.
 
 app.post('/api/ai-menu-upload', async (req, res) => {
   try {
@@ -352,10 +352,10 @@ app.post('/api/ai-menu-upload', async (req, res) => {
     if (!imageBase64)  return res.status(400).json({ error: 'imageBase64 is required' });
     if (!mimeType)     return res.status(400).json({ error: 'mimeType is required' });
 
-    const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
-    if (!GEMINI_API_KEY) {
-      console.error('[AI Menu] GEMINI_API_KEY not set in environment');
-      return res.status(500).json({ error: 'AI service not configured. Add GEMINI_API_KEY in Render environment.' });
+    const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
+    if (!OPENAI_API_KEY) {
+      console.error('[AI Menu] OPENAI_API_KEY not set in environment');
+      return res.status(500).json({ error: 'AI service not configured. Add OPENAI_API_KEY in Render environment.' });
     }
 
     // Validate file size — base64 is ~33% larger than binary, so 7MB base64 ≈ 5MB file
@@ -372,68 +372,46 @@ app.post('/api/ai-menu-upload', async (req, res) => {
 
     console.log(`[AI Menu] Processing for cafeId=${cafeId}, type=${mimeType}, size≈${Math.round(approxBytes/1024)}KB`);
 
-    // ── Call Gemini Vision API directly via fetch ──────────────────────────────
-    const prompt = `You are a restaurant menu extraction AI.
-
-Convert the uploaded menu into structured JSON.
-
-Return ONLY JSON in this format:
-
-[
-  {
-    "name": "",
-    "price": 0,
-    "category": "",
-    "description": "",
-    "available": true
-  }
-]
-
-Rules:
-- Remove currency symbols from prices
-- Price must be a number only (no strings)
-- Auto detect category from context (Beverages, Food, Snacks, Desserts, Main Course, Starters, Other)
-- Clean item names (remove numbering, extra symbols)
-- If price is missing or unclear, use 0
-- No extra text outside the JSON array`;
-
-    const geminiRes = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=${GEMINI_API_KEY}`,
-      {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          contents: [{
-            parts: [
-              { text: prompt },
-              {
-                inline_data: {
-                  mime_type: mimeType === 'application/pdf' ? 'application/pdf' : mimeType,
-                  data: imageBase64,
-                },
+    // ── Call OpenAI vision API (gpt-4o-mini) ─────────────────────────────────
+    const openaiRes = await fetch('https://api.openai.com/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${OPENAI_API_KEY}`,
+      },
+      body: JSON.stringify({
+        model: 'gpt-4o-mini',
+        max_tokens: 4096,
+        temperature: 0.1,
+        messages: [{
+          role: 'user',
+          content: [
+            { type: 'text', text: prompt },
+            {
+              type: 'image_url',
+              image_url: {
+                url: `data:${mimeType};base64,${imageBase64}`,
+                detail: 'high',
               },
-            ],
-          }],
-          generationConfig: {
-            temperature: 0.1,      // low temp = more deterministic JSON output
-            maxOutputTokens: 4096,
-          },
-        }),
-      }
-    );
+            },
+          ],
+        }],
+      }),
+    });
 
-    if (!geminiRes.ok) {
-      const errText = await geminiRes.text();
-      console.error('[AI Menu] Gemini API error:', geminiRes.status, errText.slice(0, 300));
-      return res.status(502).json({ error: 'AI service error. Check your Gemini API key.' });
+    if (!openaiRes.ok) {
+      const errText = await openaiRes.text();
+      console.error('[AI Menu] OpenAI API error:', openaiRes.status, errText.slice(0, 300));
+      return res.status(502).json({ error: `AI service error (${openaiRes.status}). Check your OPENAI_API_KEY in Render.` });
     }
 
-    const geminiData = await geminiRes.json();
-    const rawText = geminiData?.candidates?.[0]?.content?.parts?.[0]?.text || '';
+    const openaiData = await openaiRes.json();
+    const rawText = openaiData?.choices?.[0]?.message?.content || '';
 
     if (!rawText) {
-      console.error('[AI Menu] Empty response from Gemini');
+      console.error('[AI Menu] Empty response from OpenAI');
       return res.status(502).json({ error: 'No response from AI. Try a clearer image.' });
+    }
     }
 
     // ── Safe JSON parsing — strip markdown fences if present ──────────────────
@@ -481,45 +459,46 @@ Rules:
 });
 
 // ─── GET /test-gemini ─────────────────────────────────────────────────────────
-// Verifies the GEMINI_API_KEY env var is set and the Gemini API responds.
+// Verifies the OPENAI_API_KEY env var is set and the OpenAI API responds.
 // Uses the same native fetch pattern as /api/ai-menu-upload — no extra SDK needed.
 // Zero impact on existing routes or payment logic.
 
 app.get('/test-gemini', async (req, res) => {
   try {
-    const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
-    if (!GEMINI_API_KEY) {
+    const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
+    if (!OPENAI_API_KEY) {
       return res.status(500).json({
         success: false,
-        error: 'GEMINI_API_KEY not set. Add it in Render → Environment Variables.',
+        error: 'OPENAI_API_KEY not set. Add it in Render → Environment Variables.',
       });
     }
 
-    const geminiRes = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=${GEMINI_API_KEY}`,
-      {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          contents: [{ parts: [{ text: 'Say hello from SmartCafe AI' }] }],
-          generationConfig: { maxOutputTokens: 64 },
-        }),
-      }
-    );
+    const openaiRes = await fetch('https://api.openai.com/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${OPENAI_API_KEY}`,
+      },
+      body: JSON.stringify({
+        model: 'gpt-4o-mini',
+        max_tokens: 64,
+        messages: [{ role: 'user', content: 'Say hello from SmartCafe AI' }],
+      }),
+    });
 
-    if (!geminiRes.ok) {
-      const errText = await geminiRes.text();
-      console.error('[test-gemini] Gemini API error:', geminiRes.status, errText);
+    if (!openaiRes.ok) {
+      const errText = await openaiRes.text();
+      console.error('[test-gemini] OpenAI API error:', openaiRes.status, errText);
       return res.status(502).json({
         success: false,
-        status: geminiRes.status,
-        error: `Gemini API returned ${geminiRes.status}`,
-        detail: errText,   // full response body so you can see the exact error
+        status: openaiRes.status,
+        error: `OpenAI API returned ${openaiRes.status}`,
+        detail: errText,
       });
     }
 
-    const data = await geminiRes.json();
-    const text = data?.candidates?.[0]?.content?.parts?.[0]?.text || '(no text)';
+    const data = await openaiRes.json();
+    const text = data?.choices?.[0]?.message?.content || '(no text)';
 
     console.log('[test-gemini] Success:', text.slice(0, 80));
     return res.json({ success: true, message: text });
