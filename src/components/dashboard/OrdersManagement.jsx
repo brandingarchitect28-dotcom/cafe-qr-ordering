@@ -12,6 +12,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import InvoiceModal from './InvoiceModal';
 import { getInvoiceByOrderId, getInvoiceById, ensureInvoiceForOrder } from '../../services/invoiceService';
 import ExternalOrderModal, { getSourceMeta } from './ExternalOrderModal';
+import { useTheme } from '../../hooks/useTheme';
 
 // Notification sound (base64 encoded short beep)
 const NOTIFICATION_SOUND = 'data:audio/mp3;base64,SUQzBAAAAAAAI1RTU0UAAAAPAAADTGF2ZjU4Ljc2LjEwMAAAAAAAAAAAAAAA/+M4wAAAAAAAAAAAAEluZm8AAAAPAAAAAwAAAbAAqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV////////////////////////////////////////////AAAAAExhdmM1OC4xMwAAAAAAAAAAAAAAACQDgAAAAAAAAAGw3X+VkgAAAAAAAAAAAAAAAAD/4xjEAAJQAVAAAAAAvYCCB4P+UBn//+D4PoGH/ygM///KAHAY////4Pg+D7/8EMOD4f/6gYf///wfB9///5QGf/lAZ//+UAcH0GH////+oGH//6gYf5QBwfD4fygDg//+D5//ygMAAAAAAA/+MYxBYCwAFYAAAAAPHjx4sePHjx5OTk5FRUVFRU9PT09PT09PT0/////////////////////////////////+MYxCMAAADSAAAAAP///////////////////////////////////////////////+MYxDAAAADSAAAAAP///////////////////////////////////////////////+MYxD4AAADSAAAAAP//////////////////////////////////////////////';
@@ -20,6 +21,7 @@ const OrdersManagement = () => {
   const { user } = useAuth();
   const cafeId = user?.cafeId;
   const { data: cafe } = useDocument('cafes', cafeId);
+  const { T, isLight } = useTheme();
   const cafeCurrency = cafe?.currencySymbol || '₹';
   const [statusFilter, setStatusFilter] = useState('all');
   const [searchQuery, setSearchQuery] = useState('');
@@ -359,7 +361,7 @@ const OrdersManagement = () => {
             onClick={() => setDeleteConfirmId(null)}
           >
             <motion.div
-              className="bg-[#0F0F0F] border border-white/10 rounded-xl p-6 w-full max-w-sm"
+              className={`${T.card} rounded-xl p-6 w-full max-w-sm`}
               initial={{ scale: 0.95, y: 10 }} animate={{ scale: 1, y: 0 }}
               onClick={e => e.stopPropagation()}
             >
@@ -367,22 +369,22 @@ const OrdersManagement = () => {
                 <div className="w-10 h-10 rounded-full bg-red-500/15 flex items-center justify-center flex-shrink-0">
                   <Trash2 className="w-5 h-5 text-red-400" />
                 </div>
-                <h3 className="text-white font-bold text-lg">Delete Order?</h3>
+                <h3 className={`${T.heading} font-bold text-lg`}>Delete Order?</h3>
               </div>
-              <p className="text-[#A3A3A3] text-sm mb-5">
+              <p className={`${T.muted} text-sm mb-5`}>
                 This order will be hidden from the dashboard. All data is preserved.
               </p>
               <div className="flex gap-3">
                 <button
                   onClick={() => setDeleteConfirmId(null)}
-                  className="flex-1 py-2.5 border border-white/10 text-[#A3A3A3] hover:text-white rounded-lg text-sm font-semibold transition-all"
+                  className={`flex-1 py-2.5 border ${T.borderMd} text-[#A3A3A3] hover:text-white rounded-lg text-sm font-semibold transition-all`}
                 >
                   Cancel
                 </button>
                 <button
                   onClick={() => handleSoftDelete(deleteConfirmId)}
                   disabled={deleting}
-                  className="flex-1 py-2.5 bg-red-500 hover:bg-red-600 text-white rounded-lg text-sm font-bold transition-all disabled:opacity-50 flex items-center justify-center gap-1.5"
+                  className={`flex-1 py-2.5 bg-red-500 hover:bg-red-600 ${T.heading} rounded-lg text-sm font-bold transition-all disabled:opacity-50 flex items-center justify-center gap-1.5`}
                 >
                   {deleting
                     ? <><div className="w-4 h-4 rounded-full border-2 border-white/30 border-t-white animate-spin" />Deleting…</>
@@ -428,7 +430,7 @@ const OrdersManagement = () => {
               <X className="w-4 h-4" />
             </button>
             <div className="flex items-start gap-4">
-              <div className="bg-black/20 p-3 rounded-full">
+              <div className={`${T.innerCard} p-3 rounded-full`}>
                 <Bell className="w-6 h-6 animate-bounce" />
               </div>
               <div>
@@ -451,7 +453,7 @@ const OrdersManagement = () => {
 
       {/* Header with Sound Toggle */}
       <div className="flex flex-wrap justify-between items-center gap-3">
-        <h2 className="text-2xl font-bold text-white" style={{ fontFamily: 'Playfair Display, serif' }}>
+        <h2 className={`text-2xl font-bold ${T.heading}`} style={{ fontFamily: 'Playfair Display, serif' }}>
           Orders Management
         </h2>
         <div className="flex items-center gap-2 flex-wrap">
@@ -469,7 +471,7 @@ const OrdersManagement = () => {
             className={`flex items-center gap-2 px-4 py-2 rounded-sm transition-all ${
               soundEnabled
                 ? 'bg-[#D4AF37]/20 text-[#D4AF37] border border-[#D4AF37]/30'
-                : 'bg-white/5 text-[#A3A3A3] border border-white/10'
+                : '${T.subCard} text-[#A3A3A3] border ${T.borderMd}'
             }`}
             data-testid="sound-toggle"
           >
@@ -482,13 +484,13 @@ const OrdersManagement = () => {
       {/* Search and Export */}
       <div className="flex flex-col md:flex-row gap-4">
         <div className="relative flex-1">
-          <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 text-[#A3A3A3] w-5 h-5" />
+          <Search className={`absolute left-4 top-1/2 transform -translate-y-1/2 ${T.muted} w-5 h-5`} />
           <input
             type="text"
             data-testid="order-search"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full bg-[#0F0F0F] border border-white/10 text-white placeholder:text-neutral-600 focus:border-[#D4AF37] focus:ring-1 focus:ring-[#D4AF37] rounded-sm h-12 pl-12 px-4 transition-all"
+            className={`w-full ${T.card} text-white placeholder:text-neutral-600 focus:border-[#D4AF37] focus:ring-1 focus:ring-[#D4AF37] rounded-sm h-12 pl-12 px-4 transition-all`}
             placeholder="Search by order #, customer name, or phone..."
           />
         </div>
@@ -496,7 +498,7 @@ const OrdersManagement = () => {
         <CSVLink
           data={csvData}
           filename={`orders-${new Date().toISOString().split('T')[0]}.csv`}
-          className="bg-[#10B981] text-white hover:bg-[#059669] rounded-sm px-6 py-3 font-semibold transition-all duration-300 flex items-center justify-center gap-2 whitespace-nowrap"
+          className={`bg-[#10B981] ${T.heading} hover:bg-[#059669] rounded-sm px-6 py-3 font-semibold transition-all duration-300 flex items-center justify-center gap-2 whitespace-nowrap`}
           data-testid="export-csv-btn"
         >
           <Download className="w-5 h-5" />
@@ -507,23 +509,23 @@ const OrdersManagement = () => {
       {/* Date Filters */}
       <div className="flex flex-col md:flex-row gap-4">
         <div className="flex-1">
-          <label className="block text-[#A3A3A3] text-sm mb-2">Start Date</label>
+          <label className={`block ${T.muted} text-sm mb-2`}>Start Date</label>
           <input
             type="date"
             data-testid="start-date-filter"
             value={startDate}
             onChange={(e) => setStartDate(e.target.value)}
-            className="w-full bg-[#0F0F0F] border border-white/10 text-white focus:border-[#D4AF37] focus:ring-1 focus:ring-[#D4AF37] rounded-sm h-12 px-4 transition-all"
+            className={`w-full ${T.card} text-white focus:border-[#D4AF37] focus:ring-1 focus:ring-[#D4AF37] rounded-sm h-12 px-4 transition-all`}
           />
         </div>
         <div className="flex-1">
-          <label className="block text-[#A3A3A3] text-sm mb-2">End Date</label>
+          <label className={`block ${T.muted} text-sm mb-2`}>End Date</label>
           <input
             type="date"
             data-testid="end-date-filter"
             value={endDate}
             onChange={(e) => setEndDate(e.target.value)}
-            className="w-full bg-[#0F0F0F] border border-white/10 text-white focus:border-[#D4AF37] focus:ring-1 focus:ring-[#D4AF37] rounded-sm h-12 px-4 transition-all"
+            className={`w-full ${T.card} text-white focus:border-[#D4AF37] focus:ring-1 focus:ring-[#D4AF37] rounded-sm h-12 px-4 transition-all`}
           />
         </div>
       </div>
@@ -538,7 +540,7 @@ const OrdersManagement = () => {
             className={`px-4 py-2 rounded-sm font-medium transition-all ${
               statusFilter === status
                 ? 'bg-[#D4AF37] text-black'
-                : 'bg-white/5 text-[#A3A3A3] hover:bg-white/10 hover:text-white'
+                : '${T.subCard} text-[#A3A3A3] hover:bg-white/10 hover:text-white'
             }`}
           >
             {status.charAt(0).toUpperCase() + status.slice(1)}
@@ -547,21 +549,21 @@ const OrdersManagement = () => {
       </div>
 
       {loading ? (
-        <div className="text-center text-[#A3A3A3] py-8">Loading orders...</div>
+        <div className={`text-center ${T.muted} py-8`}>Loading orders...</div>
       ) : filteredOrders.length === 0 ? (
-        <div className="bg-[#0F0F0F] border border-white/5 rounded-sm p-12 text-center">
-          <AlertCircle className="w-12 h-12 text-[#A3A3A3] mx-auto mb-4" />
-          <p className="text-[#A3A3A3] text-lg">No orders found</p>
+        <div className={`${T.card} rounded-sm p-12 text-center`}>
+          <AlertCircle className={`w-12 h-12 ${T.muted} mx-auto mb-4`} />
+          <p className={`${T.muted} text-lg`}>No orders found</p>
           <p className="text-[#666] text-sm mt-2">New orders will appear here in real-time</p>
         </div>
       ) : (
         <>
           {/* Desktop Table View */}
-          <div className="hidden lg:block bg-[#0F0F0F] border border-white/5 rounded-sm overflow-hidden">
+          <div className={`hidden lg:block ${T.card} rounded-sm overflow-hidden`}>
             <div className="overflow-x-auto">
               <table className="w-full">
                 <thead>
-                  <tr className="border-b border-white/10 bg-black/30">
+                  <tr className={`border-b ${T.borderMd} ${T.innerCard}`}>
                     <th className="text-left px-4 py-4 text-[#D4AF37] font-semibold text-sm">Order #</th>
                     <th className="text-left px-4 py-4 text-[#D4AF37] font-semibold text-sm">Customer</th>
                     <th className="text-left px-4 py-4 text-[#D4AF37] font-semibold text-sm">Phone</th>
@@ -578,8 +580,8 @@ const OrdersManagement = () => {
                   {filteredOrders.map((order) => (
                     <React.Fragment key={order.id}>
                       <tr 
-                        className={`border-b border-white/5 hover:bg-white/5 transition-colors cursor-pointer ${
-                          expandedOrder === order.id ? 'bg-white/5' : ''
+                        className={`border-b ${T.border} hover:${T.subCard} transition-colors cursor-pointer ${
+                          expandedOrder === order.id ? '${T.subCard}' : ''
                         }`}
                         onClick={() => setExpandedOrder(expandedOrder === order.id ? null : order.id)}
                         data-testid={`order-row-${order.id}`}
@@ -599,18 +601,18 @@ const OrdersManagement = () => {
                             })()}
                           </div>
                         </td>
-                        <td className="px-4 py-4 text-white font-medium">{order.customerName || '-'}</td>
-                        <td className="px-4 py-4 text-[#A3A3A3]">{order.customerPhone || '-'}</td>
+                        <td className={`px-4 py-4 ${T.label} font-medium`}>{order.customerName || '-'}</td>
+                        <td className={`px-4 py-4 ${T.muted}`}>{order.customerPhone || '-'}</td>
                         <td className="px-4 py-4">
-                          <span className="text-white capitalize">{order.orderType || '-'}</span>
+                          <span className={`${T.heading} capitalize`}>{order.orderType || '-'}</span>
                         </td>
-                        <td className="px-4 py-4 text-white">
+                        <td className={`px-4 py-4 ${T.heading}`}>
                           {order.orderType === 'dine-in' ? (order.tableNumber || '-') : 
                            order.orderType === 'delivery' ? (
-                             <span className="text-[#A3A3A3] text-xs">Delivery</span>
+                             <span className={`${T.muted} text-xs`}>Delivery</span>
                            ) : '-'}
                         </td>
-                        <td className="px-4 py-4 text-[#A3A3A3]">{getItemsCount(order.items)}</td>
+                        <td className={`px-4 py-4 ${T.muted}`}>{getItemsCount(order.items)}</td>
                         <td className="px-4 py-4">
                           <span className="text-[#D4AF37] font-bold">{order.currencySymbol || cafeCurrency}{(order.totalAmount || order.total || 0).toFixed(0)}</span>
                         </td>
@@ -631,7 +633,7 @@ const OrdersManagement = () => {
                                 data-testid={`order-status-${order.id}`}
                                 value={order.orderStatus || 'new'}
                                 onChange={(e) => updateOrderStatus(order.id, e.target.value)}
-                                className="bg-black/40 border border-white/10 text-white rounded px-2 py-1 text-xs focus:border-[#D4AF37] focus:ring-1 focus:ring-[#D4AF37]"
+                                className={`bg-black/40 border ${T.borderMd} text-white rounded px-2 py-1 text-xs focus:border-[#D4AF37] focus:ring-1 focus:ring-[#D4AF37]`}
                               >
                                 <option value="new">New</option>
                                 <option value="preparing">Preparing</option>
@@ -643,7 +645,7 @@ const OrdersManagement = () => {
                                 data-testid={`payment-status-${order.id}`}
                                 value={order.paymentStatus || 'pending'}
                                 onChange={(e) => updatePaymentStatus(order.id, e.target.value)}
-                                className="bg-black/40 border border-white/10 text-white rounded px-2 py-1 text-xs focus:border-[#D4AF37] focus:ring-1 focus:ring-[#D4AF37]"
+                                className={`bg-black/40 border ${T.borderMd} text-white rounded px-2 py-1 text-xs focus:border-[#D4AF37] focus:ring-1 focus:ring-[#D4AF37]`}
                               >
                                 <option value="pending">Pending</option>
                                 <option value="paid">Paid</option>
@@ -667,7 +669,7 @@ const OrdersManagement = () => {
                                     onClick={(e) => handleDownloadInvoice(order.id, e)}
                                     disabled={invoiceLoading === order.id}
                                     data-testid={`download-invoice-${order.id}`}
-                                    className="flex items-center gap-1 px-2.5 py-1.5 bg-white/5 hover:bg-white/10 border border-white/10 text-[#A3A3A3] hover:text-white rounded text-xs font-medium transition-all disabled:opacity-50"
+                                    className={`flex items-center gap-1 px-2.5 py-1.5 ${T.subCard} hover:bg-white/10 border ${T.borderMd} text-[#A3A3A3] hover:text-white rounded text-xs font-medium transition-all disabled:opacity-50`}
                                     title="Download PDF"
                                   >
                                     <FileText className="w-3 h-3" />
@@ -700,7 +702,7 @@ const OrdersManagement = () => {
                                   </button>
                                 </>
                               ) : (
-                                <span className="text-[#555] text-xs italic px-1 py-1.5">
+                                <span className={`${T.faint} text-xs italic px-1 py-1.5`}>
                                   Invoice generating…
                                 </span>
                               )}
@@ -709,7 +711,7 @@ const OrdersManagement = () => {
                         </td>
                       </tr>
                       {expandedOrder === order.id && (
-                        <tr className="bg-black/20">
+                        <tr className={`${T.innerCard}`}>
                           <td colSpan="10" className="px-4 py-4">
                             <div className="grid grid-cols-2 gap-6">
                               <div>
@@ -718,19 +720,19 @@ const OrdersManagement = () => {
                                   {order.items?.map((item, idx) => (
                                     <div key={idx} className="space-y-0.5">
                                       <div className="flex justify-between text-sm">
-                                        <span className="text-white">{item.name} x{item.quantity}</span>
+                                        <span className={`${T.heading}`}>{item.name} x{item.quantity}</span>
                                         <span className="text-[#D4AF37]">{order.currencySymbol || cafeCurrency}{(item.price * item.quantity).toFixed(2)}</span>
                                       </div>
                                       {item.addons?.map((a, ai) => (
                                         <div key={ai} className="flex justify-between text-xs pl-3">
-                                          <span className="text-[#555]">↳ {a.name}</span>
-                                          <span className="text-[#A3A3A3]">+{order.currencySymbol || cafeCurrency}{(a.price || 0).toFixed(2)}</span>
+                                          <span className={`${T.faint}`}>↳ {a.name}</span>
+                                          <span className={`${T.muted}`}>+{order.currencySymbol || cafeCurrency}{(a.price || 0).toFixed(2)}</span>
                                         </div>
                                       ))}
                                     </div>
                                   ))}
-                                  <div className="border-t border-white/10 pt-2 mt-2 flex justify-between font-bold">
-                                    <span className="text-white">Total</span>
+                                  <div className={`border-t ${T.borderMd} pt-2 mt-2 flex justify-between font-bold`}>
+                                    <span className={`${T.heading}`}>Total</span>
                                     <span className="text-[#D4AF37]">{order.currencySymbol || cafeCurrency}{(order.totalAmount || order.total || 0).toFixed(2)}</span>
                                   </div>
                                 </div>
@@ -738,18 +740,18 @@ const OrdersManagement = () => {
                               <div>
                                 <h4 className="text-[#D4AF37] font-semibold mb-3">Details</h4>
                                 <div className="space-y-2 text-sm">
-                                  <div className="flex items-center gap-2 text-[#A3A3A3]">
+                                  <div className={`flex items-center gap-2 ${T.muted}`}>
                                     <Clock className="w-4 h-4" />
                                     <span>{order.createdAt?.toDate?.().toLocaleString() || 'N/A'}</span>
                                   </div>
                                   {order.customerPhone && (
-                                    <div className="flex items-center gap-2 text-[#A3A3A3]">
+                                    <div className={`flex items-center gap-2 ${T.muted}`}>
                                       <Phone className="w-4 h-4" />
                                       <span>{order.customerPhone}</span>
                                     </div>
                                   )}
                                   {order.orderType === 'delivery' && order.deliveryAddress && (
-                                    <div className="flex items-start gap-2 text-[#A3A3A3]">
+                                    <div className={`flex items-start gap-2 ${T.muted}`}>
                                       <MapPin className="w-4 h-4 mt-0.5" />
                                       <span>{order.deliveryAddress}</span>
                                     </div>
@@ -757,10 +759,10 @@ const OrdersManagement = () => {
                                   {order.specialInstructions && (
                                     <div className="mt-3 p-3 bg-[#D4AF37]/10 border border-[#D4AF37]/30 rounded">
                                       <p className="text-[#D4AF37] text-xs font-semibold mb-1">Special Instructions:</p>
-                                      <p className="text-white text-sm">{order.specialInstructions}</p>
+                                      <p className={`${T.body} text-sm`}>{order.specialInstructions}</p>
                                     </div>
                                   )}
-                                  <div className="text-[#A3A3A3] text-xs mt-2">
+                                  <div className={`${T.muted} text-xs mt-2`}>
                                     Payment: {order.paymentMode === 'counter' ? 'Pay at Counter' : order.paymentMode === 'table' ? 'Pay on Table' : 'Prepaid (UPI)'}
                                   </div>
                                 </div>
@@ -782,7 +784,7 @@ const OrdersManagement = () => {
               <div
                 key={order.id}
                 data-testid={`order-card-${order.id}`}
-                className="bg-[#0F0F0F] border border-white/5 rounded-sm overflow-hidden"
+                className={`${T.card} rounded-sm overflow-hidden`}
               >
                 <div 
                   className="p-4 flex items-center justify-between cursor-pointer"
@@ -803,8 +805,8 @@ const OrdersManagement = () => {
                       })()}
                     </div>
                     <div>
-                      <p className="text-white font-medium">{order.customerName}</p>
-                      <p className="text-[#A3A3A3] text-sm">{order.customerPhone}</p>
+                      <p className={`${T.label} font-medium`}>{order.customerName}</p>
+                      <p className={`${T.muted} text-sm`}>{order.customerPhone}</p>
                     </div>
                   </div>
                   <div className="flex flex-col items-end gap-1">
@@ -815,32 +817,32 @@ const OrdersManagement = () => {
                   </div>
                 </div>
 
-                <div className="px-4 pb-4 flex flex-wrap gap-2 border-t border-white/5 pt-3">
-                  <span className="text-[#A3A3A3] text-sm capitalize">{order.orderType}</span>
+                <div className={`px-4 pb-4 flex flex-wrap gap-2 border-t ${T.border} pt-3`}>
+                  <span className={`${T.muted} text-sm capitalize`}>{order.orderType}</span>
                   {order.orderType === 'dine-in' && order.tableNumber && (
-                    <span className="text-white text-sm">• Table {order.tableNumber}</span>
+                    <span className={`${T.body} text-sm`}>• Table {order.tableNumber}</span>
                   )}
-                  <span className="text-[#A3A3A3] text-sm">• {getItemsCount(order.items)}</span>
+                  <span className={`${T.muted} text-sm`}>• {getItemsCount(order.items)}</span>
                   <span className={`px-2 py-0.5 rounded text-xs font-medium border ${getPaymentBadge(order.paymentStatus)}`}>
                     {order.paymentStatus || 'pending'}
                   </span>
                 </div>
 
                 {expandedOrder === order.id && (
-                  <div className="px-4 pb-4 border-t border-white/10 pt-4 space-y-4">
+                  <div className={`px-4 pb-4 border-t ${T.borderMd} pt-4 space-y-4`}>
                     <div>
                       <h4 className="text-[#D4AF37] font-semibold mb-2 text-sm">Items</h4>
                       <div className="space-y-1">
                         {order.items?.map((item, idx) => (
                           <div key={idx} className="space-y-0.5">
                             <div className="flex justify-between text-sm">
-                              <span className="text-white">{item.name} x{item.quantity}</span>
+                              <span className={`${T.heading}`}>{item.name} x{item.quantity}</span>
                               <span className="text-[#D4AF37]">{order.currencySymbol || cafeCurrency}{(item.price * item.quantity).toFixed(2)}</span>
                             </div>
                             {item.addons?.map((a, ai) => (
                               <div key={ai} className="flex justify-between text-xs pl-3">
-                                <span className="text-[#555]">↳ {a.name}</span>
-                                <span className="text-[#A3A3A3]">+{order.currencySymbol || cafeCurrency}{(a.price || 0).toFixed(2)}</span>
+                                <span className={`${T.faint}`}>↳ {a.name}</span>
+                                <span className={`${T.muted}`}>+{order.currencySymbol || cafeCurrency}{(a.price || 0).toFixed(2)}</span>
                               </div>
                             ))}
                           </div>
@@ -851,7 +853,7 @@ const OrdersManagement = () => {
                     {order.specialInstructions && (
                       <div className="p-3 bg-[#D4AF37]/10 border border-[#D4AF37]/30 rounded">
                         <p className="text-[#D4AF37] text-xs font-semibold mb-1">Special Instructions:</p>
-                        <p className="text-white text-sm">{order.specialInstructions}</p>
+                        <p className={`${T.body} text-sm`}>{order.specialInstructions}</p>
                       </div>
                     )}
 
@@ -859,7 +861,7 @@ const OrdersManagement = () => {
                       <select
                         value={order.orderStatus || 'new'}
                         onChange={(e) => updateOrderStatus(order.id, e.target.value)}
-                        className="flex-1 bg-black/40 border border-white/10 text-white rounded px-3 py-2 text-sm focus:border-[#D4AF37]"
+                        className={`flex-1 bg-black/40 border ${T.borderMd} text-white rounded px-3 py-2 text-sm focus:border-[#D4AF37]`}
                       >
                         <option value="new">New</option>
                         <option value="preparing">Preparing</option>
@@ -870,7 +872,7 @@ const OrdersManagement = () => {
                       <select
                         value={order.paymentStatus || 'pending'}
                         onChange={(e) => updatePaymentStatus(order.id, e.target.value)}
-                        className="flex-1 bg-black/40 border border-white/10 text-white rounded px-3 py-2 text-sm focus:border-[#D4AF37]"
+                        className={`flex-1 bg-black/40 border ${T.borderMd} text-white rounded px-3 py-2 text-sm focus:border-[#D4AF37]`}
                       >
                         <option value="pending">Pending</option>
                         <option value="paid">Paid</option>
@@ -891,7 +893,7 @@ const OrdersManagement = () => {
                           <button
                             onClick={(e) => handleDownloadInvoice(order.id, e)}
                             disabled={invoiceLoading === order.id}
-                            className="flex-1 flex items-center justify-center gap-2 py-2.5 bg-white/5 hover:bg-white/10 border border-white/10 text-[#A3A3A3] hover:text-white rounded text-sm font-medium transition-all disabled:opacity-50"
+                            className={`flex-1 flex items-center justify-center gap-2 py-2.5 ${T.subCard} hover:bg-white/10 border ${T.borderMd} text-[#A3A3A3] hover:text-white rounded text-sm font-medium transition-all disabled:opacity-50`}
                           >
                             <FileText className="w-4 h-4" />
                             PDF
@@ -922,7 +924,7 @@ const OrdersManagement = () => {
                           </button>
                         </>
                       ) : (
-                        <p className="text-[#555] text-xs italic py-2">
+                        <p className={`${T.faint} text-xs italic py-2`}>
                           Invoice generating… please wait.
                         </p>
                       )}
@@ -933,7 +935,7 @@ const OrdersManagement = () => {
             ))}
           </div>
 
-          <div className="text-center text-[#A3A3A3] text-sm">
+          <div className={`text-center ${T.muted} text-sm`}>
             Showing {filteredOrders.length} order{filteredOrders.length !== 1 ? 's' : ''} • Real-time updates enabled
           </div>
         </>

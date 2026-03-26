@@ -23,6 +23,7 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { generateAndSendReport, startDailyReportScheduler, stopDailyReportScheduler } from '../../services/whatsappReportService';
+import { useTheme } from '../../hooks/useTheme';
 
 // ─── helpers ──────────────────────────────────────────────────────────────────
 
@@ -90,7 +91,7 @@ const RecentOrderCard = React.memo(({ order, isNew, CUR }) => {
       className={`relative rounded-sm border overflow-hidden transition-colors duration-700 ${
         lit
           ? 'border-[#D4AF37]/50 bg-[#D4AF37]/5'
-          : 'border-white/5 bg-black/20 hover:border-white/8 hover:bg-black/30'
+          : '${T.border} ${T.innerCard} hover:border-white/8 hover:${T.innerCard}'
       }`}
       data-testid={`overview-order-${order.id}`}
     >
@@ -135,7 +136,7 @@ const RecentOrderCard = React.memo(({ order, isNew, CUR }) => {
         {/* Customer + meta */}
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-1.5 flex-wrap">
-            <span className="text-white font-semibold text-sm truncate">
+            <span className={`${T.heading} font-semibold text-sm truncate`}>
               {order.customerName || 'Guest'}
             </span>
             {src && (
@@ -147,7 +148,7 @@ const RecentOrderCard = React.memo(({ order, isNew, CUR }) => {
 
           <div className="flex items-center gap-2.5 mt-0.5 flex-wrap">
             {/* Table / order type */}
-            <span className="flex items-center gap-0.5 text-[#A3A3A3] text-xs">
+            <span className={`flex items-center gap-0.5 ${T.muted} text-xs`}>
               {order.orderType === 'dine-in' ? (
                 <><MapPin className="w-3 h-3" />{order.tableNumber ? `T${order.tableNumber}` : 'Dine-in'}</>
               ) : order.orderType === 'delivery' ? (
@@ -158,7 +159,7 @@ const RecentOrderCard = React.memo(({ order, isNew, CUR }) => {
             </span>
 
             {/* Items count */}
-            <span className="text-[#A3A3A3] text-xs">
+            <span className={`${T.muted} text-xs`}>
               {totalItems} item{totalItems !== 1 ? 's' : ''}
             </span>
 
@@ -166,11 +167,11 @@ const RecentOrderCard = React.memo(({ order, isNew, CUR }) => {
             <span className={`text-xs font-medium ${pay.cls}`}>{pay.label}</span>
 
             {/* Time — pushed right */}
-            <span className="text-[#555] text-xs ml-auto">{fmtTime(order.createdAt)}</span>
+            <span className={`${T.faint} text-xs ml-auto`}>{fmtTime(order.createdAt)}</span>
           </div>
 
           {/* Item names */}
-          <p className="text-[#555] text-xs mt-0.5 truncate">
+          <p className={`${T.faint} text-xs mt-0.5 truncate`}>
             {order.items?.slice(0, 3).map(i => `${i.name} ×${i.quantity}`).join(' · ')}
             {(order.items?.length ?? 0) > 3 && ` +${order.items.length - 3}`}
           </p>
@@ -207,6 +208,7 @@ const Overview = () => {
     cafeId ? [where('cafeId', '==', cafeId)] : []
   );
   const { data: cafe } = useDocument('cafes', cafeId);
+  const { T, isLight } = useTheme();
   const CUR = cafe?.currencySymbol || '₹';
 
   // ── Sound notification — plays once per genuinely new order ──────────────
@@ -356,14 +358,14 @@ const Overview = () => {
             <div
               key={stat.label}
               data-testid={`stat-${stat.label.toLowerCase().replace(/\s+/g, '-')}`}
-              className="bg-[#0F0F0F] border border-white/5 rounded-sm p-6 hover:border-white/10 transition-colors"
+              className={`${T.card} rounded-sm p-6 hover:${T.borderMd} transition-colors`}
               style={{ borderLeft: `3px solid ${stat.accent}22` }}
             >
               <div className="flex items-center justify-between mb-4">
-                <p className="text-[#A3A3A3] text-sm uppercase tracking-wide">{stat.label}</p>
+                <p className={`${T.muted} text-sm uppercase tracking-wide`}>{stat.label}</p>
                 <Icon className={`w-5 h-5 ${stat.color}`} />
               </div>
-              <p className="text-3xl font-bold text-white">{stat.value}</p>
+              <p className={`text-3xl font-bold ${T.heading}`}>{stat.value}</p>
             </div>
           );
         })}
@@ -374,7 +376,7 @@ const Overview = () => {
       {!showSummary && (
         <button
           onClick={() => setShowSummary(true)}
-          className="w-full flex items-center justify-center gap-2.5 py-3 bg-[#0F0F0F] border border-[#D4AF37]/20 hover:border-[#D4AF37]/40 hover:bg-[#D4AF37]/5 rounded-xl text-[#D4AF37] text-sm font-semibold transition-all duration-200 group"
+          className={`w-full flex items-center justify-center gap-2.5 py-3 ${T.card} border-[#D4AF37]/20 hover:border-[#D4AF37]/40 hover:bg-[#D4AF37]/5 rounded-xl text-[#D4AF37] text-sm font-semibold transition-all duration-200 group`}
         >
           <TrendingUp className="w-4 h-4 group-hover:scale-110 transition-transform" />
           View Today's Business Summary
@@ -412,20 +414,20 @@ const Overview = () => {
               animate={{ opacity: 1, y: 0, scale: 1    }}
               exit={{    opacity: 0, y: 8, scale: 0.99 }}
               transition={{ duration: 0.22 }}
-              className="bg-[#0F0F0F] border border-[#D4AF37]/20 rounded-xl overflow-hidden"
+              className={`${T.card} border-[#D4AF37]/20 rounded-xl overflow-hidden`}
             >
               {/* Header */}
-              <div className="flex items-center justify-between px-5 py-4 border-b border-white/5"
+              <div className={`flex items-center justify-between px-5 py-4 border-b ${T.border}`}
                 style={{ background:'linear-gradient(135deg, rgba(212,175,55,0.08), transparent)' }}>
                 <div className="flex items-center gap-3">
                   <div className="w-8 h-8 rounded-lg bg-[#D4AF37]/15 flex items-center justify-center">
                     <TrendingUp className="w-4 h-4 text-[#D4AF37]" />
                   </div>
                   <div>
-                    <h3 className="text-white font-bold text-sm" style={{ fontFamily:'Playfair Display,serif' }}>
+                    <h3 className={`${T.heading} font-bold text-sm`} style={{ fontFamily:'Playfair Display,serif' }}>
                       Today's Business Summary
                     </h3>
-                    <p className="text-[#555] text-xs">{new Date().toLocaleDateString('en-IN', { weekday:'long', day:'2-digit', month:'long' })}</p>
+                    <p className={`${T.faint} text-xs`}>{new Date().toLocaleDateString('en-IN', { weekday:'long', day:'2-digit', month:'long' })}</p>
                   </div>
                 </div>
                 <div className="flex items-center gap-3">
@@ -435,7 +437,7 @@ const Overview = () => {
                   {/* Collapse button */}
                   <button
                     onClick={() => setShowSummary(false)}
-                    className="w-7 h-7 rounded-lg flex items-center justify-center text-[#555] hover:text-white hover:bg-white/10 transition-all"
+                    className={`w-7 h-7 rounded-lg flex items-center justify-center text-[#555] hover:${T.heading} hover:bg-white/10 transition-all`}
                     title="Hide summary"
                   >
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="w-4 h-4">
@@ -447,24 +449,24 @@ const Overview = () => {
 
               <div className="p-5 grid grid-cols-2 sm:grid-cols-4 gap-4">
                 <div className="space-y-1">
-                  <p className="text-[#555] text-xs uppercase tracking-wide">Revenue</p>
+                  <p className={`${T.faint} text-xs uppercase tracking-wide`}>Revenue</p>
                   <p className="text-[#10B981] font-black text-xl">{CUR}{totalRev.toFixed(2)}</p>
-                  <p className="text-[#555] text-xs">{paid.length} paid orders</p>
+                  <p className={`${T.faint} text-xs`}>{paid.length} paid orders</p>
                 </div>
                 <div className="space-y-1">
-                  <p className="text-[#555] text-xs uppercase tracking-wide">Pending</p>
+                  <p className={`${T.faint} text-xs uppercase tracking-wide`}>Pending</p>
                   <p className="text-[#F59E0B] font-black text-xl">{pending.length}</p>
-                  <p className="text-[#555] text-xs">awaiting payment</p>
+                  <p className={`${T.faint} text-xs`}>awaiting payment</p>
                 </div>
                 <div className="space-y-1">
-                  <p className="text-[#555] text-xs uppercase tracking-wide">GST Collected</p>
+                  <p className={`${T.faint} text-xs uppercase tracking-wide`}>GST Collected</p>
                   <p className="text-[#8B5CF6] font-black text-xl">{CUR}{totalGST.toFixed(2)}</p>
-                  <p className="text-[#555] text-xs">incl. in revenue</p>
+                  <p className={`${T.faint} text-xs`}>incl. in revenue</p>
                 </div>
                 <div className="space-y-1">
-                  <p className="text-[#555] text-xs uppercase tracking-wide">Service Charge</p>
+                  <p className={`${T.faint} text-xs uppercase tracking-wide`}>Service Charge</p>
                   <p className="text-[#3B82F6] font-black text-xl">{CUR}{totalSC.toFixed(2)}</p>
-                  <p className="text-[#555] text-xs">collected today</p>
+                  <p className={`${T.faint} text-xs`}>collected today</p>
                 </div>
               </div>
 
@@ -472,27 +474,27 @@ const Overview = () => {
                 <div className="px-5 pb-5 grid grid-cols-1 sm:grid-cols-2 gap-4">
                   {topItems.length > 0 && (
                     <div className="bg-white/3 rounded-lg p-3">
-                      <p className="text-[#A3A3A3] text-xs uppercase tracking-wide mb-2 flex items-center gap-1">
+                      <p className={`${T.muted} text-xs uppercase tracking-wide mb-2 flex items-center gap-1`}>
                         🏆 Top Selling Items
                       </p>
                       {topItems.map(([name, qty], i) => (
-                        <div key={name} className="flex justify-between items-center py-1 text-xs border-b border-white/5 last:border-0">
-                          <span className="text-white flex items-center gap-1.5">
+                        <div key={name} className={`flex justify-between items-center py-1 text-xs border-b ${T.border} last:border-0`}>
+                          <span className={`${T.heading} flex items-center gap-1.5`}>
                             <span className="text-[#D4AF37] font-bold">{i+1}.</span>{name}
                           </span>
-                          <span className="text-[#A3A3A3]">{qty} sold</span>
+                          <span className={`${T.muted}`}>{qty} sold</span>
                         </div>
                       ))}
                     </div>
                   )}
                   {topCats.length > 0 && (
                     <div className="bg-white/3 rounded-lg p-3">
-                      <p className="text-[#A3A3A3] text-xs uppercase tracking-wide mb-2 flex items-center gap-1">
+                      <p className={`${T.muted} text-xs uppercase tracking-wide mb-2 flex items-center gap-1`}>
                         📊 Category Revenue
                       </p>
                       {topCats.map(([cat, rev], i) => (
-                        <div key={cat} className="flex justify-between items-center py-1 text-xs border-b border-white/5 last:border-0">
-                          <span className="text-white flex items-center gap-1.5">
+                        <div key={cat} className={`flex justify-between items-center py-1 text-xs border-b ${T.border} last:border-0`}>
+                          <span className={`${T.heading} flex items-center gap-1.5`}>
                             <span className="text-[#D4AF37] font-bold">{i+1}.</span>{cat}
                           </span>
                           <span className="text-[#10B981] font-semibold">{CUR}{rev.toFixed(2)}</span>
@@ -508,17 +510,17 @@ const Overview = () => {
       </AnimatePresence>
 
       {/* ── WhatsApp Daily Report Button ────────────────────────────────── */}
-      <div className="bg-[#0F0F0F] border border-white/5 rounded-sm px-5 py-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+      <div className={`${T.card} rounded-sm px-5 py-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3`}>
         <div>
-          <p className="text-white font-semibold text-sm">📊 Daily Analytics Report</p>
-          <p className="text-[#A3A3A3] text-xs mt-0.5">
+          <p className={`${T.heading} font-semibold text-sm`}>📊 Daily Analytics Report</p>
+          <p className={`${T.muted} text-xs mt-0.5`}>
             Auto-sends to WhatsApp at 11:00 PM · or send now manually
           </p>
         </div>
         <button
           onClick={handleSendReport}
           disabled={reportSending}
-          className="flex items-center gap-2 px-4 py-2 bg-green-600 hover:bg-green-700 text-white font-bold rounded-sm text-sm transition-all disabled:opacity-50 flex-shrink-0"
+          className={`flex items-center gap-2 px-4 py-2 bg-green-600 hover:bg-green-700 ${T.heading} font-bold rounded-sm text-sm transition-all disabled:opacity-50 flex-shrink-0`}
         >
           {reportSending
             ? <><RefreshCw className="w-4 h-4 animate-spin" /> Generating…</>
@@ -544,7 +546,7 @@ const Overview = () => {
                   ⚠ Low Stock — {lowStockItems.length} item{lowStockItems.length !== 1 ? 's' : ''} need restocking
                 </h4>
               </div>
-              <span className="text-[#A3A3A3] text-xs hidden sm:block">Dashboard → Inventory</span>
+              <span className={`${T.muted} text-xs hidden sm:block`}>Dashboard → Inventory</span>
             </div>
             <div className="flex flex-wrap gap-2">
               {lowStockItems.slice(0, 8).map(item => (
@@ -563,12 +565,12 @@ const Overview = () => {
       </AnimatePresence>
 
       {/* Recent Orders */}
-      <div className="bg-[#0F0F0F] border border-white/5 rounded-sm overflow-hidden">
+      <div className={`${T.card} rounded-sm overflow-hidden`}>
 
         {/* Header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-white/5">
+        <div className={`flex items-center justify-between px-6 py-4 border-b ${T.border}`}>
           <div className="flex items-center gap-3">
-            <h3 className="text-xl font-semibold text-white" style={{ fontFamily: 'Playfair Display, serif' }}>
+            <h3 className={`text-xl font-semibold ${T.heading}`} style={{ fontFamily: 'Playfair Display, serif' }}>
               Recent Orders
             </h3>
             <span className="flex items-center gap-1.5 px-2 py-0.5 bg-[#10B981]/10 border border-[#10B981]/20 rounded-full text-[#10B981] text-[10px] font-semibold uppercase tracking-wide">
@@ -590,7 +592,7 @@ const Overview = () => {
                 </motion.span>
               )}
             </AnimatePresence>
-            <span className="text-[#A3A3A3] text-xs">
+            <span className={`${T.muted} text-xs`}>
               Last {recentOrders.length} of {orders?.length ?? 0}
             </span>
           </div>
@@ -607,9 +609,9 @@ const Overview = () => {
             </div>
           ) : recentOrders.length === 0 ? (
             <div className="text-center py-12">
-              <ShoppingBag className="w-10 h-10 text-[#A3A3A3]/30 mx-auto mb-3" />
-              <p className="text-[#A3A3A3] text-sm">No orders yet</p>
-              <p className="text-[#555] text-xs mt-1">New orders will appear here instantly</p>
+              <ShoppingBag className={`w-10 h-10 ${T.muted}/30 mx-auto mb-3`} />
+              <p className={`${T.muted} text-sm`}>No orders yet</p>
+              <p className={`${T.faint} text-xs mt-1`}>New orders will appear here instantly</p>
             </div>
           ) : (
             <AnimatePresence mode="popLayout" initial={false}>
@@ -627,12 +629,12 @@ const Overview = () => {
 
         {/* Footer */}
         {!ordersLoading && recentOrders.length > 0 && (
-          <div className="px-6 py-3 border-t border-white/5 flex items-center justify-between">
-            <p className="text-[#555] text-xs flex items-center gap-1.5">
+          <div className={`px-6 py-3 border-t ${T.border} flex items-center justify-between`}>
+            <p className={`${T.faint} text-xs flex items-center gap-1.5`}>
               <span className="w-1.5 h-1.5 rounded-full bg-[#10B981] animate-pulse" />
               Updates instantly when new orders arrive
             </p>
-            <p className="text-[#555] text-xs">
+            <p className={`${T.faint} text-xs`}>
               Showing newest {recentOrders.length}
             </p>
           </div>

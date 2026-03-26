@@ -19,6 +19,7 @@ import {
   Flame, CheckCircle2, Clock, ArrowRight,
 } from 'lucide-react';
 import { toast } from 'sonner';
+import { useTheme } from '../../hooks/useTheme';
 
 // Status column config (same accent palette as KitchenDisplay)
 const COLS = [
@@ -37,6 +38,7 @@ const KitchenDashboardTab = () => {
 
   const { data: orders,  loading } = useCollection('orders', cafeId ? [where('cafeId', '==', cafeId)] : []);
   const { data: cafe              } = useDocument('cafes', cafeId);
+  const { T, isLight } = useTheme();
 
   // Kitchen URL — same cafeId used for the QR ordering page
   const kitchenUrl = cafeId ? `${window.location.origin}/kitchen/${cafeId}` : '';
@@ -81,16 +83,16 @@ const KitchenDashboardTab = () => {
     <div className="space-y-6">
 
       {/* ── Header card ─────────────────────────────────────────────────── */}
-      <div className="bg-[#0F0F0F] border border-white/5 rounded-sm p-6 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+      <div className={`${T.card} rounded-sm p-6 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4`}>
         <div className="flex items-center gap-4">
           <div className="w-12 h-12 rounded-lg bg-[#D4AF37]/10 flex items-center justify-center flex-shrink-0">
             <ChefHat className="w-6 h-6 text-[#D4AF37]" />
           </div>
           <div>
-            <h3 className="text-xl font-semibold text-white" style={{ fontFamily: 'Playfair Display, serif' }}>
+            <h3 className={`text-xl font-semibold ${T.heading}`} style={{ fontFamily: 'Playfair Display, serif' }}>
               Kitchen Display System
             </h3>
-            <p className="text-[#A3A3A3] text-sm mt-0.5">
+            <p className={`${T.muted} text-sm mt-0.5`}>
               Open this URL on your kitchen tablet for a full-screen live view.
             </p>
           </div>
@@ -107,12 +109,12 @@ const KitchenDashboardTab = () => {
       </div>
 
       {/* ── Kitchen URL copy strip ───────────────────────────────────────── */}
-      <div className="bg-[#0F0F0F] border border-white/5 rounded-sm px-4 py-3 flex items-center gap-3">
-        <span className="text-[#A3A3A3] text-xs flex-shrink-0">Kitchen URL:</span>
+      <div className={`${T.card} rounded-sm px-4 py-3 flex items-center gap-3`}>
+        <span className={`${T.muted} text-xs flex-shrink-0`}>Kitchen URL:</span>
         <code className="text-[#D4AF37] text-xs font-mono flex-1 truncate">{kitchenUrl}</code>
         <button
           onClick={() => { navigator.clipboard.writeText(kitchenUrl); toast.success('Kitchen URL copied!'); }}
-          className="text-[#A3A3A3] hover:text-white text-xs px-3 py-1 border border-white/10 rounded hover:border-white/20 transition-all flex-shrink-0"
+          className={`text-[#A3A3A3] hover:${T.body} text-xs px-3 py-1 border ${T.borderMd} rounded hover:border-white/20 transition-all flex-shrink-0`}
         >
           Copy
         </button>
@@ -125,7 +127,7 @@ const KitchenDashboardTab = () => {
           return (
             <div
               key={col.id}
-              className="bg-[#0F0F0F] border border-white/5 rounded-sm p-5 flex items-center gap-4"
+              className={`${T.card} rounded-sm p-5 flex items-center gap-4`}
               style={{ borderLeft: `3px solid ${col.accent}` }}
             >
               <div
@@ -138,7 +140,7 @@ const KitchenDashboardTab = () => {
                 <p className="text-3xl font-bold" style={{ color: col.accent }}>
                   {col.orders.length}
                 </p>
-                <p className="text-[#A3A3A3] text-xs uppercase tracking-wide">{col.label}</p>
+                <p className={`${T.muted} text-xs uppercase tracking-wide`}>{col.label}</p>
               </div>
             </div>
           );
@@ -147,13 +149,13 @@ const KitchenDashboardTab = () => {
 
       {/* ── Active order cards ───────────────────────────────────────────── */}
       {activeOrders.length === 0 ? (
-        <div className="bg-[#0F0F0F] border border-white/5 rounded-sm p-12 text-center">
-          <UtensilsCrossed className="w-12 h-12 text-[#A3A3A3] mx-auto mb-3" />
-          <p className="text-[#A3A3A3]">No active orders in the kitchen right now</p>
+        <div className={`${T.card} rounded-sm p-12 text-center`}>
+          <UtensilsCrossed className={`w-12 h-12 ${T.muted} mx-auto mb-3`} />
+          <p className={`${T.muted}`}>No active orders in the kitchen right now</p>
         </div>
       ) : (
         <div className="space-y-3">
-          <h4 className="text-white font-semibold text-sm uppercase tracking-wide text-[#A3A3A3]">
+          <h4 className={`${T.heading} font-semibold text-sm uppercase tracking-wide text-[#A3A3A3]`}>
             Active Orders — {activeOrders.length} total
           </h4>
           <AnimatePresence mode="popLayout">
@@ -175,7 +177,7 @@ const KitchenDashboardTab = () => {
                   initial={{ opacity: 0, y: 10 }}
                   animate={{ opacity: 1, y: 0  }}
                   exit={{    opacity: 0, y: -6  }}
-                  className="bg-[#0F0F0F] border border-white/5 rounded-sm overflow-hidden flex items-stretch"
+                  className={`${T.card} rounded-sm overflow-hidden flex items-stretch`}
                 >
                   {/* Status colour bar */}
                   <div className="w-1 flex-shrink-0" style={{ backgroundColor: colMeta.accent }} />
@@ -187,7 +189,7 @@ const KitchenDashboardTab = () => {
                         #{order.orderNumber ? String(order.orderNumber).padStart(3,'0') : order.id.slice(0,6)}
                       </span>
                       {order.tableNumber && (
-                        <span className="text-xs text-[#A3A3A3]">T{order.tableNumber}</span>
+                        <span className={`text-xs ${T.muted}`}>T{order.tableNumber}</span>
                       )}
                     </div>
 
@@ -201,7 +203,7 @@ const KitchenDashboardTab = () => {
                     </span>
 
                     {/* Items summary */}
-                    <div className="flex-1 text-sm text-[#A3A3A3] truncate">
+                    <div className={`flex-1 text-sm ${T.muted} truncate`}>
                       {order.items?.map(i => `${i.name} ×${i.quantity}`).join(' · ')}
                     </div>
 

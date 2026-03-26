@@ -181,17 +181,42 @@ const Settings = () => {
   const getPreviewColors = () => {
     const isLight = settings.mode === 'light';
     return {
-      background: isLight ? '#ffffff' : '#0f0f0f',
-      backgroundSecondary: isLight ? '#f5f5f5' : '#1a1a1a',
-      text: isLight ? '#111111' : '#ffffff',
-      textMuted: isLight ? '#666666' : '#a3a3a3',
-      primary: settings.primaryColor,
-      cardBg: isLight ? '#ffffff' : '#151515',
-      border: isLight ? '#e5e5e5' : '#2a2a2a'
+      background:          isLight ? '#ffffff'  : '#0f0f0f',
+      backgroundSecondary: isLight ? '#f5f5f5'  : '#1a1a1a',
+      text:                isLight ? '#111111'  : '#ffffff',
+      textMuted:           isLight ? '#666666'  : '#a3a3a3',
+      primary:             settings.primaryColor,
+      cardBg:              isLight ? '#ffffff'  : '#151515',
+      border:              isLight ? '#e5e5e5'  : '#2a2a2a',
     };
   };
 
   const colors = getPreviewColors();
+  const isLight = settings.mode === 'light';
+
+  // ── Dynamic class strings — switch every element between light and dark ──────
+  // Used throughout the JSX below so theme changes reflect instantly on save,
+  // with no dependency on CSS specificity or deployment timing.
+  const T = {
+    card:        isLight ? 'bg-white border border-[#E5E5E5]'         : 'bg-[#0F0F0F] border border-white/5',
+    heading:     isLight ? 'text-[#111111]'                            : 'text-white',
+    label:       isLight ? 'text-[#1A1A1A]'                           : 'text-white',
+    muted:       isLight ? 'text-[#666666]'                           : 'text-[#A3A3A3]',
+    faint:       isLight ? 'text-[#999999]'                           : 'text-[#555]',
+    input:       isLight
+      ? 'bg-white border border-[#CCCCCC] text-[#111111] placeholder:text-[#999999] focus:border-[#D4AF37] focus:ring-1 focus:ring-[#D4AF37]'
+      : 'bg-black/20 border border-white/10 text-white placeholder:text-neutral-600 focus:border-[#D4AF37] focus:ring-1 focus:ring-[#D4AF37]',
+    select:      isLight
+      ? 'bg-white border border-[#CCCCCC] text-[#111111] focus:border-[#D4AF37] focus:ring-1 focus:ring-[#D4AF37]'
+      : 'bg-black/20 border border-white/10 text-white focus:border-[#D4AF37] focus:ring-1 focus:ring-[#D4AF37]',
+    option:      isLight ? 'bg-white text-[#111111]'                  : 'bg-[#0F0F0F] text-white',
+    toggleOff:   isLight ? 'bg-[#CCCCCC]'                             : 'bg-white/10',
+    divider:     isLight ? 'border-[#E5E5E5]'                         : 'border-white/5',
+    subCard:     isLight ? 'bg-[#F5F3EE] border border-[#E5E5E5]'     : 'bg-white/3 border border-white/5',
+    fileInput:   isLight
+      ? 'bg-white border border-[#CCCCCC] text-[#111111]'
+      : 'bg-black/20 border border-white/10 text-white',
+  };
 
   if (loading) {
     return (
@@ -204,41 +229,41 @@ const Settings = () => {
   return (
     <div className="space-y-6">
       {/* Cafe Information */}
-      <div className="bg-[#0F0F0F] border border-white/5 rounded-sm p-6">
-        <h3 className="text-xl font-semibold text-white mb-6" style={{ fontFamily: 'Playfair Display, serif' }}>
+      <div className={`${T.card} rounded-sm p-6`}>
+        <h3 className={`text-xl font-semibold mb-6 ${T.heading}`} style={{ fontFamily: 'Playfair Display, serif' }}>
           Café Information
         </h3>
 
         <div className="space-y-4">
           <div>
-            <label className="block text-white text-sm font-medium mb-2">Café Name</label>
+            <label className={`block text-sm font-medium mb-2 ${T.label}`}>Café Name</label>
             <input
               type="text"
               data-testid="settings-cafe-name"
               value={settings.name}
               onChange={(e) => setSettings(prev => ({ ...prev, name: e.target.value }))}
-              className="w-full bg-black/20 border border-white/10 text-white placeholder:text-neutral-600 focus:border-[#D4AF37] focus:ring-1 focus:ring-[#D4AF37] rounded-sm h-12 px-4 transition-all"
+              className={`w-full rounded-sm h-12 px-4 transition-all ${T.input}`}
               placeholder="e.g., Downtown Coffee"
             />
           </div>
 
           <div>
-            <label className="block text-white text-sm font-medium mb-2">Tagline (Optional)</label>
+            <label className={`block text-sm font-medium mb-2 ${T.label}`}>Tagline (Optional)</label>
             <input
               type="text"
               data-testid="settings-tagline"
               value={settings.tagline}
               onChange={(e) => setSettings(prev => ({ ...prev, tagline: e.target.value }))}
-              className="w-full bg-black/20 border border-white/10 text-white placeholder:text-neutral-600 focus:border-[#D4AF37] focus:ring-1 focus:ring-[#D4AF37] rounded-sm h-12 px-4 transition-all"
+              className={`w-full rounded-sm h-12 px-4 transition-all ${T.input}`}
               placeholder="e.g., Crafted with love, served with joy"
             />
           </div>
 
           <div>
-            <label className="block text-white text-sm font-medium mb-2">Logo</label>
+            <label className={`block text-sm font-medium mb-2 ${T.label}`}>Logo</label>
             <div className="space-y-3">
               {settings.logo && (
-                <div className="w-24 h-24 rounded-sm overflow-hidden border border-white/10">
+                <div className={`w-24 h-24 rounded-sm overflow-hidden border ${T.divider}`}>
                   <img src={settings.logo} alt="Logo" className="w-full h-full object-cover" />
                 </div>
               )}
@@ -247,7 +272,7 @@ const Settings = () => {
                 accept="image/*"
                 data-testid="settings-logo-upload"
                 onChange={handleLogoUpload}
-                className="w-full bg-black/20 border border-white/10 text-white rounded-sm px-4 py-3 file:mr-4 file:py-2 file:px-4 file:rounded-sm file:border-0 file:bg-[#D4AF37] file:text-black file:font-semibold hover:file:bg-[#C5A059] transition-all"
+                className={`w-full rounded-sm px-4 py-3 file:mr-4 file:py-2 file:px-4 file:rounded-sm file:border-0 file:bg-[#D4AF37] file:text-black file:font-semibold hover:file:bg-[#C5A059] transition-all ${T.fileInput}`}
               />
             </div>
           </div>
@@ -255,33 +280,33 @@ const Settings = () => {
       </div>
 
       {/* Contact Settings */}
-      <div className="bg-[#0F0F0F] border border-white/5 rounded-sm p-6">
-        <h3 className="text-xl font-semibold text-white mb-6" style={{ fontFamily: 'Playfair Display, serif' }}>
+      <div className={`${T.card} rounded-sm p-6`}>
+        <h3 className={`text-xl font-semibold mb-6 ${T.heading}`} style={{ fontFamily: 'Playfair Display, serif' }}>
           Contact & Payment Settings
         </h3>
 
         <div className="space-y-4">
           <div>
-            <label className="block text-white text-sm font-medium mb-2">WhatsApp Number</label>
+            <label className={`block text-sm font-medium mb-2 ${T.label}`}>WhatsApp Number</label>
             <input
               type="tel"
               data-testid="settings-whatsapp"
               value={settings.whatsappNumber}
               onChange={(e) => setSettings(prev => ({ ...prev, whatsappNumber: e.target.value }))}
-              className="w-full bg-black/20 border border-white/10 text-white placeholder:text-neutral-600 focus:border-[#D4AF37] focus:ring-1 focus:ring-[#D4AF37] rounded-sm h-12 px-4 transition-all"
+              className={`w-full rounded-sm h-12 px-4 transition-all ${T.input}`}
               placeholder="+919876543210 (with country code)"
             />
-            <p className="text-[#A3A3A3] text-xs mt-2">Orders will be sent to this WhatsApp number</p>
+            <p className={`text-xs mt-2 ${T.muted}`}>Orders will be sent to this WhatsApp number</p>
           </div>
 
           <div>
-            <label className="block text-white text-sm font-medium mb-2">UPI ID (for prepaid orders)</label>
+            <label className={`block text-sm font-medium mb-2 ${T.label}`}>UPI ID (for prepaid orders)</label>
             <input
               type="text"
               data-testid="settings-upi"
               value={settings.upiId}
               onChange={(e) => setSettings(prev => ({ ...prev, upiId: e.target.value }))}
-              className="w-full bg-black/20 border border-white/10 text-white placeholder:text-neutral-600 focus:border-[#D4AF37] focus:ring-1 focus:ring-[#D4AF37] rounded-sm h-12 px-4 transition-all"
+              className={`w-full rounded-sm h-12 px-4 transition-all ${T.input}`}
               placeholder="merchant@upi"
             />
           </div>
@@ -289,8 +314,8 @@ const Settings = () => {
       </div>
 
       {/* NEW: Billing Settings */}
-      <div className="bg-[#0F0F0F] border border-white/5 rounded-sm p-6">
-        <h3 className="text-xl font-semibold text-white mb-6" style={{ fontFamily: 'Playfair Display, serif' }}>
+      <div className={`${T.card} rounded-sm p-6`}>
+        <h3 className={`text-xl font-semibold mb-6 ${T.heading}`} style={{ fontFamily: 'Playfair Display, serif' }}>
           Billing Settings
         </h3>
 
@@ -298,14 +323,14 @@ const Settings = () => {
           {/* GST Toggle */}
           <div className="flex items-center justify-between">
             <div>
-              <label className="block text-white text-sm font-medium">Enable GST Billing</label>
-              <p className="text-[#A3A3A3] text-xs mt-1">Apply GST tax to all customer orders</p>
+              <label className={`block text-sm font-medium ${T.label}`}>Enable GST Billing</label>
+              <p className={`text-xs mt-1 ${T.muted}`}>Apply GST tax to all customer orders</p>
             </div>
             <button
               type="button"
               onClick={() => setSettings(prev => ({ ...prev, gstEnabled: !prev.gstEnabled }))}
               className={`relative inline-flex h-7 w-12 items-center rounded-full transition-colors duration-200 focus:outline-none ${
-                settings.gstEnabled ? 'bg-[#D4AF37]' : 'bg-white/10'
+                settings.gstEnabled ? 'bg-[#D4AF37]' : T.toggleOff
               }`}
             >
               <span
@@ -320,7 +345,7 @@ const Settings = () => {
           {settings.gstEnabled && (
             <>
               <div>
-                <label className="block text-white text-sm font-medium mb-2">GST Rate (%)</label>
+                <label className={`block text-sm font-medium mb-2 ${T.label}`}>GST Rate (%)</label>
                 <input
                   type="number"
                   min="0"
@@ -328,19 +353,19 @@ const Settings = () => {
                   step="0.01"
                   value={settings.gstRate}
                   onChange={(e) => setSettings(prev => ({ ...prev, gstRate: e.target.value }))}
-                  className="w-full bg-black/20 border border-white/10 text-white placeholder:text-neutral-600 focus:border-[#D4AF37] focus:ring-1 focus:ring-[#D4AF37] rounded-sm h-12 px-4 transition-all"
+                  className={`w-full rounded-sm h-12 px-4 transition-all ${T.input}`}
                   placeholder="e.g., 5"
                 />
-                <p className="text-[#A3A3A3] text-xs mt-2">Common GST rates: 5%, 12%, 18%</p>
+                <p className={`text-xs mt-2 ${T.muted}`}>Common GST rates: 5%, 12%, 18%</p>
               </div>
 
               <div>
-                <label className="block text-white text-sm font-medium mb-2">GST Number (Optional)</label>
+                <label className={`block text-sm font-medium mb-2 ${T.label}`}>GST Number (Optional)</label>
                 <input
                   type="text"
                   value={settings.gstNumber}
                   onChange={(e) => setSettings(prev => ({ ...prev, gstNumber: e.target.value }))}
-                  className="w-full bg-black/20 border border-white/10 text-white placeholder:text-neutral-600 focus:border-[#D4AF37] focus:ring-1 focus:ring-[#D4AF37] rounded-sm h-12 px-4 transition-all"
+                  className={`w-full rounded-sm h-12 px-4 transition-all ${T.input}`}
                   placeholder="e.g., 27AAPFU0939F1ZV"
                 />
               </div>
@@ -351,12 +376,12 @@ const Settings = () => {
 
 
       {/* Currency Settings */}
-      <div className="bg-[#0F0F0F] border border-white/5 rounded-sm p-6">
-        <h3 className="text-xl font-semibold text-white mb-6" style={{ fontFamily: 'Playfair Display, serif' }}>
+      <div className={`${T.card} rounded-sm p-6`}>
+        <h3 className={`text-xl font-semibold mb-6 ${T.heading}`} style={{ fontFamily: 'Playfair Display, serif' }}>
           Currency Settings
         </h3>
         <div>
-          <label className="block text-white text-sm font-medium mb-2">Currency</label>
+          <label className={`block text-sm font-medium mb-2 ${T.label}`}>Currency</label>
           <select
             value={settings.currencyCode}
             onChange={(e) => {
@@ -369,37 +394,37 @@ const Settings = () => {
                 currencySymbol: options[e.target.value] || '₹'
               }));
             }}
-            className="w-full bg-black/20 border border-white/10 text-white focus:border-[#D4AF37] focus:ring-1 focus:ring-[#D4AF37] rounded-sm h-12 px-4 transition-all"
+            className={`w-full rounded-sm h-12 px-4 transition-all ${T.select}`}
           >
-            <option value="INR" className="bg-[#0F0F0F]">INR (₹) — Indian Rupee</option>
-            <option value="USD" className="bg-[#0F0F0F]">USD ($) — US Dollar</option>
-            <option value="EUR" className="bg-[#0F0F0F]">EUR (€) — Euro</option>
-            <option value="GBP" className="bg-[#0F0F0F]">GBP (£) — British Pound</option>
-            <option value="AED" className="bg-[#0F0F0F]">AED (د.إ) — UAE Dirham</option>
-            <option value="AUD" className="bg-[#0F0F0F]">AUD ($) — Australian Dollar</option>
+            <option value="INR" className={T.option}>INR (₹) — Indian Rupee</option>
+            <option value="USD" className={T.option}>USD ($) — US Dollar</option>
+            <option value="EUR" className={T.option}>EUR (€) — Euro</option>
+            <option value="GBP" className={T.option}>GBP (£) — British Pound</option>
+            <option value="AED" className={T.option}>AED (د.إ) — UAE Dirham</option>
+            <option value="AUD" className={T.option}>AUD ($) — Australian Dollar</option>
           </select>
-          <p className="text-[#A3A3A3] text-xs mt-2">
+          <p className={`text-xs mt-2 ${T.muted}`}>
             Selected: {settings.currencyCode} — Symbol: {settings.currencySymbol}
           </p>
         </div>
       </div>
 
       {/* Tax Settings */}
-      <div className="bg-[#0F0F0F] border border-white/5 rounded-sm p-6">
-        <h3 className="text-xl font-semibold text-white mb-6" style={{ fontFamily: 'Playfair Display, serif' }}>
+      <div className={`${T.card} rounded-sm p-6`}>
+        <h3 className={`text-xl font-semibold mb-6 ${T.heading}`} style={{ fontFamily: 'Playfair Display, serif' }}>
           Tax Settings
         </h3>
         <div className="space-y-4">
           <div className="flex items-center justify-between">
             <div>
-              <label className="block text-white text-sm font-medium">Enable Tax</label>
-              <p className="text-[#A3A3A3] text-xs mt-1">Apply tax to all customer orders</p>
+              <label className={`block text-sm font-medium ${T.label}`}>Enable Tax</label>
+              <p className={`text-xs mt-1 ${T.muted}`}>Apply tax to all customer orders</p>
             </div>
             <button
               type="button"
               onClick={() => setSettings(prev => ({ ...prev, taxEnabled: !prev.taxEnabled }))}
               className={`relative inline-flex h-7 w-12 items-center rounded-full transition-colors duration-200 focus:outline-none ${
-                settings.taxEnabled ? 'bg-[#D4AF37]' : 'bg-white/10'
+                settings.taxEnabled ? 'bg-[#D4AF37]' : T.toggleOff
               }`}
             >
               <span className={`inline-block h-5 w-5 transform rounded-full bg-white shadow transition-transform duration-200 ${
@@ -410,17 +435,17 @@ const Settings = () => {
           {settings.taxEnabled && (
             <>
               <div>
-                <label className="block text-white text-sm font-medium mb-2">Tax Name</label>
+                <label className={`block text-sm font-medium mb-2 ${T.label}`}>Tax Name</label>
                 <input
                   type="text"
                   value={settings.taxName}
                   onChange={(e) => setSettings(prev => ({ ...prev, taxName: e.target.value }))}
-                  className="w-full bg-black/20 border border-white/10 text-white placeholder:text-neutral-600 focus:border-[#D4AF37] focus:ring-1 focus:ring-[#D4AF37] rounded-sm h-12 px-4 transition-all"
+                  className={`w-full rounded-sm h-12 px-4 transition-all ${T.input}`}
                   placeholder="e.g., GST, VAT, Sales Tax"
                 />
               </div>
               <div>
-                <label className="block text-white text-sm font-medium mb-2">Tax Percentage (%)</label>
+                <label className={`block text-sm font-medium mb-2 ${T.label}`}>Tax Percentage (%)</label>
                 <input
                   type="number"
                   min="0"
@@ -428,7 +453,7 @@ const Settings = () => {
                   step="0.01"
                   value={settings.taxRate}
                   onChange={(e) => setSettings(prev => ({ ...prev, taxRate: e.target.value }))}
-                  className="w-full bg-black/20 border border-white/10 text-white placeholder:text-neutral-600 focus:border-[#D4AF37] focus:ring-1 focus:ring-[#D4AF37] rounded-sm h-12 px-4 transition-all"
+                  className={`w-full rounded-sm h-12 px-4 transition-all ${T.input}`}
                   placeholder="e.g., 10"
                 />
               </div>
@@ -438,21 +463,21 @@ const Settings = () => {
       </div>
 
       {/* Service Charge Settings */}
-      <div className="bg-[#0F0F0F] border border-white/5 rounded-sm p-6">
-        <h3 className="text-xl font-semibold text-white mb-6" style={{ fontFamily: 'Playfair Display, serif' }}>
+      <div className={`${T.card} rounded-sm p-6`}>
+        <h3 className={`text-xl font-semibold mb-6 ${T.heading}`} style={{ fontFamily: 'Playfair Display, serif' }}>
           Service Charge
         </h3>
         <div className="space-y-4">
           <div className="flex items-center justify-between">
             <div>
-              <label className="block text-white text-sm font-medium">Enable Service Charge</label>
-              <p className="text-[#A3A3A3] text-xs mt-1">Add a service charge to all orders</p>
+              <label className={`block text-sm font-medium ${T.label}`}>Enable Service Charge</label>
+              <p className={`text-xs mt-1 ${T.muted}`}>Add a service charge to all orders</p>
             </div>
             <button
               type="button"
               onClick={() => setSettings(prev => ({ ...prev, serviceChargeEnabled: !prev.serviceChargeEnabled }))}
               className={`relative inline-flex h-7 w-12 items-center rounded-full transition-colors duration-200 focus:outline-none ${
-                settings.serviceChargeEnabled ? 'bg-[#D4AF37]' : 'bg-white/10'
+                settings.serviceChargeEnabled ? 'bg-[#D4AF37]' : T.toggleOff
               }`}
             >
               <span className={`inline-block h-5 w-5 transform rounded-full bg-white shadow transition-transform duration-200 ${
@@ -462,7 +487,7 @@ const Settings = () => {
           </div>
           {settings.serviceChargeEnabled && (
             <div>
-              <label className="block text-white text-sm font-medium mb-2">Service Charge Percentage (%)</label>
+              <label className={`block text-sm font-medium mb-2 ${T.label}`}>Service Charge Percentage (%)</label>
               <input
                 type="number"
                 min="0"
@@ -470,7 +495,7 @@ const Settings = () => {
                 step="0.01"
                 value={settings.serviceChargeRate}
                 onChange={(e) => setSettings(prev => ({ ...prev, serviceChargeRate: e.target.value }))}
-                className="w-full bg-black/20 border border-white/10 text-white placeholder:text-neutral-600 focus:border-[#D4AF37] focus:ring-1 focus:ring-[#D4AF37] rounded-sm h-12 px-4 transition-all"
+                className={`w-full rounded-sm h-12 px-4 transition-all ${T.input}`}
                 placeholder="e.g., 10"
               />
             </div>
@@ -479,21 +504,21 @@ const Settings = () => {
       </div>
 
       {/* Platform Fee Settings */}
-      <div className="bg-[#0F0F0F] border border-white/5 rounded-sm p-6">
-        <h3 className="text-xl font-semibold text-white mb-6" style={{ fontFamily: 'Playfair Display, serif' }}>
+      <div className={`${T.card} rounded-sm p-6`}>
+        <h3 className={`text-xl font-semibold mb-6 ${T.heading}`} style={{ fontFamily: 'Playfair Display, serif' }}>
           Platform Fee
         </h3>
         <div className="space-y-4">
           <div className="flex items-center justify-between">
             <div>
-              <label className="block text-white text-sm font-medium">Enable Platform Fee</label>
-              <p className="text-[#A3A3A3] text-xs mt-1">Add a fixed platform fee to every order</p>
+              <label className={`block text-sm font-medium ${T.label}`}>Enable Platform Fee</label>
+              <p className={`text-xs mt-1 ${T.muted}`}>Add a fixed platform fee to every order</p>
             </div>
             <button
               type="button"
               onClick={() => setSettings(prev => ({ ...prev, platformFeeEnabled: !prev.platformFeeEnabled }))}
               className={`relative inline-flex h-7 w-12 items-center rounded-full transition-colors duration-200 focus:outline-none ${
-                settings.platformFeeEnabled ? 'bg-[#D4AF37]' : 'bg-white/10'
+                settings.platformFeeEnabled ? 'bg-[#D4AF37]' : T.toggleOff
               }`}
             >
               <span className={`inline-block h-5 w-5 transform rounded-full bg-white shadow transition-transform duration-200 ${
@@ -503,14 +528,14 @@ const Settings = () => {
           </div>
           {settings.platformFeeEnabled && (
             <div>
-              <label className="block text-white text-sm font-medium mb-2">Platform Fee Amount (₹)</label>
+              <label className={`block text-sm font-medium mb-2 ${T.label}`}>Platform Fee Amount (₹)</label>
               <input
                 type="number"
                 min="0"
                 step="1"
                 value={settings.platformFeeAmount}
                 onChange={(e) => setSettings(prev => ({ ...prev, platformFeeAmount: e.target.value }))}
-                className="w-full bg-black/20 border border-white/10 text-white placeholder:text-neutral-600 focus:border-[#D4AF37] focus:ring-1 focus:ring-[#D4AF37] rounded-sm h-12 px-4 transition-all"
+                className={`w-full rounded-sm h-12 px-4 transition-all ${T.input}`}
                 placeholder="e.g., 20"
               />
               <p className="text-[#A3A3A3] text-xs mt-1.5">Fixed amount added to every order total</p>
@@ -520,15 +545,15 @@ const Settings = () => {
       </div>
 
       {/* NEW: Appearance Settings */}
-      <div className="bg-[#0F0F0F] border border-white/5 rounded-sm p-6">
-        <h3 className="text-xl font-semibold text-white mb-6" style={{ fontFamily: 'Playfair Display, serif' }}>
+      <div className={`${T.card} rounded-sm p-6`}>
+        <h3 className={`text-xl font-semibold mb-6 ${T.heading}`} style={{ fontFamily: 'Playfair Display, serif' }}>
           Appearance Settings
         </h3>
 
         <div className="space-y-6">
           {/* Mode Selection */}
           <div>
-            <label className="block text-white text-sm font-medium mb-3">Mode</label>
+            <label className={`block text-sm font-medium mb-3 ${T.label}`}>Mode</label>
             <div className="flex gap-3">
               <button
                 type="button"
@@ -561,7 +586,7 @@ const Settings = () => {
 
           {/* Primary Brand Color */}
           <div>
-            <label className="block text-white text-sm font-medium mb-3">Primary Brand Color</label>
+            <label className={`block text-sm font-medium mb-3 ${T.label}`}>Primary Brand Color</label>
             <div className="flex items-center gap-4">
               <div className="relative">
                 <input
@@ -588,18 +613,18 @@ const Settings = () => {
                       setSettings(prev => ({ ...prev, primaryColor: val }));
                     }
                   }}
-                  className="w-full bg-black/20 border border-white/10 text-white rounded-sm h-12 px-4 font-mono uppercase"
+                  className={`w-full rounded-sm h-12 px-4 font-mono uppercase ${T.input}`}
                   placeholder="#D4AF37"
                   maxLength={7}
                 />
               </div>
             </div>
-            <p className="text-[#A3A3A3] text-xs mt-2">This color will be used for buttons, highlights, and accents on your ordering page.</p>
+            <p className={`text-xs mt-2 ${T.muted}`}>This color will be used for buttons, highlights, and accents on your ordering page.</p>
           </div>
 
           {/* Quick Color Presets */}
           <div>
-            <label className="block text-white text-sm font-medium mb-3">Quick Presets</label>
+            <label className={`block text-sm font-medium mb-3 ${T.label}`}>Quick Presets</label>
             <div className="flex flex-wrap gap-2">
               {[
                 { color: '#D4AF37', name: 'Gold' },
@@ -630,15 +655,15 @@ const Settings = () => {
       </div>
 
       {/* Live Preview */}
-      <div className="bg-[#0F0F0F] border border-white/5 rounded-sm p-6">
-        <h3 className="text-xl font-semibold text-white mb-6" style={{ fontFamily: 'Playfair Display, serif' }}>
+      <div className={`${T.card} rounded-sm p-6`}>
+        <h3 className={`text-xl font-semibold mb-6 ${T.heading}`} style={{ fontFamily: 'Playfair Display, serif' }}>
           Live Preview
         </h3>
         <p className="text-[#A3A3A3] text-sm mb-4">This is how your ordering page will look to customers.</p>
 
         {/* Preview Container */}
         <div 
-          className="rounded-lg overflow-hidden border-2 border-white/10"
+          className={`rounded-lg overflow-hidden border-2 ${T.divider}`}
           style={{ backgroundColor: colors.background }}
         >
           {/* Preview Header */}
@@ -748,7 +773,7 @@ const Settings = () => {
       </div>
 
       {/* ── Feature 3: Payment Settings ── */}
-      <div className="bg-[#0F0F0F] border border-white/5 rounded-sm p-6">
+      <div className={`${T.card} rounded-sm p-6`}>
         <div className="flex items-center gap-3 mb-6">
           <div className="w-9 h-9 rounded-lg bg-[#D4AF37]/10 flex items-center justify-center">
             <CreditCard className="w-5 h-5 text-[#D4AF37]" />
@@ -761,10 +786,10 @@ const Settings = () => {
         <div className="space-y-5">
 
           {/* Enable Online Payments toggle */}
-          <div className="flex items-center justify-between p-4 bg-black/20 rounded-sm border border-white/5">
+          <div className={`flex items-center justify-between p-4 rounded-sm ${T.subCard}`}>
             <div>
-              <p className="text-white font-medium">Enable Online Payments</p>
-              <p className="text-[#A3A3A3] text-xs mt-0.5">
+              <p className={`font-medium ${T.label}`}>Enable Online Payments</p>
+              <p className={`text-xs mt-0.5 ${T.muted}`}>
                 Allow customers to pay online via Razorpay at checkout
               </p>
             </div>
@@ -773,7 +798,7 @@ const Settings = () => {
               data-testid="payment-enabled-toggle"
               onClick={() => setPaymentSettings(prev => ({ ...prev, enabled: !prev.enabled }))}
               className={`relative inline-flex h-7 w-12 items-center rounded-full transition-colors duration-200 focus:outline-none ${
-                paymentSettings.enabled ? 'bg-[#D4AF37]' : 'bg-white/10'
+                paymentSettings.enabled ? 'bg-[#D4AF37]' : T.toggleOff
               }`}
             >
               <span
@@ -812,25 +837,25 @@ const Settings = () => {
 
               {/* Payment Gateway selector */}
               <div>
-                <label className="block text-white text-sm font-medium mb-2">
+                <label className={`block text-sm font-medium mb-2 ${T.label}`}>
                   Payment Gateway
                 </label>
                 <select
                   data-testid="payment-gateway-select"
                   value={paymentSettings.gateway}
                   onChange={(e) => setPaymentSettings(prev => ({ ...prev, gateway: e.target.value, keyId:'', keySecret:'' }))}
-                  className="w-full bg-black/20 border border-white/10 text-white focus:border-[#D4AF37] focus:ring-1 focus:ring-[#D4AF37] rounded-sm h-12 px-4 transition-all"
+                  className={`w-full rounded-sm h-12 px-4 transition-all ${T.select}`}
                 >
-                  <option value="razorpay" className="bg-[#0F0F0F]">Razorpay</option>
-                  <option value="cashfree" className="bg-[#0F0F0F]">Cashfree</option>
-                  <option value="stripe"   className="bg-[#0F0F0F]">Stripe (coming soon)</option>
-                  <option value="paytm"    className="bg-[#0F0F0F]">Paytm (coming soon)</option>
+                  <option value="razorpay" className={T.option}>Razorpay</option>
+                  <option value="cashfree" className={T.option}>Cashfree</option>
+                  <option value="stripe"   className={T.option}>Stripe (coming soon)</option>
+                  <option value="paytm"    className={T.option}>Paytm (coming soon)</option>
                 </select>
               </div>
 
               {/* Merchant Name */}
               <div>
-                <label className="block text-white text-sm font-medium mb-2">
+                <label className={`block text-sm font-medium mb-2 ${T.label}`}>
                   Merchant Name
                   <span className="text-[#A3A3A3] font-normal ml-1 text-xs">(shown on payment popup)</span>
                 </label>
@@ -840,24 +865,24 @@ const Settings = () => {
                   value={paymentSettings.merchantName}
                   onChange={(e) => setPaymentSettings(prev => ({ ...prev, merchantName: e.target.value }))}
                   placeholder="e.g., Downtown Coffee"
-                  className="w-full bg-black/20 border border-white/10 text-white placeholder:text-neutral-600 focus:border-[#D4AF37] focus:ring-1 focus:ring-[#D4AF37] rounded-sm h-12 px-4 transition-all"
+                  className={`w-full rounded-sm h-12 px-4 transition-all ${T.input}`}
                 />
               </div>
 
               {/* Currency */}
               <div>
-                <label className="block text-white text-sm font-medium mb-2">Currency</label>
+                <label className={`block text-sm font-medium mb-2 ${T.label}`}>Currency</label>
                 <select
                   data-testid="payment-currency-select"
                   value={paymentSettings.currency}
                   onChange={(e) => setPaymentSettings(prev => ({ ...prev, currency: e.target.value }))}
-                  className="w-full bg-black/20 border border-white/10 text-white focus:border-[#D4AF37] focus:ring-1 focus:ring-[#D4AF37] rounded-sm h-12 px-4 transition-all"
+                  className={`w-full rounded-sm h-12 px-4 transition-all ${T.select}`}
                 >
-                  <option value="INR" className="bg-[#0F0F0F]">INR — Indian Rupee</option>
-                  <option value="USD" className="bg-[#0F0F0F]">USD — US Dollar</option>
-                  <option value="EUR" className="bg-[#0F0F0F]">EUR — Euro</option>
-                  <option value="GBP" className="bg-[#0F0F0F]">GBP — British Pound</option>
-                  <option value="AED" className="bg-[#0F0F0F]">AED — UAE Dirham</option>
+                  <option value="INR" className={T.option}>INR — Indian Rupee</option>
+                  <option value="USD" className={T.option}>USD — US Dollar</option>
+                  <option value="EUR" className={T.option}>EUR — Euro</option>
+                  <option value="GBP" className={T.option}>GBP — British Pound</option>
+                  <option value="AED" className={T.option}>AED — UAE Dirham</option>
                 </select>
               </div>
 
@@ -865,7 +890,7 @@ const Settings = () => {
               {paymentSettings.gateway === 'razorpay' && (
                 <div className="space-y-4">
                   <div>
-                    <label className="block text-white text-sm font-medium mb-2">
+                    <label className={`block text-sm font-medium mb-2 ${T.label}`}>
                       Razorpay Key ID
                       <span className="text-[#A3A3A3] font-normal ml-1 text-xs">(starts with rzp_)</span>
                     </label>
@@ -875,7 +900,7 @@ const Settings = () => {
                       value={paymentSettings.keyId}
                       onChange={(e) => setPaymentSettings(prev => ({ ...prev, keyId: e.target.value }))}
                       placeholder="rzp_live_xxxxxxxxxxxx"
-                      className="w-full bg-black/20 border border-white/10 text-white placeholder:text-neutral-600 focus:border-[#D4AF37] focus:ring-1 focus:ring-[#D4AF37] rounded-sm h-12 px-4 font-mono transition-all"
+                      className={`w-full rounded-sm h-12 px-4 font-mono transition-all ${T.input}`}
                     />
                     <p className="text-[#A3A3A3] text-xs mt-1.5">
                       Find this in your{' '}
@@ -886,7 +911,7 @@ const Settings = () => {
                     </p>
                   </div>
                   <div>
-                    <label className="block text-white text-sm font-medium mb-2">Razorpay Key Secret</label>
+                    <label className={`block text-sm font-medium mb-2 ${T.label}`}>Razorpay Key Secret</label>
                     <div className="relative">
                       <input
                         type={showKeySecret ? 'text' : 'password'}
@@ -894,7 +919,7 @@ const Settings = () => {
                         value={paymentSettings.keySecret}
                         onChange={(e) => setPaymentSettings(prev => ({ ...prev, keySecret: e.target.value }))}
                         placeholder="••••••••••••••••••••"
-                        className="w-full bg-black/20 border border-white/10 text-white placeholder:text-neutral-600 focus:border-[#D4AF37] focus:ring-1 focus:ring-[#D4AF37] rounded-sm h-12 px-4 pr-12 font-mono transition-all"
+                        className={`w-full rounded-sm h-12 px-4 pr-12 font-mono transition-all ${T.input}`}
                       />
                       <button type="button" onClick={() => setShowKeySecret(v => !v)}
                         className="absolute right-3 top-1/2 -translate-y-1/2 text-[#A3A3A3] hover:text-white transition-colors p-1" tabIndex={-1}>
@@ -936,24 +961,24 @@ const Settings = () => {
                     </p>
                   </div>
                   <div>
-                    <label className="block text-white text-sm font-medium mb-2">Cashfree App ID</label>
+                    <label className={`block text-sm font-medium mb-2 ${T.label}`}>Cashfree App ID</label>
                     <input
                       type="text"
                       value={paymentSettings.keyId}
                       onChange={(e) => setPaymentSettings(prev => ({ ...prev, keyId: e.target.value }))}
                       placeholder="Your Cashfree App ID"
-                      className="w-full bg-black/20 border border-white/10 text-white placeholder:text-neutral-600 focus:border-[#D4AF37] focus:ring-1 focus:ring-[#D4AF37] rounded-sm h-12 px-4 font-mono transition-all"
+                      className={`w-full rounded-sm h-12 px-4 font-mono transition-all ${T.input}`}
                     />
                   </div>
                   <div>
-                    <label className="block text-white text-sm font-medium mb-2">Cashfree Secret Key</label>
+                    <label className={`block text-sm font-medium mb-2 ${T.label}`}>Cashfree Secret Key</label>
                     <div className="relative">
                       <input
                         type={showKeySecret ? 'text' : 'password'}
                         value={paymentSettings.keySecret}
                         onChange={(e) => setPaymentSettings(prev => ({ ...prev, keySecret: e.target.value }))}
                         placeholder="••••••••••••••••••••"
-                        className="w-full bg-black/20 border border-white/10 text-white placeholder:text-neutral-600 focus:border-[#D4AF37] focus:ring-1 focus:ring-[#D4AF37] rounded-sm h-12 px-4 pr-12 font-mono transition-all"
+                        className={`w-full rounded-sm h-12 px-4 pr-12 font-mono transition-all ${T.input}`}
                       />
                       <button type="button" onClick={() => setShowKeySecret(v => !v)}
                         className="absolute right-3 top-1/2 -translate-y-1/2 text-[#A3A3A3] hover:text-white transition-colors p-1" tabIndex={-1}>
@@ -964,7 +989,7 @@ const Settings = () => {
                   </div>
                   {/* Backend URL for server-side Cashfree calls (Task 5) */}
                   <div>
-                    <label className="block text-white text-sm font-medium mb-2">
+                    <label className={`block text-sm font-medium mb-2 ${T.label}`}>
                       Backend URL
                       <span className="text-[#A3A3A3] font-normal ml-1 text-xs">(your Render/server URL)</span>
                     </label>
@@ -973,7 +998,7 @@ const Settings = () => {
                       value={paymentSettings.backendUrl}
                       onChange={(e) => setPaymentSettings(prev => ({ ...prev, backendUrl: e.target.value }))}
                       placeholder="https://your-app.onrender.com"
-                      className="w-full bg-black/20 border border-white/10 text-white placeholder:text-neutral-600 focus:border-[#D4AF37] focus:ring-1 focus:ring-[#D4AF37] rounded-sm h-12 px-4 font-mono transition-all"
+                      className={`w-full rounded-sm h-12 px-4 font-mono transition-all ${T.input}`}
                     />
                     <p className="text-[#A3A3A3] text-xs mt-1.5">
                       Your backend creates the Cashfree order server-side — keys never exposed to browser.

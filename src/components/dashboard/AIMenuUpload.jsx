@@ -14,13 +14,14 @@ import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
 import { motion, AnimatePresence } from 'framer-motion';
 import { toast } from 'sonner';
 import {
+import { useTheme } from '../../hooks/useTheme';
   Upload, Sparkles, Check, X, Pencil, RefreshCw,
   FileImage, Plus, Trash2, Save, Lock, ChevronRight,
 } from 'lucide-react';
 
 const CATEGORIES = ['Beverages', 'Food', 'Snacks', 'Desserts', 'Main Course', 'Starters', 'Other'];
 
-const inputCls = 'w-full bg-black/20 border border-white/10 text-white placeholder:text-neutral-600 focus:border-[#D4AF37] focus:ring-1 focus:ring-[#D4AF37] rounded-sm px-3 h-9 text-sm transition-all';
+const inputCls = 'w-full ${T.innerCard} border ${T.borderMd} text-white placeholder:text-neutral-600 focus:border-[#D4AF37] focus:ring-1 focus:ring-[#D4AF37] rounded-sm px-3 h-9 text-sm transition-all';
 
 // ─── Item edit row ─────────────────────────────────────────────────────────────
 
@@ -34,7 +35,7 @@ const ItemRow = ({ item, index, onChange, onRemove, currency }) => {
       animate={{ opacity: 1, x: 0 }}
       exit={{ opacity: 0, x: 10 }}
       transition={{ delay: index * 0.03 }}
-      className="bg-[#0A0A0A] border border-white/5 rounded-lg p-3"
+      className={`${T.card} rounded-lg p-3`}
     >
       {editing ? (
         <div className="grid grid-cols-12 gap-2 items-center">
@@ -56,7 +57,7 @@ const ItemRow = ({ item, index, onChange, onRemove, currency }) => {
             value={item.category}
             onChange={e => onChange(index, 'category', e.target.value)}
           >
-            {CATEGORIES.map(c => <option key={c} value={c} className="bg-[#0F0F0F]">{c}</option>)}
+            {CATEGORIES.map(c => <option key={c} value={c} className={T.option}>{c}</option>)}
           </select>
           <input
             className={`${inputCls} col-span-2`}
@@ -78,8 +79,8 @@ const ItemRow = ({ item, index, onChange, onRemove, currency }) => {
               <span className="text-[#D4AF37] text-xs font-bold">{index + 1}</span>
             </div>
             <div className="min-w-0 flex-1">
-              <p className="text-white font-medium text-sm truncate">{item.name || 'Unnamed item'}</p>
-              <p className="text-[#A3A3A3] text-xs">{item.category}</p>
+              <p className={`${T.label} font-medium text-sm truncate`}>{item.name || 'Unnamed item'}</p>
+              <p className={`${T.muted} text-xs`}>{item.category}</p>
             </div>
             <span className="text-[#D4AF37] font-bold text-sm flex-shrink-0">
               {currency}{parseFloat(item.price || 0).toFixed(0)}
@@ -88,13 +89,13 @@ const ItemRow = ({ item, index, onChange, onRemove, currency }) => {
           <div className="flex items-center gap-1">
             <button
               onClick={() => setEditing(true)}
-              className="p-1.5 text-[#A3A3A3] hover:text-white hover:bg-white/10 rounded transition-all"
+              className={`p-1.5 text-[#A3A3A3] hover:${T.heading} hover:bg-white/10 rounded transition-all`}
             >
               <Pencil className="w-3.5 h-3.5" />
             </button>
             <button
               onClick={() => onRemove(index)}
-              className="p-1.5 text-[#A3A3A3] hover:text-red-400 hover:bg-red-500/10 rounded transition-all"
+              className={`p-1.5 ${T.muted} hover:text-red-400 hover:bg-red-500/10 rounded transition-all`}
             >
               <Trash2 className="w-3.5 h-3.5" />
             </button>
@@ -111,6 +112,7 @@ const AIMenuUpload = ({ onClose }) => {
   const { user } = useAuth();
   const cafeId   = user?.cafeId;
   const { data: cafe } = useDocument('cafes', cafeId);
+  const { T, isLight } = useTheme();
   const CUR = cafe?.currencySymbol || '₹';
 
   const fileInputRef = useRef(null);
@@ -247,8 +249,8 @@ const AIMenuUpload = ({ onClose }) => {
         <div className="w-14 h-14 rounded-2xl bg-[#D4AF37]/10 flex items-center justify-center mb-4">
           <Lock className="w-7 h-7 text-[#D4AF37]" />
         </div>
-        <h3 className="text-white font-bold text-lg mb-2">AI Menu Upload Locked</h3>
-        <p className="text-[#A3A3A3] text-sm max-w-xs">Contact your administrator to enable AI Menu Upload for your café.</p>
+        <h3 className={`${T.heading} font-bold text-lg mb-2`}>AI Menu Upload Locked</h3>
+        <p className={`${T.muted} text-sm max-w-xs`}>Contact your administrator to enable AI Menu Upload for your café.</p>
       </div>
     );
   }
@@ -263,14 +265,14 @@ const AIMenuUpload = ({ onClose }) => {
             <Sparkles className="w-5 h-5 text-[#D4AF37]" />
           </div>
           <div>
-            <h3 className="text-white font-bold" style={{ fontFamily: 'Playfair Display, serif' }}>
+            <h3 className={`${T.heading} font-bold`} style={{ fontFamily: 'Playfair Display, serif' }}>
               AI Menu Upload
             </h3>
-            <p className="text-[#A3A3A3] text-xs">Upload your physical menu — AI extracts items automatically</p>
+            <p className={`${T.muted} text-xs`}>Upload your physical menu — AI extracts items automatically</p>
           </div>
         </div>
         {/* Step indicator */}
-        <div className="hidden sm:flex items-center gap-1 text-xs text-[#A3A3A3]">
+        <div className={`hidden sm:flex items-center gap-1 text-xs ${T.muted}`}>
           {['Upload', 'Preview', 'Done'].map((s, i) => (
             <React.Fragment key={s}>
               <span className={
@@ -304,14 +306,14 @@ const AIMenuUpload = ({ onClose }) => {
               className={`border-2 border-dashed rounded-xl p-12 text-center cursor-pointer transition-all ${
                 dragOver
                   ? 'border-[#D4AF37] bg-[#D4AF37]/5'
-                  : 'border-white/10 hover:border-white/20 hover:bg-white/3'
+                  : '${T.borderMd} hover:border-white/20 hover:bg-white/3'
               }`}
             >
               {loading ? (
                 <div className="flex flex-col items-center gap-3">
                   <RefreshCw className="w-10 h-10 text-[#D4AF37] animate-spin" />
-                  <p className="text-white font-semibold">Extracting menu items…</p>
-                  <p className="text-[#A3A3A3] text-sm">Gemini AI is reading your menu</p>
+                  <p className={`${T.heading} font-semibold`}>Extracting menu items…</p>
+                  <p className={`${T.muted} text-sm`}>Gemini AI is reading your menu</p>
                 </div>
               ) : (
                 <div className="flex flex-col items-center gap-3">
@@ -319,8 +321,8 @@ const AIMenuUpload = ({ onClose }) => {
                     <FileImage className="w-7 h-7 text-[#D4AF37]" />
                   </div>
                   <div>
-                    <p className="text-white font-semibold">Drop your menu here</p>
-                    <p className="text-[#A3A3A3] text-sm mt-1">JPG, PNG, WebP, or PDF · Max 10MB</p>
+                    <p className={`${T.heading} font-semibold`}>Drop your menu here</p>
+                    <p className={`${T.muted} text-sm mt-1`}>JPG, PNG, WebP, or PDF · Max 10MB</p>
                   </div>
                   <span className="text-[#D4AF37] text-sm font-semibold border border-[#D4AF37]/30 px-4 py-1.5 rounded-sm hover:bg-[#D4AF37]/10 transition-colors">
                     Browse Files
@@ -348,12 +350,12 @@ const AIMenuUpload = ({ onClose }) => {
             className="space-y-4"
           >
             <div className="flex items-center justify-between">
-              <p className="text-[#A3A3A3] text-sm">
-                <span className="text-white font-semibold">{items.length} items</span> extracted — review and edit before saving
+              <p className={`${T.muted} text-sm`}>
+                <span className={`${T.heading} font-semibold`}>{items.length} items</span> extracted — review and edit before saving
               </p>
               <button
                 onClick={() => { setStep('upload'); setFile(null); setItems([]); }}
-                className="text-[#A3A3A3] hover:text-white text-xs transition-colors"
+                className={`text-[#A3A3A3] hover:${T.body} text-xs transition-colors`}
               >
                 ← Upload different file
               </button>
@@ -364,7 +366,7 @@ const AIMenuUpload = ({ onClose }) => {
               <img
                 src={preview}
                 alt="Menu preview"
-                className="w-full max-h-48 object-contain rounded-lg border border-white/10 bg-black/20"
+                className={`w-full max-h-48 object-contain rounded-lg border ${T.borderMd} ${T.innerCard}`}
               />
             )}
 
@@ -395,7 +397,7 @@ const AIMenuUpload = ({ onClose }) => {
             <div className="flex gap-3 pt-2">
               <button
                 onClick={() => { setStep('upload'); setFile(null); setItems([]); }}
-                className="flex-1 py-2.5 border border-white/10 text-[#A3A3A3] hover:text-white rounded-sm text-sm transition-all"
+                className={`flex-1 py-2.5 border ${T.borderMd} text-[#A3A3A3] hover:text-white rounded-sm text-sm transition-all`}
               >
                 Cancel
               </button>
@@ -426,14 +428,14 @@ const AIMenuUpload = ({ onClose }) => {
             <div className="w-16 h-16 rounded-full bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center mx-auto mb-4">
               <Check className="w-8 h-8 text-emerald-400" />
             </div>
-            <h3 className="text-white text-xl font-bold mb-2">Menu Items Added!</h3>
-            <p className="text-[#A3A3A3] text-sm mb-6">
+            <h3 className={`${T.heading} text-xl font-bold mb-2`}>Menu Items Added!</h3>
+            <p className={`${T.muted} text-sm mb-6`}>
               All items are now live in your menu and visible to customers.
             </p>
             <div className="flex gap-3 justify-center">
               <button
                 onClick={() => { setStep('upload'); setFile(null); setItems([]); setPreview(null); }}
-                className="px-5 py-2 border border-white/10 text-white rounded-sm text-sm hover:bg-white/5 transition-all"
+                className={`px-5 py-2 border ${T.borderMd} text-white rounded-sm text-sm hover:${T.subCard} transition-all`}
               >
                 Upload Another
               </button>

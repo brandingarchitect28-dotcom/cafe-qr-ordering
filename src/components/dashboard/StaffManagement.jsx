@@ -13,6 +13,7 @@ import { Users, CalendarCheck, IndianRupee, UserPlus, Lock } from 'lucide-react'
 import StaffList from './staff/StaffList';
 import AttendanceDashboard from './staff/AttendanceDashboard';
 import SalaryDashboard from './staff/SalaryDashboard';
+import { useTheme } from '../../hooks/useTheme';
 
 const TABS = [
   { id: 'staff',      label: 'Staff',      icon: Users         },
@@ -24,6 +25,7 @@ const StaffManagement = () => {
   const { user }   = useAuth();
   const cafeId     = user?.cafeId;
   const { data: cafe } = useDocument('cafes', cafeId);
+  const { T, isLight } = useTheme();
   const [tab, setTab] = useState('staff');
 
   // Feature gate — owner can enable/disable this module
@@ -35,10 +37,10 @@ const StaffManagement = () => {
         <div className="w-16 h-16 rounded-2xl bg-[#D4AF37]/10 flex items-center justify-center mb-4">
           <Lock className="w-8 h-8 text-[#D4AF37]" />
         </div>
-        <h2 className="text-white font-bold text-2xl mb-2" style={{ fontFamily: 'Playfair Display, serif' }}>
+        <h2 className={`${T.heading} font-bold text-2xl mb-2`} style={{ fontFamily: 'Playfair Display, serif' }}>
           Staff Management
         </h2>
-        <p className="text-[#A3A3A3] text-sm max-w-xs">
+        <p className={`${T.muted} text-sm max-w-xs`}>
           This module is disabled. Enable it in Settings → Feature Toggles.
         </p>
       </div>
@@ -50,15 +52,15 @@ const StaffManagement = () => {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-white font-bold text-2xl" style={{ fontFamily: 'Playfair Display, serif' }}>
+          <h2 className={`${T.heading} font-bold text-2xl`} style={{ fontFamily: 'Playfair Display, serif' }}>
             Staff Management
           </h2>
-          <p className="text-[#555] text-xs mt-1">Manage your team, attendance and salaries</p>
+          <p className={`${T.faint} text-xs mt-1`}>Manage your team, attendance and salaries</p>
         </div>
       </div>
 
       {/* Tab nav */}
-      <div className="flex gap-1 p-1 rounded-xl bg-black/30 border border-white/5 w-fit">
+      <div className={`flex gap-1 p-1 rounded-xl ${T.innerCard} border ${T.border} w-fit`}>
         {TABS.map(t => (
           <button key={t.id} onClick={() => setTab(t.id)}
             className="flex items-center gap-2 px-5 py-2.5 rounded-lg text-sm font-semibold transition-all"

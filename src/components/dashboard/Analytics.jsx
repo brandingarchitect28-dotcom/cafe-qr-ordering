@@ -17,6 +17,7 @@ import {
 } from 'recharts';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X } from 'lucide-react';
+import { useTheme } from '../../hooks/useTheme';
 
 // ─── Safe string helper — prevents TypeError: x.toLowerCase is not a function ─
 const safeLower = (v) => {
@@ -40,16 +41,16 @@ const ChartModal = ({ chart, onClose, CUR = '₹' }) => {
         onClick={onClose}
       >
         <motion.div
-          className="bg-[#0F0F0F] border border-white/10 rounded-2xl w-full max-w-md max-h-[80vh] flex flex-col overflow-hidden"
+          className={`${T.card} rounded-2xl w-full max-w-md max-h-[80vh] flex flex-col overflow-hidden`}
           initial={{ scale: 0.95, y: 12 }} animate={{ scale: 1, y: 0 }}
           onClick={e => e.stopPropagation()}
         >
           {/* Header */}
-          <div className="flex items-center justify-between px-5 py-4 border-b border-white/5">
-            <h3 className="text-white font-bold text-base" style={{ fontFamily: 'Playfair Display, serif' }}>
+          <div className={`flex items-center justify-between px-5 py-4 border-b ${T.border}`}>
+            <h3 className={`${T.heading} font-bold text-base`} style={{ fontFamily: 'Playfair Display, serif' }}>
               {chart.title}
             </h3>
-            <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-white/10 text-[#A3A3A3] transition-all">
+            <button onClick={onClose} className={`p-1.5 rounded-lg hover:bg-white/10 ${T.muted} transition-all`}>
               <X className="w-4 h-4" />
             </button>
           </div>
@@ -57,17 +58,17 @@ const ChartModal = ({ chart, onClose, CUR = '₹' }) => {
           {/* Table */}
           <div className="overflow-y-auto flex-1">
             <table className="w-full text-sm">
-              <thead className="sticky top-0 bg-[#0A0A0A]">
+              <thead className={`sticky top-0 ${T.tableHead}`}>
                 <tr>
-                  <th className="px-5 py-3 text-left text-[#555] text-xs uppercase tracking-wide font-semibold">
+                  <th className={`px-5 py-3 text-left ${T.faint} text-xs uppercase tracking-wide font-semibold`}>
                     {chart.labelKey}
                   </th>
                   {chart.valueLabel && (
-                    <th className="px-5 py-3 text-right text-[#555] text-xs uppercase tracking-wide font-semibold">
+                    <th className={`px-5 py-3 text-right ${T.faint} text-xs uppercase tracking-wide font-semibold`}>
                       {chart.valueLabel}
                     </th>
                   )}
-                  <th className="px-5 py-3 text-right text-[#555] text-xs uppercase tracking-wide font-semibold">
+                  <th className={`px-5 py-3 text-right ${T.faint} text-xs uppercase tracking-wide font-semibold`}>
                     Share
                   </th>
                 </tr>
@@ -83,7 +84,7 @@ const ChartModal = ({ chart, onClose, CUR = '₹' }) => {
                       <td className="px-5 py-3">
                         <div className="flex items-center gap-2.5">
                           <span className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ background: color }} />
-                          <span className="text-white">{row.name || row.method || row.source || '—'}</span>
+                          <span className={`${T.heading}`}>{row.name || row.method || row.source || '—'}</span>
                         </div>
                       </td>
                       {chart.valueLabel && (
@@ -93,10 +94,10 @@ const ChartModal = ({ chart, onClose, CUR = '₹' }) => {
                       )}
                       <td className="px-5 py-3 text-right">
                         <div className="flex items-center justify-end gap-2">
-                          <div className="w-16 h-1.5 rounded-full bg-white/5 overflow-hidden">
+                          <div className={`w-16 h-1.5 rounded-full ${T.subCard} overflow-hidden`}>
                             <div className="h-full rounded-full" style={{ width: `${pct}%`, background: color }} />
                           </div>
-                          <span className="text-[#A3A3A3] text-xs w-10 text-right">{pct}%</span>
+                          <span className={`${T.muted} text-xs w-10 text-right`}>{pct}%</span>
                         </div>
                       </td>
                     </tr>
@@ -107,9 +108,9 @@ const ChartModal = ({ chart, onClose, CUR = '₹' }) => {
           </div>
 
           {/* Footer total */}
-          <div className="px-5 py-3 border-t border-white/5 flex justify-between text-sm">
-            <span className="text-[#555]">Total</span>
-            <span className="text-white font-bold">
+          <div className={`px-5 py-3 border-t ${T.border} flex justify-between text-sm`}>
+            <span className={`${T.faint}`}>Total</span>
+            <span className={`${T.heading} font-bold`}>
               {safeLower(chart.valueLabel).includes('revenue')
                 ? `${CUR}${fmt(total)}`
                 : total.toLocaleString('en-IN')
@@ -164,6 +165,7 @@ const Analytics = () => {
   const cafeId   = user?.cafeId;
   const { data: orders } = useCollection('orders', cafeId ? [where('cafeId', '==', cafeId)] : []);
   const { data: cafe   } = useDocument('cafes', cafeId);
+  const { T, isLight } = useTheme();
   const CUR = cafe?.currencySymbol || '₹';
   const [activeChart, setActiveChart] = useState(null); // drill-down modal
 
@@ -286,8 +288,8 @@ const Analytics = () => {
 
   if (!analytics) {
     return (
-      <div className="bg-[#0F0F0F] border border-white/5 rounded-sm p-12 text-center">
-        <p className="text-[#A3A3A3] text-lg">No data yet. Start receiving orders to see analytics!</p>
+      <div className={`${T.card} rounded-sm p-12 text-center`}>
+        <p className={`${T.muted} text-lg`}>No data yet. Start receiving orders to see analytics!</p>
       </div>
     );
   }
@@ -300,8 +302,8 @@ const Analytics = () => {
       <ChartModal chart={activeChart} onClose={() => setActiveChart(null)} CUR={CUR} />
 
       {/* ── Revenue Chart ──────────────────────────────────────────────────── */}
-      <div className="bg-[#0F0F0F] border border-white/5 rounded-sm p-6">
-        <h3 className="text-xl font-semibold text-white mb-6" style={{ fontFamily: 'Playfair Display, serif' }}>
+      <div className={`${T.card} rounded-sm p-6`}>
+        <h3 className={`text-xl font-semibold ${T.heading} mb-6`} style={{ fontFamily: 'Playfair Display, serif' }}>
           Revenue (Last 7 Days)
         </h3>
         <ResponsiveContainer width="100%" height={280}>
@@ -318,8 +320,8 @@ const Analytics = () => {
       </div>
 
       {/* ── Orders per Day ─────────────────────────────────────────────────── */}
-      <div className="bg-[#0F0F0F] border border-white/5 rounded-sm p-6">
-        <h3 className="text-xl font-semibold text-white mb-6" style={{ fontFamily: 'Playfair Display, serif' }}>
+      <div className={`${T.card} rounded-sm p-6`}>
+        <h3 className={`text-xl font-semibold ${T.heading} mb-6`} style={{ fontFamily: 'Playfair Display, serif' }}>
           Orders (Last 7 Days)
         </h3>
         <ResponsiveContainer width="100%" height={260}>
@@ -338,8 +340,8 @@ const Analytics = () => {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
 
         {/* ── Top Items ──────────────────────────────────────────────────── */}
-        <div className="bg-[#0F0F0F] border border-white/5 rounded-sm p-6">
-          <h3 className="text-xl font-semibold text-white mb-6" style={{ fontFamily: 'Playfair Display, serif' }}>
+        <div className={`${T.card} rounded-sm p-6`}>
+          <h3 className={`text-xl font-semibold ${T.heading} mb-6`} style={{ fontFamily: 'Playfair Display, serif' }}>
             Best Selling Items
           </h3>
           <ResponsiveContainer width="100%" height={260}>
@@ -355,11 +357,11 @@ const Analytics = () => {
         </div>
 
         {/* ── Payment Status ─────────────────────────────────────────────── */}
-        <div className="bg-[#0F0F0F] border border-white/5 rounded-sm p-6 cursor-pointer hover:border-white/10 transition-colors"
+        <div className={`${T.card} rounded-sm p-6 cursor-pointer hover:${T.borderMd} transition-colors`}
           onClick={() => setActiveChart({ title: 'Payment Status Breakdown', labelKey: 'Status', valueLabel: 'Orders', data: analytics.paymentSplit })}
           title="Click for breakdown"
         >
-          <h3 className="text-xl font-semibold text-white mb-6" style={{ fontFamily: 'Playfair Display, serif' }}>
+          <h3 className={`text-xl font-semibold ${T.heading} mb-6`} style={{ fontFamily: 'Playfair Display, serif' }}>
             Payment Status
           </h3>
           <ResponsiveContainer width="100%" height={260}>
@@ -385,11 +387,11 @@ const Analytics = () => {
       </div>
 
       {/* ── Order Status Distribution ─────────────────────────────────────── */}
-      <div className="bg-[#0F0F0F] border border-white/5 rounded-sm p-6 cursor-pointer hover:border-white/10 transition-colors"
+      <div className={`${T.card} rounded-sm p-6 cursor-pointer hover:${T.borderMd} transition-colors`}
         onClick={() => setActiveChart({ title: 'Order Status Distribution', labelKey: 'Status', valueLabel: 'Orders', data: analytics.orderStatusSplit })}
         title="Click for breakdown"
       >
-        <h3 className="text-xl font-semibold text-white mb-6" style={{ fontFamily: 'Playfair Display, serif' }}>
+        <h3 className={`text-xl font-semibold ${T.heading} mb-6`} style={{ fontFamily: 'Playfair Display, serif' }}>
           Order Status Distribution
         </h3>
         <ResponsiveContainer width="100%" height={260}>
@@ -417,14 +419,14 @@ const Analytics = () => {
       {analytics.orderSourceSplit.length > 0 && (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
 
-          <div className="bg-[#0F0F0F] border border-white/5 rounded-sm p-6 cursor-pointer hover:border-white/10 transition-colors"
+          <div className={`${T.card} rounded-sm p-6 cursor-pointer hover:${T.borderMd} transition-colors`}
             onClick={() => setActiveChart({ title: 'Orders by Source', labelKey: 'Source', valueLabel: 'Orders', data: analytics.orderSourceSplit.map(d => ({ ...d, value: d.value })) })}
             title="Click for breakdown"
           >
-            <h3 className="text-xl font-semibold text-white mb-2" style={{ fontFamily: 'Playfair Display, serif' }}>
+            <h3 className={`text-xl font-semibold ${T.heading} mb-2`} style={{ fontFamily: 'Playfair Display, serif' }}>
               Orders by Source
             </h3>
-            <p className="text-[#A3A3A3] text-xs mb-6">Where your orders come from</p>
+            <p className={`${T.muted} text-xs mb-6`}>Where your orders come from</p>
             <ResponsiveContainer width="100%" height={260}>
               <PieChart>
                 <Pie data={analytics.orderSourceSplit} cx="50%" cy="50%"
@@ -447,14 +449,14 @@ const Analytics = () => {
             <Insight lines={analytics.insights.source} />
           </div>
 
-          <div className="bg-[#0F0F0F] border border-white/5 rounded-sm p-6 cursor-pointer hover:border-white/10 transition-colors"
+          <div className={`${T.card} rounded-sm p-6 cursor-pointer hover:${T.borderMd} transition-colors`}
             onClick={() => setActiveChart({ title: 'Revenue by Source', labelKey: 'Source', valueLabel: 'Revenue', data: analytics.revenueBySource.map(d => ({ ...d, value: d.revenue })) })}
             title="Click for breakdown"
           >
-            <h3 className="text-xl font-semibold text-white mb-2" style={{ fontFamily: 'Playfair Display, serif' }}>
+            <h3 className={`text-xl font-semibold ${T.heading} mb-2`} style={{ fontFamily: 'Playfair Display, serif' }}>
               Revenue by Source
             </h3>
-            <p className="text-[#A3A3A3] text-xs mb-6">Revenue earned per platform</p>
+            <p className={`${T.muted} text-xs mb-6`}>Revenue earned per platform</p>
             <ResponsiveContainer width="100%" height={260}>
               <BarChart data={analytics.revenueBySource} layout="vertical">
                 <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.06)" />
@@ -474,14 +476,14 @@ const Analytics = () => {
 
       {/* ── Source summary table ──────────────────────────────────────────── */}
       {analytics.orderSourceSplit.length > 1 && (
-        <div className="bg-[#0F0F0F] border border-white/5 rounded-sm p-6">
-          <h3 className="text-xl font-semibold text-white mb-4" style={{ fontFamily: 'Playfair Display, serif' }}>
+        <div className={`${T.card} rounded-sm p-6`}>
+          <h3 className={`text-xl font-semibold ${T.heading} mb-4`} style={{ fontFamily: 'Playfair Display, serif' }}>
             Platform Performance Summary
           </h3>
           <div className="overflow-x-auto">
             <table className="w-full">
               <thead>
-                <tr className="border-b border-white/10">
+                <tr className={`border-b ${T.borderMd}`}>
                   {['Platform','Orders','Revenue','% of Orders'].map(h => (
                     <th key={h} className="text-left px-4 py-3 text-[#D4AF37] font-semibold text-xs uppercase tracking-wide">{h}</th>
                   ))}
@@ -493,23 +495,23 @@ const Analytics = () => {
                   const totalOrds = analytics.orderSourceSplit.reduce((s, i) => s + i.value, 0);
                   const pct       = totalOrds > 0 ? ((src.value / totalOrds) * 100).toFixed(1) : '0';
                   return (
-                    <tr key={idx} className="border-b border-white/5 hover:bg-white/3 transition-colors">
+                    <tr key={idx} className={`border-b ${T.border} hover:bg-white/3 transition-colors`}>
                       <td className="px-4 py-3">
                         <div className="flex items-center gap-2">
                           <span className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: src.color }} />
-                          <span className="text-white font-medium text-sm">{src.name}</span>
+                          <span className={`${T.label} font-medium text-sm`}>{src.name}</span>
                         </div>
                       </td>
-                      <td className="px-4 py-3 text-white text-sm">{src.value}</td>
+                      <td className={`px-4 py-3 ${T.body} text-sm`}>{src.value}</td>
                       <td className="px-4 py-3 text-[#D4AF37] font-semibold text-sm">
                         {CUR}{revEntry ? revEntry.revenue.toFixed(2) : '0.00'}
                       </td>
                       <td className="px-4 py-3">
                         <div className="flex items-center gap-2">
-                          <div className="flex-1 bg-white/5 rounded-full h-1.5 max-w-[80px]">
+                          <div className={`flex-1 ${T.subCard} rounded-full h-1.5 max-w-[80px]`}>
                             <div className="h-1.5 rounded-full" style={{ width:`${pct}%`, backgroundColor:src.color }} />
                           </div>
-                          <span className="text-[#A3A3A3] text-xs">{pct}%</span>
+                          <span className={`${T.muted} text-xs`}>{pct}%</span>
                         </div>
                       </td>
                     </tr>

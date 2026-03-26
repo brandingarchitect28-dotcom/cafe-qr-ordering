@@ -25,6 +25,7 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 import InvoiceModal from './InvoiceModal';
+import { useTheme } from '../../hooks/useTheme';
 
 const fmt = (n) => (parseFloat(n) || 0).toFixed(2);
 
@@ -44,6 +45,7 @@ const InvoicesTab = () => {
   const { user } = useAuth();
   const cafeId   = user?.cafeId;
   const { data: cafe } = useDocument('cafes', cafeId);
+  const { T, isLight } = useTheme();
   const CUR = cafe?.currencySymbol || '₹';
 
   const [invoices,       setInvoices      ] = useState([]);
@@ -115,10 +117,10 @@ const InvoicesTab = () => {
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
-          <h2 className="text-white font-bold text-2xl" style={{ fontFamily: 'Playfair Display, serif' }}>
+          <h2 className={`${T.heading} font-bold text-2xl`} style={{ fontFamily: 'Playfair Display, serif' }}>
             Invoices
           </h2>
-          <p className="text-[#555] text-xs mt-0.5">
+          <p className={`${T.faint} text-xs mt-0.5`}>
             {invoices.length} total · {invoices.filter(i => i.paymentStatus === 'paid').length} paid
           </p>
         </div>
@@ -127,13 +129,13 @@ const InvoicesTab = () => {
       {/* Filters */}
       <div className="flex flex-col sm:flex-row gap-3">
         <div className="relative flex-1">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[#555]" />
+          <Search className={`absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 ${T.faint}`} />
           <input
             type="text"
             value={search}
             onChange={e => setSearch(e.target.value)}
             placeholder="Search by invoice #, order #, customer name or phone…"
-            className="w-full pl-9 pr-4 h-10 bg-black/20 border border-white/10 text-white placeholder:text-neutral-600 focus:border-[#D4AF37] focus:ring-1 focus:ring-[#D4AF37] rounded-sm text-sm outline-none"
+            className={`w-full pl-9 pr-4 h-10 ${T.innerCard} border ${T.borderMd} text-white placeholder:text-neutral-600 focus:border-[#D4AF37] focus:ring-1 focus:ring-[#D4AF37] rounded-sm text-sm outline-none`}
           />
         </div>
         <div className="flex gap-2">
@@ -159,8 +161,8 @@ const InvoicesTab = () => {
           { label: 'Total Revenue',  val: `${CUR}${fmt(invoices.filter(i => i.paymentStatus==='paid').reduce((s,i) => s+(i.totalAmount||0),0))}`, color: '#3B82F6' },
         ].map(s => (
           <motion.div key={s.label} whileHover={{ y: -2 }}
-            className="bg-[#0F0F0F] border border-white/5 rounded-xl p-4">
-            <p className="text-[#555] text-xs uppercase tracking-wide mb-1">{s.label}</p>
+            className={`${T.card} rounded-xl p-4`}>
+            <p className={`${T.faint} text-xs uppercase tracking-wide mb-1`}>{s.label}</p>
             <p className="font-black text-xl" style={{ color: s.color }}>{s.val}</p>
           </motion.div>
         ))}
@@ -174,9 +176,9 @@ const InvoicesTab = () => {
           ))}
         </div>
       ) : filtered.length === 0 ? (
-        <div className="bg-[#0F0F0F] border border-white/5 rounded-xl p-12 text-center">
-          <FileText className="w-12 h-12 text-[#A3A3A3]/30 mx-auto mb-3" />
-          <p className="text-[#A3A3A3]">
+        <div className={`${T.card} rounded-xl p-12 text-center`}>
+          <FileText className={`w-12 h-12 ${T.muted}/30 mx-auto mb-3`} />
+          <p className={`${T.muted}`}>
             {invoices.length === 0
               ? 'No invoices yet. Invoices are auto-generated when orders are placed.'
               : 'No invoices match your search.'}
@@ -190,7 +192,7 @@ const InvoicesTab = () => {
                 initial={{ opacity: 0, y: 8 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: i * 0.03 }}
-                className="bg-[#0F0F0F] border border-white/5 rounded-xl overflow-hidden hover:border-white/10 transition-colors"
+                className={`${T.card} rounded-xl overflow-hidden hover:${T.borderMd} transition-colors`}
               >
                 {/* Main row */}
                 <div className="flex items-center justify-between px-5 py-4 gap-4">
@@ -200,17 +202,17 @@ const InvoicesTab = () => {
                       <span className="text-[#D4AF37] font-bold text-sm">
                         {inv.invoiceNumber || `INV-${String(inv.orderNumber||'').padStart(4,'0')}`}
                       </span>
-                      <span className="text-[#555] text-xs">Order #{String(inv.orderNumber||'').padStart(3,'0')}</span>
+                      <span className={`${T.faint} text-xs`}>Order #{String(inv.orderNumber||'').padStart(3,'0')}</span>
                       <StatusBadge status={inv.paymentStatus} />
                     </div>
                     <div className="flex items-center gap-3 mt-1 flex-wrap">
                       {inv.customerName && (
-                        <span className="text-white text-sm">{inv.customerName}</span>
+                        <span className={`${T.body} text-sm`}>{inv.customerName}</span>
                       )}
                       {inv.customerPhone && (
-                        <span className="text-[#555] text-xs">{inv.customerPhone}</span>
+                        <span className={`${T.faint} text-xs`}>{inv.customerPhone}</span>
                       )}
-                      <span className="text-[#555] text-xs">{formatDate(inv.createdAt)}</span>
+                      <span className={`${T.faint} text-xs`}>{formatDate(inv.createdAt)}</span>
                     </div>
                   </div>
 
@@ -218,10 +220,10 @@ const InvoicesTab = () => {
                   <div className="flex items-center gap-4 flex-shrink-0">
                     <div className="text-right hidden sm:block">
                       {inv.gstAmount > 0 && (
-                        <p className="text-[#555] text-xs">GST: {CUR}{fmt(inv.gstAmount)}</p>
+                        <p className={`${T.faint} text-xs`}>GST: {CUR}{fmt(inv.gstAmount)}</p>
                       )}
                       {inv.serviceChargeAmount > 0 && (
-                        <p className="text-[#555] text-xs">SC: {CUR}{fmt(inv.serviceChargeAmount)}</p>
+                        <p className={`${T.faint} text-xs`}>SC: {CUR}{fmt(inv.serviceChargeAmount)}</p>
                       )}
                       <p className="text-[#D4AF37] font-black text-base">{CUR}{fmt(inv.totalAmount)}</p>
                     </div>
@@ -249,20 +251,20 @@ const InvoicesTab = () => {
 
                 {/* Items summary (collapsed) */}
                 {inv.items?.length > 0 && (
-                  <div className="px-5 pb-3 border-t border-white/5 pt-2">
+                  <div className={`px-5 pb-3 border-t ${T.border} pt-2`}>
                     <div className="flex flex-wrap gap-2">
                       {inv.items.slice(0, 4).map((item, j) => (
-                        <span key={j} className="text-xs px-2 py-0.5 rounded-full bg-white/5 text-[#A3A3A3]">
+                        <span key={j} className={`text-xs px-2 py-0.5 rounded-full ${T.subCard} text-[#A3A3A3]`}>
                           {item.name} ×{item.quantity}
                         </span>
                       ))}
                       {inv.items.length > 4 && (
-                        <span className="text-xs text-[#555]">+{inv.items.length - 4} more</span>
+                        <span className={`text-xs ${T.faint}`}>+{inv.items.length - 4} more</span>
                       )}
                     </div>
                     {/* Mobile total */}
                     <div className="flex items-center justify-between mt-2 sm:hidden">
-                      <span className="text-[#555] text-xs">
+                      <span className={`${T.faint} text-xs`}>
                         {inv.gstAmount > 0 ? `GST: ${CUR}${fmt(inv.gstAmount)}` : ''}
                         {inv.serviceChargeAmount > 0 ? ` · SC: ${CUR}${fmt(inv.serviceChargeAmount)}` : ''}
                       </span>

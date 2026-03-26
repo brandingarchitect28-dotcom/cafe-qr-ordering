@@ -17,6 +17,7 @@ import { where } from 'firebase/firestore';
 import { motion, AnimatePresence } from 'framer-motion';
 import { MessageSquare, Users, Send, Filter, Check, X, ChevronDown, Star, Clock, Sparkles } from 'lucide-react';
 import { toast } from 'sonner';
+import { useTheme } from '../../hooks/useTheme';
 
 // ─── message templates ────────────────────────────────────────────────────────
 
@@ -77,6 +78,7 @@ const WhatsAppMarketing = () => {
 
   const { data: orders } = useCollection('orders', cafeId ? [where('cafeId', '==', cafeId)] : []);
   const { data: cafe } = useDocument('cafes', cafeId);
+  const { T, isLight } = useTheme();
   const CUR = cafe?.currencySymbol || '₹';
 
   const [filter,    setFilter  ] = useState('all'); // all | frequent | recent
@@ -144,17 +146,17 @@ const WhatsAppMarketing = () => {
     setSelected(new Set());
   };
 
-  const inputCls = 'w-full bg-black/20 border border-white/10 text-white placeholder:text-neutral-600 focus:border-[#D4AF37] focus:ring-1 focus:ring-[#D4AF37] rounded-lg px-4 py-3 text-sm transition-all outline-none';
+  const inputCls = 'w-full ${T.innerCard} border ${T.borderMd} text-white placeholder:text-neutral-600 focus:border-[#D4AF37] focus:ring-1 focus:ring-[#D4AF37] rounded-lg px-4 py-3 text-sm transition-all outline-none';
 
   return (
     <div className="space-y-6">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-white font-bold text-2xl" style={{ fontFamily: 'Playfair Display, serif' }}>
+          <h2 className={`${T.heading} font-bold text-2xl`} style={{ fontFamily: 'Playfair Display, serif' }}>
             WhatsApp Marketing
           </h2>
-          <p className="text-[#A3A3A3] text-sm mt-1">
+          <p className={`${T.muted} text-sm mt-1`}>
             {allCustomers.length} unique customers · {orders?.length || 0} total orders
           </p>
         </div>
@@ -164,15 +166,15 @@ const WhatsAppMarketing = () => {
 
         {/* Left — Compose message */}
         <div className="space-y-4">
-          <div className="bg-[#0F0F0F] border border-white/5 rounded-xl p-5">
-            <h3 className="text-white font-semibold mb-4 flex items-center gap-2">
+          <div className={`${T.card} rounded-xl p-5`}>
+            <h3 className={`${T.heading} font-semibold mb-4 flex items-center gap-2`}>
               <MessageSquare className="w-4 h-4 text-[#D4AF37]" />
               Compose Message
             </h3>
 
             {/* Templates */}
             <div className="mb-4">
-              <p className="text-[#A3A3A3] text-xs uppercase tracking-wide mb-2 flex items-center gap-1">
+              <p className={`${T.muted} text-xs uppercase tracking-wide mb-2 flex items-center gap-1`}>
                 <Sparkles className="w-3 h-3" />
                 Quick Templates
               </p>
@@ -195,7 +197,7 @@ const WhatsAppMarketing = () => {
 
             {/* Message */}
             <div>
-              <label className="block text-white text-sm font-medium mb-2">Message</label>
+              <label className={`block ${T.label} text-sm font-medium mb-2`}>Message</label>
               <textarea
                 value={message}
                 onChange={e => { setMessage(e.target.value); setTemplate(''); }}
@@ -203,7 +205,7 @@ const WhatsAppMarketing = () => {
                 rows={8}
                 className={`${inputCls} resize-none`}
               />
-              <p className="text-[#555] text-xs mt-1">{message.length} characters</p>
+              <p className={`${T.faint} text-xs mt-1`}>{message.length} characters</p>
             </div>
 
             {/* Send button */}
@@ -221,7 +223,7 @@ const WhatsAppMarketing = () => {
               }
             </motion.button>
             {selected.size > 0 && (
-              <p className="text-[#555] text-xs text-center mt-2">
+              <p className={`${T.faint} text-xs text-center mt-2`}>
                 WhatsApp will open for each customer. Allow popups.
               </p>
             )}
@@ -229,11 +231,11 @@ const WhatsAppMarketing = () => {
         </div>
 
         {/* Right — Customer list */}
-        <div className="bg-[#0F0F0F] border border-white/5 rounded-xl overflow-hidden">
+        <div className={`${T.card} rounded-xl overflow-hidden`}>
           {/* Filters */}
-          <div className="px-5 py-4 border-b border-white/5">
+          <div className={`px-5 py-4 border-b ${T.border}`}>
             <div className="flex items-center justify-between mb-3">
-              <h3 className="text-white font-semibold flex items-center gap-2">
+              <h3 className={`${T.heading} font-semibold flex items-center gap-2`}>
                 <Users className="w-4 h-4 text-[#D4AF37]" />
                 Customers ({customers.length})
               </h3>
@@ -271,8 +273,8 @@ const WhatsAppMarketing = () => {
           <div className="overflow-y-auto" style={{ maxHeight: '460px' }}>
             {customers.length === 0 ? (
               <div className="text-center py-12">
-                <Users className="w-10 h-10 mx-auto mb-3 text-[#A3A3A3]/30" />
-                <p className="text-[#A3A3A3] text-sm">No customers match this filter</p>
+                <Users className={`w-10 h-10 mx-auto mb-3 ${T.muted}/30`} />
+                <p className={`${T.muted} text-sm`}>No customers match this filter</p>
               </div>
             ) : (
               <AnimatePresence>
@@ -285,7 +287,7 @@ const WhatsAppMarketing = () => {
                       animate={{ opacity: 1 }}
                       transition={{ delay: i * 0.02 }}
                       onClick={() => toggleCustomer(c.phone)}
-                      className="flex items-center gap-3 px-5 py-3 border-b border-white/5 cursor-pointer transition-all hover:bg-white/3"
+                      className={`flex items-center gap-3 px-5 py-3 border-b ${T.border} cursor-pointer transition-all hover:bg-white/3`}
                       style={isSelected ? { background: 'rgba(212,175,55,0.06)' } : {}}
                     >
                       {/* Checkbox */}
@@ -305,8 +307,8 @@ const WhatsAppMarketing = () => {
 
                       {/* Info */}
                       <div className="flex-1 min-w-0">
-                        <p className="text-white text-sm font-medium truncate">{c.name}</p>
-                        <p className="text-[#555] text-xs">
+                        <p className={`${T.label} text-sm font-medium truncate`}>{c.name}</p>
+                        <p className={`${T.faint} text-xs`}>
                           {c.phone} · {c.orderCount} order{c.orderCount !== 1 ? 's' : ''} · {CUR}{c.totalSpend.toFixed(0)}
                         </p>
                       </div>
@@ -333,9 +335,9 @@ const WhatsAppMarketing = () => {
 
           {/* Selected count */}
           {selected.size > 0 && (
-            <div className="px-5 py-3 border-t border-white/5 flex items-center justify-between">
+            <div className={`px-5 py-3 border-t ${T.border} flex items-center justify-between`}>
               <p className="text-[#D4AF37] text-sm font-semibold">{selected.size} selected</p>
-              <button onClick={() => setSelected(new Set())} className="text-[#555] hover:text-white text-xs transition-colors">
+              <button onClick={() => setSelected(new Set())} className={`text-[#555] hover:${T.body} text-xs transition-colors`}>
                 Clear
               </button>
             </div>

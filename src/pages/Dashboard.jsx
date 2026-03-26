@@ -63,6 +63,17 @@ const Dashboard = () => {
     document.documentElement.classList.toggle('light-mode', mode === 'light');
   }, [cafe?.mode]);
 
+  // Theme shortcuts — used on root wrappers below
+  const isLight = cafe?.mode === 'light';
+  const rootBg   = isLight ? 'bg-[#F5F3EE]' : 'bg-[#050505]';
+  const sidebarBg = isLight ? 'bg-white border-r border-[#E5E5E5]' : 'bg-[#050505] border-r border-white/5';
+  const headerBg  = isLight ? 'bg-white/90 border-b border-[#E5E5E5]' : 'bg-[#050505]/80 border-b border-white/5';
+  const navText   = isLight ? 'text-[#444444]' : 'text-[#A3A3A3]';
+  const navHover  = isLight ? 'hover:bg-[#F0EDE8] hover:text-[#111111]' : 'hover:text-white hover:bg-white/5';
+  const footerBorder = isLight ? 'border-t border-[#E5E5E5]' : 'border-t border-white/5';
+  const footerText   = isLight ? 'text-[#666666]' : 'text-[#555]';
+  const footerEmail  = isLight ? 'text-[#111111]' : 'text-white';
+
   // Safe feature resolver: defaults ALL features to true if missing (backward compat)
   const features = {
     staff:        cafe?.features?.staffManagementEnabled    !== false,
@@ -99,7 +110,7 @@ const Dashboard = () => {
   ];
 
   return (
-    <div className="min-h-screen bg-[#050505]" style={{ fontFamily: 'Manrope, sans-serif' }}>
+    <div className={`min-h-screen ${rootBg}`} style={{ fontFamily: 'Manrope, sans-serif' }}>
       {/* Mobile Sidebar Overlay */}
       {sidebarOpen && (
         <div 
@@ -143,7 +154,7 @@ const Dashboard = () => {
       </AnimatePresence>
 
       {/* Sidebar */}
-      <aside className={`fixed top-0 left-0 h-screen w-64 bg-[#050505] border-r border-white/5 flex flex-col z-50 transform transition-transform lg:translate-x-0 ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'}`}>
+      <aside className={`fixed top-0 left-0 h-screen w-64 flex flex-col z-50 transform transition-transform lg:translate-x-0 ${sidebarBg} ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'}`}>
         {/* Logo header — fixed at top */}
         <div className="flex items-center justify-between p-4 flex-shrink-0">
           <h1 className="text-xl font-bold text-[#D4AF37]" style={{ fontFamily: 'Playfair Display, serif' }}>BRANDING ARCHITECT</h1>
@@ -179,8 +190,8 @@ const Dashboard = () => {
                   isActive && !locked
                     ? 'bg-[#D4AF37] text-black font-semibold'
                     : locked
-                    ? 'text-[#333] cursor-pointer hover:text-[#555] hover:bg-white/2'
-                    : 'text-[#A3A3A3] hover:text-white hover:bg-white/5'
+                    ? `${isLight ? 'text-[#BBBBBB]' : 'text-[#333]'} cursor-pointer ${isLight ? 'hover:bg-[#F0EDE8] hover:text-[#888]' : 'hover:text-[#555] hover:bg-white/2'}`
+                    : `${navText} ${navHover}`
                 }`}
               >
                 <Icon className="w-5 h-5 flex-shrink-0" />
@@ -192,10 +203,10 @@ const Dashboard = () => {
         </nav>
 
         {/* Logout — always visible at bottom */}
-        <div className="border-t border-white/5 p-4 flex-shrink-0">
+        <div className={`${footerBorder} p-4 flex-shrink-0`}>
           <div className="px-4 py-2 mb-2">
-            <p className="text-[#A3A3A3] text-xs">Logged in as</p>
-            <p className="text-white text-sm font-semibold truncate">{user?.email}</p>
+            <p className={`text-xs ${footerText}`}>Logged in as</p>
+            <p className={`text-sm font-semibold truncate ${footerEmail}`}>{user?.email}</p>
           </div>
           <button
             data-testid="logout-btn"
@@ -211,14 +222,14 @@ const Dashboard = () => {
       {/* Main Content */}
       <div className="lg:ml-64">
         {/* Header */}
-        <header className="sticky top-0 z-30 h-16 border-b border-white/5 bg-[#050505]/80 backdrop-blur-md px-6 flex items-center justify-between">
+        <header className={`sticky top-0 z-30 h-16 backdrop-blur-md px-6 flex items-center justify-between ${headerBg}`}>
           <button
             className="lg:hidden text-[#D4AF37]"
             onClick={() => setSidebarOpen(true)}
           >
             <MenuIcon className="w-6 h-6" />
           </button>
-          <h2 className="text-2xl font-bold text-white" style={{ fontFamily: 'Playfair Display, serif' }}>
+          <h2 className={`text-2xl font-bold ${isLight ? 'text-[#111111]' : 'text-white'}`} style={{ fontFamily: 'Playfair Display, serif' }}>
             {menuItems.find(item => item.id === activeTab)?.label}
           </h2>
           <div className="w-8 lg:hidden" />

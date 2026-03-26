@@ -14,6 +14,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Sparkles, Send, RefreshCw, Coffee, AlertCircle, Trash2 } from 'lucide-react';
 import { askAI } from '../../services/aiService';
 import { toast } from 'sonner';
+import { useTheme } from '../../hooks/useTheme';
 
 // ─── Suggested quick questions ────────────────────────────────────────────────
 const SUGGESTIONS = [
@@ -62,6 +63,7 @@ const Bubble = ({ msg }) => {
 const AskAI = () => {
   const { user } = useAuth();
   const cafeId   = user?.cafeId;
+  const { T, isLight } = useTheme();
 
   const [messages,  setMessages ] = useState([
     { role: 'assistant', content: "Hi! I'm your café AI assistant. Ask me anything about your orders, revenue, menu performance, or how to grow your business." }
@@ -122,15 +124,15 @@ const AskAI = () => {
             <Sparkles className="w-5 h-5 text-[#D4AF37]" />
           </div>
           <div>
-            <h2 className="text-white font-bold text-xl" style={{ fontFamily: 'Playfair Display, serif' }}>
+            <h2 className={`${T.heading} font-bold text-xl`} style={{ fontFamily: 'Playfair Display, serif' }}>
               AI Business Assistant
             </h2>
-            <p className="text-[#555] text-xs">Ask about your orders, revenue, and growth</p>
+            <p className={`${T.faint} text-xs`}>Ask about your orders, revenue, and growth</p>
           </div>
         </div>
         <button
           onClick={clearChat}
-          className="flex items-center gap-1.5 px-3 py-1.5 text-xs text-[#555] hover:text-[#A3A3A3] border border-white/5 hover:border-white/10 rounded-lg transition-all"
+          className={`flex items-center gap-1.5 px-3 py-1.5 text-xs text-[#555] hover:text-[#A3A3A3] border ${T.border} hover:${T.borderMd} rounded-lg transition-all`}
         >
           <Trash2 className="w-3 h-3" />
           Clear
@@ -168,7 +170,7 @@ const AskAI = () => {
       {/* Suggestions */}
       {messages.length <= 2 && !loading && (
         <div className="flex-shrink-0 mt-3 mb-3">
-          <p className="text-[#555] text-xs mb-2">💡 Quick questions:</p>
+          <p className={`${T.faint} text-xs mb-2`}>💡 Quick questions:</p>
           <div className="flex flex-wrap gap-2">
             {SUGGESTIONS.map(s => (
               <button key={s} onClick={() => handleSend(s)}
@@ -192,7 +194,7 @@ const AskAI = () => {
             placeholder="Ask about your business…"
             rows={1}
             disabled={loading}
-            className="flex-1 bg-transparent text-white placeholder:text-[#444] text-sm resize-none outline-none px-3 py-3 leading-relaxed"
+            className={`flex-1 bg-transparent ${T.heading} placeholder:text-[#444] text-sm resize-none outline-none px-3 py-3 leading-relaxed`}
             style={{ maxHeight: '120px', minHeight: '44px' }}
             onInput={e => {
               // Auto-resize textarea
@@ -208,7 +210,7 @@ const AskAI = () => {
             style={{ background: input.trim() && !loading ? 'linear-gradient(135deg,#D4AF37,#C5A059)' : 'rgba(255,255,255,0.06)' }}
           >
             {loading
-              ? <RefreshCw className="w-4 h-4 text-[#A3A3A3] animate-spin" />
+              ? <RefreshCw className={`w-4 h-4 ${T.muted} animate-spin`} />
               : <Send className="w-4 h-4 text-black" />
             }
           </motion.button>

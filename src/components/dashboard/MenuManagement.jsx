@@ -7,11 +7,13 @@ import { Plus, Edit, Trash2, X, RefreshCw } from 'lucide-react';
 import { toast } from 'sonner';
 import MediaUpload, { MediaPreview } from '../MediaUpload';
 import AddOnEditor from './AddOnEditor';
+import { useTheme } from '../../hooks/useTheme';
 
 const MenuManagement = () => {
   const { user } = useAuth();
   const cafeId = user?.cafeId;
   const { data: cafe } = useDocument('cafes', cafeId);
+  const { T, isLight } = useTheme();
   const CUR = cafe?.currencySymbol || '₹';
   const [showForm, setShowForm] = useState(false);
   const [editingItem, setEditingItem] = useState(null);
@@ -116,12 +118,12 @@ const MenuManagement = () => {
       </button>
 
       {showForm && (
-        <div className="bg-[#0F0F0F] border border-white/5 rounded-sm p-6">
+        <div className={`${T.card} rounded-sm p-6`}>
           <div className="flex items-center justify-between mb-6">
-            <h3 className="text-xl font-semibold text-white" style={{ fontFamily: 'Playfair Display, serif' }}>
+            <h3 className={`text-xl font-semibold ${T.heading}`} style={{ fontFamily: 'Playfair Display, serif' }}>
               {editingItem ? 'Edit Menu Item' : 'Add New Menu Item'}
             </h3>
-            <button onClick={resetForm} disabled={saving} className="text-[#A3A3A3] hover:text-white transition-colors disabled:opacity-50">
+            <button onClick={resetForm} disabled={saving} className={`text-[#A3A3A3] hover:${T.heading} transition-colors disabled:opacity-50`}>
               <X className="w-6 h-6" />
             </button>
           </div>
@@ -129,12 +131,12 @@ const MenuManagement = () => {
           <form onSubmit={handleSubmit} className="space-y-4">
             {/* Name */}
             <div>
-              <label className="block text-white text-sm font-medium mb-2">Item Name</label>
+              <label className={`block ${T.label} text-sm font-medium mb-2`}>Item Name</label>
               <input
                 type="text"
                 value={formData.name}
                 onChange={(e) => setFormData(prev => ({ ...prev, name: e.target.value }))}
-                className="w-full bg-black/20 border border-white/10 text-white placeholder:text-neutral-600 focus:border-[#D4AF37] focus:ring-1 focus:ring-[#D4AF37] rounded-sm h-12 px-4 transition-all"
+                className={`w-full ${T.innerCard} border ${T.borderMd} text-white placeholder:text-neutral-600 focus:border-[#D4AF37] focus:ring-1 focus:ring-[#D4AF37] rounded-sm h-12 px-4 transition-all`}
                 placeholder="e.g., Espresso"
                 required
                 disabled={saving}
@@ -144,25 +146,25 @@ const MenuManagement = () => {
             {/* Price + Category */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
-                <label className="block text-white text-sm font-medium mb-2">{`Price (${CUR})`}</label>
+                <label className={`block ${T.label} text-sm font-medium mb-2`}>{`Price (${CUR})`}</label>
                 <input
                   type="number"
                   step="0.01"
                   value={formData.price}
                   onChange={(e) => setFormData(prev => ({ ...prev, price: e.target.value }))}
-                  className="w-full bg-black/20 border border-white/10 text-white placeholder:text-neutral-600 focus:border-[#D4AF37] focus:ring-1 focus:ring-[#D4AF37] rounded-sm h-12 px-4 transition-all"
+                  className={`w-full ${T.innerCard} border ${T.borderMd} text-white placeholder:text-neutral-600 focus:border-[#D4AF37] focus:ring-1 focus:ring-[#D4AF37] rounded-sm h-12 px-4 transition-all`}
                   placeholder="99"
                   required
                   disabled={saving}
                 />
               </div>
               <div>
-                <label className="block text-white text-sm font-medium mb-2">Category</label>
+                <label className={`block ${T.label} text-sm font-medium mb-2`}>Category</label>
                 <input
                   type="text"
                   value={formData.category}
                   onChange={(e) => setFormData(prev => ({ ...prev, category: e.target.value }))}
-                  className="w-full bg-black/20 border border-white/10 text-white placeholder:text-neutral-600 focus:border-[#D4AF37] focus:ring-1 focus:ring-[#D4AF37] rounded-sm h-12 px-4 transition-all"
+                  className={`w-full ${T.innerCard} border ${T.borderMd} text-white placeholder:text-neutral-600 focus:border-[#D4AF37] focus:ring-1 focus:ring-[#D4AF37] rounded-sm h-12 px-4 transition-all`}
                   placeholder="e.g., Coffee"
                   disabled={saving}
                 />
@@ -194,9 +196,9 @@ const MenuManagement = () => {
                 checked={formData.available}
                 onChange={(e) => setFormData(prev => ({ ...prev, available: e.target.checked }))}
                 disabled={saving}
-                className="w-5 h-5 rounded border-white/10 bg-black/20 text-[#D4AF37] focus:ring-[#D4AF37]"
+                className={`w-5 h-5 rounded ${T.borderMd} ${T.innerCard} text-[#D4AF37] focus:ring-[#D4AF37]`}
               />
-              <label className="text-white">Available for order</label>
+              <label className={`${T.heading}`}>Available for order</label>
             </div>
 
             {/* Buttons */}
@@ -213,7 +215,7 @@ const MenuManagement = () => {
                 type="button"
                 onClick={resetForm}
                 disabled={saving}
-                className="bg-transparent border border-white/10 text-white hover:bg-white/5 rounded-sm px-6 py-3 font-semibold transition-all disabled:opacity-50"
+                className={`bg-transparent border ${T.borderMd} text-white hover:${T.subCard} rounded-sm px-6 py-3 font-semibold transition-all disabled:opacity-50`}
               >
                 Cancel
               </button>
@@ -224,11 +226,11 @@ const MenuManagement = () => {
 
       {/* Menu items list */}
       {loading ? (
-        <div className="text-center text-[#A3A3A3] py-8">Loading menu...</div>
+        <div className={`text-center ${T.muted} py-8`}>Loading menu...</div>
       ) : menuItems && menuItems.length > 0 ? (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {menuItems.map((item) => (
-            <div key={item.id} className="bg-[#0F0F0F] border border-white/5 rounded-sm overflow-hidden hover:border-white/10 transition-colors">
+            <div key={item.id} className={`${T.card} rounded-sm overflow-hidden hover:${T.borderMd} transition-colors`}>
               {item.image && (
                 <div className="aspect-video overflow-hidden">
                   <MediaPreview
@@ -241,8 +243,8 @@ const MenuManagement = () => {
               <div className="p-6">
                 <div className="flex justify-between items-start mb-2">
                   <div>
-                    <h3 className="text-xl font-semibold text-white">{item.name}</h3>
-                    {item.category && <p className="text-[#A3A3A3] text-sm">{item.category}</p>}
+                    <h3 className={`text-xl font-semibold ${T.heading}`}>{item.name}</h3>
+                    {item.category && <p className={`${T.muted} text-sm`}>{item.category}</p>}
                   </div>
                   <span className="text-lg font-bold text-[#D4AF37]">{CUR}{item.price.toFixed(2)}</span>
                 </div>
@@ -257,7 +259,7 @@ const MenuManagement = () => {
                   )}
                 </div>
                 <div className="flex gap-2">
-                  <button onClick={() => handleEdit(item)} className="flex-1 bg-white/5 hover:bg-white/10 text-white rounded-sm px-4 py-2 transition-all flex items-center justify-center gap-2">
+                  <button onClick={() => handleEdit(item)} className={`flex-1 ${T.subCard} hover:bg-white/10 text-white rounded-sm px-4 py-2 transition-all flex items-center justify-center gap-2`}>
                     <Edit className="w-4 h-4" /> Edit
                   </button>
                   <button onClick={() => toggleAvailability(item.id, item.available)} className="bg-[#D4AF37]/20 hover:bg-[#D4AF37]/30 text-[#D4AF37] rounded-sm px-4 py-2 transition-all">
@@ -272,8 +274,8 @@ const MenuManagement = () => {
           ))}
         </div>
       ) : (
-        <div className="bg-[#0F0F0F] border border-white/5 rounded-sm p-12 text-center">
-          <p className="text-[#A3A3A3] text-lg">No menu items yet. Add your first item!</p>
+        <div className={`${T.card} rounded-sm p-12 text-center`}>
+          <p className={`${T.muted} text-lg`}>No menu items yet. Add your first item!</p>
         </div>
       )}
     </div>

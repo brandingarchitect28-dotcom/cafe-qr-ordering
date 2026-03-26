@@ -4,6 +4,7 @@ import { useDocument } from '../../hooks/useFirestore';
 import { QRCodeSVG } from 'qrcode.react';
 import { Download, Printer, ExternalLink, Copy, Check } from 'lucide-react';
 import { toast } from 'sonner';
+import { useTheme } from '../../hooks/useTheme';
 
 const QRGenerator = () => {
   const { user } = useAuth();
@@ -13,6 +14,7 @@ const QRGenerator = () => {
   
   // Get cafe data to show cafe name
   const { data: cafe } = useDocument('cafes', cafeId);
+  const { T, isLight } = useTheme();
 
   // Use production URL or current origin
   // For deployed apps, use the actual domain; for preview, use window.location.origin
@@ -68,8 +70,8 @@ const QRGenerator = () => {
 
   if (!cafeId) {
     return (
-      <div className="bg-[#0F0F0F] border border-white/5 rounded-sm p-8 text-center">
-        <p className="text-[#A3A3A3]">No cafe assigned to your account</p>
+      <div className={`${T.card} rounded-sm p-8 text-center`}>
+        <p className={`${T.muted}`}>No cafe assigned to your account</p>
       </div>
     );
   }
@@ -77,11 +79,11 @@ const QRGenerator = () => {
   return (
     <div className="space-y-6">
       {/* QR Code Display */}
-      <div className="bg-[#0F0F0F] border border-white/5 rounded-sm p-8">
-        <h3 className="text-xl font-semibold text-white mb-2 text-center" style={{ fontFamily: 'Playfair Display, serif' }}>
+      <div className={`${T.card} rounded-sm p-8`}>
+        <h3 className={`text-xl font-semibold ${T.heading} mb-2 text-center`} style={{ fontFamily: 'Playfair Display, serif' }}>
           {cafe?.name || 'Your Café'} QR Code
         </h3>
-        <p className="text-[#A3A3A3] text-sm text-center mb-6">
+        <p className={`${T.muted} text-sm text-center mb-6`}>
           Scan to view menu and place orders
         </p>
 
@@ -102,7 +104,7 @@ const QRGenerator = () => {
 
           {/* Cafe URL with Copy Button */}
           <div className="text-center space-y-2 print:hidden">
-            <p className="text-[#A3A3A3] text-sm">Scan to order from:</p>
+            <p className={`${T.muted} text-sm`}>Scan to order from:</p>
             <div className="flex items-center justify-center gap-2">
               <p className="text-[#D4AF37] font-mono text-sm break-all max-w-md">
                 {cafeUrl}
@@ -115,7 +117,7 @@ const QRGenerator = () => {
                 {copied ? (
                   <Check className="w-4 h-4 text-green-400" />
                 ) : (
-                  <Copy className="w-4 h-4 text-[#A3A3A3]" />
+                  <Copy className={`w-4 h-4 ${T.muted}`} />
                 )}
               </button>
             </div>
@@ -147,7 +149,7 @@ const QRGenerator = () => {
             <button
               onClick={openCafePage}
               data-testid="preview-cafe-btn"
-              className="bg-white/5 border border-white/10 text-white hover:bg-white/10 rounded-sm px-6 py-3 font-semibold transition-all duration-300 flex items-center gap-2"
+              className={`${T.subCard} border ${T.borderMd} text-white hover:bg-white/10 rounded-sm px-6 py-3 font-semibold transition-all duration-300 flex items-center gap-2`}
             >
               <ExternalLink className="w-5 h-5" />
               Preview Page
@@ -158,7 +160,7 @@ const QRGenerator = () => {
 
       {/* Instructions */}
       <div className="bg-[#D4AF37]/10 border border-[#D4AF37]/30 rounded-sm p-6 print:hidden">
-        <h4 className="text-white font-semibold mb-3">How to Use QR Code</h4>
+        <h4 className={`${T.heading} font-semibold mb-3`}>How to Use QR Code</h4>
         <ol className="text-[#E5E5E5] text-sm space-y-2">
           <li>1. <strong>Download</strong> the QR code as PNG image</li>
           <li>2. <strong>Print</strong> the QR code on table tents, menus, or posters</li>
