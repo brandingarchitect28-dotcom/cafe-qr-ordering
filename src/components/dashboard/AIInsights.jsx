@@ -12,8 +12,8 @@ import { useDocument } from '../../hooks/useFirestore';
 import { getFunctions, httpsCallable } from 'firebase/functions';
 import { motion, AnimatePresence } from 'framer-motion';
 import { toast } from 'sonner';
-import {
 import { useTheme } from '../../hooks/useTheme';
+import {
   Sparkles, TrendingUp, TrendingDown, Package, Clock,
   RefreshCw, ChevronDown, ChevronUp, Zap, Target,
   MessageSquare, BarChart2, ShoppingBag, AlertTriangle,
