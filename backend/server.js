@@ -412,7 +412,6 @@ app.post('/api/ai-menu-upload', async (req, res) => {
       console.error('[AI Menu] Empty response from OpenAI');
       return res.status(502).json({ error: 'No response from AI. Try a clearer image.' });
     }
-    }
 
     // ── Safe JSON parsing — strip markdown fences if present ──────────────────
     let items;
