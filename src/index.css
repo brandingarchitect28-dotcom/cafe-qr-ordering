@@ -635,3 +635,251 @@ html.light-mode ::-webkit-scrollbar-thumb:hover { background: rgba(197,160,89,0.
   will-change: auto; /* browser hints, not permanent promotion */
 }
 
+
+/* ============================================================
+   LIGHT MODE — COMPREHENSIVE VISIBILITY FIX
+   Covers all missing cases from the initial light mode pass.
+   CSS-only. Zero component files changed.
+   ============================================================ */
+
+/* ── 1. ROOT COLOUR TOKENS for light mode ────────────────────
+   These CSS variables let any component use var(--lm-text) etc.
+   The existing Tailwind class overrides remain in place.
+   ──────────────────────────────────────────────────────────── */
+html.light-mode {
+  --lm-bg:           #F5F3EE;
+  --lm-bg-card:      #FFFFFF;
+  --lm-bg-subtle:    rgba(0,0,0,0.04);
+  --lm-text:         #1A1A1A;
+  --lm-text-muted:   #555555;
+  --lm-text-faint:   #888888;
+  --lm-border:       rgba(0,0,0,0.10);
+  --lm-placeholder:  #999999;
+}
+
+/* ── 2. BODY & ROOT — force colour in light mode ─────────────
+   Overrides the dark base set by html/body/root rules above.
+   ──────────────────────────────────────────────────────────── */
+html.light-mode body,
+html.light-mode #root {
+  color: #1A1A1A !important;
+}
+
+/* ── 3. ALL TEXT COLOUR CLASSES — complete coverage ──────────
+   Every Tailwind text-[#xxx] that appears in the codebase.
+   ──────────────────────────────────────────────────────────── */
+
+/* Primary text (was white, now near-black) */
+html.light-mode .text-white         { color: #111111 !important; }
+html.light-mode .text-\[#E5E5E5\]   { color: #1A1A1A !important; }
+html.light-mode .text-\[#D1D1D1\]   { color: #2A2A2A !important; }
+html.light-mode .text-\[#D0D0D0\]   { color: #2A2A2A !important; }
+
+/* Muted / secondary text */
+html.light-mode .text-\[#A3A3A3\]   { color: #555555 !important; }
+html.light-mode .text-\[#666\]       { color: #555555 !important; }
+html.light-mode .text-\[#555\]       { color: #666666 !important; }
+html.light-mode .text-\[#444\]       { color: #777777 !important; }
+
+/* Very faint dark-mode labels — these were nearly invisible even in dark mode,
+   flip them to a readable mid-grey in light mode */
+html.light-mode .text-\[#333\]       { color: #777777 !important; }
+html.light-mode .text-\[#2a2a2a\]    { color: #888888 !important; }
+
+/* Neutral Tailwind classes */
+html.light-mode .text-neutral-600    { color: #555555 !important; }
+html.light-mode .text-neutral-500    { color: #666666 !important; }
+html.light-mode .text-neutral-400    { color: #777777 !important; }
+
+/* text-black stays black in light mode — already correct */
+
+/* ── 4. PLACEHOLDER TEXT — all input types ───────────────────
+   placeholder:text-neutral-600 is used 42× across components.
+   ──────────────────────────────────────────────────────────── */
+html.light-mode input::placeholder,
+html.light-mode textarea::placeholder,
+html.light-mode select::placeholder {
+  color: #999999 !important;
+  opacity: 1;
+}
+html.light-mode .placeholder\:text-neutral-600::placeholder { color: #999999 !important; }
+html.light-mode .placeholder\:text-neutral-500::placeholder { color: #AAAAAA !important; }
+html.light-mode .placeholder\:text-neutral-400::placeholder { color: #BBBBBB !important; }
+
+/* ── 5. INPUT / TEXTAREA / SELECT — full visibility ─────────
+   Covers background, text, border, and caret for all states.
+   ──────────────────────────────────────────────────────────── */
+html.light-mode input:not([type="checkbox"]):not([type="radio"]):not([type="range"]),
+html.light-mode textarea,
+html.light-mode select {
+  background-color: #FFFFFF !important;
+  color:            #111111 !important;
+  border-color:     rgba(0,0,0,0.15) !important;
+  caret-color:      #111111 !important;
+}
+
+html.light-mode input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):focus,
+html.light-mode textarea:focus,
+html.light-mode select:focus {
+  border-color: rgba(212,175,55,0.7) !important;
+  box-shadow: 0 0 0 3px rgba(212,175,55,0.18) !important;
+  outline: none !important;
+}
+
+/* Select dropdown option text */
+html.light-mode select option {
+  background-color: #FFFFFF;
+  color:            #111111;
+}
+
+/* ── 6. DARK CARD BACKGROUNDS — all shades ───────────────────
+   Covers bg-[#0F0F0F], bg-[#0A0A0A], bg-[#050505],
+   bg-[#060606], bg-[#151515], and bg-black variants.
+   ──────────────────────────────────────────────────────────── */
+html.light-mode .bg-\[#0F0F0F\],
+html.light-mode .bg-\[#0A0A0A\],
+html.light-mode .bg-\[#050505\],
+html.light-mode .bg-\[#060606\],
+html.light-mode .bg-\[#030303\],
+html.light-mode .bg-\[#151515\],
+html.light-mode .bg-\[#111\],
+html.light-mode .bg-\[#1A1A1A\] {
+  background-color: #FFFFFF !important;
+  background-image: none !important;
+}
+
+/* Semi-transparent dark overlays → subtle light */
+html.light-mode .bg-black\/20,
+html.light-mode .bg-black\/30,
+html.light-mode .bg-black\/40,
+html.light-mode .bg-black\/50,
+html.light-mode .bg-black\/60 {
+  background-color: rgba(0,0,0,0.05) !important;
+}
+
+html.light-mode .bg-white\/3,
+html.light-mode .bg-white\/4,
+html.light-mode .bg-white\/5,
+html.light-mode .bg-white\/\[0\.03\],
+html.light-mode .bg-white\/\[0\.04\],
+html.light-mode .bg-white\/\[0\.05\] {
+  background-color: rgba(0,0,0,0.04) !important;
+}
+
+/* ── 7. BORDERS — all opacity variants ───────────────────────*/
+html.light-mode .border-white\/5,
+html.light-mode .border-white\/8,
+html.light-mode .border-white\/10,
+html.light-mode .border-white\/\[0\.05\],
+html.light-mode .border-white\/\[0\.08\] {
+  border-color: rgba(0,0,0,0.09) !important;
+}
+
+/* ── 8. BUTTONS — contrast fixes ────────────────────────────
+   Dark bg buttons need to become visible.
+   Gold buttons (#D4AF37) already readable — keep them.
+   White-text-on-dark buttons get flipped.
+   ──────────────────────────────────────────────────────────── */
+
+/* Dark background buttons with white text */
+html.light-mode button.bg-\[#0F0F0F\],
+html.light-mode button.bg-\[#0A0A0A\],
+html.light-mode button.bg-\[#1A1A1A\] {
+  background-color: #F0EDE8 !important;
+  color:            #111111 !important;
+  border-color:     rgba(0,0,0,0.12) !important;
+}
+
+/* Subtle/ghost buttons (bg-white/5 pattern) */
+html.light-mode button.bg-white\/5,
+html.light-mode button.bg-white\/8,
+html.light-mode button.bg-white\/10 {
+  background-color: rgba(0,0,0,0.06) !important;
+  color:            #111111 !important;
+}
+
+/* Hover states for ghost buttons */
+html.light-mode button.hover\:bg-white\/10:hover,
+html.light-mode button.hover\:bg-white\/8:hover {
+  background-color: rgba(0,0,0,0.09) !important;
+}
+
+/* ── 9. ACTIVE NAV BUTTON — gold stays readable ──────────────*/
+html.light-mode nav button.bg-\[#D4AF37\] {
+  color: #000000 !important;
+}
+
+/* Non-active nav items */
+html.light-mode nav button.text-\[#A3A3A3\] {
+  color: #555555 !important;
+}
+
+/* ── 10. LABELS — all headings and form labels ───────────────
+   h1–h6 and label elements inside the main content area.
+   ──────────────────────────────────────────────────────────── */
+html.light-mode main h1,
+html.light-mode main h2,
+html.light-mode main h3,
+html.light-mode main h4,
+html.light-mode main h5,
+html.light-mode main h6 {
+  color: #111111 !important;
+}
+
+html.light-mode label {
+  color: #1A1A1A !important;
+}
+
+html.light-mode p {
+  color: inherit;
+}
+
+/* ── 11. INLINE STYLE OVERRIDES — font colour ────────────────
+   Components using style={{ color: '#A3A3A3' }} etc. can't be
+   targeted by class selectors. Target by element + context.
+   ──────────────────────────────────────────────────────────── */
+html.light-mode [style*="color: rgb(163, 163, 163)"],
+html.light-mode [style*="color:#A3A3A3"],
+html.light-mode [style*="color: #A3A3A3"] {
+  color: #555555 !important;
+}
+html.light-mode [style*="color: rgb(85, 85, 85)"],
+html.light-mode [style*="color:#555555"],
+html.light-mode [style*="color: #555"] {
+  color: #666666 !important;
+}
+
+/* ── 12. BADGE / CHIP components ─────────────────────────────*/
+html.light-mode .rounded-full.bg-white\/10 {
+  background-color: rgba(0,0,0,0.08) !important;
+  color: #111111 !important;
+}
+
+/* ── 13. TABLE elements ───────────────────────────────────────*/
+html.light-mode table { color: #111111 !important; }
+html.light-mode th    { color: #111111 !important; background-color: rgba(0,0,0,0.05) !important; }
+html.light-mode td    { color: #1A1A1A !important; border-color: rgba(0,0,0,0.07) !important; }
+html.light-mode tr:nth-child(even) td { background-color: rgba(0,0,0,0.025) !important; }
+
+/* ── 14. MODAL / OVERLAY backgrounds ─────────────────────────*/
+html.light-mode .bg-black\/70,
+html.light-mode .bg-black\/80 {
+  background-color: rgba(0,0,0,0.45) !important;
+}
+
+/* ── 15. RECHARTS / CHART text ───────────────────────────────*/
+html.light-mode .recharts-text,
+html.light-mode .recharts-label,
+html.light-mode .recharts-legend-item-text {
+  fill:  #333333 !important;
+  color: #333333 !important;
+}
+html.light-mode .recharts-cartesian-axis-tick text {
+  fill: #555555 !important;
+}
+html.light-mode .recharts-tooltip-wrapper .recharts-default-tooltip {
+  background-color: #FFFFFF !important;
+  border-color: rgba(0,0,0,0.12) !important;
+  color: #111111 !important;
+}
+
