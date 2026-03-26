@@ -65,7 +65,7 @@ const getPayment = (m) => PAYMENT_LABEL[m] || PAYMENT_LABEL.counter;
 
 // ─── RecentOrderCard ──────────────────────────────────────────────────────────
 
-const RecentOrderCard = React.memo(({ order, isNew, CUR }) => {
+const RecentOrderCard = React.memo(({ order, isNew, CUR, T }) => {
   const [lit, setLit] = useState(isNew);
   const st         = getStatus(order.orderStatus);
   const src        = order.source && order.source !== 'qr' && order.source !== 'direct'
@@ -617,7 +617,7 @@ const Overview = () => {
             <AnimatePresence mode="popLayout" initial={false}>
               {recentOrders.map(order => (
                 <RecentOrderCard
-                  key={order.id}
+T={T}                   key={order.id}
                   order={order}
                   isNew={newIds.has(order.id)}
                   CUR={CUR}

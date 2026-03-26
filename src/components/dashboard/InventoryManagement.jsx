@@ -59,7 +59,7 @@ const fmtDate = (ts) => {
 
 // ─── InventoryForm (add / edit modal) ────────────────────────────────────────
 
-const InventoryForm = ({ initial, onSave, onClose, saving }) => {
+const InventoryForm = ({ initial, onSave, onClose, saving, T }) => {
   const [form, setForm] = useState(initial || EMPTY_FORM);
 
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
@@ -73,10 +73,8 @@ const InventoryForm = ({ initial, onSave, onClose, saving }) => {
     onSave(form);
   };
 
-  const inputCls =
-    'w-full ${T.innerCard} border ${T.borderMd} text-white placeholder:text-neutral-600 ' +
-    'focus:border-[#D4AF37] focus:ring-1 focus:ring-[#D4AF37] rounded-sm h-11 px-4 transition-all text-sm';
-  const labelCls = 'block ${T.label} text-sm font-medium mb-1.5';
+  const inputCls = `w-full ${T.input} rounded-sm h-11 px-4 transition-all text-sm`;
+  const labelCls = ''; // moved inline
 
   return (
     <motion.div
@@ -113,13 +111,13 @@ const InventoryForm = ({ initial, onSave, onClose, saving }) => {
         <form onSubmit={handleSubmit} className="p-6 space-y-4">
           {/* Item Name */}
           <div>
-            <label className={labelCls}>Item Name</label>
+            <label className={`block ${T.label} text-sm font-medium mb-1.5`}>Item Name</label>
             <input
               type="text"
               value={form.itemName}
               onChange={e => set('itemName', e.target.value)}
               placeholder="e.g., Coffee Powder"
-              className={inputCls}
+              className={`w-full ${T.input} rounded-sm h-11 px-4 text-sm transition-all`}
               data-testid="inv-item-name"
               autoFocus
             />
@@ -127,13 +125,13 @@ const InventoryForm = ({ initial, onSave, onClose, saving }) => {
 
           {/* Category */}
           <div>
-            <label className={labelCls}>Category</label>
+            <label className={`block ${T.label} text-sm font-medium mb-1.5`}>Category</label>
             <input
               type="text"
               value={form.category}
               onChange={e => set('category', e.target.value)}
               placeholder="e.g., Beverages, Dairy, Dry Goods"
-              className={inputCls}
+              className={`w-full ${T.input} rounded-sm h-11 px-4 text-sm transition-all`}
               data-testid="inv-category"
             />
           </div>
@@ -141,7 +139,7 @@ const InventoryForm = ({ initial, onSave, onClose, saving }) => {
           {/* Quantity + Unit row */}
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className={labelCls}>Current Quantity</label>
+              <label className={`block ${T.label} text-sm font-medium mb-1.5`}>Current Quantity</label>
               <input
                 type="number"
                 min="0"
@@ -149,12 +147,12 @@ const InventoryForm = ({ initial, onSave, onClose, saving }) => {
                 value={form.quantity}
                 onChange={e => set('quantity', e.target.value)}
                 placeholder="0"
-                className={inputCls}
+                className={`w-full ${T.input} rounded-sm h-11 px-4 text-sm transition-all`}
                 data-testid="inv-quantity"
               />
             </div>
             <div>
-              <label className={labelCls}>Unit</label>
+              <label className={`block ${T.label} text-sm font-medium mb-1.5`}>Unit</label>
               <select
                 value={form.unit}
                 onChange={e => set('unit', e.target.value)}
@@ -170,7 +168,7 @@ const InventoryForm = ({ initial, onSave, onClose, saving }) => {
 
           {/* Low Stock Threshold */}
           <div>
-            <label className={labelCls}>
+            <label className={`block ${T.label} text-sm font-medium mb-1.5`}>
               Low Stock Alert Threshold
               <span className={`${T.muted} font-normal ml-1 text-xs`}>
                 (alert shown when quantity ≤ this value)
@@ -183,14 +181,14 @@ const InventoryForm = ({ initial, onSave, onClose, saving }) => {
               value={form.lowStockThreshold}
               onChange={e => set('lowStockThreshold', e.target.value)}
               placeholder="e.g., 500"
-              className={inputCls}
+              className={`w-full ${T.input} rounded-sm h-11 px-4 text-sm transition-all`}
               data-testid="inv-threshold"
             />
           </div>
 
           {/* Cost Per Unit — for profit calculation */}
           <div>
-            <label className={labelCls}>
+            <label className={`block ${T.label} text-sm font-medium mb-1.5`}>
               Cost Per Unit (₹)
               <span className={`${T.muted} font-normal ml-1 text-xs`}>
                 (used to calculate COGS and net profit)
@@ -203,7 +201,7 @@ const InventoryForm = ({ initial, onSave, onClose, saving }) => {
               value={form.costPerUnit}
               onChange={e => set('costPerUnit', e.target.value)}
               placeholder="e.g., 5.50"
-              className={inputCls}
+              className={`w-full ${T.input} rounded-sm h-11 px-4 text-sm transition-all`}
               data-testid="inv-cost"
             />
           </div>
@@ -237,7 +235,7 @@ const InventoryForm = ({ initial, onSave, onClose, saving }) => {
 
 // ─── QuickQtyEditor — inline quantity adjust cell ────────────────────────────
 
-const QuickQtyEditor = ({ item }) => {
+const QuickQtyEditor = ({ item, T }) => {
   const [editing, setEditing] = useState(false);
   const [val,     setVal    ] = useState(String(item.quantity ?? 0));
   const [saving,  setSaving ] = useState(false);
@@ -578,7 +576,7 @@ const InventoryManagement = () => {
 
                         {/* Stock Quantity — inline editable */}
                         <td className="px-4 py-3.5">
-                          <QuickQtyEditor item={item} />
+                          <QuickQtyEditor T={T} item={item} />
                         </td>
 
                         {/* Threshold */}
@@ -646,7 +644,7 @@ const InventoryManagement = () => {
       <AnimatePresence>
         {showForm && (
           <InventoryForm
-            initial={editTarget
+T={T}             initial={editTarget
               ? {
                   itemName:          editTarget.itemName,
                   category:          editTarget.category,

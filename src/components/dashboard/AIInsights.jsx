@@ -36,7 +36,7 @@ const CARD_VARIANTS = {
 
 // ─── sub-components ───────────────────────────────────────────────────────────
 
-const SectionCard = ({ title, icon: Icon, children, delay = 0, accent = '#D4AF37' }) => (
+const SectionCard = ({ title, icon: Icon, children, delay = 0, accent = '#D4AF37', T }) => (
   <motion.div
     custom={delay}
     variants={CARD_VARIANTS}
@@ -58,21 +58,21 @@ const SectionCard = ({ title, icon: Icon, children, delay = 0, accent = '#D4AF37
   </motion.div>
 );
 
-const InsightBullet = ({ text, color = '#D4AF37' }) => (
+const InsightBullet = ({ text, color = '#D4AF37', T }) => (
   <div className="flex items-start gap-2.5 py-1.5">
     <div className="w-1.5 h-1.5 rounded-full flex-shrink-0 mt-1.5" style={{ background: color }} />
     <p className="text-[#D1D1D1] text-sm leading-relaxed">{text}</p>
   </div>
 );
 
-const StatPill = ({ label, value, color }) => (
+const StatPill = ({ label, value, color, T }) => (
   <div className={`flex items-center justify-between py-2 border-b ${T.border} last:border-0`}>
     <span className={`${T.muted} text-sm`}>{label}</span>
     <span className="font-semibold text-sm" style={{ color }}>{value}</span>
   </div>
 );
 
-const ActionItem = ({ text, index }) => (
+const ActionItem = ({ text, index, T }) => (
   <motion.div
     initial={{ opacity: 0, x: -10 }}
     animate={{ opacity: 1, x: 0 }}
@@ -88,7 +88,7 @@ const ActionItem = ({ text, index }) => (
 
 // ─── Skeleton loader ──────────────────────────────────────────────────────────
 
-const InsightSkeleton = () => (
+const InsightSkeleton = ({ T }) => (
   <div className="space-y-4">
     {[1, 2, 3, 4].map(i => (
       <div key={i} className={`${T.card} rounded-xl p-5 animate-pulse`}>
@@ -105,7 +105,7 @@ const InsightSkeleton = () => (
 
 // ─── Locked state ─────────────────────────────────────────────────────────────
 
-const LockedState = () => (
+const LockedState = ({ T }) => (
   <motion.div
     initial={{ opacity: 0, scale: 0.95 }}
     animate={{ opacity: 1, scale: 1 }}
@@ -185,7 +185,7 @@ const AIInsights = () => {
     }
   }, [cafeId, dateRange, loading]);
 
-  if (!isEnabled) return <LockedState />;
+  if (!isEnabled) return <LockedState T={T} />;
 
   const health = insights ? HEALTH_CONFIG[insights.summary?.overallHealth] || HEALTH_CONFIG.good : null;
 
@@ -236,7 +236,7 @@ const AIInsights = () => {
       </div>
 
       {/* Loading */}
-      {loading && <InsightSkeleton />}
+      {loading && <InsightSkeleton T={T}  />}
 
       {/* Empty */}
       {!loading && !insights && (
@@ -313,7 +313,7 @@ const AIInsights = () => {
           )}
 
           {/* Revenue Analysis */}
-          <SectionCard title="Revenue Analysis" icon={TrendingUp} delay={1} accent="#10B981">
+          <SectionCard T={T} title="Revenue Analysis" icon={TrendingUp} delay={1} accent="#10B981">
             <p className="text-[#D1D1D1] text-sm leading-relaxed mb-4">
               {insights.revenue?.analysis}
             </p>
@@ -335,26 +335,26 @@ const AIInsights = () => {
 
           {/* Products */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-            <SectionCard title="Star Performers" icon={Star} delay={2} accent="#D4AF37">
+            <SectionCard T={T} title="Star Performers" icon={Star} delay={2} accent="#D4AF37">
               {(insights.products?.stars || []).map((item, i) => (
-                <InsightBullet key={i} text={item} color="#D4AF37" />
+                <InsightBullet T={T} key={i} text={item} color="#D4AF37" />
               ))}
               {(insights.products?.comboSuggestions || []).length > 0 && (
                 <>
                   <p className={`${T.muted} text-xs uppercase tracking-wide mt-4 mb-2`}>Combo Ideas</p>
                   {insights.products.comboSuggestions.map((c, i) => (
-                    <InsightBullet key={i} text={c} color="#10B981" />
+                    <InsightBullet T={T} key={i} text={c} color="#10B981" />
                   ))}
                 </>
               )}
             </SectionCard>
 
-            <SectionCard title="Product Strategy" icon={Target} delay={3} accent="#3B82F6">
+            <SectionCard T={T} title="Product Strategy" icon={Target} delay={3} accent="#3B82F6">
               {(insights.products?.pricingOpportunities || []).length > 0 && (
                 <>
                   <p className={`${T.muted} text-xs uppercase tracking-wide mb-2`}>Pricing Opportunities</p>
                   {insights.products.pricingOpportunities.map((p, i) => (
-                    <InsightBullet key={i} text={p} color="#3B82F6" />
+                    <InsightBullet T={T} key={i} text={p} color="#3B82F6" />
                   ))}
                 </>
               )}
@@ -362,7 +362,7 @@ const AIInsights = () => {
                 <>
                   <p className={`${T.muted} text-xs uppercase tracking-wide mt-4 mb-2`}>Push These Items</p>
                   {insights.products.toPromote.map((p, i) => (
-                    <InsightBullet key={i} text={p} color="#F59E0B" />
+                    <InsightBullet T={T} key={i} text={p} color="#F59E0B" />
                   ))}
                 </>
               )}
@@ -370,7 +370,7 @@ const AIInsights = () => {
           </div>
 
           {/* Operations */}
-          <SectionCard title="Operations & Staffing" icon={Clock} delay={4} accent="#8B5CF6">
+          <SectionCard T={T} title="Operations & Staffing" icon={Clock} delay={4} accent="#8B5CF6">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="bg-white/3 rounded-lg p-4">
                 <p className={`${T.muted} text-xs uppercase tracking-wide mb-2`}>⚡ Peak Hours</p>
@@ -392,18 +392,18 @@ const AIInsights = () => {
           </SectionCard>
 
           {/* Growth */}
-          <SectionCard title="Growth Strategies" icon={Zap} delay={5} accent="#F59E0B">
+          <SectionCard T={T} title="Growth Strategies" icon={Zap} delay={5} accent="#F59E0B">
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
               <div>
                 <p className={`${T.muted} text-xs uppercase tracking-wide mb-3`}>Upsell Tactics</p>
                 {(insights.growth?.upsellStrategies || []).map((s, i) => (
-                  <InsightBullet key={i} text={s} color="#F59E0B" />
+                  <InsightBullet T={T} key={i} text={s} color="#F59E0B" />
                 ))}
               </div>
               <div>
                 <p className={`${T.muted} text-xs uppercase tracking-wide mb-3`}>Time-Based Offers</p>
                 {(insights.growth?.timeBasedOffers || []).map((o, i) => (
-                  <InsightBullet key={i} text={o} color="#10B981" />
+                  <InsightBullet T={T} key={i} text={o} color="#10B981" />
                 ))}
               </div>
             </div>
@@ -416,7 +416,7 @@ const AIInsights = () => {
           </SectionCard>
 
           {/* WhatsApp Marketing Message */}
-          <SectionCard title="WhatsApp Marketing Message" icon={MessageSquare} delay={6} accent="#25D366">
+          <SectionCard T={T} title="WhatsApp Marketing Message" icon={MessageSquare} delay={6} accent="#25D366">
             <div
               className="cursor-pointer"
               onClick={() => setExpanded(e => ({ ...e, marketing: !e.marketing }))}
@@ -462,7 +462,7 @@ const AIInsights = () => {
           </SectionCard>
 
           {/* Action Plan */}
-          <SectionCard title="Your Action Plan" icon={CheckCircle2} delay={7} accent="#10B981">
+          <SectionCard T={T} title="Your Action Plan" icon={CheckCircle2} delay={7} accent="#10B981">
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
               {[
                 { label: '🎯 Today', items: insights.actionPlan?.today,     color: '#EF4444' },
@@ -473,7 +473,7 @@ const AIInsights = () => {
                   <p className="text-xs font-bold mb-3" style={{ color }}>{label}</p>
                   <div className="space-y-2">
                     {(items || []).map((item, i) => (
-                      <ActionItem key={i} text={item} index={i} />
+                      <ActionItem T={T} key={i} text={item} index={i} />
                     ))}
                   </div>
                 </div>

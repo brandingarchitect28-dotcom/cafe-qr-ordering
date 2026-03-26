@@ -28,7 +28,7 @@ const safeLower = (v) => {
 
 // ─── Chart Drill-Down Modal ───────────────────────────────────────────────────
 // Opens when user clicks a chart card. Shows full breakdown table.
-const ChartModal = ({ chart, onClose, CUR = '₹' }) => {
+const ChartModal = ({ chart, onClose, CUR = '₹', T }) => {
   if (!chart) return null;
   const fmt = (n) => (parseFloat(n) || 0).toFixed(2);
   const total = chart.data.reduce((s, d) => s + (d.value || d.revenue || d.count || 0), 0) || 1;
@@ -149,7 +149,7 @@ const DarkTooltip = ({ active, payload, label, prefix = '' }) => {
 };
 
 // ─── Written explanation box ──────────────────────────────────────────────────
-const Insight = ({ lines }) => (
+const Insight = ({ lines, T }) => (
   <div style={{ background: 'rgba(212,175,55,0.05)', border: '1px solid rgba(212,175,55,0.15)', borderRadius: '8px', padding: '12px 16px', marginTop: '16px' }}>
     <p style={{ color: '#D4AF37', fontSize: '11px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '8px' }}>
       💡 Insight
@@ -299,7 +299,7 @@ const Analytics = () => {
   return (
     <div className="space-y-6">
       {/* Chart drill-down modal */}
-      <ChartModal chart={activeChart} onClose={() => setActiveChart(null)} CUR={CUR} />
+      <ChartModal T={T} chart={activeChart} onClose={() => setActiveChart(null)} CUR={CUR} />
 
       {/* ── Revenue Chart ──────────────────────────────────────────────────── */}
       <div className={`${T.card} rounded-sm p-6`}>
@@ -316,7 +316,7 @@ const Analytics = () => {
             <Line type="monotone" dataKey="revenue" name={`Revenue (${CUR})`} stroke="#D4AF37" strokeWidth={2.5} dot={{ fill: '#D4AF37', r: 4 }} activeDot={{ r: 6 }} />
           </LineChart>
         </ResponsiveContainer>
-        <Insight lines={analytics.insights.revenue} />
+        <Insight T={T} lines={analytics.insights.revenue} />
       </div>
 
       {/* ── Orders per Day ─────────────────────────────────────────────────── */}
@@ -334,7 +334,7 @@ const Analytics = () => {
             <Bar dataKey="orders" fill="#10B981" name="Orders" radius={[3,3,0,0]} />
           </BarChart>
         </ResponsiveContainer>
-        <Insight lines={analytics.insights.orders} />
+        <Insight T={T} lines={analytics.insights.orders} />
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -353,7 +353,7 @@ const Analytics = () => {
               <Bar dataKey="count" fill="#D4AF37" name="Qty Sold" radius={[0,3,3,0]} />
             </BarChart>
           </ResponsiveContainer>
-          <Insight lines={analytics.insights.items} />
+          <Insight T={T} lines={analytics.insights.items} />
         </div>
 
         {/* ── Payment Status ─────────────────────────────────────────────── */}
@@ -382,7 +382,7 @@ const Analytics = () => {
               <Tooltip content={<DarkTooltip />} />
             </PieChart>
           </ResponsiveContainer>
-          <Insight lines={analytics.insights.payment} />
+          <Insight T={T} lines={analytics.insights.payment} />
         </div>
       </div>
 
@@ -412,7 +412,7 @@ const Analytics = () => {
             <Tooltip content={<DarkTooltip />} />
           </PieChart>
         </ResponsiveContainer>
-        <Insight lines={analytics.insights.status} />
+        <Insight T={T} lines={analytics.insights.status} />
       </div>
 
       {/* ── Order Source Charts ───────────────────────────────────────────── */}
@@ -446,7 +446,7 @@ const Analytics = () => {
                 <Legend wrapperStyle={{ fontSize: '11px' }} formatter={(v) => <span style={{ color: '#A3A3A3' }}>{v}</span>} />
               </PieChart>
             </ResponsiveContainer>
-            <Insight lines={analytics.insights.source} />
+            <Insight T={T} lines={analytics.insights.source} />
           </div>
 
           <div className={`${T.card} rounded-sm p-6 cursor-pointer hover:${T.borderMd} transition-colors`}

@@ -39,7 +39,8 @@ const safeLower = (v) => {
   return String(v).toLowerCase();
 };
 
-const CustomTooltip = ({ active, payload, label, CUR = '₹' }) => {
+const CustomTooltip = ({ active, payload, label, CUR = '₹', T: TProp }) => {
+  const T = TProp || { card: 'bg-[#0F0F0F] border border-white/5', muted: 'text-[#A3A3A3]', heading: 'text-white', faint: 'text-[#555]', border: 'border-white/5' };
   if (!active || !payload?.length) return null;
   return (
     <div style={{ background:'#1a1a1a', border:'1px solid rgba(212,175,55,0.3)', borderRadius:8, padding:'10px 14px', color:'#fff' }}>
@@ -55,7 +56,7 @@ const CustomTooltip = ({ active, payload, label, CUR = '₹' }) => {
 };
 
 // ─── Stat card ────────────────────────────────────────────────────────────────
-const StatCard = ({ label, value, sub, icon: Icon, color, index }) => (
+const StatCard = ({ label, value, sub, icon: Icon, color, index, T }) => (
   <motion.div
     initial={{ opacity:0, y:16 }}
     animate={{ opacity:1, y:0 }}
@@ -75,7 +76,7 @@ const StatCard = ({ label, value, sub, icon: Icon, color, index }) => (
 );
 
 // ─── Section with explanation panel ───────────────────────────────────────────
-const SectionCard = ({ title, icon: Icon, explanation, children, delay = 0 }) => (
+const SectionCard = ({ title, icon: Icon, explanation, children, delay = 0, T }) => (
   <motion.div
     initial={{ opacity:0, y:16 }}
     animate={{ opacity:1, y:0 }}
@@ -98,7 +99,7 @@ const SectionCard = ({ title, icon: Icon, explanation, children, delay = 0 }) =>
 );
 
 // ─── Skeleton ─────────────────────────────────────────────────────────────────
-const Skel = ({ h='h-4', w='w-full' }) => <div className={`${h} ${w} rounded ${T.subCard} animate-pulse`} />;
+const Skel = ({ h='h-4', w='w-full', T: TT }) => <div className={`${h} ${w} rounded ${TT ? TT.subCard : 'bg-white/5'} animate-pulse`} />;
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 const today = () => new Date().toISOString().split('T')[0];
@@ -175,7 +176,7 @@ const AdvancedAnalytics = () => {
     window.location.href = url;
   };
 
-  const inputCls = '${T.innerCard} border ${T.borderMd} text-white rounded-sm px-3 h-9 text-sm focus:border-[#D4AF37] outline-none';
+  const inputCls = `${T.input} rounded-sm px-3 h-9 text-sm`;
 
   return (
     <div className="space-y-6">
@@ -268,7 +269,7 @@ const AdvancedAnalytics = () => {
         <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
           {[...Array(6)].map((_,i) => (
             <div key={i} className={`${T.card} rounded-xl p-5 space-y-3`}>
-              <Skel h="h-3" w="w-1/2"/><Skel h="h-7" w="w-3/4"/>
+              <Skel T={T} h="h-3" w="w-1/2"/><Skel T={T} h="h-7" w="w-3/4"/>
             </div>
           ))}
         </div>
@@ -293,11 +294,11 @@ const AdvancedAnalytics = () => {
               { label:'Total Orders',   value:data.revenue.totalOrders,                        sub:`${fromDate} → ${toDate}`,                  icon:Package,     color:'#F59E0B', index:3 },
               { label:'GST Collected',  value:`${CUR}${data.gst.totalGST.toFixed(2)}`,         sub:`${data.gst.byRate?.length||0} slabs`,      icon:FileText,    color:'#8B5CF6', index:4 },
               { label:'Net Profit',     value:`${CUR}${data.profit.netProfit.toFixed(2)}`,     sub:`Margin: ${data.profit.margin}%`,            icon:Star,        color:data.profit.netProfit>=0?'#10B981':'#EF4444', index:5 },
-            ].map(s => <StatCard key={s.label} {...s} />)}
+            ].map(s => <StatCard T={T} key={s.label} {...s} />)}
           </div>
 
           {/* ── Revenue trend ────────────────────────────────────────── */}
-          <SectionCard title="Revenue Trend" icon={TrendingUp} delay={0.1} explanation={explanations.revenue}>
+          <SectionCard T={T} title="Revenue Trend" icon={TrendingUp} delay={0.1} explanation={explanations.revenue}>
             <ResponsiveContainer width="100%" height={240}>
               <LineChart data={data.revenueByDay}>
                 <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.04)" />
@@ -313,7 +314,7 @@ const AdvancedAnalytics = () => {
 
           {/* ── GST + Profit side by side ────────────────────────────── */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <SectionCard title="GST Summary" icon={FileText} delay={0.15} explanation={explanations.gst}>
+            <SectionCard T={T} title="GST Summary" icon={FileText} delay={0.15} explanation={explanations.gst}>
               <div className="space-y-2 mb-4">
                 {(data.gst.byRate||[]).map((g,i) => (
                   <div key={i} className={`flex items-center justify-between py-2 border-b ${T.border} text-sm`}>
@@ -332,7 +333,7 @@ const AdvancedAnalytics = () => {
               </div>
             </SectionCard>
 
-            <SectionCard title="Profit Analysis" icon={IndianRupee} delay={0.2} explanation={explanations.profit}>
+            <SectionCard T={T} title="Profit Analysis" icon={IndianRupee} delay={0.2} explanation={explanations.profit}>
               {!data.profit.hasCostData && (
                 <p className={`${T.faint} text-xs italic mb-3`}>Add recipe costs in Inventory → Manage Recipes to see full profit</p>
               )}
@@ -360,7 +361,7 @@ const AdvancedAnalytics = () => {
 
           {/* ── Payment + Source ─────────────────────────────────────── */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <SectionCard title="Payment Methods" icon={IndianRupee} delay={0.25} explanation={explanations.payment}>
+            <SectionCard T={T} title="Payment Methods" icon={IndianRupee} delay={0.25} explanation={explanations.payment}>
               <ResponsiveContainer width="100%" height={200}>
                 <PieChart>
                   <Pie data={data.payment} cx="50%" cy="50%" outerRadius={75} dataKey="count"
@@ -380,7 +381,7 @@ const AdvancedAnalytics = () => {
               </div>
             </SectionCard>
 
-            <SectionCard title="Order Sources" icon={ShoppingBag} delay={0.3} explanation="Breakdown of where orders came from — QR code, Zomato, Swiggy, phone, walk-in.">
+            <SectionCard T={T} title="Order Sources" icon={ShoppingBag} delay={0.3} explanation="Breakdown of where orders came from — QR code, Zomato, Swiggy, phone, walk-in.">
               <ResponsiveContainer width="100%" height={200}>
                 <PieChart>
                   <Pie data={data.source} cx="50%" cy="50%" outerRadius={75} dataKey="count"
@@ -401,7 +402,7 @@ const AdvancedAnalytics = () => {
           </div>
 
           {/* ── Peak hours ───────────────────────────────────────────── */}
-          <SectionCard title="Peak Hours" icon={Clock} delay={0.35} explanation="Hours with the most orders. Use this to plan staffing and kitchen prep.">
+          <SectionCard T={T} title="Peak Hours" icon={Clock} delay={0.35} explanation="Hours with the most orders. Use this to plan staffing and kitchen prep.">
             <ResponsiveContainer width="100%" height={200}>
               <BarChart data={data.peakHours.slice(6,24)}>
                 <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.04)" />
@@ -414,7 +415,7 @@ const AdvancedAnalytics = () => {
           </SectionCard>
 
           {/* ── Category ─────────────────────────────────────────────── */}
-          <SectionCard title="Category Performance" icon={BarChart2} delay={0.4} explanation={explanations.category}>
+          <SectionCard T={T} title="Category Performance" icon={BarChart2} delay={0.4} explanation={explanations.category}>
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
               <div className="space-y-3">
                 {(data.categories.categories||[]).slice(0,6).map((cat,i) => (
@@ -462,7 +463,7 @@ const AdvancedAnalytics = () => {
           </SectionCard>
 
           {/* ── Item performance ─────────────────────────────────────── */}
-          <SectionCard title="Item Performance" icon={Star} delay={0.45} explanation={explanations.items}>
+          <SectionCard T={T} title="Item Performance" icon={Star} delay={0.45} explanation={explanations.items}>
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
               <div>
                 <p className={`${T.muted} text-xs uppercase tracking-wide mb-3`}>🏆 Top Performers</p>

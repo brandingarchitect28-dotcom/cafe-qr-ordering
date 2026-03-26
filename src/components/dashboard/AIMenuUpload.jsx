@@ -21,11 +21,12 @@ import {
 
 const CATEGORIES = ['Beverages', 'Food', 'Snacks', 'Desserts', 'Main Course', 'Starters', 'Other'];
 
-const inputCls = 'w-full ${T.innerCard} border ${T.borderMd} text-white placeholder:text-neutral-600 focus:border-[#D4AF37] focus:ring-1 focus:ring-[#D4AF37] rounded-sm px-3 h-9 text-sm transition-all';
+const getInputCls = (T) => `w-full ${T.input} rounded-sm px-3 h-9 text-sm transition-all`;
 
 // ─── Item edit row ─────────────────────────────────────────────────────────────
 
-const ItemRow = ({ item, index, onChange, onRemove, currency }) => {
+const ItemRow = ({ item, index, onChange, onRemove, currency, T }) => {
+  const inputCls = getInputCls(T);
   const [editing, setEditing] = useState(false);
 
   return (
@@ -375,7 +376,7 @@ const AIMenuUpload = ({ onClose }) => {
               <AnimatePresence>
                 {items.map((item, i) => (
                   <ItemRow
-                    key={i}
+T={T}                     key={i}
                     item={item}
                     index={i}
                     onChange={handleChange}
