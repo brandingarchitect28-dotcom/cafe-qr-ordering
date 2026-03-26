@@ -508,6 +508,41 @@ app.get('/test-gemini', async (req, res) => {
   }
 });
 
+// ─── POST /api/save-api-keys ──────────────────────────────────────────────────
+// Receives API keys from AdminApiSettings frontend.
+// Keys are NOT stored in code or DB — this route validates them and instructs
+// the owner to set them in Render environment variables, which is the secure path.
+// The response guides the owner on exactly what to set where.
+
+app.post('/api/save-api-keys', (req, res) => {
+  const { openaiKey, geminiKey, whatsappKey } = req.body || {};
+
+  if (!openaiKey && !geminiKey && !whatsappKey) {
+    return res.status(400).json({ error: 'No keys provided.' });
+  }
+
+  // Log which key types were received (never log the actual values)
+  const received = [
+    openaiKey   && 'OPENAI_API_KEY',
+    geminiKey   && 'GEMINI_API_KEY',
+    whatsappKey && 'WHATSAPP_API_KEY',
+  ].filter(Boolean);
+
+  console.log('[save-api-keys] Keys received for:', received.join(', '));
+
+  // Build instructions for each key that was submitted
+  const instructions = [];
+  if (openaiKey)   instructions.push(`OPENAI_API_KEY = ${openaiKey.slice(0, 8)}...`);
+  if (geminiKey)   instructions.push(`GEMINI_API_KEY = ${geminiKey.slice(0, 8)}...`);
+  if (whatsappKey) instructions.push(`WHATSAPP_API_KEY = ${whatsappKey.slice(0, 8)}...`);
+
+  return res.json({
+    success: true,
+    message: `Keys received ✓ — add them in Render → Environment Variables: ${received.join(', ')}`,
+    instructions,
+  });
+});
+
 // ─── 404 — must be AFTER all routes ─────────────────────────────────────────
 app.use((req, res) => {
   res.status(404).json({ error: `Route ${req.method} ${req.path} not found.` });
