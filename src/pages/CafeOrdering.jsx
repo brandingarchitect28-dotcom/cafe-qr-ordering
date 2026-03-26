@@ -1129,8 +1129,8 @@ const CafeOrdering = () => {
                 initial="rest"
                 whileHover="hover"
                 animate={addingItemId === item.id ? { scale: [1, 0.95, 1] } : "rest"}
-                className="rounded-2xl overflow-hidden shadow-md group" style={{ backgroundColor: COLORS.cardBg }}
-                style={{ boxShadow: `0 4px 20px ${COLORS.shadow}` }}
+                className="rounded-2xl overflow-hidden shadow-md group"
+                style={{ backgroundColor: COLORS.cardBg, boxShadow: `0 4px 20px ${COLORS.shadow}` }}
               >
                 {/* Item Image */}
                 <div className="aspect-square overflow-hidden relative">
