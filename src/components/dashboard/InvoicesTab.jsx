@@ -93,7 +93,7 @@ const InvoicesTab = () => {
 
   // Send invoice via WhatsApp — uses shared generateInvoiceMessage for consistency
   const handleSendWA = (inv) => {
-    const phone = (inv.customerPhone || '');
+    const phone = formatWhatsAppNumber(inv.customerPhone || '');
     if (!phone) { toast.error('No customer phone number on this invoice'); return; }
     const msg = generateInvoiceMessage(inv, { name: inv.cafeName, currencySymbol: CUR });
     window.location.href = `https://wa.me/${phone}?text=${encodeURIComponent(msg)}`;

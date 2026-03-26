@@ -678,7 +678,7 @@ const OrdersManagement = () => {
                                     <button
                                       onClick={(e) => {
                                         e.stopPropagation();
-                                        const phone = order.formatWhatsAppNumber(customerPhone);
+                                        const phone = formatWhatsAppNumber(order.customerPhone || '');
                                         const msg = generateInvoiceMessage(order, { currencySymbol: order.currencySymbol || cafeCurrency });
                                         window.location.href = `https://wa.me/${phone}?text=${encodeURIComponent(msg)}`;
                                       }}
@@ -901,7 +901,7 @@ const OrdersManagement = () => {
                             <button
                               onClick={(e) => {
                                 e.stopPropagation();
-                                const phone = order.formatWhatsAppNumber(customerPhone);
+                                const phone = formatWhatsAppNumber(order.customerPhone || '');
                                 const msg = generateInvoiceMessage(order, { currencySymbol: order.currencySymbol || cafeCurrency });
                                 window.location.href = `https://wa.me/${phone}?text=${encodeURIComponent(msg)}`;
                               }}

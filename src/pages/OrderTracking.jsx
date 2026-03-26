@@ -232,7 +232,7 @@ const OrderTracking = () => {
   // ── Send invoice to customer via WhatsApp (optional, not auto-redirect) ──────
   const handleSendInvoice = useCallback(() => {
     if (!order) return;
-    const phone = (order.customerPhone || '');
+    const phone = formatWhatsAppNumber(order.customerPhone || '');
     if (!phone) { alert('No phone number on this order.'); return; }
     setWaSending(true);
     const msg = generateInvoiceMessage(order);
