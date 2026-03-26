@@ -398,7 +398,7 @@ Rules:
 - No extra text outside the JSON array`;
 
     const geminiRes = await fetch(
-      `https://generativelanguage.googleapis.com/v1/models/gemini-pro:generateContent?key=${GEMINI_API_KEY}`,
+      `https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash-latest:generateContent?key=${GEMINI_API_KEY}`,
       {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -496,7 +496,7 @@ app.get('/test-gemini', async (req, res) => {
     }
 
     const geminiRes = await fetch(
-      `https://generativelanguage.googleapis.com/v1/models/gemini-pro:generateContent?key=${GEMINI_API_KEY}`,
+      `https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash-latest:generateContent?key=${GEMINI_API_KEY}`,
       {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -509,10 +509,12 @@ app.get('/test-gemini', async (req, res) => {
 
     if (!geminiRes.ok) {
       const errText = await geminiRes.text();
-      console.error('[test-gemini] Gemini API error:', geminiRes.status, errText.slice(0, 200));
+      console.error('[test-gemini] Gemini API error:', geminiRes.status, errText);
       return res.status(502).json({
         success: false,
-        error: `Gemini API returned ${geminiRes.status}. Check your API key is valid.`,
+        status: geminiRes.status,
+        error: `Gemini API returned ${geminiRes.status}`,
+        detail: errText,   // full response body so you can see the exact error
       });
     }
 
