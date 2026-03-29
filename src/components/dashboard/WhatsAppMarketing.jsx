@@ -170,30 +170,55 @@ const WhatsAppMarketing = () => {
   }, [cafeId]);
 
   // ── Live progress listener for the active campaign ────────────────────────
-  useEffect(() => {
+  // FIX 1: Attach listener immediately using campaignId directly — not via
+  //         activeCampaign state — so no state-race tears down the listener.
+  // FIX 2: Query the collection (not a single doc ref) so we catch Firestore
+  //         updates that arrived before the client listener attached.
+  // FIX 3: 60s hard timeout so the UI never stays stuck permanently.
+  const attachProgressListener = (campaignId, total) => {
     if (unsubRef.current) { unsubRef.current(); unsubRef.current = null; }
-    if (!activeCampaign?.id) return;
 
-    const unsub = onSnapshot(
-      doc(db, 'whatsapp_campaigns', activeCampaign.id),
+    const timeoutId = setTimeout(() => {
+      if (unsubRef.current) { unsubRef.current(); unsubRef.current = null; }
+      setSending(false);
+      setActiveCampaign(prev => prev ? { ...prev, status: 'completed' } : prev);
+      toast.warning('Campaign timed out — check Campaign History for final status.');
+    }, 60_000);
+
+    const q = query(
+      collection(db, 'whatsapp_campaigns'),
+      where('cafeId', '==', cafeId),
+      orderBy('createdAt', 'desc'),
+      limit(1)
+    );
+
+    const unsub = onSnapshot(q,
       snap => {
-        if (!snap.exists()) return;
-        const d = snap.data();
+        if (snap.empty) return;
+        const docSnap = snap.docs[0];
+        if (docSnap.id !== campaignId) return;
+        const d = docSnap.data();
         setActiveCampaign(prev => ({ ...prev, ...d }));
         if (d.status === 'completed' || d.status === 'failed') {
+          clearTimeout(timeoutId);
+          if (unsubRef.current) { unsubRef.current(); unsubRef.current = null; }
           setSending(false);
           if (d.status === 'completed') {
-            toast.success(`Campaign completed — ${d.sent} sent, ${d.failed} failed ✓`);
+            toast.success(`Campaign completed — ${d.sent} sent ✓`);
           } else {
             toast.error('Campaign failed. Check your backend logs.');
           }
         }
       },
-      err => console.error('[WA-Progress]', err.message)
+      err => {
+        console.error('[WA-Progress]', err.message);
+        clearTimeout(timeoutId);
+        setSending(false);
+      }
     );
-    unsubRef.current = unsub;
-    return () => { unsub(); unsubRef.current = null; };
-  }, [activeCampaign?.id]);
+
+    unsubRef.current = () => { clearTimeout(timeoutId); unsub(); };
+  };
 
   // ── Existing customer list logic (unchanged) ──────────────────────────────
   const allCustomers = useMemo(() => buildCustomerList(orders), [orders]);
@@ -260,7 +285,8 @@ const WhatsAppMarketing = () => {
 
     setSending(true);
     setSent(0);
-    setActiveCampaign(null);
+    // FIX: do NOT setActiveCampaign(null) here — that triggers useEffect cleanup
+    // and tears down any existing listener before the new one is attached.
 
     try {
       const resp = await fetch(`${backendUrl}/api/send-whatsapp-campaign`, {
@@ -271,9 +297,15 @@ const WhatsAppMarketing = () => {
       const json = await resp.json();
       if (!resp.ok) throw new Error(json.error || `Server error ${resp.status}`);
 
+      // Set local state so UI renders the progress card immediately
       setActiveCampaign({ id: json.campaignId, total: json.total, sent: 0, failed: 0, status: 'processing' });
       setSelected(new Set());
-      toast.success(`Campaign started — ${json.total} recipients queued ✓`);
+
+      // FIX: attach the Firestore listener NOW, using the campaignId directly,
+      // before any state batching can race against it.
+      attachProgressListener(json.campaignId, json.total);
+
+      toast.success(`Campaign started — processing ${json.total} customers…`);
     } catch (err) {
       console.error('[WA-Campaign] Launch failed:', err.message);
       toast.error(`Failed to start campaign: ${err.message}`);

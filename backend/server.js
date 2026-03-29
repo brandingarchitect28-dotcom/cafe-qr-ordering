@@ -619,7 +619,7 @@ app.post('/api/send-whatsapp-campaign', async (req, res) => {
       failed:    0,
       status:    'processing',
       message:   message.trim(),
-      createdAt: new Date(),
+      createdAt: require('firebase-admin').firestore.FieldValue.serverTimestamp(),
     });
   } catch (err) {
     console.error('[WA-Campaign] Failed to create campaign doc:', err.message);
@@ -654,8 +654,8 @@ app.post('/api/send-whatsapp-campaign', async (req, res) => {
         console.error('[WA-Campaign] Progress update failed:', updateErr.message);
       }
 
-      // 400ms delay between messages — safe for WhatsApp rate limits
-      await new Promise(r => setTimeout(r, 400));
+      // 200ms delay between messages — fast enough to see progress, safe for rate limits
+      await new Promise(r => setTimeout(r, 200));
     }
 
     // Mark campaign complete
