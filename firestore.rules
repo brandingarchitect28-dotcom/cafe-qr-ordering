@@ -186,6 +186,16 @@ service cloud.firestore {
       allow read:   if true;
       allow write:  if isAdmin() || (isAuthenticated() && isCafeOwner(cafeId));
     }
+    // ── WhatsApp Campaigns — written by Admin SDK backend, read by cafe owner ──
+    match /whatsapp_campaigns/{campaignId} {
+      // Cafe owner can read their own campaigns (for live progress + history)
+      allow read: if isAuthenticated() &&
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.cafeId ==
+        resource.data.cafeId;
+      // Only backend (Admin SDK) writes — client cannot create or modify
+      allow create, update, delete: if false;
+    }
+
     // ── Staff Management collections ──────────────────────────────────────────
     match /staff/{staffId} {
       allow read:   if isAdmin() || (isAuthenticated() && isCafeOwner(resource.data.cafeId));
