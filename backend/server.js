@@ -543,6 +543,138 @@ app.post('/api/save-api-keys', (req, res) => {
   });
 });
 
+// ─── POST /api/send-whatsapp-campaign ────────────────────────────────────────
+// Queue-based WhatsApp marketing campaign.
+// Validates, deduplicates, creates a campaign doc in Firestore,
+// then processes each customer sequentially with a 400ms delay.
+// Uses wa.me placeholder logic — ready to swap for Meta/Twilio later.
+//
+// Request body: { cafeId, customers: [{ name, phone }], message }
+// ─────────────────────────────────────────────────────────────────────────────
+
+// ── Reusable: format phone (mirrors frontend utils/whatsapp.js) ───────────────
+function formatWANumber(raw) {
+  if (!raw) return '';
+  const digits = String(raw).replace(/\D/g, '');
+  if (!digits) return '';
+  if (digits.length === 10) return `91${digits}`;
+  return digits;
+}
+
+// ── Reusable: send one WhatsApp message ──────────────────────────────────────
+// Currently a placeholder — logs the send.
+// Replace this one function body when Meta Cloud API / Twilio is ready.
+async function sendWhatsAppMessage(phone, message) {
+  const formatted = formatWANumber(phone);
+  if (!formatted || formatted.length < 10) {
+    throw new Error(`Invalid phone number: ${phone}`);
+  }
+  // PLACEHOLDER — swap with Meta or Twilio SDK call here:
+  // await twilioClient.messages.create({ from: 'whatsapp:+14155238886', to: `whatsapp:+${formatted}`, body: message });
+  console.log(`[WA-Campaign] Sent to +${formatted} (${message.slice(0, 40)}...)`);
+  return { phone: formatted, status: 'sent' };
+}
+
+// ── In-memory lock: prevent concurrent campaigns per cafe ─────────────────────
+const activeCampaigns = new Set();
+
+app.post('/api/send-whatsapp-campaign', async (req, res) => {
+  const { cafeId, customers, message } = req.body || {};
+
+  // ── Validation ────────────────────────────────────────────────────────────
+  if (!cafeId)               return res.status(400).json({ error: 'cafeId is required.' });
+  if (!message?.trim())      return res.status(400).json({ error: 'message is required.' });
+  if (!Array.isArray(customers) || customers.length === 0)
+    return res.status(400).json({ error: 'customers array is required.' });
+
+  // Prevent concurrent campaign for the same cafe
+  if (activeCampaigns.has(cafeId)) {
+    return res.status(429).json({ error: 'A campaign is already running for this café. Please wait.' });
+  }
+
+  // ── Deduplicate + validate phones (client-side also validates, belt & braces) ─
+  const seen = new Set();
+  const valid = customers.filter(c => {
+    const ph = formatWANumber(c.phone);
+    if (!ph || ph.length < 10) return false;
+    if (seen.has(ph))          return false;
+    seen.add(ph);
+    return true;
+  }).slice(0, 200); // hard cap at 200 per campaign
+
+  if (valid.length === 0)
+    return res.status(400).json({ error: 'No valid phone numbers found after filtering.' });
+
+  // ── Create Firestore campaign doc ─────────────────────────────────────────
+  if (!firestoreDb) {
+    return res.status(503).json({ error: 'Firestore not initialised. Check FIREBASE_SERVICE_ACCOUNT env var.' });
+  }
+
+  let campaignRef;
+  try {
+    campaignRef = await firestoreDb.collection('whatsapp_campaigns').add({
+      cafeId,
+      total:     valid.length,
+      sent:      0,
+      failed:    0,
+      status:    'processing',
+      message:   message.trim(),
+      createdAt: new Date(),
+    });
+  } catch (err) {
+    console.error('[WA-Campaign] Failed to create campaign doc:', err.message);
+    return res.status(500).json({ error: 'Failed to initialise campaign in database.' });
+  }
+
+  const campaignId = campaignRef.id;
+
+  // ── Respond immediately so client can start polling ───────────────────────
+  res.json({ success: true, campaignId, total: valid.length });
+
+  // ── Process campaign sequentially in background ───────────────────────────
+  activeCampaigns.add(cafeId);
+
+  (async () => {
+    let sent = 0;
+    let failed = 0;
+
+    for (const customer of valid) {
+      try {
+        await sendWhatsAppMessage(customer.phone, message.trim());
+        sent++;
+      } catch (err) {
+        console.error(`[WA-Campaign] Failed for ${customer.phone}:`, err.message);
+        failed++;
+      }
+
+      // Update Firestore progress after each customer
+      try {
+        await campaignRef.update({ sent, failed });
+      } catch (updateErr) {
+        console.error('[WA-Campaign] Progress update failed:', updateErr.message);
+      }
+
+      // 400ms delay between messages — safe for WhatsApp rate limits
+      await new Promise(r => setTimeout(r, 400));
+    }
+
+    // Mark campaign complete
+    try {
+      await campaignRef.update({
+        status: failed === valid.length ? 'failed' : 'completed',
+        sent,
+        failed,
+        completedAt: new Date(),
+      });
+    } catch (err) {
+      console.error('[WA-Campaign] Failed to mark complete:', err.message);
+    }
+
+    activeCampaigns.delete(cafeId);
+    console.log(`[WA-Campaign] ${campaignId} done — sent: ${sent}, failed: ${failed}`);
+  })();
+});
+
 // ─── 404 — must be AFTER all routes ─────────────────────────────────────────
 app.use((req, res) => {
   res.status(404).json({ error: `Route ${req.method} ${req.path} not found.` });
@@ -561,6 +693,7 @@ app.listen(PORT, () => {
   console.log(`[Server]   POST /create-order → Cashfree order creation`);
   console.log(`[Server]   POST /webhook      → payment status callback`);
   console.log(`[Server]   POST /api/ai-menu-upload → AI menu extraction`);
+  console.log(`[Server]   POST /api/send-whatsapp-campaign → WhatsApp bulk campaign`);
   console.log(`[Server]   GET  /test-gemini  → Gemini API key verification`);
 });
 

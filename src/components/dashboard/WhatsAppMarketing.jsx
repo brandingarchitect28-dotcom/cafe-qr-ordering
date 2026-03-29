@@ -7,19 +7,33 @@
  * - Compose message (manual or template)
  * - Open wa.me links for each selected customer
  * - Bulk send via sequential WhatsApp opens
+ *
+ * EXTENDED: Queue-based campaign system
+ * - POST /api/send-whatsapp-campaign → backend processes sequentially
+ * - Live progress via Firestore onSnapshot on whatsapp_campaigns doc
+ * - Campaign history from whatsapp_campaigns collection
+ * - Validation: dedup + min-length check + 200-cap before send
+ * - Concurrent-campaign lock (one per cafe at a time)
  */
 
 import { formatWhatsAppNumber } from '../../utils/whatsapp';
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
 import { useCollection, useDocument } from '../../hooks/useFirestore';
-import { where } from 'firebase/firestore';
+import {
+  where, collection, query, orderBy, limit, onSnapshot, doc,
+} from 'firebase/firestore';
+import { db } from '../../lib/firebase';
 import { motion, AnimatePresence } from 'framer-motion';
-import { MessageSquare, Users, Send, Filter, Check, X, ChevronDown, Star, Clock, Sparkles } from 'lucide-react';
+import {
+  MessageSquare, Users, Send, Check, Star, Clock, Sparkles,
+  History, AlertCircle, CheckCircle2, Loader2, XCircle,
+  ChevronDown, ChevronUp,
+} from 'lucide-react';
 import { toast } from 'sonner';
 import { useTheme } from '../../hooks/useTheme';
 
-// ─── message templates ────────────────────────────────────────────────────────
+// ─── message templates (unchanged) ───────────────────────────────────────────
 
 const TEMPLATES = [
   {
@@ -44,7 +58,7 @@ const TEMPLATES = [
   },
 ];
 
-// ─── customer processing ──────────────────────────────────────────────────────
+// ─── customer processing (unchanged) ─────────────────────────────────────────
 
 const buildCustomerList = (orders) => {
   const map = {};
@@ -70,28 +84,120 @@ const buildCustomerList = (orders) => {
   return Object.values(map);
 };
 
+// ─── StatusBadge sub-component ────────────────────────────────────────────────
+
+const StatusBadge = ({ status }) => {
+  const MAP = {
+    processing: { label: 'Sending…',  color: '#F59E0B', Icon: Loader2,      spin: true  },
+    completed:  { label: 'Completed', color: '#10B981', Icon: CheckCircle2, spin: false },
+    failed:     { label: 'Failed',    color: '#EF4444', Icon: XCircle,      spin: false },
+  };
+  const cfg = MAP[status] || MAP.processing;
+  return (
+    <span className="inline-flex items-center gap-1 text-xs font-semibold px-2 py-0.5 rounded-full"
+      style={{ background: `${cfg.color}18`, color: cfg.color }}>
+      <cfg.Icon className={`w-3 h-3${cfg.spin ? ' animate-spin' : ''}`} />
+      {cfg.label}
+    </span>
+  );
+};
+
+// ─── ProgressBar sub-component ────────────────────────────────────────────────
+
+const ProgressBar = ({ sent, total }) => {
+  const pct = total > 0 ? Math.round((sent / total) * 100) : 0;
+  return (
+    <div className="w-full">
+      <div className="flex justify-between text-xs mb-1" style={{ color: '#A3A3A3' }}>
+        <span>Sending {sent} / {total}</span>
+        <span>{pct}%</span>
+      </div>
+      <div className="h-2 rounded-full overflow-hidden" style={{ background: 'rgba(255,255,255,0.08)' }}>
+        <motion.div
+          className="h-full rounded-full"
+          style={{ background: 'linear-gradient(90deg, #25D366, #128C7E)' }}
+          initial={{ width: 0 }}
+          animate={{ width: `${pct}%` }}
+          transition={{ duration: 0.3 }}
+        />
+      </div>
+    </div>
+  );
+};
+
 // ─── Main component ───────────────────────────────────────────────────────────
 
 const WhatsAppMarketing = () => {
-  const { user } = useAuth();
-  const cafeId = user?.cafeId;
+  const { user }   = useAuth();
+  const cafeId     = user?.cafeId;
 
   const { data: orders } = useCollection('orders', cafeId ? [where('cafeId', '==', cafeId)] : []);
-  const { data: cafe } = useDocument('cafes', cafeId);
-  const { T, isLight } = useTheme();
+  const { data: cafe   } = useDocument('cafes', cafeId);
+  const { T, isLight   } = useTheme();
   const CUR = cafe?.currencySymbol || '₹';
 
-  const [filter,    setFilter  ] = useState('all'); // all | frequent | recent
-  const [selected,  setSelected] = useState(new Set());
-  const [message,   setMessage ] = useState('');
-  const [template,  setTemplate] = useState('');
-  const [sending,   setSending ] = useState(false);
-  const [sent,      setSent    ] = useState(0);
+  // ── Existing state (preserved exactly) ────────────────────────────────────
+  const [filter,   setFilter  ] = useState('all');
+  const [selected, setSelected] = useState(new Set());
+  const [message,  setMessage ] = useState('');
+  const [template, setTemplate] = useState('');
+  const [sending,  setSending ] = useState(false);
+  const [sent,     setSent    ] = useState(0);
 
-  // Build deduplicated customer list
+  // ── New campaign state ────────────────────────────────────────────────────
+  const [activeCampaign, setActiveCampaign] = useState(null);
+  const [campaigns,      setCampaigns     ] = useState([]);
+  const [historyOpen,    setHistoryOpen   ] = useState(false);
+  const unsubRef = useRef(null);
+
+  // Derive backendUrl from cafe Firestore doc (same pattern as AdminApiSettings)
+  const backendUrl = (cafe?.paymentSettings?.backendUrl || '').replace(/\/$/, '');
+
+  // ── Real-time campaign history listener ───────────────────────────────────
+  useEffect(() => {
+    if (!cafeId) return;
+    const q = query(
+      collection(db, 'whatsapp_campaigns'),
+      where('cafeId', '==', cafeId),
+      orderBy('createdAt', 'desc'),
+      limit(10)
+    );
+    const unsub = onSnapshot(q,
+      snap => setCampaigns(snap.docs.map(d => ({ id: d.id, ...d.data() }))),
+      err  => console.error('[WA-History]', err.message)
+    );
+    return () => unsub();
+  }, [cafeId]);
+
+  // ── Live progress listener for the active campaign ────────────────────────
+  useEffect(() => {
+    if (unsubRef.current) { unsubRef.current(); unsubRef.current = null; }
+    if (!activeCampaign?.id) return;
+
+    const unsub = onSnapshot(
+      doc(db, 'whatsapp_campaigns', activeCampaign.id),
+      snap => {
+        if (!snap.exists()) return;
+        const d = snap.data();
+        setActiveCampaign(prev => ({ ...prev, ...d }));
+        if (d.status === 'completed' || d.status === 'failed') {
+          setSending(false);
+          if (d.status === 'completed') {
+            toast.success(`Campaign completed — ${d.sent} sent, ${d.failed} failed ✓`);
+          } else {
+            toast.error('Campaign failed. Check your backend logs.');
+          }
+        }
+      },
+      err => console.error('[WA-Progress]', err.message)
+    );
+    unsubRef.current = unsub;
+    return () => { unsub(); unsubRef.current = null; };
+  }, [activeCampaign?.id]);
+
+  // ── Existing customer list logic (unchanged) ──────────────────────────────
   const allCustomers = useMemo(() => buildCustomerList(orders), [orders]);
 
-  // Apply filter
   const customers = useMemo(() => {
     const now = new Date();
     if (filter === 'frequent') return allCustomers.filter(c => c.orderCount >= 2);
@@ -123,34 +229,82 @@ const WhatsAppMarketing = () => {
     setMessage(tpl.text(cafe));
   };
 
-  // Open WhatsApp for each selected customer sequentially
+  // ── Build validated + deduped customer payload ────────────────────────────
+  const buildValidCustomers = () => {
+    const seen  = new Set();
+    const valid = [];
+    for (const phone of selected) {
+      const digits = String(phone || '').replace(/\D/g, '');
+      if (!digits || digits.length < 10) continue;
+      if (seen.has(digits)) continue;
+      seen.add(digits);
+      const c = allCustomers.find(x => x.phone === phone);
+      valid.push({ phone: digits, name: c?.name || 'Customer' });
+      if (valid.length >= 200) break;
+    }
+    return valid;
+  };
+
+  // ── Send handler — upgraded to backend campaign API ───────────────────────
   const handleSend = async () => {
-    if (!message.trim()) { toast.error('Write a message first'); return; }
+    if (!message.trim())     { toast.error('Write a message first'); return; }
     if (selected.size === 0) { toast.error('Select at least one customer'); return; }
+    if (!backendUrl) {
+      toast.error('Backend URL not set. Go to Settings → Payment Settings.'); return;
+    }
+
+    const validCustomers = buildValidCustomers();
+    if (validCustomers.length === 0) {
+      toast.error('No valid phone numbers in selection.'); return;
+    }
 
     setSending(true);
     setSent(0);
-    let count = 0;
+    setActiveCampaign(null);
 
-    for (const phone of selected) {
-      const url = `https://wa.me/${phone}?text=${encodeURIComponent(message)}`;
-      window.open(url, '_blank');
-      count++;
-      setSent(count);
-      // Small delay between opens to avoid popup blocking
-      await new Promise(r => setTimeout(r, 600));
+    try {
+      const resp = await fetch(`${backendUrl}/api/send-whatsapp-campaign`, {
+        method:  'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body:    JSON.stringify({ cafeId, customers: validCustomers, message: message.trim() }),
+      });
+      const json = await resp.json();
+      if (!resp.ok) throw new Error(json.error || `Server error ${resp.status}`);
+
+      setActiveCampaign({ id: json.campaignId, total: json.total, sent: 0, failed: 0, status: 'processing' });
+      setSelected(new Set());
+      toast.success(`Campaign started — ${json.total} recipients queued ✓`);
+    } catch (err) {
+      console.error('[WA-Campaign] Launch failed:', err.message);
+      toast.error(`Failed to start campaign: ${err.message}`);
+      setSending(false);
     }
-
-    toast.success(`Opened WhatsApp for ${count} customer${count !== 1 ? 's' : ''} ✓`);
-    setSending(false);
-    setSelected(new Set());
   };
 
-  const inputCls = 'w-full ${T.innerCard} border ${T.borderMd} text-white placeholder:text-neutral-600 focus:border-[#D4AF37] focus:ring-1 focus:ring-[#D4AF37] rounded-lg px-4 py-3 text-sm transition-all outline-none';
+  // ── inputCls (preserved from original) ───────────────────────────────────
+  const inputCls = `w-full ${T.input} rounded-lg px-4 py-3 text-sm transition-all outline-none`;
 
+  // ── Date formatter ────────────────────────────────────────────────────────
+  const fmtDate = (val) => {
+    if (!val) return '—';
+    try {
+      const d = val?.toDate?.() || (val instanceof Date ? val : new Date(val));
+      return d.toLocaleDateString('en-IN', {
+        day: '2-digit', month: 'short', year: 'numeric',
+        hour: '2-digit', minute: '2-digit',
+      });
+    } catch { return '—'; }
+  };
+
+  // ─── valid count for send button label ───────────────────────────────────
+  const validCount    = buildValidCustomers().length;
+  const skippedCount  = selected.size - validCount;
+
+  // ─────────────────────────────────────────────────────────────────────────
   return (
     <div className="space-y-6">
-      {/* Header */}
+
+      {/* ── Header (unchanged) ── */}
       <div className="flex items-center justify-between">
         <div>
           <h2 className={`${T.heading} font-bold text-2xl`} style={{ fontFamily: 'Playfair Display, serif' }}>
@@ -162,9 +316,55 @@ const WhatsAppMarketing = () => {
         </div>
       </div>
 
+      {/* ── Live campaign progress (NEW) ── */}
+      <AnimatePresence>
+        {activeCampaign && (
+          <motion.div
+            initial={{ opacity: 0, y: -10 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -10 }}
+            className={`${T.card} rounded-xl p-5`}
+          >
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center gap-2">
+                {activeCampaign.status === 'processing' && (
+                  <div className="w-2 h-2 rounded-full bg-[#25D366] animate-pulse" />
+                )}
+                <h3 className={`${T.heading} font-semibold text-sm`}>Campaign Progress</h3>
+              </div>
+              <StatusBadge status={activeCampaign.status} />
+            </div>
+
+            <ProgressBar sent={activeCampaign.sent || 0} total={activeCampaign.total || 1} />
+
+            <div className="flex justify-between mt-3 text-xs">
+              <span className="text-emerald-400 font-semibold">✓ Sent: {activeCampaign.sent || 0}</span>
+              {(activeCampaign.failed || 0) > 0 && (
+                <span className="text-red-400 font-semibold">✗ Failed: {activeCampaign.failed}</span>
+              )}
+              <span className={T.faint}>Total: {activeCampaign.total}</span>
+            </div>
+
+            {activeCampaign.status === 'completed' && (
+              <div className="mt-3 p-3 rounded-lg text-sm font-semibold text-emerald-400 text-center"
+                style={{ background: 'rgba(16,185,129,0.08)', border: '1px solid rgba(16,185,129,0.2)' }}>
+                ✓ Campaign completed successfully
+              </div>
+            )}
+            {activeCampaign.status === 'failed' && (
+              <div className="mt-3 p-3 rounded-lg text-sm font-semibold text-red-400 text-center"
+                style={{ background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.2)' }}>
+                ✗ Campaign failed — check backend logs
+              </div>
+            )}
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* ── 2-column layout (unchanged) ── */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
 
-        {/* Left — Compose message */}
+        {/* Left — Compose (unchanged structure, extended send button) */}
         <div className="space-y-4">
           <div className={`${T.card} rounded-xl p-5`}>
             <h3 className={`${T.heading} font-semibold mb-4 flex items-center gap-2`}>
@@ -172,7 +372,7 @@ const WhatsAppMarketing = () => {
               Compose Message
             </h3>
 
-            {/* Templates */}
+            {/* Templates (unchanged) */}
             <div className="mb-4">
               <p className={`${T.muted} text-xs uppercase tracking-wide mb-2 flex items-center gap-1`}>
                 <Sparkles className="w-3 h-3" />
@@ -195,7 +395,7 @@ const WhatsAppMarketing = () => {
               </div>
             </div>
 
-            {/* Message */}
+            {/* Message textarea (unchanged) */}
             <div>
               <label className={`block ${T.label} text-sm font-medium mb-2`}>Message</label>
               <textarea
@@ -208,7 +408,26 @@ const WhatsAppMarketing = () => {
               <p className={`${T.faint} text-xs mt-1`}>{message.length} characters</p>
             </div>
 
-            {/* Send button */}
+            {/* Validation summary (NEW) */}
+            {selected.size > 0 && (
+              <div className="mt-3 p-3 rounded-lg text-xs space-y-1"
+                style={{ background: 'rgba(212,175,55,0.06)', border: '1px solid rgba(212,175,55,0.15)' }}>
+                <p className={`${T.heading} font-semibold`}>
+                  Ready to send:{' '}
+                  <span className="text-[#D4AF37]">{validCount}</span>
+                  {validCount >= 200 && (
+                    <span className="text-amber-400 ml-1">(capped at 200)</span>
+                  )}
+                </p>
+                {skippedCount > 0 && (
+                  <p className="text-amber-400">
+                    ⚠ {skippedCount} skipped (invalid or duplicate numbers)
+                  </p>
+                )}
+              </div>
+            )}
+
+            {/* Send button (extended state) */}
             <motion.button
               whileHover={{ scale: 1.02 }}
               whileTap={{ scale: 0.98 }}
@@ -217,22 +436,41 @@ const WhatsAppMarketing = () => {
               className="w-full mt-4 py-3 rounded-xl text-black font-bold flex items-center justify-center gap-2 transition-all disabled:opacity-50"
               style={{ background: 'linear-gradient(135deg, #25D366, #128C7E)' }}
             >
-              {sending
-                ? <><div className="w-4 h-4 rounded-full border-2 border-black/30 border-t-black animate-spin" />Sending {sent}/{selected.size}...</>
-                : <><Send className="w-4 h-4" />Send to {selected.size} Customer{selected.size !== 1 ? 's' : ''}</>
-              }
+              {sending ? (
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  Campaign Running…{' '}
+                  {activeCampaign
+                    ? `${activeCampaign.sent || 0} / ${activeCampaign.total}`
+                    : ''}
+                </>
+              ) : (
+                <>
+                  <Send className="w-4 h-4" />
+                  Send to {validCount || selected.size} Customer{selected.size !== 1 ? 's' : ''}
+                </>
+              )}
             </motion.button>
-            {selected.size > 0 && (
+
+            {/* Backend URL warning (NEW) */}
+            {!backendUrl && (
+              <div className="mt-3 flex items-start gap-2 p-3 rounded-lg text-xs"
+                style={{ background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.2)', color: '#EF4444' }}>
+                <AlertCircle className="w-3.5 h-3.5 mt-0.5 flex-shrink-0" />
+                Backend URL not configured — go to Settings → Payment Settings.
+              </div>
+            )}
+
+            {selected.size > 0 && backendUrl && (
               <p className={`${T.faint} text-xs text-center mt-2`}>
-                WhatsApp will open for each customer. Allow popups.
+                Messages processed via backend queue — no popup blocking
               </p>
             )}
           </div>
         </div>
 
-        {/* Right — Customer list */}
+        {/* Right — Customer list (unchanged exactly) */}
         <div className={`${T.card} rounded-xl overflow-hidden`}>
-          {/* Filters */}
           <div className={`px-5 py-4 border-b ${T.border}`}>
             <div className="flex items-center justify-between mb-3">
               <h3 className={`${T.heading} font-semibold flex items-center gap-2`}>
@@ -269,7 +507,6 @@ const WhatsAppMarketing = () => {
             </div>
           </div>
 
-          {/* List */}
           <div className="overflow-y-auto" style={{ maxHeight: '460px' }}>
             {customers.length === 0 ? (
               <div className="text-center py-12">
@@ -290,7 +527,6 @@ const WhatsAppMarketing = () => {
                       className={`flex items-center gap-3 px-5 py-3 border-b ${T.border} cursor-pointer transition-all hover:bg-white/3`}
                       style={isSelected ? { background: 'rgba(212,175,55,0.06)' } : {}}
                     >
-                      {/* Checkbox */}
                       <div className="w-5 h-5 rounded flex items-center justify-center flex-shrink-0 transition-all"
                         style={isSelected
                           ? { background: '#D4AF37' }
@@ -299,13 +535,11 @@ const WhatsAppMarketing = () => {
                         {isSelected && <Check className="w-3 h-3 text-black" />}
                       </div>
 
-                      {/* Avatar */}
                       <div className="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 text-sm font-bold"
                         style={{ background: 'rgba(212,175,55,0.15)', color: '#D4AF37' }}>
                         {c.name.charAt(0).toUpperCase()}
                       </div>
 
-                      {/* Info */}
                       <div className="flex-1 min-w-0">
                         <p className={`${T.label} text-sm font-medium truncate`}>{c.name}</p>
                         <p className={`${T.faint} text-xs`}>
@@ -313,7 +547,6 @@ const WhatsAppMarketing = () => {
                         </p>
                       </div>
 
-                      {/* Badges */}
                       <div className="flex gap-1 flex-shrink-0">
                         {c.orderCount >= 3 && (
                           <span className="text-[10px] px-1.5 py-0.5 rounded bg-[#D4AF37]/15 text-[#D4AF37] font-semibold">
@@ -333,17 +566,98 @@ const WhatsAppMarketing = () => {
             )}
           </div>
 
-          {/* Selected count */}
           {selected.size > 0 && (
             <div className={`px-5 py-3 border-t ${T.border} flex items-center justify-between`}>
               <p className="text-[#D4AF37] text-sm font-semibold">{selected.size} selected</p>
-              <button onClick={() => setSelected(new Set())} className={`text-[#555] hover:${T.body} text-xs transition-colors`}>
+              <button onClick={() => setSelected(new Set())} className={`${T.faint} hover:${T.body} text-xs transition-colors`}>
                 Clear
               </button>
             </div>
           )}
         </div>
       </div>
+
+      {/* ── Campaign History (NEW) ── */}
+      <div className={`${T.card} rounded-xl overflow-hidden`}>
+        <button
+          onClick={() => setHistoryOpen(v => !v)}
+          className={`w-full flex items-center justify-between px-5 py-4 border-b ${T.border} transition-all`}
+        >
+          <h3 className={`${T.heading} font-semibold flex items-center gap-2`}>
+            <History className="w-4 h-4 text-[#D4AF37]" />
+            Campaign History
+            {campaigns.length > 0 && (
+              <span className="text-xs px-2 py-0.5 rounded-full font-semibold"
+                style={{ background: 'rgba(212,175,55,0.15)', color: '#D4AF37' }}>
+                {campaigns.length}
+              </span>
+            )}
+          </h3>
+          {historyOpen
+            ? <ChevronUp className={`w-4 h-4 ${T.muted}`} />
+            : <ChevronDown className={`w-4 h-4 ${T.muted}`} />
+          }
+        </button>
+
+        <AnimatePresence>
+          {historyOpen && (
+            <motion.div
+              initial={{ height: 0, opacity: 0 }}
+              animate={{ height: 'auto', opacity: 1 }}
+              exit={{ height: 0, opacity: 0 }}
+              transition={{ duration: 0.2 }}
+              style={{ overflow: 'hidden' }}
+            >
+              {campaigns.length === 0 ? (
+                <div className="text-center py-10">
+                  <History className={`w-8 h-8 mx-auto mb-2 ${T.muted} opacity-30`} />
+                  <p className={`${T.muted} text-sm`}>No campaigns sent yet</p>
+                </div>
+              ) : (
+                <>
+                  {/* Header row */}
+                  <div className={`grid px-5 py-2 text-xs font-semibold uppercase tracking-wide ${T.muted} border-b ${T.border}`}
+                    style={{ gridTemplateColumns: '2fr 1fr 1fr 1fr 1.2fr' }}>
+                    <span>Date</span>
+                    <span className="text-center">Total</span>
+                    <span className="text-center">Sent</span>
+                    <span className="text-center">Failed</span>
+                    <span className="text-center">Status</span>
+                  </div>
+
+                  {campaigns.map((c, i) => (
+                    <div key={c.id}
+                      className={`grid items-center px-5 py-3 border-b ${T.border} text-sm`}
+                      style={{
+                        gridTemplateColumns: '2fr 1fr 1fr 1fr 1.2fr',
+                        background: i % 2 === 0 ? 'transparent' : 'rgba(255,255,255,0.015)',
+                      }}
+                    >
+                      <div>
+                        <p className={`${T.heading} text-xs font-medium`}>{fmtDate(c.createdAt)}</p>
+                        {c.message && (
+                          <p className={`${T.faint} text-xs truncate max-w-[180px]`} title={c.message}>
+                            {c.message.slice(0, 50)}{c.message.length > 50 ? '…' : ''}
+                          </p>
+                        )}
+                      </div>
+                      <p className={`${T.heading} text-center font-semibold`}>{c.total ?? '—'}</p>
+                      <p className="text-center font-semibold text-emerald-400">{c.sent ?? '—'}</p>
+                      <p className={`text-center font-semibold ${(c.failed || 0) > 0 ? 'text-red-400' : T.faint}`}>
+                        {c.failed ?? '—'}
+                      </p>
+                      <div className="flex justify-center">
+                        <StatusBadge status={c.status} />
+                      </div>
+                    </div>
+                  ))}
+                </>
+              )}
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </div>
+
     </div>
   );
 };
