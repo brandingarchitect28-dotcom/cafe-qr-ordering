@@ -12,8 +12,9 @@
 import { formatWhatsAppNumber } from '../../utils/whatsapp';
 import React, { useState, useMemo } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
-import { useDocument } from '../../hooks/useFirestore';
+import { useDocument, useCollection } from '../../hooks/useFirestore';
 import { useAdvancedAnalytics } from '../../hooks/useAdvancedAnalytics';
+import { where } from 'firebase/firestore';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   BarChart, Bar, LineChart, Line, PieChart, Pie, Cell,
@@ -144,6 +145,81 @@ const AdvancedAnalytics = () => {
 
   const { data, loading, error, lastFetch, refresh } = useAdvancedAnalytics(cafeId, fromDate, toDate);
   const explanations = useMemo(() => buildExplanation(data, CUR), [data, CUR]);
+
+  const { data: orders } = useCollection(
+    'orders',
+    cafeId ? [where('cafeId', '==', cafeId)] : []
+  );
+
+  // ── Growth Analysis (Today vs Yesterday, This Week vs Last Week) ───────────
+  // Derived entirely from data.revenueByDay (last 7 days) — no new DB fields
+  const growthMetrics = useMemo(() => {
+    if (!data?.revenueByDay || data.revenueByDay.length < 2) return null;
+    const days = data.revenueByDay;
+    const todayRev     = days[days.length - 1]?.revenue ?? 0;
+    const yesterdayRev = days[days.length - 2]?.revenue ?? 0;
+    const todayPct = yesterdayRev === 0
+      ? (todayRev > 0 ? 100 : 0)
+      : parseFloat((((todayRev - yesterdayRev) / yesterdayRev) * 100).toFixed(1));
+
+    // This week = sum of last 7 days; Last week needs revenueBy30
+    const rev30 = data.revenueBy30 || [];
+    const thisWeekRev = rev30.slice(-7).reduce((s, d) => s + d.revenue, 0);
+    const lastWeekRev = rev30.slice(-14, -7).reduce((s, d) => s + d.revenue, 0);
+    const weekPct = lastWeekRev === 0
+      ? (thisWeekRev > 0 ? 100 : 0)
+      : parseFloat((((thisWeekRev - lastWeekRev) / lastWeekRev) * 100).toFixed(1));
+
+    return { todayRev, yesterdayRev, todayPct, thisWeekRev, lastWeekRev, weekPct };
+  }, [data]);
+
+  // ── Customer Analysis ──────────────────────────────────────────────────────
+  // Uses raw orders collection (customerPhone) — no new DB fields
+  const customerMetrics = useMemo(() => {
+    if (!orders?.length) return null;
+    const from = new Date(fromDate);
+    const to   = new Date(toDate); to.setHours(23, 59, 59, 999);
+
+    // Count orders per unique phone across ALL time (to detect repeat customers)
+    const lifetimeCounts = {};
+    orders.forEach(o => {
+      const ph = o.customerPhone?.replace(/\D/g, '');
+      if (!ph || ph.length < 10) return;
+      lifetimeCounts[ph] = (lifetimeCounts[ph] || 0) + 1;
+    });
+
+    // Orders within selected period
+    const periodOrders = orders.filter(o => {
+      const t = o.createdAt?.toDate?.() || new Date(0);
+      return t >= from && t <= to;
+    });
+
+    // Unique phones in period
+    const periodPhones = new Set();
+    periodOrders.forEach(o => {
+      const ph = o.customerPhone?.replace(/\D/g, '');
+      if (ph && ph.length >= 10) periodPhones.add(ph);
+    });
+
+    // New = first order ever falls within selected period
+    let newCustomers = 0;
+    periodPhones.forEach(ph => {
+      // Find their earliest order across ALL time
+      const allPhoneOrders = orders.filter(o => o.customerPhone?.replace(/\D/g, '') === ph);
+      const earliest = allPhoneOrders.reduce((min, o) => {
+        const t = o.createdAt?.toDate?.() || new Date(9999, 0);
+        return t < min ? t : min;
+      }, new Date(9999, 0));
+      if (earliest >= from && earliest <= to) newCustomers++;
+    });
+
+    const total  = periodPhones.size;
+    const repeat = periodPhones.size > 0
+      ? [...periodPhones].filter(ph => (lifetimeCounts[ph] || 0) > 1).length
+      : 0;
+
+    return { total, newCustomers, repeat };
+  }, [orders, fromDate, toDate]);
 
   const [pdfLoading, setPdfLoading] = useState(false);
 
@@ -500,6 +576,133 @@ const AdvancedAnalytics = () => {
               </div>
             </div>
           </SectionCard>
+
+          {/* ── Growth Analysis ──────────────────────────────────────── */}
+          {growthMetrics && (
+            <SectionCard T={T} title="Growth Analysis" icon={TrendingUp} delay={0.5}
+              explanation="Compares revenue performance across time periods. Growth % = ((Current - Previous) / Previous) × 100.">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+
+                {/* Today vs Yesterday */}
+                <div className={`${T.subCard} rounded-xl p-5`}>
+                  <p className={`${T.muted} text-xs uppercase tracking-wide mb-3`}>Today vs Yesterday</p>
+                  <div className="flex items-end justify-between mb-3">
+                    <div>
+                      <p className={`${T.faint} text-xs mb-1`}>Today</p>
+                      <p className="text-xl font-black text-[#D4AF37]">{CUR}{growthMetrics.todayRev.toFixed(2)}</p>
+                    </div>
+                    <div className="text-right">
+                      <p className={`${T.faint} text-xs mb-1`}>Yesterday</p>
+                      <p className={`${T.heading} text-xl font-black`}>{CUR}{growthMetrics.yesterdayRev.toFixed(2)}</p>
+                    </div>
+                  </div>
+                  <div className={`flex items-center justify-between p-3 rounded-lg ${
+                    growthMetrics.todayPct >= 0
+                      ? 'bg-emerald-500/8 border border-emerald-500/20'
+                      : 'bg-red-500/8 border border-red-500/20'
+                  }`}>
+                    <span className={`text-sm font-semibold ${T.heading}`}>Daily Growth</span>
+                    <span className={`text-lg font-black ${growthMetrics.todayPct >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
+                      {growthMetrics.todayPct >= 0 ? '+' : ''}{growthMetrics.todayPct}% {growthMetrics.todayPct >= 0 ? '📈' : '📉'}
+                    </span>
+                  </div>
+                </div>
+
+                {/* This Week vs Last Week */}
+                <div className={`${T.subCard} rounded-xl p-5`}>
+                  <p className={`${T.muted} text-xs uppercase tracking-wide mb-3`}>This Week vs Last Week</p>
+                  <div className="flex items-end justify-between mb-3">
+                    <div>
+                      <p className={`${T.faint} text-xs mb-1`}>This Week</p>
+                      <p className="text-xl font-black text-[#D4AF37]">{CUR}{growthMetrics.thisWeekRev.toFixed(2)}</p>
+                    </div>
+                    <div className="text-right">
+                      <p className={`${T.faint} text-xs mb-1`}>Last Week</p>
+                      <p className={`${T.heading} text-xl font-black`}>{CUR}{growthMetrics.lastWeekRev.toFixed(2)}</p>
+                    </div>
+                  </div>
+                  <div className={`flex items-center justify-between p-3 rounded-lg ${
+                    growthMetrics.weekPct >= 0
+                      ? 'bg-emerald-500/8 border border-emerald-500/20'
+                      : 'bg-red-500/8 border border-red-500/20'
+                  }`}>
+                    <span className={`text-sm font-semibold ${T.heading}`}>Weekly Growth</span>
+                    <span className={`text-lg font-black ${growthMetrics.weekPct >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
+                      {growthMetrics.weekPct >= 0 ? '+' : ''}{growthMetrics.weekPct}% {growthMetrics.weekPct >= 0 ? '📈' : '📉'}
+                    </span>
+                  </div>
+                </div>
+
+              </div>
+            </SectionCard>
+          )}
+
+          {/* ── Customer Analysis ────────────────────────────────────── */}
+          {customerMetrics && (
+            <SectionCard T={T} title="Customer Analysis" icon={ShoppingBag} delay={0.55}
+              explanation="Unique customers identified by phone number. New = first order within selected period. Repeat = ordered more than once across all time.">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+
+                {/* Total Customers */}
+                <div className={`${T.subCard} rounded-xl p-5 text-center`}>
+                  <div className="w-10 h-10 rounded-full flex items-center justify-center mx-auto mb-3"
+                    style={{ background: 'rgba(212,175,55,0.12)' }}>
+                    <ShoppingBag className="w-5 h-5 text-[#D4AF37]" />
+                  </div>
+                  <p className={`${T.muted} text-xs uppercase tracking-wide mb-2`}>Total Customers</p>
+                  <p className="text-3xl font-black text-[#D4AF37]">{customerMetrics.total}</p>
+                  <p className={`${T.faint} text-xs mt-1`}>unique phone numbers</p>
+                </div>
+
+                {/* New Customers */}
+                <div className={`${T.subCard} rounded-xl p-5 text-center`}>
+                  <div className="w-10 h-10 rounded-full flex items-center justify-center mx-auto mb-3"
+                    style={{ background: 'rgba(16,185,129,0.12)' }}>
+                    <Star className="w-5 h-5 text-emerald-400" />
+                  </div>
+                  <p className={`${T.muted} text-xs uppercase tracking-wide mb-2`}>New Customers</p>
+                  <p className="text-3xl font-black text-emerald-400">{customerMetrics.newCustomers}</p>
+                  <p className={`${T.faint} text-xs mt-1`}>first order this period</p>
+                </div>
+
+                {/* Repeat Customers */}
+                <div className={`${T.subCard} rounded-xl p-5 text-center`}>
+                  <div className="w-10 h-10 rounded-full flex items-center justify-center mx-auto mb-3"
+                    style={{ background: 'rgba(139,92,246,0.12)' }}>
+                    <TrendingUp className="w-5 h-5" style={{ color: '#8B5CF6' }} />
+                  </div>
+                  <p className={`${T.muted} text-xs uppercase tracking-wide mb-2`}>Repeat Customers</p>
+                  <p className="text-3xl font-black" style={{ color: '#8B5CF6' }}>{customerMetrics.repeat}</p>
+                  <p className={`${T.faint} text-xs mt-1`}>ordered more than once</p>
+                </div>
+
+              </div>
+
+              {/* Retention bar */}
+              {customerMetrics.total > 0 && (
+                <div className="mt-4">
+                  <div className="flex justify-between text-xs mb-1.5">
+                    <span className={`${T.muted}`}>Retention Rate</span>
+                    <span className="text-[#D4AF37] font-semibold">
+                      {Math.round((customerMetrics.repeat / customerMetrics.total) * 100)}%
+                    </span>
+                  </div>
+                  <div className={`h-2 rounded-full ${T.subCard} overflow-hidden`}>
+                    <motion.div
+                      initial={{ width: 0 }}
+                      animate={{ width: `${Math.round((customerMetrics.repeat / customerMetrics.total) * 100)}%` }}
+                      transition={{ duration: 0.6, delay: 0.2 }}
+                      className="h-full rounded-full"
+                      style={{ background: 'linear-gradient(90deg, #D4AF37, #8B5CF6)' }}
+                    />
+                  </div>
+                  <p className={`${T.faint} text-xs mt-1.5`}>
+                    {customerMetrics.repeat} of {customerMetrics.total} customers came back
+                  </p>
+                </div>
+              )}
+            </SectionCard>
+          )}
         </>
       )}
     </div>
