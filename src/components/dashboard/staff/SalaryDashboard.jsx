@@ -1,278 +1,291 @@
 /**
  * SalaryDashboard.jsx
- * Monthly salary calculation, bonus/advance management, and payment tracking.
+ *
+ * Main salary management tab.
+ * - Month picker
+ * - "Calculate All Salaries" button — one click, full salary sheet for everyone
+ * - SalaryCard per staff member (expandable)
+ * - Bonus / advance overrides per staff
+ * - Save all sheets to Firestore
+ *
+ * Drop-in upgrade: replaces the existing SalaryDashboard.jsx.
+ * Same props interface, same T theme object.
  */
 
-import React, { useState, useEffect } from 'react';
-import { collection, query, where, onSnapshot } from 'firebase/firestore';
-import { db } from '../../../lib/firebase';
-import { motion, AnimatePresence } from 'framer-motion';
+import React, { useState, useCallback } from 'react';
+import { motion } from 'framer-motion';
 import {
-  IndianRupee, CheckCircle, RefreshCw, ChevronLeft,
-  ChevronRight, Calculator, CreditCard, AlertCircle,
+  Calculator, RefreshCw, Save, TrendingDown,
+  Users, IndianRupee, CheckCircle2,
 } from 'lucide-react';
 import {
-  calculateAndSaveSalary, markSalaryPaid, getMonthlySalaries,
-} from '../../../services/staffService';
+  collection, query, where, getDocs,
+  doc, setDoc, serverTimestamp,
+} from 'firebase/firestore';
+import { db } from '../../../lib/firebase';
+import { useAuth } from '../../../contexts/AuthContext';
+import { useDocument } from '../../../hooks/useFirestore';
 import { toast } from 'sonner';
+import {
+  calculateAllSalaries, toDateKey,
+} from '../../../services/salaryEngine';
+import SalaryCard from './SalaryCard';
+import { useTheme } from '../../../hooks/useTheme';
 
-const fmt = (n) => (parseFloat(n) || 0).toLocaleString('en-IN', { maximumFractionDigits: 2 });
+// ── Helpers ────────────────────────────────────────────────────────────────────
+const todayYM = () => toDateKey(new Date()).slice(0, 7);
 
-// ─── Salary Card ──────────────────────────────────────────────────────────────
-const SalaryCard = ({ record, onMarkPaid, onRecalculate }) => {
-  const [showDetail, setShowDetail] = useState(false);
-  const [paying,     setPaying    ] = useState(false);
+const monthLabel = (ym) =>
+  new Date(ym + '-01').toLocaleDateString('en-IN', {
+    month: 'long', year: 'numeric',
+  });
 
-  const handlePay = async () => {
-    setPaying(true);
-    try {
-      await markSalaryPaid(record.id);
-      onMarkPaid(record.id);
-      toast.success(`Salary marked as paid for ${record.staffName}`);
-    } catch (err) {
-      toast.error(err.message);
-    } finally {
-      setPaying(false);
-    }
-  };
-
-  return (
-    <motion.div whileHover={{ y: -2 }}
-      className="bg-[#0F0F0F] border border-white/5 rounded-2xl overflow-hidden hover:border-white/10 transition-colors">
-      <div className="p-5">
-        {/* Header */}
-        <div className="flex items-start justify-between mb-4">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-[#D4AF37]/10 flex items-center justify-center font-black text-[#D4AF37]">
-              {record.staffName?.charAt(0)}
-            </div>
-            <div>
-              <p className="text-white font-semibold text-sm">{record.staffName}</p>
-              {record.isPaid ? (
-                <span className="flex items-center gap-1 text-emerald-400 text-xs font-semibold">
-                  <CheckCircle className="w-3 h-3" />Paid
-                </span>
-              ) : (
-                <span className="text-amber-400 text-xs font-semibold">Pending</span>
-              )}
-            </div>
-          </div>
-          <div className="text-right">
-            <p className="text-[#D4AF37] font-black text-xl">₹{fmt(record.netSalary)}</p>
-            <p className="text-[#555] text-xs">Net salary</p>
-          </div>
-        </div>
-
-        {/* Quick stats */}
-        <div className="grid grid-cols-3 gap-3 mb-4">
-          {[
-            { label: 'Present', val: record.presentDays, color: '#10B981' },
-            { label: 'Absent',  val: record.absentDays,  color: '#EF4444' },
-            { label: 'Half-day',val: record.halfDays,     color: '#3B82F6' },
-          ].map(s => (
-            <div key={s.label} className="text-center p-2 rounded-xl bg-white/3">
-              <p className="font-black text-lg" style={{ color: s.color }}>{s.val}</p>
-              <p className="text-[#555] text-xs">{s.label}</p>
-            </div>
-          ))}
-        </div>
-
-        {/* Breakdown toggle */}
-        <button onClick={() => setShowDetail(v => !v)}
-          className="w-full text-[#555] text-xs hover:text-[#A3A3A3] transition-colors mb-3 text-left">
-          {showDetail ? '▲ Hide' : '▼ Show'} breakdown
-        </button>
-
-        <AnimatePresence>
-          {showDetail && (
-            <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }}
-              exit={{ height: 0, opacity: 0 }} className="overflow-hidden">
-              <div className="space-y-1.5 text-xs mb-4 p-3 rounded-xl bg-white/3">
-                {[
-                  { label: 'Base Salary',         val: `+₹${fmt(record.baseSalary)}`,         color: '#10B981' },
-                  { label: 'Absent Deduction',    val: `-₹${fmt(record.absentDeduction)}`,    color: '#EF4444' },
-                  { label: 'Half-day Deduction',  val: `-₹${fmt(record.halfDayDeduction)}`,   color: '#EF4444' },
-                  { label: 'Bonus',               val: `+₹${fmt(record.bonus)}`,              color: '#D4AF37' },
-                  { label: 'Advance',             val: `-₹${fmt(record.advance)}`,            color: '#F97316' },
-                ].map(r => (
-                  <div key={r.label} className="flex justify-between">
-                    <span className="text-[#555]">{r.label}</span>
-                    <span className="font-semibold" style={{ color: r.color }}>{r.val}</span>
-                  </div>
-                ))}
-                <div className="border-t border-white/10 pt-1.5 flex justify-between font-bold">
-                  <span className="text-white">Net Salary</span>
-                  <span className="text-[#D4AF37]">₹{fmt(record.netSalary)}</span>
-                </div>
-              </div>
-            </motion.div>
-          )}
-        </AnimatePresence>
-
-        {/* Actions */}
-        <div className="flex gap-2">
-          {!record.isPaid && (
-            <button onClick={handlePay} disabled={paying}
-              className="flex-1 flex items-center justify-center gap-1.5 py-2.5 bg-emerald-500/15 hover:bg-emerald-500/25 text-emerald-400 border border-emerald-500/20 rounded-xl text-xs font-bold transition-all disabled:opacity-50">
-              {paying ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <CheckCircle className="w-3.5 h-3.5" />}
-              Mark Paid
-            </button>
-          )}
-          {record.upiId && (
-            <button onClick={() => {
-              const msg = `Salary for ${record.month}: ₹${fmt(record.netSalary)}`;
-              window.location.href = `upi://pay?pa=${record.upiId}&pn=${record.staffName}&am=${record.netSalary}&tn=${encodeURIComponent(msg)}&cu=INR`;
-            }}
-              className="flex-1 flex items-center justify-center gap-1.5 py-2.5 bg-[#D4AF37]/10 hover:bg-[#D4AF37]/20 text-[#D4AF37] border border-[#D4AF37]/20 rounded-xl text-xs font-bold transition-all">
-              <CreditCard className="w-3.5 h-3.5" />Pay via UPI
-            </button>
-          )}
-        </div>
-
-        {record.isPaid && record.paidAt && (
-          <p className="text-center text-[#555] text-xs mt-2">
-            Paid on {record.paidAt?.toDate?.().toLocaleDateString('en-IN') || '—'}
-          </p>
-        )}
-      </div>
-    </motion.div>
-  );
+const prevMonth = (ym) => {
+  const [y, m] = ym.split('-').map(Number);
+  return m === 1 ? `${y - 1}-12` : `${y}-${String(m - 1).padStart(2, '0')}`;
 };
 
-// ─── Main ─────────────────────────────────────────────────────────────────────
-const SalaryDashboard = ({ cafeId }) => {
-  const now = new Date();
-  const [month, setMonth] = useState({ year: now.getFullYear(), m: now.getMonth() + 1 });
-  const [staffList,  setStaffList ] = useState([]);
-  const [salaries,   setSalaries  ] = useState([]);
-  const [loading,    setLoading   ] = useState(false);
-  const [bonus,      setBonus     ] = useState({});
-  const [advance,    setAdvance   ] = useState({});
-  const [generating, setGenerating] = useState(false);
+// ── Main component ─────────────────────────────────────────────────────────────
+const SalaryDashboard = ({ staffList = [] }) => {
+  const { user }          = useAuth();
+  const cafeId            = user?.cafeId;
+  const { data: cafe }    = useDocument('cafes', cafeId);
+  const { T }             = useTheme();
 
-  const yearMonth = `${month.year}-${String(month.m).padStart(2, '0')}`;
-  const monthLabel = new Date(month.year, month.m - 1).toLocaleDateString('en-IN', { month: 'long', year: 'numeric' });
+  const [yearMonth,    setYearMonth   ] = useState(todayYM());
+  const [sheets,       setSheets      ] = useState([]);
+  const [calculating,  setCalculating ] = useState(false);
+  const [saving,       setSaving      ] = useState(false);
+  const [overrides,    setOverrides   ] = useState({}); // { [staffId]: { bonus, advance } }
 
-  // Real-time staff
-  useEffect(() => {
-    if (!cafeId) return;
-    return onSnapshot(
-      query(collection(db, 'staff'), where('cafeId', '==', cafeId), where('isActive', '==', true)),
-      snap => setStaffList(snap.docs.map(d => ({ id: d.id, ...d.data() })))
-    );
-  }, [cafeId]);
+  // ── Totals for summary strip ─────────────────────────────────────────────────
+  const totals = sheets.reduce(
+    (acc, s) => ({
+      payroll:     acc.payroll     + s.finalSalary,
+      deductions:  acc.deductions  + s.totalDeductions,
+      paid:        acc.paid        + (s.status === 'paid' ? 1 : 0),
+    }),
+    { payroll: 0, deductions: 0, paid: 0 }
+  );
 
-  // Load salaries for current month
-  const loadSalaries = async () => {
-    setLoading(true);
-    const data = await getMonthlySalaries(cafeId, yearMonth);
-    setSalaries(data);
-    setLoading(false);
-  };
+  // ── Handle override change from SalaryCard ───────────────────────────────────
+  const handleOverrideChange = useCallback((staffId, vals) => {
+    setOverrides(prev => ({ ...prev, [staffId]: vals }));
+  }, []);
 
-  useEffect(() => { if (cafeId) loadSalaries(); }, [cafeId, yearMonth]);
-
-  const generateAll = async () => {
-    setGenerating(true);
+  // ── Calculate All Salaries ───────────────────────────────────────────────────
+  const calculateAll = async () => {
+    if (!staffList.length) {
+      toast.error('No staff found. Add staff first.');
+      return;
+    }
+    setCalculating(true);
     try {
-      const results = await Promise.allSettled(
-        staffList.map(s => calculateAndSaveSalary(cafeId, s.id, yearMonth, {
-          bonus:   parseFloat(bonus[s.id]) || 0,
-          advance: parseFloat(advance[s.id]) || 0,
-        }))
+      // Fetch all attendance for this cafe + month in one query
+      const attSnap = await getDocs(
+        query(
+          collection(db, 'attendance'),
+          where('cafeId', '==', cafeId),
+          where('month',  '==', yearMonth)
+        )
       );
-      const failed = results.filter(r => r.status === 'rejected').length;
-      if (failed) toast.error(`${failed} salary calculations failed`);
-      else toast.success(`Salaries calculated for ${staffList.length} staff members`);
-      await loadSalaries();
+      const allAtt = attSnap.docs.map(d => d.data());
+
+      // Group attendance by staffId
+      const attByStaff = {};
+      allAtt.forEach(a => {
+        if (!attByStaff[a.staffId]) attByStaff[a.staffId] = [];
+        attByStaff[a.staffId].push(a);
+      });
+
+      // Run engine
+      const results = calculateAllSalaries(
+        staffList, attByStaff, yearMonth, overrides
+      );
+
+      setSheets(results);
+      toast.success(`Salary calculated for ${results.length} staff ✓`);
     } catch (err) {
-      toast.error(err.message);
+      console.error('[SalaryDashboard]', err.message);
+      toast.error('Calculation failed: ' + err.message);
     } finally {
-      setGenerating(false);
+      setCalculating(false);
     }
   };
 
-  const totalPayable = salaries.filter(s => !s.isPaid).reduce((sum, s) => sum + (s.netSalary || 0), 0);
-  const totalPaid    = salaries.filter(s => s.isPaid).reduce((sum, s) => sum + (s.netSalary || 0), 0);
+  // ── Recalculate with new overrides ───────────────────────────────────────────
+  const recalculate = async () => {
+    if (!sheets.length) { await calculateAll(); return; }
+    setCalculating(true);
+    try {
+      const attSnap = await getDocs(
+        query(
+          collection(db, 'attendance'),
+          where('cafeId', '==', cafeId),
+          where('month',  '==', yearMonth)
+        )
+      );
+      const allAtt = attSnap.docs.map(d => d.data());
+      const attByStaff = {};
+      allAtt.forEach(a => {
+        if (!attByStaff[a.staffId]) attByStaff[a.staffId] = [];
+        attByStaff[a.staffId].push(a);
+      });
+      const results = calculateAllSalaries(staffList, attByStaff, yearMonth, overrides);
+      setSheets(results);
+      toast.success('Salaries recalculated ✓');
+    } catch (err) {
+      toast.error('Recalculation failed: ' + err.message);
+    } finally {
+      setCalculating(false);
+    }
+  };
 
-  const prev = () => setMonth(m => m.m === 1 ? { year: m.year - 1, m: 12 } : { ...m, m: m.m - 1 });
-  const next = () => setMonth(m => m.m === 12 ? { year: m.year + 1, m: 1 } : { ...m, m: m.m + 1 });
+  // ── Save all sheets to Firestore ─────────────────────────────────────────────
+  const saveAll = async () => {
+    if (!sheets.length) {
+      toast.error('Calculate salaries first.');
+      return;
+    }
+    setSaving(true);
+    try {
+      await Promise.all(
+        sheets.map(sheet => {
+          const docId = `${cafeId}_${sheet.staffId}_${sheet.month}`;
+          return setDoc(doc(db, 'salary', docId), {
+            ...sheet,
+            cafeId,
+            savedAt: serverTimestamp(),
+          }, { merge: true });
+        })
+      );
+      toast.success('All salary sheets saved ✓');
+    } catch (err) {
+      toast.error('Save failed: ' + err.message);
+    } finally {
+      setSaving(false);
+    }
+  };
 
   return (
     <div className="space-y-5">
-      {/* Month selector */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div className="flex items-center gap-3">
-          <button onClick={prev} className="p-2 rounded-lg hover:bg-white/10 text-[#A3A3A3] transition-all"><ChevronLeft className="w-4 h-4" /></button>
-          <span className="text-white font-semibold text-sm min-w-[140px] text-center">{monthLabel}</span>
-          <button onClick={next} className="p-2 rounded-lg hover:bg-white/10 text-[#A3A3A3] transition-all"><ChevronRight className="w-4 h-4" /></button>
+
+      {/* ── Header ── */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+        <div>
+          <h2 className={`${T.heading} font-bold text-2xl`}
+            style={{ fontFamily: 'Playfair Display, serif' }}>
+            Salary Management
+          </h2>
+          <p className={`${T.muted} text-sm mt-1`}>
+            {staffList.length} staff · {monthLabel(yearMonth)}
+          </p>
         </div>
-        <button onClick={generateAll} disabled={generating || staffList.length === 0}
-          className="flex items-center gap-2 px-5 py-2.5 bg-[#D4AF37] hover:bg-[#C5A059] text-black font-bold rounded-xl text-sm transition-all disabled:opacity-50">
-          {generating ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Calculator className="w-4 h-4" />}
-          {generating ? 'Calculating…' : 'Calculate All Salaries'}
-        </button>
+
+        {/* Month selector */}
+        <div className="flex items-center gap-2">
+          <input
+            type="month"
+            value={yearMonth}
+            max={todayYM()}
+            onChange={e => { setYearMonth(e.target.value); setSheets([]); }}
+            className={`${T.input} rounded-lg px-3 py-2 text-sm h-9`}
+          />
+        </div>
       </div>
 
-      {/* Summary cards */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
-        {[
-          { label: 'Total Payable', val: `₹${fmt(totalPayable)}`, color: '#EF4444' },
-          { label: 'Total Paid',    val: `₹${fmt(totalPaid)}`,    color: '#10B981' },
-          { label: 'Staff Count',   val: staffList.length,         color: '#D4AF37' },
-        ].map(s => (
-          <div key={s.label} className="bg-[#0F0F0F] border border-white/5 rounded-2xl p-4">
-            <p className="text-[#555] text-xs uppercase tracking-wide mb-1">{s.label}</p>
-            <p className="font-black text-xl" style={{ color: s.color }}>{s.val}</p>
-          </div>
-        ))}
-      </div>
-
-      {/* Bonus/advance inputs */}
-      {staffList.length > 0 && salaries.length === 0 && (
-        <div className="bg-[#0F0F0F] border border-white/5 rounded-2xl p-5">
-          <p className="text-white font-semibold text-sm mb-4">Bonus & Advance (before calculating)</p>
-          <div className="space-y-3">
-            {staffList.map(s => (
-              <div key={s.id} className="flex items-center gap-3">
-                <span className="text-white text-sm w-32 truncate">{s.name}</span>
-                <div className="flex gap-2 flex-1">
-                  <input type="number" min="0" placeholder="Bonus ₹"
-                    value={bonus[s.id] || ''}
-                    onChange={e => setBonus(b => ({ ...b, [s.id]: e.target.value }))}
-                    className="flex-1 bg-black/20 border border-white/10 text-white rounded-lg h-9 px-3 text-sm outline-none focus:border-[#D4AF37] placeholder:text-neutral-600" />
-                  <input type="number" min="0" placeholder="Advance ₹"
-                    value={advance[s.id] || ''}
-                    onChange={e => setAdvance(a => ({ ...a, [s.id]: e.target.value }))}
-                    className="flex-1 bg-black/20 border border-white/10 text-white rounded-lg h-9 px-3 text-sm outline-none focus:border-[#D4AF37] placeholder:text-neutral-600" />
-                </div>
+      {/* ── Summary strip (only after calculation) ── */}
+      {sheets.length > 0 && (
+        <motion.div
+          initial={{ opacity: 0, y: 8 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="grid grid-cols-3 gap-3"
+        >
+          {[
+            { label: 'Total Payroll',  val: `₹${totals.payroll.toLocaleString('en-IN')}`,     icon: IndianRupee, color: '#D4A843' },
+            { label: 'Total Deductions', val: `₹${totals.deductions.toLocaleString('en-IN')}`, icon: TrendingDown, color: '#EF4444' },
+            { label: 'Paid',           val: `${totals.paid} / ${sheets.length}`,              icon: CheckCircle2, color: '#10B981' },
+          ].map((s, i) => (
+            <div key={i} className={`${T.card} rounded-xl p-4`}>
+              <div className="flex items-center justify-between mb-2">
+                <p className={`${T.muted} text-xs`}>{s.label}</p>
+                <s.icon className="w-4 h-4" style={{ color: s.color }} />
               </div>
-            ))}
-          </div>
+              <p className="font-black text-lg" style={{ color: s.color }}>{s.val}</p>
+            </div>
+          ))}
+        </motion.div>
+      )}
+
+      {/* ── Action buttons ── */}
+      <div className="flex gap-2 flex-wrap">
+        <button
+          onClick={calculateAll}
+          disabled={calculating}
+          className="flex items-center gap-2 px-5 py-2.5 rounded-xl font-bold text-sm transition-all disabled:opacity-60 text-black"
+          style={{ background: 'linear-gradient(135deg, #D4A843, #B8902A)' }}
+        >
+          <Calculator className={`w-4 h-4 ${calculating ? 'animate-spin' : ''}`} />
+          {calculating ? 'Calculating…' : sheets.length ? 'Recalculate All' : 'Calculate All Salaries'}
+        </button>
+
+        {sheets.length > 0 && (
+          <>
+            <button
+              onClick={recalculate}
+              disabled={calculating}
+              className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold border ${T.borderMd} ${T.subCard} ${T.muted} hover:text-white transition-all disabled:opacity-50`}
+            >
+              <RefreshCw className="w-3.5 h-3.5" />
+              Apply Overrides
+            </button>
+            <button
+              onClick={saveAll}
+              disabled={saving}
+              className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold bg-emerald-600 hover:bg-emerald-700 text-white transition-all disabled:opacity-50"
+            >
+              <Save className="w-3.5 h-3.5" />
+              {saving ? 'Saving…' : 'Save All Sheets'}
+            </button>
+          </>
+        )}
+      </div>
+
+      {/* ── Empty state ── */}
+      {sheets.length === 0 && !calculating && (
+        <div className={`${T.card} rounded-xl p-12 text-center`}>
+          <Calculator className={`w-12 h-12 mx-auto mb-4`} style={{ color: 'rgba(212,168,67,0.3)' }} />
+          <p className={`${T.heading} font-semibold mb-1`}>No salary data yet</p>
+          <p className={`${T.muted} text-sm`}>
+            Click <strong style={{ color: '#D4A843' }}>Calculate All Salaries</strong> to generate
+            salary sheets for {monthLabel(yearMonth)}.
+          </p>
+          <p className={`${T.faint} text-xs mt-2`}>
+            Attendance data is read automatically — no manual entry needed.
+          </p>
         </div>
       )}
 
-      {/* Salary cards */}
-      {loading ? (
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          {[...Array(4)].map((_, i) => <div key={i} className="h-48 rounded-2xl bg-white/3 animate-pulse" style={{ animationDelay: `${i*80}ms` }} />)}
-        </div>
-      ) : salaries.length === 0 ? (
-        <div className="bg-[#0F0F0F] border border-white/5 rounded-2xl p-12 text-center">
-          <Calculator className="w-12 h-12 text-[#333] mx-auto mb-3" />
-          <p className="text-[#A3A3A3] text-sm">No salary records for {monthLabel}</p>
-          <p className="text-[#555] text-xs mt-1">Click "Calculate All Salaries" to generate</p>
-        </div>
-      ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          {salaries.map(rec => (
-            <SalaryCard key={rec.id} record={rec}
-              onMarkPaid={() => loadSalaries()}
-              onRecalculate={() => loadSalaries()}
-            />
-          ))}
+      {/* ── Salary cards ── */}
+      {sheets.length > 0 && (
+        <div className="space-y-3">
+          {sheets.map((sheet) => {
+            const staff = staffList.find(s => s.id === sheet.staffId) || {};
+            return (
+              <SalaryCard
+                key={sheet.staffId}
+                sheet={sheet}
+                staff={{ ...staff, id: sheet.staffId }}
+                cafeId={cafeId}
+                cafeName={cafe?.name || 'the café'}
+                T={T}
+                onOverrideChange={handleOverrideChange}
+              />
+            );
+          })}
         </div>
       )}
+
     </div>
   );
 };
