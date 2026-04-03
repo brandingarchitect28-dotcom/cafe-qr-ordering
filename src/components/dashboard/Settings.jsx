@@ -3,7 +3,8 @@ import { useAuth } from '../../contexts/AuthContext';
 import { doc, updateDoc, onSnapshot } from 'firebase/firestore';
 import { db } from '../../lib/firebase';
 import { uploadImage } from '../../utils/uploadImage';
-import { Save, Sun, Moon, ShoppingCart, Plus, Coffee } from 'lucide-react';
+import { Save, Sun, Moon, ShoppingCart, Plus, Coffee, CreditCard, Eye, EyeOff, AlertTriangle } from 'lucide-react';
+import ChangePassword from './ChangePassword';
 import { toast } from 'sonner';
 
 const Settings = () => {
@@ -12,6 +13,18 @@ const Settings = () => {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState(false);
+
+  // Online Payment Settings
+  const [showKeySecret, setShowKeySecret] = useState(false);
+  const [savingPayment, setSavingPayment] = useState(false);
+  const [paymentSettings, setPaymentSettings] = useState({
+    enabled:      false,
+    gateway:      'cashfree',
+    keyId:        '',
+    keySecret:    '',
+    merchantName: '',
+    currency:     'INR',
+  });
 
   const [settings, setSettings] = useState({
     name: '',
@@ -33,11 +46,7 @@ const Settings = () => {
     taxRate: 5,
     // Feature: Service Charge
     serviceChargeEnabled: false,
-    serviceChargeRate: 10,
-    // Feature: Platform Fee (NEW)
-    platformFeeEnabled: false,
-    platformFeeType: 'percentage',
-    platformFeeValue: 2
+    serviceChargeRate: 10
   });
 
   // REAL-TIME: Load settings with onSnapshot
@@ -66,12 +75,23 @@ const Settings = () => {
             taxName: data.taxName || 'GST',
             taxRate: data.taxRate ?? 5,
             serviceChargeEnabled: data.serviceChargeEnabled || false,
-            serviceChargeRate: data.serviceChargeRate ?? 10,
-            platformFeeEnabled: data.platformFeeEnabled || false,
-            platformFeeType: data.platformFeeType || 'percentage',
-            platformFeeValue: data.platformFeeValue ?? 2
+            serviceChargeRate: data.serviceChargeRate ?? 10
           });
         }
+        // Hydrate payment settings if present
+          if (docSnap.exists()) {
+            const d2 = docSnap.data();
+            if (d2.paymentSettings) {
+              setPaymentSettings({
+                enabled:      d2.paymentSettings.enabled      ?? false,
+                gateway:      d2.paymentSettings.gateway      || 'cashfree',
+                keyId:        d2.paymentSettings.keyId        || '',
+                keySecret:    d2.paymentSettings.keySecret    || '',
+                merchantName: d2.paymentSettings.merchantName || '',
+                currency:     d2.paymentSettings.currency     || 'INR',
+              });
+            }
+          }
         setLoading(false);
       },
       (error) => {
@@ -106,6 +126,28 @@ const Settings = () => {
     }
   };
 
+  const handleSavePayment = async () => {
+    if (!cafeId) { toast.error('Cafe ID not found'); return; }
+    setSavingPayment(true);
+    try {
+      await updateDoc(doc(db, 'cafes', cafeId), {
+        paymentSettings: {
+          enabled:      paymentSettings.enabled,
+          gateway:      paymentSettings.gateway,
+          keyId:        paymentSettings.keyId.trim(),
+          keySecret:    paymentSettings.keySecret.trim(),
+          merchantName: paymentSettings.merchantName.trim(),
+          currency:     paymentSettings.currency,
+        },
+      });
+      toast.success('Payment settings saved ✓');
+    } catch (err) {
+      toast.error('Failed to save payment settings');
+    } finally {
+      setSavingPayment(false);
+    }
+  };
+
   const handleSave = async () => {
     if (!cafeId) {
       toast.error('Cafe ID not found');
@@ -131,10 +173,7 @@ const Settings = () => {
         taxName: settings.taxName || 'GST',
         taxRate: parseFloat(settings.taxRate) || 0,
         serviceChargeEnabled: settings.serviceChargeEnabled,
-        serviceChargeRate: parseFloat(settings.serviceChargeRate) || 0,
-        platformFeeEnabled: settings.platformFeeEnabled,
-        platformFeeType: settings.platformFeeType,
-        platformFeeValue: parseFloat(settings.platformFeeValue) || 0
+        serviceChargeRate: parseFloat(settings.serviceChargeRate) || 0
       });
       toast.success('Settings saved successfully!');
     } catch (error) {
@@ -445,67 +484,6 @@ const Settings = () => {
         </div>
       </div>
 
-
-      {/* Platform Fee Settings (NEW) */}
-      <div className="bg-[#0F0F0F] border border-white/5 rounded-sm p-6">
-        <h3 className="text-xl font-semibold text-white mb-6" style={{ fontFamily: 'Playfair Display, serif' }}>
-          Platform Fee
-        </h3>
-        <div className="space-y-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <label className="block text-white text-sm font-medium">Enable Platform Fee</label>
-              <p className="text-[#A3A3A3] text-xs mt-1">Deducted from your net revenue (not charged to customers)</p>
-            </div>
-            <button
-              type="button"
-              onClick={() => setSettings(prev => ({ ...prev, platformFeeEnabled: !prev.platformFeeEnabled }))}
-              className={`relative inline-flex h-7 w-12 items-center rounded-full transition-colors duration-200 focus:outline-none ${
-                settings.platformFeeEnabled ? 'bg-[#D4AF37]' : 'bg-white/10'
-              }`}
-            >
-              <span className={`inline-block h-5 w-5 transform rounded-full bg-white shadow transition-transform duration-200 ${
-                settings.platformFeeEnabled ? 'translate-x-6' : 'translate-x-1'
-              }`} />
-            </button>
-          </div>
-          {settings.platformFeeEnabled && (
-            <>
-              <div>
-                <label className="block text-white text-sm font-medium mb-2">Fee Type</label>
-                <select
-                  value={settings.platformFeeType}
-                  onChange={(e) => setSettings(prev => ({ ...prev, platformFeeType: e.target.value }))}
-                  className="w-full bg-black/20 border border-white/10 text-white focus:border-[#D4AF37] focus:ring-1 focus:ring-[#D4AF37] rounded-sm h-12 px-4 transition-all"
-                >
-                  <option value="percentage" className="bg-[#0F0F0F]">Percentage (% of subtotal)</option>
-                  <option value="fixed" className="bg-[#0F0F0F]">Fixed Amount per Order</option>
-                </select>
-              </div>
-              <div>
-                <label className="block text-white text-sm font-medium mb-2">
-                  {settings.platformFeeType === 'fixed' ? 'Fixed Fee Amount' : 'Fee Percentage (%)'}
-                </label>
-                <input
-                  type="number"
-                  min="0"
-                  step="0.01"
-                  value={settings.platformFeeValue}
-                  onChange={(e) => setSettings(prev => ({ ...prev, platformFeeValue: e.target.value }))}
-                  className="w-full bg-black/20 border border-white/10 text-white placeholder:text-neutral-600 focus:border-[#D4AF37] focus:ring-1 focus:ring-[#D4AF37] rounded-sm h-12 px-4 transition-all"
-                  placeholder={settings.platformFeeType === 'fixed' ? 'e.g., 50' : 'e.g., 2'}
-                />
-                <p className="text-[#A3A3A3] text-xs mt-2">
-                  {settings.platformFeeType === 'fixed'
-                    ? 'This fixed amount will be deducted from each order\'s net revenue'
-                    : 'This % of subtotal will be deducted from net revenue per order'}
-                </p>
-              </div>
-            </>
-          )}
-        </div>
-      </div>
-
       {/* NEW: Appearance Settings */}
       <div className="bg-[#0F0F0F] border border-white/5 rounded-sm p-6">
         <h3 className="text-xl font-semibold text-white mb-6" style={{ fontFamily: 'Playfair Display, serif' }}>
@@ -733,6 +711,172 @@ const Settings = () => {
           </div>
         </div>
       </div>
+
+
+      {/* Online Payment Settings */}
+      <div className="bg-[#0F0F0F] border border-white/5 rounded-sm p-6">
+        <h3 className="text-xl font-semibold text-white mb-6" style={{ fontFamily: 'Playfair Display, serif' }}>
+          Online Payment Settings
+        </h3>
+
+        <div className="space-y-5">
+
+          {/* Enable toggle */}
+          <div className="flex items-center justify-between p-4 bg-black/20 rounded-sm border border-white/5">
+            <div>
+              <p className="text-white font-medium">Enable Online Payments</p>
+              <p className="text-[#A3A3A3] text-xs mt-0.5">
+                Allow customers to pay online at checkout
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => setPaymentSettings(prev => ({ ...prev, enabled: !prev.enabled }))}
+              className={`relative inline-flex h-7 w-12 items-center rounded-full transition-colors duration-200 focus:outline-none ${
+                paymentSettings.enabled ? 'bg-[#D4AF37]' : 'bg-white/10'
+              }`}
+            >
+              <span className={`inline-block h-5 w-5 transform rounded-full bg-white shadow transition-transform duration-200 ${
+                paymentSettings.enabled ? 'translate-x-6' : 'translate-x-1'
+              }`} />
+            </button>
+          </div>
+
+          {paymentSettings.enabled && (
+            <div className="space-y-4">
+
+              {/* Gateway selector */}
+              <div>
+                <label className="block text-white text-sm font-medium mb-2">Payment Gateway</label>
+                <select
+                  value={paymentSettings.gateway}
+                  onChange={(e) => setPaymentSettings(prev => ({ ...prev, gateway: e.target.value, keyId: '', keySecret: '' }))}
+                  className="w-full bg-black/20 border border-white/10 text-white focus:border-[#D4AF37] focus:ring-1 focus:ring-[#D4AF37] rounded-sm h-12 px-4 transition-all"
+                >
+                  <option value="cashfree" className="bg-[#0F0F0F]">Cashfree</option>
+                  <option value="razorpay" className="bg-[#0F0F0F]">Razorpay</option>
+                </select>
+              </div>
+
+              {/* Cashfree fields */}
+              {paymentSettings.gateway === 'cashfree' && (
+                <>
+                  <div>
+                    <label className="block text-white text-sm font-medium mb-2">Cashfree App ID</label>
+                    <input
+                      type="text"
+                      value={paymentSettings.keyId}
+                      onChange={(e) => setPaymentSettings(prev => ({ ...prev, keyId: e.target.value }))}
+                      placeholder="Your Cashfree App ID"
+                      className="w-full bg-black/20 border border-white/10 text-white placeholder:text-neutral-600 focus:border-[#D4AF37] focus:ring-1 focus:ring-[#D4AF37] rounded-sm h-12 px-4 font-mono transition-all"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-white text-sm font-medium mb-2">Cashfree Secret Key</label>
+                    <div className="relative">
+                      <input
+                        type={showKeySecret ? 'text' : 'password'}
+                        value={paymentSettings.keySecret}
+                        onChange={(e) => setPaymentSettings(prev => ({ ...prev, keySecret: e.target.value }))}
+                        placeholder="••••••••••••••••••••"
+                        className="w-full bg-black/20 border border-white/10 text-white placeholder:text-neutral-600 focus:border-[#D4AF37] focus:ring-1 focus:ring-[#D4AF37] rounded-sm h-12 px-4 pr-12 font-mono transition-all"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowKeySecret(v => !v)}
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-[#A3A3A3] hover:text-white transition-colors p-1"
+                        tabIndex={-1}
+                        title={showKeySecret ? 'Hide secret' : 'Show secret'}
+                      >
+                        {showKeySecret ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                      </button>
+                    </div>
+                    <p className="text-[#A3A3A3] text-xs mt-1.5">Keep this confidential. Stored in your private Firestore document.</p>
+                  </div>
+                </>
+              )}
+
+              {/* Razorpay fields */}
+              {paymentSettings.gateway === 'razorpay' && (
+                <>
+                  <div>
+                    <label className="block text-white text-sm font-medium mb-2">
+                      Razorpay Key ID
+                      <span className="text-[#A3A3A3] font-normal ml-1 text-xs">(starts with rzp_)</span>
+                    </label>
+                    <input
+                      type="text"
+                      value={paymentSettings.keyId}
+                      onChange={(e) => setPaymentSettings(prev => ({ ...prev, keyId: e.target.value }))}
+                      placeholder="rzp_live_xxxxxxxxxxxx"
+                      className="w-full bg-black/20 border border-white/10 text-white placeholder:text-neutral-600 focus:border-[#D4AF37] focus:ring-1 focus:ring-[#D4AF37] rounded-sm h-12 px-4 font-mono transition-all"
+                    />
+                    {paymentSettings.keyId && !paymentSettings.keyId.startsWith('rzp_') && (
+                      <p className="text-red-400 text-xs mt-1 flex items-center gap-1">
+                        <AlertTriangle className="w-3.5 h-3.5" />
+                        Key ID should start with rzp_live_ or rzp_test_
+                      </p>
+                    )}
+                    {paymentSettings.keyId.startsWith('rzp_test_') && (
+                      <p className="text-yellow-400 text-xs mt-1 flex items-center gap-1">
+                        <AlertTriangle className="w-3.5 h-3.5" />
+                        You are using a test key. Switch to rzp_live_ for production.
+                      </p>
+                    )}
+                  </div>
+                  <div>
+                    <label className="block text-white text-sm font-medium mb-2">Razorpay Key Secret</label>
+                    <div className="relative">
+                      <input
+                        type={showKeySecret ? 'text' : 'password'}
+                        value={paymentSettings.keySecret}
+                        onChange={(e) => setPaymentSettings(prev => ({ ...prev, keySecret: e.target.value }))}
+                        placeholder="••••••••••••••••••••"
+                        className="w-full bg-black/20 border border-white/10 text-white placeholder:text-neutral-600 focus:border-[#D4AF37] focus:ring-1 focus:ring-[#D4AF37] rounded-sm h-12 px-4 pr-12 font-mono transition-all"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowKeySecret(v => !v)}
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-[#A3A3A3] hover:text-white transition-colors p-1"
+                        tabIndex={-1}
+                        title={showKeySecret ? 'Hide secret' : 'Show secret'}
+                      >
+                        {showKeySecret ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                      </button>
+                    </div>
+                    <p className="text-[#A3A3A3] text-xs mt-1.5">Keep this confidential. Stored in your private Firestore document.</p>
+                  </div>
+                </>
+              )}
+
+              {/* Merchant Name */}
+              <div>
+                <label className="block text-white text-sm font-medium mb-2">Merchant / Business Name</label>
+                <input
+                  type="text"
+                  value={paymentSettings.merchantName}
+                  onChange={(e) => setPaymentSettings(prev => ({ ...prev, merchantName: e.target.value }))}
+                  placeholder="e.g., Downtown Coffee Pvt Ltd"
+                  className="w-full bg-black/20 border border-white/10 text-white placeholder:text-neutral-600 focus:border-[#D4AF37] focus:ring-1 focus:ring-[#D4AF37] rounded-sm h-12 px-4 transition-all"
+                />
+              </div>
+
+              {/* Save payment settings button */}
+              <button
+                onClick={handleSavePayment}
+                disabled={savingPayment}
+                className="flex items-center gap-2 bg-[#D4AF37] text-black hover:bg-[#C5A059] rounded-sm px-6 py-3 font-semibold transition-all duration-300 hover:shadow-[0_0_20px_rgba(212,175,55,0.3)] disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <CreditCard className="w-4 h-4" />
+                {savingPayment ? 'Saving...' : 'Save Payment Settings'}
+              </button>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Change Password */}
+      <ChangePassword />
 
       {/* Save Button */}
       <button
