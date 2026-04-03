@@ -1,9 +1,3 @@
-/**
- * StaffList.jsx
- * Exact original working file — no new imports, no new dependencies.
- * Add Staff button opens StaffFormModal via internal showForm state.
- */
-
 import React, { useState, useEffect } from 'react';
 import { collection, query, where, onSnapshot } from 'firebase/firestore';
 import { db } from '../../../lib/firebase';
@@ -16,7 +10,6 @@ import {
 import { addStaff, updateStaff, deleteStaff, ROLES, SALARY_TYPES } from '../../../services/staffService';
 import { toast } from 'sonner';
 
-// ─── Constants ────────────────────────────────────────────────────────────────
 const EMPTY = {
   name: '', role: 'Waiter', phone: '', upiId: '',
   salaryType: 'monthly', salaryAmount: '', shiftStart: '09:00',
@@ -25,16 +18,15 @@ const EMPTY = {
 const inputCls =
   'w-full bg-black/20 border border-white/10 text-white placeholder:text-neutral-600 ' +
   'focus:border-[#D4AF37] focus:ring-1 focus:ring-[#D4AF37] rounded-lg h-11 px-4 text-sm outline-none transition-all';
+
 const labelCls =
   'block text-[#A3A3A3] text-xs font-semibold uppercase tracking-wide mb-1.5';
 
-// ─── Role colours ─────────────────────────────────────────────────────────────
 const ROLE_COLORS = {
   Manager: '#D4AF37', Chef: '#EF4444', Waiter: '#3B82F6',
   Cashier: '#10B981', Cleaner: '#8B5CF6', Delivery: '#F97316', Other: '#A3A3A3',
 };
 
-// ─── Staff Form Modal ─────────────────────────────────────────────────────────
 const StaffFormModal = ({ initial, onSave, onClose, saving }) => {
   const [form, setForm] = useState(initial || EMPTY);
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
@@ -42,21 +34,22 @@ const StaffFormModal = ({ initial, onSave, onClose, saving }) => {
   const handleSubmit = (e) => {
     e.preventDefault();
     if (!form.name.trim()) { toast.error('Name is required'); return; }
-    if (!form.salaryAmount || isNaN(form.salaryAmount)) {
-      toast.error('Valid salary amount required'); return;
-    }
+    if (!form.salaryAmount || isNaN(form.salaryAmount)) { toast.error('Valid salary amount required'); return; }
     onSave(form);
   };
 
   return (
     <motion.div
       className="fixed inset-0 z-50 flex items-center justify-center p-4"
-      initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
     >
       <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" onClick={onClose} />
       <motion.div
         className="relative bg-[#0F0F0F] border border-white/10 rounded-2xl w-full max-w-lg p-6 space-y-5 overflow-y-auto max-h-[90vh]"
-        initial={{ scale: 0.95, y: 20 }} animate={{ scale: 1, y: 0 }}
+        initial={{ scale: 0.95, y: 20 }}
+        animate={{ scale: 1, y: 0 }}
       >
         <div className="flex items-center justify-between">
           <h3 className="text-white font-bold text-lg" style={{ fontFamily: 'Playfair Display, serif' }}>
@@ -85,7 +78,9 @@ const StaffFormModal = ({ initial, onSave, onClose, saving }) => {
                 value={form.role}
                 onChange={e => set('role', e.target.value)}
               >
-                {ROLES.map(r => <option key={r} value={r} className="bg-[#0F0F0F]">{r}</option>)}
+                {ROLES.map(r => (
+                  <option key={r} value={r} className="bg-[#0F0F0F]">{r}</option>
+                ))}
               </select>
             </div>
             <div>
@@ -168,18 +163,20 @@ const StaffFormModal = ({ initial, onSave, onClose, saving }) => {
   );
 };
 
-// ─── QR Modal ─────────────────────────────────────────────────────────────────
 const QRModal = ({ staff, cafeId, onClose }) => {
   const qrValue = `STAFF_ATTENDANCE|${cafeId}|${staff.id}`;
   return (
     <motion.div
       className="fixed inset-0 z-50 flex items-center justify-center p-4"
-      initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
     >
       <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" onClick={onClose} />
       <motion.div
         className="relative bg-[#0F0F0F] border border-white/10 rounded-2xl p-8 text-center space-y-5"
-        initial={{ scale: 0.9 }} animate={{ scale: 1 }}
+        initial={{ scale: 0.9 }}
+        animate={{ scale: 1 }}
       >
         <button onClick={onClose} className="absolute top-4 right-4 p-2 rounded-lg hover:bg-white/10 text-[#A3A3A3]">
           <X className="w-4 h-4" />
@@ -199,23 +196,21 @@ const QRModal = ({ staff, cafeId, onClose }) => {
   );
 };
 
-// ─── Main StaffList ───────────────────────────────────────────────────────────
 const StaffList = ({ cafeId }) => {
-  const [staff,       setStaff      ] = useState([]);
-  const [loading,     setLoading    ] = useState(true);
-  const [showForm,    setShowForm   ] = useState(false);   // ← controls Add Staff modal
-  const [editTarget,  setEditTarget ] = useState(null);
-  const [saving,      setSaving     ] = useState(false);
-  const [qrTarget,    setQrTarget   ] = useState(null);
-  const [deleteId,    setDeleteId   ] = useState(null);
+  const [staff, setStaff] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [showForm, setShowForm] = useState(false);
+  const [editTarget, setEditTarget] = useState(null);
+  const [saving, setSaving] = useState(false);
+  const [qrTarget, setQrTarget] = useState(null);
+  const [deleteId, setDeleteId] = useState(null);
 
-  // Real-time staff listener
   useEffect(() => {
     if (!cafeId) return;
     const unsub = onSnapshot(
       query(
         collection(db, 'staff'),
-        where('cafeId',   '==', cafeId),
+        where('cafeId', '==', cafeId),
         where('isActive', '==', true)
       ),
       snap => {
@@ -226,7 +221,10 @@ const StaffList = ({ cafeId }) => {
         );
         setLoading(false);
       },
-      err => { console.error('[StaffList]', err); setLoading(false); }
+      err => {
+        console.error('[StaffList]', err);
+        setLoading(false);
+      }
     );
     return () => unsub();
   }, [cafeId]);
@@ -262,7 +260,6 @@ const StaffList = ({ cafeId }) => {
 
   return (
     <>
-      {/* ── Modals ── */}
       <AnimatePresence>
         {(showForm || editTarget) && (
           <StaffFormModal
@@ -273,28 +270,33 @@ const StaffList = ({ cafeId }) => {
           />
         )}
         {qrTarget && (
-          <QRModal staff={qrTarget} cafeId={cafeId} onClose={() => setQrTarget(null)} />
+          <QRModal
+            staff={qrTarget}
+            cafeId={cafeId}
+            onClose={() => setQrTarget(null)}
+          />
         )}
       </AnimatePresence>
 
-      {/* ── Header ── */}
       <div className="flex items-center justify-between mb-4">
         <p className="text-[#555] text-sm">{staff.length} team members</p>
         <motion.button
           whileTap={{ scale: 0.97 }}
-          onClick={() => setShowForm(true)}         {/* ← THIS opens the modal */}
+          onClick={() => setShowForm(true)}
           className="flex items-center gap-2 px-4 py-2.5 bg-[#D4AF37] hover:bg-[#C5A059] text-black font-bold rounded-xl text-sm transition-all"
         >
           <UserPlus className="w-4 h-4" />Add Staff
         </motion.button>
       </div>
 
-      {/* ── Loading skeletons ── */}
       {loading ? (
         <div className="space-y-3">
           {[...Array(3)].map((_, i) => (
-            <div key={i} className="h-20 rounded-xl bg-white/3 animate-pulse"
-              style={{ animationDelay: `${i * 80}ms` }} />
+            <div
+              key={i}
+              className="h-20 rounded-xl bg-white/3 animate-pulse"
+              style={{ animationDelay: `${i * 80}ms` }}
+            />
           ))}
         </div>
       ) : staff.length === 0 ? (
@@ -320,7 +322,6 @@ const StaffList = ({ cafeId }) => {
                 transition={{ delay: i * 0.04 }}
                 className="bg-[#0F0F0F] border border-white/5 rounded-2xl p-5 hover:border-white/10 transition-colors"
               >
-                {/* Top row */}
                 <div className="flex items-start justify-between mb-3">
                   <div className="flex items-center gap-3">
                     <div
@@ -368,7 +369,6 @@ const StaffList = ({ cafeId }) => {
                   </div>
                 </div>
 
-                {/* Details */}
                 <div className="space-y-1.5 text-xs text-[#555]">
                   {s.phone && (
                     <div className="flex items-center gap-1.5">
@@ -385,7 +385,6 @@ const StaffList = ({ cafeId }) => {
                   </div>
                 </div>
 
-                {/* Salary */}
                 <div className="mt-3 pt-3 border-t border-white/5 flex justify-between items-center">
                   <span className="text-[#555] text-xs capitalize">{s.salaryType} salary</span>
                   <span className="text-[#D4AF37] font-black text-sm">
@@ -393,7 +392,6 @@ const StaffList = ({ cafeId }) => {
                   </span>
                 </div>
 
-                {/* Delete confirm */}
                 <AnimatePresence>
                   {deleteId === s.id && (
                     <motion.div
