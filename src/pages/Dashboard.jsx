@@ -1,85 +1,23 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { signOut } from 'firebase/auth';
 import { auth } from '../lib/firebase';
 import { useNavigate } from 'react-router-dom';
-import { useDocument } from '../hooks/useFirestore';
-import { LayoutDashboard, ShoppingBag, Menu as MenuIcon, Gift, BarChart3, Settings as SettingsIcon, QrCode, LogOut, X, UtensilsCrossed, ExternalLink, Boxes, Sparkles, Upload, TrendingUp, MessageSquare, Bot, FileText, Users, Lock } from 'lucide-react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { LayoutDashboard, ShoppingBag, Menu as MenuIcon, Gift, BarChart3, Settings as SettingsIcon, QrCode, LogOut, X, CreditCard } from 'lucide-react';
 import Overview from '../components/dashboard/Overview';
 import OrdersManagement from '../components/dashboard/OrdersManagement';
 import MenuManagement from '../components/dashboard/MenuManagement';
 import OffersManagement from '../components/dashboard/OffersManagement';
 import Analytics from '../components/dashboard/Analytics';
-import AdvancedAnalytics from '../components/dashboard/AdvancedAnalytics';
+import PaymentsAnalytics from '../components/dashboard/PaymentsAnalytics';
 import Settings from '../components/dashboard/Settings';
 import QRGenerator from '../components/dashboard/QRGenerator';
-import KitchenDashboardTab from '../components/dashboard/KitchenDashboardTab';
-import InventoryManagement from '../components/dashboard/InventoryManagement';
-import AIInsights from '../components/dashboard/AIInsights';
-import AIMenuUpload from '../components/dashboard/AIMenuUpload';
-import WhatsAppMarketing from '../components/dashboard/WhatsAppMarketing';
-import AskAI from '../components/dashboard/AskAI';
-import InvoicesTab from '../components/dashboard/InvoicesTab';
-import StaffManagement from '../components/dashboard/StaffManagement';
-
-// ─── LockedFeature — shown in content area when feature is disabled ────────────
-// Safe: only renders instead of the real component. Real component is never mounted.
-const LockedFeature = ({ label, icon: Icon }) => (
-  <div className="flex flex-col items-center justify-center py-24 text-center select-none">
-    <div className="w-20 h-20 rounded-2xl bg-white/3 border border-white/8 flex items-center justify-center mb-5 relative">
-      {Icon && <Icon className="w-9 h-9 text-[#333]" />}
-      <div className="absolute -bottom-2 -right-2 w-7 h-7 rounded-full bg-[#0F0F0F] border border-white/10 flex items-center justify-center">
-        <Lock className="w-3.5 h-3.5 text-[#555]" />
-      </div>
-    </div>
-    <h2 className="text-white font-bold text-xl mb-2" style={{ fontFamily: 'Playfair Display, serif' }}>
-      {label} is Locked
-    </h2>
-    <p className="text-[#555] text-sm max-w-xs leading-relaxed">
-      This feature is not enabled for your plan.<br />
-      Contact your admin to unlock access.
-    </p>
-    <div className="mt-6 px-5 py-2.5 rounded-lg border border-white/8 text-[#555] text-xs">
-      🔒 Upgrade your plan to access {label}
-    </div>
-  </div>
-);
 
 const Dashboard = () => {
   const { user } = useAuth();
-  const navigate  = useNavigate();
-  const [activeTab,    setActiveTab   ] = useState('overview');
-  const [sidebarOpen,  setSidebarOpen ] = useState(false);
-  const [upgradePopup, setUpgradePopup] = useState(null); // label of locked feature
-
-  // Load cafe doc to read feature flags — additive, does not affect existing logic
-  const { data: cafe } = useDocument('cafes', user?.cafeId);
-
-  // Apply light/dark class to <html> whenever cafe.mode changes.
-  // The class drives CSS variables in index.css — zero component changes needed.
-  useEffect(() => {
-    const mode = cafe?.mode || 'dark'; // default dark (existing look)
-    document.documentElement.classList.toggle('light-mode', mode === 'light');
-  }, [cafe?.mode]);
-
-  // Theme shortcuts — used on root wrappers below
-  const isLight = cafe?.mode === 'light';
-  const rootBg   = isLight ? 'bg-[#F5F3EE]' : 'bg-[#050505]';
-  const sidebarBg = isLight ? 'bg-white border-r border-[#E5E5E5]' : 'bg-[#050505] border-r border-white/5';
-  const headerBg  = isLight ? 'bg-white/90 border-b border-[#E5E5E5]' : 'bg-[#050505]/80 border-b border-white/5';
-  const navText   = isLight ? 'text-[#444444]' : 'text-[#A3A3A3]';
-  const navHover  = isLight ? 'hover:bg-[#F0EDE8] hover:text-[#111111]' : 'hover:text-white hover:bg-white/5';
-  const footerBorder = isLight ? 'border-t border-[#E5E5E5]' : 'border-t border-white/5';
-  const footerText   = isLight ? 'text-[#666666]' : 'text-[#555]';
-  const footerEmail  = isLight ? 'text-[#111111]' : 'text-white';
-
-  // Safe feature resolver: defaults ALL features to true if missing (backward compat)
-  const features = {
-    staff:        cafe?.features?.staffManagementEnabled    !== false,
-    aiAssistant:  cafe?.features?.aiAssistantEnabled        !== false,
-    marketing:    cafe?.features?.marketingWhatsappEnabled  !== false,
-  };
+  const navigate = useNavigate();
+  const [activeTab, setActiveTab] = useState('overview');
+  const [sidebarOpen, setSidebarOpen] = useState(false);
 
   const handleLogout = async () => {
     try {
@@ -91,26 +29,18 @@ const Dashboard = () => {
   };
 
   const menuItems = [
-    { id: 'overview',   label: 'Overview',    icon: LayoutDashboard },
-    { id: 'orders',     label: 'Orders',      icon: ShoppingBag     },
-    { id: 'invoices',   label: 'Invoices',    icon: FileText        },
-    { id: 'menu',       label: 'Menu',        icon: MenuIcon        },
-    { id: 'offers',     label: 'Offers',      icon: Gift            },
-    { id: 'analytics',  label: 'Analytics',   icon: BarChart3       },
-    { id: 'advanced',   label: 'Reports',     icon: TrendingUp      },
-    { id: 'marketing',  label: 'Marketing',   icon: MessageSquare,  featureKey: 'marketing'    },
-    { id: 'askai',      label: 'Ask AI',      icon: Bot,            featureKey: 'aiAssistant'  },
-    { id: 'kitchen',    label: 'Kitchen',     icon: UtensilsCrossed },
-    { id: 'inventory',  label: 'Inventory',   icon: Boxes           },
-    { id: 'ai',         label: 'AI Insights', icon: Sparkles        },
-    { id: 'aimenu',     label: 'AI Menu',     icon: Upload          },
-    { id: 'qr',         label: 'QR Code',     icon: QrCode          },
-    { id: 'staff',      label: 'Staff',       icon: Users,          featureKey: 'staff'        },
-    { id: 'settings',   label: 'Settings',    icon: SettingsIcon    },
+    { id: 'overview', label: 'Overview', icon: LayoutDashboard },
+    { id: 'orders', label: 'Orders', icon: ShoppingBag },
+    { id: 'menu', label: 'Menu', icon: MenuIcon },
+    { id: 'offers', label: 'Offers', icon: Gift },
+    { id: 'analytics', label: 'Analytics', icon: BarChart3 },
+    { id: 'payments', label: 'Payments', icon: CreditCard },
+    { id: 'qr', label: 'QR Code', icon: QrCode },
+    { id: 'settings', label: 'Settings', icon: SettingsIcon },
   ];
 
   return (
-    <div className={`min-h-screen ${rootBg}`} style={{ fontFamily: 'Manrope, sans-serif' }}>
+    <div className="min-h-screen bg-[#050505]" style={{ fontFamily: 'Manrope, sans-serif' }}>
       {/* Mobile Sidebar Overlay */}
       {sidebarOpen && (
         <div 
@@ -119,46 +49,11 @@ const Dashboard = () => {
         />
       )}
 
-      {/* Upgrade popup — shown when locked feature is clicked */}
-      <AnimatePresence>
-        {upgradePopup && (
-          <motion.div
-            className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm"
-            initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-            onClick={() => setUpgradePopup(null)}
-          >
-            <motion.div
-              className="bg-[#0F0F0F] border border-white/10 rounded-2xl p-7 w-full max-w-sm text-center"
-              initial={{ scale: 0.93, y: 10 }} animate={{ scale: 1, y: 0 }}
-              onClick={e => e.stopPropagation()}
-            >
-              <div className="w-14 h-14 rounded-2xl bg-[#D4AF37]/10 flex items-center justify-center mx-auto mb-4">
-                <Lock className="w-7 h-7 text-[#D4AF37]" />
-              </div>
-              <h3 className="text-white font-bold text-xl mb-2" style={{ fontFamily: 'Playfair Display, serif' }}>
-                Unlock {upgradePopup}
-              </h3>
-              <p className="text-[#A3A3A3] text-sm mb-6 leading-relaxed">
-                This feature is not enabled for your current plan.<br />
-                Contact your admin or upgrade your plan to get access.
-              </p>
-              <button
-                onClick={() => setUpgradePopup(null)}
-                className="w-full py-3 bg-[#D4AF37] hover:bg-[#C5A059] text-black font-bold rounded-xl text-sm transition-all"
-              >
-                Got it
-              </button>
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-
       {/* Sidebar */}
-      <aside className={`fixed top-0 left-0 h-screen w-64 flex flex-col z-50 transform transition-transform lg:translate-x-0 ${sidebarBg} ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'}`}>
-        {/* Logo header — fixed at top */}
-        <div className="flex items-center justify-between p-4 flex-shrink-0">
+      <aside className={`fixed top-0 left-0 h-screen w-64 bg-[#050505] border-r border-white/5 flex flex-col p-4 z-50 transform transition-transform lg:translate-x-0 ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'}`}>
+        <div className="flex items-center justify-between mb-8">
           <h1 className="text-xl font-bold text-[#D4AF37]" style={{ fontFamily: 'Playfair Display, serif' }}>BRANDING ARCHITECT</h1>
-          <button
+          <button 
             className="lg:hidden text-[#A3A3A3] hover:text-white"
             onClick={() => setSidebarOpen(false)}
           >
@@ -166,47 +61,34 @@ const Dashboard = () => {
           </button>
         </div>
 
-        {/* Scrollable nav */}
-        <nav className="flex-1 overflow-y-auto px-4 pb-2 space-y-1 scrollbar-thin scrollbar-thumb-white/10 scrollbar-track-transparent">
+        <nav className="flex-1 space-y-2">
           {menuItems.map((item) => {
-            const Icon    = item.icon;
-            const isActive = activeTab === item.id;
-            // Safe: if featureKey present, check features map (defaults true if missing)
-            const locked  = item.featureKey ? features[item.featureKey] === false : false;
+            const Icon = item.icon;
             return (
               <button
                 key={item.id}
                 data-testid={`nav-${item.id}`}
                 onClick={() => {
-                  if (locked) {
-                    setUpgradePopup(item.label);
-                    setSidebarOpen(false);
-                    return;
-                  }
                   setActiveTab(item.id);
                   setSidebarOpen(false);
                 }}
                 className={`w-full flex items-center gap-3 px-4 py-3 rounded-sm transition-all ${
-                  isActive && !locked
+                  activeTab === item.id
                     ? 'bg-[#D4AF37] text-black font-semibold'
-                    : locked
-                    ? `${isLight ? 'text-[#BBBBBB]' : 'text-[#333]'} cursor-pointer ${isLight ? 'hover:bg-[#F0EDE8] hover:text-[#888]' : 'hover:text-[#555] hover:bg-white/2'}`
-                    : `${navText} ${navHover}`
+                    : 'text-[#A3A3A3] hover:text-white hover:bg-white/5'
                 }`}
               >
-                <Icon className="w-5 h-5 flex-shrink-0" />
-                <span className="flex-1 text-left">{item.label}</span>
-                {locked && <Lock className="w-3 h-3 flex-shrink-0 opacity-50" />}
+                <Icon className="w-5 h-5" />
+                {item.label}
               </button>
             );
           })}
         </nav>
 
-        {/* Logout — always visible at bottom */}
-        <div className={`${footerBorder} p-4 flex-shrink-0`}>
-          <div className="px-4 py-2 mb-2">
-            <p className={`text-xs ${footerText}`}>Logged in as</p>
-            <p className={`text-sm font-semibold truncate ${footerEmail}`}>{user?.email}</p>
+        <div className="border-t border-white/5 pt-4">
+          <div className="px-4 py-3 mb-2">
+            <p className="text-[#A3A3A3] text-sm">Logged in as</p>
+            <p className="text-white font-semibold">{user?.email}</p>
           </div>
           <button
             data-testid="logout-btn"
@@ -222,14 +104,14 @@ const Dashboard = () => {
       {/* Main Content */}
       <div className="lg:ml-64">
         {/* Header */}
-        <header className={`sticky top-0 z-30 h-16 backdrop-blur-md px-6 flex items-center justify-between ${headerBg}`}>
+        <header className="sticky top-0 z-30 h-16 border-b border-white/5 bg-[#050505]/80 backdrop-blur-md px-6 flex items-center justify-between">
           <button
             className="lg:hidden text-[#D4AF37]"
             onClick={() => setSidebarOpen(true)}
           >
             <MenuIcon className="w-6 h-6" />
           </button>
-          <h2 className={`text-2xl font-bold ${isLight ? 'text-[#111111]' : 'text-white'}`} style={{ fontFamily: 'Playfair Display, serif' }}>
+          <h2 className="text-2xl font-bold text-white" style={{ fontFamily: 'Playfair Display, serif' }}>
             {menuItems.find(item => item.id === activeTab)?.label}
           </h2>
           <div className="w-8 lg:hidden" />
@@ -237,22 +119,14 @@ const Dashboard = () => {
 
         {/* Content */}
         <main className="p-6">
-          {activeTab === 'overview'   && <Overview />}
-          {activeTab === 'orders'     && <OrdersManagement />}
-          {activeTab === 'invoices'   && <InvoicesTab />}
-          {activeTab === 'menu'       && <MenuManagement />}
-          {activeTab === 'offers'     && <OffersManagement />}
-          {activeTab === 'analytics'  && <Analytics />}
-          {activeTab === 'advanced'   && <AdvancedAnalytics />}
-          {activeTab === 'marketing'  && (features.marketing    ? <WhatsAppMarketing /> : <LockedFeature label="Marketing"    icon={MessageSquare} />)}
-          {activeTab === 'askai'      && (features.aiAssistant  ? <AskAI />             : <LockedFeature label="Ask AI"       icon={Bot}           />)}
-          {activeTab === 'kitchen'    && <KitchenDashboardTab />}
-          {activeTab === 'inventory'  && <InventoryManagement />}
-          {activeTab === 'ai'         && <AIInsights />}
-          {activeTab === 'aimenu'     && <AIMenuUpload onClose={() => setActiveTab('menu')} />}
-          {activeTab === 'qr'         && <QRGenerator />}
-          {activeTab === 'staff'      && (features.staff        ? <StaffManagement />   : <LockedFeature label="Staff"        icon={Users}         />)}
-          {activeTab === 'settings'   && <Settings />}
+          {activeTab === 'overview' && <Overview />}
+          {activeTab === 'orders' && <OrdersManagement />}
+          {activeTab === 'menu' && <MenuManagement />}
+          {activeTab === 'offers' && <OffersManagement />}
+          {activeTab === 'analytics' && <Analytics />}
+          {activeTab === 'payments' && <PaymentsAnalytics />}
+          {activeTab === 'qr' && <QRGenerator />}
+          {activeTab === 'settings' && <Settings />}
         </main>
       </div>
     </div>
