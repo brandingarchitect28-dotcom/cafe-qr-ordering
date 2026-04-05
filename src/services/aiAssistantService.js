@@ -48,20 +48,33 @@ export const askAIAssistant = async (cafeId, question) => {
 
   const backendUrl = await getBackendUrl(cafeId);
 
-  const res = await fetch(`${backendUrl}/api/ai-assistant`, {
-    method:  'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body:    JSON.stringify({ cafeId, question: question.trim() }),
-  });
+  let res, data;
+  try {
+    res = await fetch(`${backendUrl}/api/ai-assistant`, {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify({ cafeId, question: question.trim() }),
+    });
+  } catch (networkErr) {
+    // fetch() itself threw — server unreachable, CORS block, or no internet
+    throw new Error(
+      `Cannot reach backend (${backendUrl}). ` +
+      'Check that your Render server is running and the URL in Settings is correct.'
+    );
+  }
 
-  const data = await res.json();
+  try {
+    data = await res.json();
+  } catch {
+    throw new Error(`Server returned an unexpected response (HTTP ${res.status}). Check Render logs.`);
+  }
 
   if (!res.ok) {
-    throw new Error(data.error || `AI request failed (${res.status})`);
+    throw new Error(data.error || `AI request failed (HTTP ${res.status})`);
   }
 
   return {
-    answer:       data.answer       || 'No response received.',
+    answer:       data.answer       || data.reply || 'No response received.',
     type:         data.type         || 'data_answer',
     actionIntent: data.actionIntent || null,
     intent:       data.intent       || 'unknown',
@@ -85,16 +98,28 @@ export const uploadBillImage = async (cafeId, imageBase64, mimeType) => {
 
   const backendUrl = await getBackendUrl(cafeId);
 
-  const res = await fetch(`${backendUrl}/api/ai-bill-upload`, {
-    method:  'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body:    JSON.stringify({ cafeId, imageBase64, mimeType }),
-  });
+  let res, data;
+  try {
+    res = await fetch(`${backendUrl}/api/ai-bill-upload`, {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify({ cafeId, imageBase64, mimeType }),
+    });
+  } catch (networkErr) {
+    throw new Error(
+      `Cannot reach backend (${backendUrl}). ` +
+      'Check that your Render server is running and the URL in Settings is correct.'
+    );
+  }
 
-  const data = await res.json();
+  try {
+    data = await res.json();
+  } catch {
+    throw new Error(`Server returned an unexpected response (HTTP ${res.status}). Check Render logs.`);
+  }
 
   if (!res.ok) {
-    throw new Error(data.error || `Bill upload failed (${res.status})`);
+    throw new Error(data.error || `Bill upload failed (HTTP ${res.status})`);
   }
 
   return {
@@ -117,16 +142,28 @@ export const executeActionIntent = async (cafeId, action, payload = {}) => {
 
   const backendUrl = await getBackendUrl(cafeId);
 
-  const res = await fetch(`${backendUrl}/api/ai-action/execute`, {
-    method:  'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body:    JSON.stringify({ cafeId, action, payload }),
-  });
+  let res, data;
+  try {
+    res = await fetch(`${backendUrl}/api/ai-action/execute`, {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify({ cafeId, action, payload }),
+    });
+  } catch (networkErr) {
+    throw new Error(
+      `Cannot reach backend (${backendUrl}). ` +
+      'Check that your Render server is running and the URL in Settings is correct.'
+    );
+  }
 
-  const data = await res.json();
+  try {
+    data = await res.json();
+  } catch {
+    throw new Error(`Server returned an unexpected response (HTTP ${res.status}). Check Render logs.`);
+  }
 
   if (!res.ok) {
-    throw new Error(data.error || `Action failed (${res.status})`);
+    throw new Error(data.error || `Action failed (HTTP ${res.status})`);
   }
 
   return { success: data.success || false, message: data.message || 'Done.' };
