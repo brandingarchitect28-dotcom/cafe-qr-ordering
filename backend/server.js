@@ -5,6 +5,14 @@ const cors    = require('cors');
 const https   = require('https');
 require('dotenv').config();
 
+// 🔥 Firebase Admin Init (REQUIRED FOR DB ACCESS)
+const admin = require("firebase-admin");
+
+if (!admin.apps.length) {
+  admin.initializeApp();
+}
+
+const db = admin.firestore();
 const app  = express();
 const PORT = process.env.PORT || 5000;
 
