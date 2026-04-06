@@ -906,7 +906,7 @@ snapshot.forEach(doc => {
     data.status === 'paid';
 
   if (isPaid) {
-    total += data.serviceCharge || 0;
+    total += data.serviceChargeAmount || 0;
   }
 });
 
