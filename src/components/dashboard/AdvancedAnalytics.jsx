@@ -133,7 +133,6 @@ const AdvancedAnalytics = () => {
   const [fromDate, setFromDate] = useState(daysAgo(30));
   const [toDate,   setToDate  ] = useState(today());
   const [preset,   setPreset  ] = useState('30');
-  const [serviceCharge, setServiceCharge] = useState(0);
   
   const applyPreset = (p) => {
     setPreset(p);
@@ -145,25 +144,8 @@ const AdvancedAnalytics = () => {
   };
 
   const { data, loading, error, lastFetch, refresh } = useAdvancedAnalytics(cafeId, fromDate, toDate);
+  const serviceCharge = data?.serviceChargeTotal || 0;
   useEffect(() => {
-    if (!cafeId) return;
-
-    const fetchServiceCharge = async () => {
-      try {
-        const res = await fetch(
-          `${import.meta.env.VITE_BACKEND_URL}/api/service-charge-total?cafeId=${cafeId}&from=${fromDate}&to=${toDate}`
-        );
-        const json = await res.json();
-
-        console.log("SERVICE CHARGE API:", json);
-        
-        setServiceCharge(json.total || 0);
-      } catch (err) {
-        console.error("Service charge fetch error:", err.message);
-      }
-    };
-
-    fetchServiceCharge();
   }, [cafeId, fromDate, toDate]);
   const explanations = useMemo(() => buildExplanation(data, CUR), [data, CUR]);
 
@@ -171,7 +153,6 @@ const AdvancedAnalytics = () => {
     'orders',
     cafeId ? [where('cafeId', '==', cafeId)] : []
   );
-  const shouldRenderStats = data || serviceCharge !== undefined;
 
   // ── Growth Analysis (Today vs Yesterday, This Week vs Last Week) ───────────
   // Derived entirely from data.revenueByDay (last 7 days) — no new DB fields
@@ -392,7 +373,7 @@ const AdvancedAnalytics = () => {
               { label:'Total Orders',   value:data.revenue.totalOrders,                        sub:`${fromDate} → ${toDate}`,                  icon:Package,     color:'#F59E0B', index:3 },
               { label:'GST Collected',  value:`${CUR}${data.gst.totalGST.toFixed(2)}`,         sub:`${data.gst.byRate?.length||0} slabs`,      icon:FileText,    color:'#8B5CF6', index:4 },
               { label:'Net Profit',     value:`${CUR}${data.profit.netProfit.toFixed(2)}`,     sub:`Margin: ${data.profit.margin}%`,            icon:Star,        color:data.profit.netProfit>=0?'#10B981':'#EF4444', index:5 },
-              { label:'Service Charges',value:`${CUR}${Number(serviceCharge || 0).toFixed(2)}`, sub:'Collected from paid orders',               icon:FileText,    color:'#EC4899', index:6 },
+              { label:'Service Charges',value:`${CUR}${Number(serviceCharge).toFixed(2)}`, sub:'Collected from paid orders',               icon:FileText,    color:'#EC4899', index:6 },
             ].map(s => <StatCard T={T} key={s.label} {...s} />)}
           </div>
 
