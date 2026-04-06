@@ -171,6 +171,7 @@ const AdvancedAnalytics = () => {
     'orders',
     cafeId ? [where('cafeId', '==', cafeId)] : []
   );
+  const shouldRenderStats = data || serviceCharge !== undefined;
 
   // ── Growth Analysis (Today vs Yesterday, This Week vs Last Week) ───────────
   // Derived entirely from data.revenueByDay (last 7 days) — no new DB fields
@@ -380,7 +381,7 @@ const AdvancedAnalytics = () => {
         </div>
       )}
 
-      {data && (
+      {shouldRenderStats && (
         <>
           {/* ── Stat cards ──────────────────────────────────────────── */}
           <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
