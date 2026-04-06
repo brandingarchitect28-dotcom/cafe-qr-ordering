@@ -893,17 +893,15 @@ app.get("/api/service-charge-total", async (req, res) => {
 snapshot.forEach(doc => {
   const data = doc.data();
 
-  // ✅ Date filter (keep same)
-  if (from && to && data.createdAt) {
-    const date = new Date(data.createdAt);
-    if (date < new Date(from) || date > new Date(to)) return;
-  }
+  console.log("ORDER:", data);
 
-  // ✅ ONLY COUNT PAID ORDERS (SAFE VERSION)
   const isPaid =
     data.paymentStatus === 'paid' ||
     data.paymentStatus === 'SUCCESS' ||
     data.status === 'paid';
+
+  console.log("isPaid:", isPaid);
+  console.log("serviceChargeAmount:", data.serviceChargeAmount);
 
   if (isPaid) {
     total += data.serviceChargeAmount || 0;
