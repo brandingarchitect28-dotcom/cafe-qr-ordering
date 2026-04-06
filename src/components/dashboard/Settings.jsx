@@ -19,7 +19,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import { doc, updateDoc, onSnapshot } from 'firebase/firestore';
 import { db } from '../../lib/firebase';
 import { uploadImage } from '../../utils/uploadImage';
-import { Save, Sun, Moon, ShoppingCart, Plus, Coffee } from 'lucide-react';
+import { Save, Sun, Moon, ShoppingCart, Plus, Coffee, CreditCard, Eye, EyeOff, ShieldCheck } from 'lucide-react';
 import { toast } from 'sonner';
 import ChangePassword from './ChangePassword';
 
@@ -29,6 +29,20 @@ const Settings = () => {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState(false);
+
+  // ─── Online Payment Settings state ─────────────────────────────────────────
+  // Stored as paymentSettings nested map in the cafes/{cafeId} Firestore doc.
+  // backendUrl is the Render backend URL used by AI Menu Upload + Cashfree payments.
+  const [showKeySecret, setShowKeySecret] = useState(false);
+  const [paymentSettings, setPaymentSettings] = useState({
+    enabled:      false,
+    gateway:      'cashfree',
+    keyId:        '',
+    keySecret:    '',
+    merchantName: '',
+    backendUrl:   '',
+    currency:     'INR',
+  });
 
   // ─── State ─────────────────────────────────────────────────────────────────
   // FIX: Added platformFeeEnabled + platformFeeRate (were missing)
@@ -89,6 +103,18 @@ const Settings = () => {
             platformFeeEnabled: data.platformFeeEnabled || false,  // ← FIX
             platformFeeRate: data.platformFeeRate ?? 2,            // ← FIX
           });
+          // Online Payment Settings (nested map)
+          if (data.paymentSettings) {
+            setPaymentSettings({
+              enabled:      data.paymentSettings.enabled      ?? false,
+              gateway:      data.paymentSettings.gateway      || 'cashfree',
+              keyId:        data.paymentSettings.keyId        || '',
+              keySecret:    data.paymentSettings.keySecret    || '',
+              merchantName: data.paymentSettings.merchantName || '',
+              backendUrl:   data.paymentSettings.backendUrl   || '',
+              currency:     data.paymentSettings.currency     || 'INR',
+            });
+          }
         }
         setLoading(false);
       },
@@ -155,6 +181,16 @@ const Settings = () => {
         serviceChargeRate: parseFloat(settings.serviceChargeRate) || 0,
         platformFeeEnabled: settings.platformFeeEnabled,                    // ← FIX
         platformFeeRate: parseFloat(settings.platformFeeRate) || 0,        // ← FIX
+        // Online Payment Settings — nested map saved as paymentSettings
+        paymentSettings: {
+          enabled:      paymentSettings.enabled,
+          gateway:      paymentSettings.gateway,
+          keyId:        paymentSettings.keyId.trim(),
+          keySecret:    paymentSettings.keySecret.trim(),
+          merchantName: paymentSettings.merchantName.trim(),
+          backendUrl:   paymentSettings.backendUrl.trim(),
+          currency:     paymentSettings.currency,
+        },
       });
       toast.success('Settings saved successfully!');
     } catch (error) {
@@ -695,6 +731,147 @@ const Settings = () => {
                 <ShoppingCart className="w-5 h-5" />
                 View Cart — ₹330
               </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* ── Online Payment Settings ───────────────────────────────────────── */}
+      <div className="bg-[#0F0F0F] border border-white/5 rounded-sm p-6">
+        <h3 className="text-xl font-semibold text-white mb-6" style={{ fontFamily: 'Playfair Display, serif' }}>
+          Online Payment Settings
+        </h3>
+
+        <div className="space-y-5">
+
+          {/* Enable Online Payments toggle */}
+          <div className="flex items-center justify-between p-4 bg-black/20 rounded-sm border border-white/5">
+            <div>
+              <p className="font-medium text-white text-sm">Enable Online Payments</p>
+              <p className="text-[#A3A3A3] text-xs mt-0.5">
+                Allow customers to pay online at checkout
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => setPaymentSettings(prev => ({ ...prev, enabled: !prev.enabled }))}
+              className={`relative inline-flex h-7 w-12 items-center rounded-full transition-colors duration-200 focus:outline-none ${
+                paymentSettings.enabled ? 'bg-[#D4AF37]' : 'bg-white/10'
+              }`}
+            >
+              <span className={`inline-block h-5 w-5 transform rounded-full bg-white shadow transition-transform duration-200 ${
+                paymentSettings.enabled ? 'translate-x-6' : 'translate-x-1'
+              }`} />
+            </button>
+          </div>
+
+          {/* Payment fields — always visible so owners can configure before enabling */}
+          <div className="space-y-4">
+
+            {/* Payment Gateway */}
+            <div>
+              <label className="block text-white text-sm font-medium mb-2">Payment Gateway</label>
+              <select
+                value={paymentSettings.gateway}
+                onChange={(e) => setPaymentSettings(prev => ({ ...prev, gateway: e.target.value }))}
+                className="w-full bg-black/20 border border-white/10 text-white focus:border-[#D4AF37] focus:ring-1 focus:ring-[#D4AF37] rounded-sm h-12 px-4 transition-all"
+              >
+                <option value="cashfree" className="bg-[#0F0F0F]">Cashfree</option>
+                <option value="razorpay" className="bg-[#0F0F0F]">Razorpay</option>
+              </select>
+            </div>
+
+            {/* App ID / Key ID */}
+            <div>
+              <label className="block text-white text-sm font-medium mb-2">
+                {paymentSettings.gateway === 'cashfree' ? 'Cashfree App ID' : 'Razorpay Key ID'}
+              </label>
+              <input
+                type="text"
+                value={paymentSettings.keyId}
+                onChange={(e) => setPaymentSettings(prev => ({ ...prev, keyId: e.target.value }))}
+                placeholder={paymentSettings.gateway === 'cashfree' ? 'Your Cashfree App ID' : 'rzp_live_xxxxxxxxxxxx'}
+                className="w-full bg-black/20 border border-white/10 text-white placeholder:text-neutral-600 focus:border-[#D4AF37] focus:ring-1 focus:ring-[#D4AF37] rounded-sm h-12 px-4 font-mono transition-all"
+              />
+            </div>
+
+            {/* Secret Key */}
+            <div>
+              <label className="block text-white text-sm font-medium mb-2">
+                {paymentSettings.gateway === 'cashfree' ? 'Cashfree Secret Key' : 'Razorpay Key Secret'}
+              </label>
+              <div className="relative">
+                <input
+                  type={showKeySecret ? 'text' : 'password'}
+                  value={paymentSettings.keySecret}
+                  onChange={(e) => setPaymentSettings(prev => ({ ...prev, keySecret: e.target.value }))}
+                  placeholder="••••••••••••••••"
+                  className="w-full bg-black/20 border border-white/10 text-white placeholder:text-neutral-600 focus:border-[#D4AF37] focus:ring-1 focus:ring-[#D4AF37] rounded-sm h-12 px-4 pr-12 font-mono transition-all"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowKeySecret(v => !v)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-[#555] hover:text-[#A3A3A3] transition-colors"
+                >
+                  {showKeySecret ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                </button>
+              </div>
+            </div>
+
+            {/* Merchant Name */}
+            <div>
+              <label className="block text-white text-sm font-medium mb-2">Merchant Name</label>
+              <input
+                type="text"
+                value={paymentSettings.merchantName}
+                onChange={(e) => setPaymentSettings(prev => ({ ...prev, merchantName: e.target.value }))}
+                placeholder="Your café name as shown to customers"
+                className="w-full bg-black/20 border border-white/10 text-white placeholder:text-neutral-600 focus:border-[#D4AF37] focus:ring-1 focus:ring-[#D4AF37] rounded-sm h-12 px-4 transition-all"
+              />
+            </div>
+
+            {/* Backend URL — critical for AI Menu Upload + Cashfree server-side calls */}
+            <div>
+              <label className="block text-white text-sm font-medium mb-2">
+                Render Backend URL
+              </label>
+              <input
+                type="url"
+                value={paymentSettings.backendUrl}
+                onChange={(e) => setPaymentSettings(prev => ({ ...prev, backendUrl: e.target.value }))}
+                placeholder="https://your-app.onrender.com"
+                className="w-full bg-black/20 border border-white/10 text-white placeholder:text-neutral-600 focus:border-[#D4AF37] focus:ring-1 focus:ring-[#D4AF37] rounded-sm h-12 px-4 font-mono transition-all"
+              />
+              <p className="text-[#A3A3A3] text-xs mt-2">
+                Your Render backend URL. Required for Cashfree payments and AI Menu Upload.
+              </p>
+            </div>
+
+            {/* Currency */}
+            <div>
+              <label className="block text-white text-sm font-medium mb-2">Payment Currency</label>
+              <select
+                value={paymentSettings.currency}
+                onChange={(e) => setPaymentSettings(prev => ({ ...prev, currency: e.target.value }))}
+                className="w-full bg-black/20 border border-white/10 text-white focus:border-[#D4AF37] focus:ring-1 focus:ring-[#D4AF37] rounded-sm h-12 px-4 transition-all"
+              >
+                <option value="INR" className="bg-[#0F0F0F]">INR — Indian Rupee</option>
+                <option value="USD" className="bg-[#0F0F0F]">USD — US Dollar</option>
+                <option value="EUR" className="bg-[#0F0F0F]">EUR — Euro</option>
+                <option value="GBP" className="bg-[#0F0F0F]">GBP — British Pound</option>
+              </select>
+            </div>
+
+            {/* Security notice */}
+            <div className="flex items-start gap-3 p-4 bg-emerald-500/5 border border-emerald-500/15 rounded-sm">
+              <ShieldCheck className="w-4 h-4 text-emerald-400 flex-shrink-0 mt-0.5" />
+              <div>
+                <p className="text-emerald-400 text-xs font-semibold">Secured via Render Backend</p>
+                <p className="text-[#A3A3A3] text-xs mt-0.5 leading-relaxed">
+                  Payment processing happens server-side on your Render backend. API keys are used
+                  by the server — never exposed to customers.
+                </p>
+              </div>
             </div>
           </div>
         </div>
