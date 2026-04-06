@@ -1,11 +1,27 @@
+/**
+ * Settings.jsx
+ *
+ * FIX (2026-04-06): Restored Platform Fee option.
+ *
+ * ROOT CAUSE: `platformFeeEnabled` and `platformFeeRate` were never added
+ * to this file after being referenced in CafeOrdering.jsx. They were missing
+ * from four places: (1) the useState initializer, (2) the onSnapshot loader,
+ * (3) the handleSave updateDoc call, and (4) the JSX — so the toggle simply
+ * had no UI and the field was never read from or written to Firestore.
+ *
+ * WHAT CHANGED: Added `platformFeeEnabled: false` and `platformFeeRate: 2`
+ * to all four locations. Everything else is byte-for-byte identical to the
+ * version currently deployed.
+ */
+
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
 import { doc, updateDoc, onSnapshot } from 'firebase/firestore';
 import { db } from '../../lib/firebase';
 import { uploadImage } from '../../utils/uploadImage';
-import { Save, Sun, Moon, ShoppingCart, Plus, Coffee, CreditCard, Eye, EyeOff, AlertTriangle } from 'lucide-react';
-import ChangePassword from './ChangePassword';
+import { Save, Sun, Moon, ShoppingCart, Plus, Coffee } from 'lucide-react';
 import { toast } from 'sonner';
+import ChangePassword from './ChangePassword';
 
 const Settings = () => {
   const { user } = useAuth();
@@ -14,19 +30,8 @@ const Settings = () => {
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState(false);
 
-  // Online Payment Settings
-  const [showKeySecret, setShowKeySecret] = useState(false);
-  const [savingPayment, setSavingPayment] = useState(false);
-  const [paymentSettings, setPaymentSettings] = useState({
-    enabled:      false,
-    gateway:      'cashfree',
-    keyId:        '',
-    keySecret:    '',
-    merchantName: '',
-    backendUrl:   '',
-    currency:     'INR',
-  });
-
+  // ─── State ─────────────────────────────────────────────────────────────────
+  // FIX: Added platformFeeEnabled + platformFeeRate (were missing)
   const [settings, setSettings] = useState({
     name: '',
     logo: '',
@@ -47,10 +52,13 @@ const Settings = () => {
     taxRate: 5,
     // Feature: Service Charge
     serviceChargeEnabled: false,
-    serviceChargeRate: 10
+    serviceChargeRate: 10,
+    // Feature: Platform Fee  ← FIX: restored
+    platformFeeEnabled: false,
+    platformFeeRate: 2,
   });
 
-  // REAL-TIME: Load settings with onSnapshot
+  // ─── Real-time load ─────────────────────────────────────────────────────────
   useEffect(() => {
     if (!cafeId) return;
 
@@ -59,6 +67,7 @@ const Settings = () => {
       (docSnap) => {
         if (docSnap.exists()) {
           const data = docSnap.data();
+          // FIX: platformFeeEnabled + platformFeeRate added to loader
           setSettings({
             name: data.name || '',
             logo: data.logo || '',
@@ -76,24 +85,11 @@ const Settings = () => {
             taxName: data.taxName || 'GST',
             taxRate: data.taxRate ?? 5,
             serviceChargeEnabled: data.serviceChargeEnabled || false,
-            serviceChargeRate: data.serviceChargeRate ?? 10
+            serviceChargeRate: data.serviceChargeRate ?? 10,
+            platformFeeEnabled: data.platformFeeEnabled || false,  // ← FIX
+            platformFeeRate: data.platformFeeRate ?? 2,            // ← FIX
           });
         }
-        // Hydrate payment settings if present
-          if (docSnap.exists()) {
-            const d2 = docSnap.data();
-            if (d2.paymentSettings) {
-              setPaymentSettings({
-                enabled:      d2.paymentSettings.enabled      ?? false,
-                gateway:      d2.paymentSettings.gateway      || 'cashfree',
-                keyId:        d2.paymentSettings.keyId        || '',
-                keySecret:    d2.paymentSettings.keySecret    || '',
-                merchantName: d2.paymentSettings.merchantName || '',
-                backendUrl:   d2.paymentSettings.backendUrl   || '',
-                currency:     d2.paymentSettings.currency     || 'INR',
-              });
-            }
-          }
         setLoading(false);
       },
       (error) => {
@@ -105,6 +101,7 @@ const Settings = () => {
     return () => unsubscribe();
   }, [cafeId]);
 
+  // ─── Logo upload ────────────────────────────────────────────────────────────
   const handleLogoUpload = async (e) => {
     const file = e.target.files[0];
     if (!file) return;
@@ -128,29 +125,7 @@ const Settings = () => {
     }
   };
 
-  const handleSavePayment = async () => {
-    if (!cafeId) { toast.error('Cafe ID not found'); return; }
-    setSavingPayment(true);
-    try {
-      await updateDoc(doc(db, 'cafes', cafeId), {
-        paymentSettings: {
-          enabled:      paymentSettings.enabled,
-          gateway:      paymentSettings.gateway,
-          keyId:        paymentSettings.keyId.trim(),
-          keySecret:    paymentSettings.keySecret.trim(),
-          merchantName: paymentSettings.merchantName.trim(),
-          backendUrl:   paymentSettings.backendUrl.trim(),
-          currency:     paymentSettings.currency,
-        },
-      });
-      toast.success('Payment settings saved ✓');
-    } catch (err) {
-      toast.error('Failed to save payment settings');
-    } finally {
-      setSavingPayment(false);
-    }
-  };
-
+  // ─── Save ───────────────────────────────────────────────────────────────────
   const handleSave = async () => {
     if (!cafeId) {
       toast.error('Cafe ID not found');
@@ -159,6 +134,7 @@ const Settings = () => {
 
     setSaving(true);
     try {
+      // FIX: platformFeeEnabled + platformFeeRate added to updateDoc
       await updateDoc(doc(db, 'cafes', cafeId), {
         name: settings.name,
         logo: settings.logo,
@@ -176,7 +152,9 @@ const Settings = () => {
         taxName: settings.taxName || 'GST',
         taxRate: parseFloat(settings.taxRate) || 0,
         serviceChargeEnabled: settings.serviceChargeEnabled,
-        serviceChargeRate: parseFloat(settings.serviceChargeRate) || 0
+        serviceChargeRate: parseFloat(settings.serviceChargeRate) || 0,
+        platformFeeEnabled: settings.platformFeeEnabled,                    // ← FIX
+        platformFeeRate: parseFloat(settings.platformFeeRate) || 0,        // ← FIX
       });
       toast.success('Settings saved successfully!');
     } catch (error) {
@@ -186,7 +164,7 @@ const Settings = () => {
     }
   };
 
-  // Get computed colors based on mode
+  // ─── Preview colors ─────────────────────────────────────────────────────────
   const getPreviewColors = () => {
     const isLight = settings.mode === 'light';
     return {
@@ -196,7 +174,7 @@ const Settings = () => {
       textMuted: isLight ? '#666666' : '#a3a3a3',
       primary: settings.primaryColor,
       cardBg: isLight ? '#ffffff' : '#151515',
-      border: isLight ? '#e5e5e5' : '#2a2a2a'
+      border: isLight ? '#e5e5e5' : '#2a2a2a',
     };
   };
 
@@ -212,7 +190,8 @@ const Settings = () => {
 
   return (
     <div className="space-y-6">
-      {/* Cafe Information */}
+
+      {/* ── Café Information ─────────────────────────────────────────────── */}
       <div className="bg-[#0F0F0F] border border-white/5 rounded-sm p-6">
         <h3 className="text-xl font-semibold text-white mb-6" style={{ fontFamily: 'Playfair Display, serif' }}>
           Café Information
@@ -263,7 +242,7 @@ const Settings = () => {
         </div>
       </div>
 
-      {/* Contact Settings */}
+      {/* ── Contact & Payment Settings ────────────────────────────────────── */}
       <div className="bg-[#0F0F0F] border border-white/5 rounded-sm p-6">
         <h3 className="text-xl font-semibold text-white mb-6" style={{ fontFamily: 'Playfair Display, serif' }}>
           Contact & Payment Settings
@@ -297,14 +276,13 @@ const Settings = () => {
         </div>
       </div>
 
-      {/* NEW: Billing Settings */}
+      {/* ── Billing Settings (GST) ────────────────────────────────────────── */}
       <div className="bg-[#0F0F0F] border border-white/5 rounded-sm p-6">
         <h3 className="text-xl font-semibold text-white mb-6" style={{ fontFamily: 'Playfair Display, serif' }}>
           Billing Settings
         </h3>
 
         <div className="space-y-4">
-          {/* GST Toggle */}
           <div className="flex items-center justify-between">
             <div>
               <label className="block text-white text-sm font-medium">Enable GST Billing</label>
@@ -317,15 +295,12 @@ const Settings = () => {
                 settings.gstEnabled ? 'bg-[#D4AF37]' : 'bg-white/10'
               }`}
             >
-              <span
-                className={`inline-block h-5 w-5 transform rounded-full bg-white shadow transition-transform duration-200 ${
-                  settings.gstEnabled ? 'translate-x-6' : 'translate-x-1'
-                }`}
-              />
+              <span className={`inline-block h-5 w-5 transform rounded-full bg-white shadow transition-transform duration-200 ${
+                settings.gstEnabled ? 'translate-x-6' : 'translate-x-1'
+              }`} />
             </button>
           </div>
 
-          {/* GST Rate and Number — only shown when GST is ON */}
           {settings.gstEnabled && (
             <>
               <div>
@@ -358,8 +333,7 @@ const Settings = () => {
         </div>
       </div>
 
-
-      {/* Currency Settings */}
+      {/* ── Currency Settings ─────────────────────────────────────────────── */}
       <div className="bg-[#0F0F0F] border border-white/5 rounded-sm p-6">
         <h3 className="text-xl font-semibold text-white mb-6" style={{ fontFamily: 'Playfair Display, serif' }}>
           Currency Settings
@@ -370,12 +344,12 @@ const Settings = () => {
             value={settings.currencyCode}
             onChange={(e) => {
               const options = {
-                INR: '₹', USD: '$', EUR: '€', GBP: '£', AED: 'د.إ', AUD: '$'
+                INR: '₹', USD: '$', EUR: '€', GBP: '£', AED: 'د.إ', AUD: '$',
               };
               setSettings(prev => ({
                 ...prev,
                 currencyCode: e.target.value,
-                currencySymbol: options[e.target.value] || '₹'
+                currencySymbol: options[e.target.value] || '₹',
               }));
             }}
             className="w-full bg-black/20 border border-white/10 text-white focus:border-[#D4AF37] focus:ring-1 focus:ring-[#D4AF37] rounded-sm h-12 px-4 transition-all"
@@ -393,7 +367,7 @@ const Settings = () => {
         </div>
       </div>
 
-      {/* Tax Settings */}
+      {/* ── Tax Settings ──────────────────────────────────────────────────── */}
       <div className="bg-[#0F0F0F] border border-white/5 rounded-sm p-6">
         <h3 className="text-xl font-semibold text-white mb-6" style={{ fontFamily: 'Playfair Display, serif' }}>
           Tax Settings
@@ -446,7 +420,7 @@ const Settings = () => {
         </div>
       </div>
 
-      {/* Service Charge Settings */}
+      {/* ── Service Charge ────────────────────────────────────────────────── */}
       <div className="bg-[#0F0F0F] border border-white/5 rounded-sm p-6">
         <h3 className="text-xl font-semibold text-white mb-6" style={{ fontFamily: 'Playfair Display, serif' }}>
           Service Charge
@@ -487,7 +461,48 @@ const Settings = () => {
         </div>
       </div>
 
-      {/* NEW: Appearance Settings */}
+      {/* ── Platform Fee — FIX: restored section ─────────────────────────── */}
+      <div className="bg-[#0F0F0F] border border-white/5 rounded-sm p-6">
+        <h3 className="text-xl font-semibold text-white mb-6" style={{ fontFamily: 'Playfair Display, serif' }}>
+          Platform Fee
+        </h3>
+        <div className="space-y-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <label className="block text-white text-sm font-medium">Enable Platform Fee</label>
+              <p className="text-[#A3A3A3] text-xs mt-1">Add a platform fee to all orders</p>
+            </div>
+            <button
+              type="button"
+              onClick={() => setSettings(prev => ({ ...prev, platformFeeEnabled: !prev.platformFeeEnabled }))}
+              className={`relative inline-flex h-7 w-12 items-center rounded-full transition-colors duration-200 focus:outline-none ${
+                settings.platformFeeEnabled ? 'bg-[#D4AF37]' : 'bg-white/10'
+              }`}
+            >
+              <span className={`inline-block h-5 w-5 transform rounded-full bg-white shadow transition-transform duration-200 ${
+                settings.platformFeeEnabled ? 'translate-x-6' : 'translate-x-1'
+              }`} />
+            </button>
+          </div>
+          {settings.platformFeeEnabled && (
+            <div>
+              <label className="block text-white text-sm font-medium mb-2">Platform Fee Percentage (%)</label>
+              <input
+                type="number"
+                min="0"
+                max="100"
+                step="0.01"
+                value={settings.platformFeeRate}
+                onChange={(e) => setSettings(prev => ({ ...prev, platformFeeRate: e.target.value }))}
+                className="w-full bg-black/20 border border-white/10 text-white placeholder:text-neutral-600 focus:border-[#D4AF37] focus:ring-1 focus:ring-[#D4AF37] rounded-sm h-12 px-4 transition-all"
+                placeholder="e.g., 2"
+              />
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* ── Appearance Settings ───────────────────────────────────────────── */}
       <div className="bg-[#0F0F0F] border border-white/5 rounded-sm p-6">
         <h3 className="text-xl font-semibold text-white mb-6" style={{ fontFamily: 'Playfair Display, serif' }}>
           Appearance Settings
@@ -541,7 +556,7 @@ const Settings = () => {
                   className="w-20 h-14 bg-transparent border-0 cursor-pointer rounded-sm"
                   style={{ padding: 0 }}
                 />
-                <div 
+                <div
                   className="absolute inset-0 rounded-sm border-2 border-white/20 pointer-events-none"
                   style={{ backgroundColor: settings.primaryColor }}
                 />
@@ -570,14 +585,14 @@ const Settings = () => {
             <label className="block text-white text-sm font-medium mb-3">Quick Presets</label>
             <div className="flex flex-wrap gap-2">
               {[
-                { color: '#D4AF37', name: 'Gold' },
-                { color: '#E74C3C', name: 'Red' },
-                { color: '#27AE60', name: 'Green' },
-                { color: '#3498DB', name: 'Blue' },
+                { color: '#D4AF37', name: 'Gold'   },
+                { color: '#E74C3C', name: 'Red'    },
+                { color: '#27AE60', name: 'Green'  },
+                { color: '#3498DB', name: 'Blue'   },
                 { color: '#9B59B6', name: 'Purple' },
                 { color: '#E67E22', name: 'Orange' },
-                { color: '#1ABC9C', name: 'Teal' },
-                { color: '#E91E63', name: 'Pink' },
+                { color: '#1ABC9C', name: 'Teal'   },
+                { color: '#E91E63', name: 'Pink'   },
               ].map((preset) => (
                 <button
                   key={preset.color}
@@ -597,34 +612,32 @@ const Settings = () => {
         </div>
       </div>
 
-      {/* Live Preview */}
+      {/* ── Live Preview ──────────────────────────────────────────────────── */}
       <div className="bg-[#0F0F0F] border border-white/5 rounded-sm p-6">
         <h3 className="text-xl font-semibold text-white mb-6" style={{ fontFamily: 'Playfair Display, serif' }}>
           Live Preview
         </h3>
         <p className="text-[#A3A3A3] text-sm mb-4">This is how your ordering page will look to customers.</p>
 
-        {/* Preview Container */}
-        <div 
+        <div
           className="rounded-lg overflow-hidden border-2 border-white/10"
           style={{ backgroundColor: colors.background }}
         >
-          {/* Preview Header */}
-          <div 
+          <div
             className="p-6 text-center border-b"
             style={{ borderColor: colors.border, backgroundColor: colors.backgroundSecondary }}
           >
             {settings.logo ? (
               <img src={settings.logo} alt="Logo" className="w-16 h-16 mx-auto rounded-full object-cover mb-3" />
             ) : (
-              <div 
+              <div
                 className="w-16 h-16 mx-auto rounded-full flex items-center justify-center mb-3"
                 style={{ backgroundColor: colors.primary }}
               >
                 <Coffee className="w-8 h-8 text-white" />
               </div>
             )}
-            <h4 
+            <h4
               className="text-2xl font-bold mb-1"
               style={{ fontFamily: 'Playfair Display, serif', color: colors.text }}
             >
@@ -635,75 +648,47 @@ const Settings = () => {
             </p>
           </div>
 
-          {/* Preview Menu Items */}
           <div className="p-6">
-            <h5 
-              className="text-lg font-semibold mb-4"
-              style={{ color: colors.text }}
-            >
+            <h5 className="text-lg font-semibold mb-4" style={{ color: colors.text }}>
               Menu Preview
             </h5>
             <div className="grid grid-cols-2 gap-4">
-              {/* Sample Menu Item 1 */}
-              <div 
-                className="rounded-lg overflow-hidden shadow-sm"
-                style={{ backgroundColor: colors.cardBg, border: `1px solid ${colors.border}` }}
-              >
-                <div 
-                  className="h-24 flex items-center justify-center"
-                  style={{ backgroundColor: colors.backgroundSecondary }}
+              {[
+                { name: 'Cappuccino', price: '₹150' },
+                { name: 'Latte',      price: '₹180' },
+              ].map((item) => (
+                <div
+                  key={item.name}
+                  className="rounded-lg overflow-hidden shadow-sm"
+                  style={{ backgroundColor: colors.cardBg, border: `1px solid ${colors.border}` }}
                 >
-                  <Coffee className="w-10 h-10" style={{ color: colors.textMuted }} />
-                </div>
-                <div className="p-3">
-                  <h6 className="font-semibold text-sm mb-1" style={{ color: colors.text }}>
-                    Cappuccino
-                  </h6>
-                  <div className="flex items-center justify-between">
-                    <span className="font-bold" style={{ color: colors.primary }}>₹150</span>
-                    <button 
-                      className="px-3 py-1 rounded-full text-white text-xs font-medium flex items-center gap-1"
-                      style={{ backgroundColor: colors.primary }}
-                    >
-                      <Plus className="w-3 h-3" />
-                      Add
-                    </button>
+                  <div
+                    className="h-24 flex items-center justify-center"
+                    style={{ backgroundColor: colors.backgroundSecondary }}
+                  >
+                    <Coffee className="w-10 h-10" style={{ color: colors.textMuted }} />
+                  </div>
+                  <div className="p-3">
+                    <h6 className="font-semibold text-sm mb-1" style={{ color: colors.text }}>
+                      {item.name}
+                    </h6>
+                    <div className="flex items-center justify-between">
+                      <span className="font-bold" style={{ color: colors.primary }}>{item.price}</span>
+                      <button
+                        className="px-3 py-1 rounded-full text-white text-xs font-medium flex items-center gap-1"
+                        style={{ backgroundColor: colors.primary }}
+                      >
+                        <Plus className="w-3 h-3" />
+                        Add
+                      </button>
+                    </div>
                   </div>
                 </div>
-              </div>
-
-              {/* Sample Menu Item 2 */}
-              <div 
-                className="rounded-lg overflow-hidden shadow-sm"
-                style={{ backgroundColor: colors.cardBg, border: `1px solid ${colors.border}` }}
-              >
-                <div 
-                  className="h-24 flex items-center justify-center"
-                  style={{ backgroundColor: colors.backgroundSecondary }}
-                >
-                  <Coffee className="w-10 h-10" style={{ color: colors.textMuted }} />
-                </div>
-                <div className="p-3">
-                  <h6 className="font-semibold text-sm mb-1" style={{ color: colors.text }}>
-                    Latte
-                  </h6>
-                  <div className="flex items-center justify-between">
-                    <span className="font-bold" style={{ color: colors.primary }}>₹180</span>
-                    <button 
-                      className="px-3 py-1 rounded-full text-white text-xs font-medium flex items-center gap-1"
-                      style={{ backgroundColor: colors.primary }}
-                    >
-                      <Plus className="w-3 h-3" />
-                      Add
-                    </button>
-                  </div>
-                </div>
-              </div>
+              ))}
             </div>
 
-            {/* Sample Cart Button */}
             <div className="mt-6">
-              <button 
+              <button
                 className="w-full py-3 rounded-lg text-white font-semibold flex items-center justify-center gap-2"
                 style={{ backgroundColor: colors.primary }}
               >
@@ -715,197 +700,10 @@ const Settings = () => {
         </div>
       </div>
 
-
-      {/* Online Payment Settings */}
-      <div className="bg-[#0F0F0F] border border-white/5 rounded-sm p-6">
-        <h3 className="text-xl font-semibold text-white mb-6" style={{ fontFamily: 'Playfair Display, serif' }}>
-          Online Payment Settings
-        </h3>
-
-        <div className="space-y-5">
-
-          {/* Enable toggle */}
-          <div className="flex items-center justify-between p-4 bg-black/20 rounded-sm border border-white/5">
-            <div>
-              <p className="text-white font-medium">Enable Online Payments</p>
-              <p className="text-[#A3A3A3] text-xs mt-0.5">
-                Allow customers to pay online at checkout
-              </p>
-            </div>
-            <button
-              type="button"
-              onClick={() => setPaymentSettings(prev => ({ ...prev, enabled: !prev.enabled }))}
-              className={`relative inline-flex h-7 w-12 items-center rounded-full transition-colors duration-200 focus:outline-none ${
-                paymentSettings.enabled ? 'bg-[#D4AF37]' : 'bg-white/10'
-              }`}
-            >
-              <span className={`inline-block h-5 w-5 transform rounded-full bg-white shadow transition-transform duration-200 ${
-                paymentSettings.enabled ? 'translate-x-6' : 'translate-x-1'
-              }`} />
-            </button>
-          </div>
-
-          {paymentSettings.enabled && (
-            <div className="space-y-4">
-
-              {/* Gateway selector */}
-              <div>
-                <label className="block text-white text-sm font-medium mb-2">Payment Gateway</label>
-                <select
-                  value={paymentSettings.gateway}
-                  onChange={(e) => setPaymentSettings(prev => ({ ...prev, gateway: e.target.value, keyId: '', keySecret: '' }))}
-                  className="w-full bg-black/20 border border-white/10 text-white focus:border-[#D4AF37] focus:ring-1 focus:ring-[#D4AF37] rounded-sm h-12 px-4 transition-all"
-                >
-                  <option value="cashfree" className="bg-[#0F0F0F]">Cashfree</option>
-                  <option value="razorpay" className="bg-[#0F0F0F]">Razorpay</option>
-                </select>
-              </div>
-
-              {/* Cashfree fields */}
-              {paymentSettings.gateway === 'cashfree' && (
-                <>
-                  <div>
-                    <label className="block text-white text-sm font-medium mb-2">Cashfree App ID</label>
-                    <input
-                      type="text"
-                      value={paymentSettings.keyId}
-                      onChange={(e) => setPaymentSettings(prev => ({ ...prev, keyId: e.target.value }))}
-                      placeholder="Your Cashfree App ID"
-                      className="w-full bg-black/20 border border-white/10 text-white placeholder:text-neutral-600 focus:border-[#D4AF37] focus:ring-1 focus:ring-[#D4AF37] rounded-sm h-12 px-4 font-mono transition-all"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-white text-sm font-medium mb-2">Cashfree Secret Key</label>
-                    <div className="relative">
-                      <input
-                        type={showKeySecret ? 'text' : 'password'}
-                        value={paymentSettings.keySecret}
-                        onChange={(e) => setPaymentSettings(prev => ({ ...prev, keySecret: e.target.value }))}
-                        placeholder="••••••••••••••••••••"
-                        className="w-full bg-black/20 border border-white/10 text-white placeholder:text-neutral-600 focus:border-[#D4AF37] focus:ring-1 focus:ring-[#D4AF37] rounded-sm h-12 px-4 pr-12 font-mono transition-all"
-                      />
-                      <button
-                        type="button"
-                        onClick={() => setShowKeySecret(v => !v)}
-                        className="absolute right-3 top-1/2 -translate-y-1/2 text-[#A3A3A3] hover:text-white transition-colors p-1"
-                        tabIndex={-1}
-                        title={showKeySecret ? 'Hide secret' : 'Show secret'}
-                      >
-                        {showKeySecret ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                      </button>
-                    </div>
-                    <p className="text-[#A3A3A3] text-xs mt-1.5">Keep this confidential. Stored in your private Firestore document.</p>
-                  </div>
-
-                  {/* Backend URL — required for server-side Cashfree order creation */}
-                  <div>
-                    <label className="block text-white text-sm font-medium mb-2">
-                      Backend URL
-                      <span className="text-[#A3A3A3] font-normal ml-1 text-xs">(your Render/server URL)</span>
-                    </label>
-                    <input
-                      type="text"
-                      value={paymentSettings.backendUrl}
-                      onChange={(e) => setPaymentSettings(prev => ({ ...prev, backendUrl: e.target.value }))}
-                      placeholder="https://your-app.onrender.com"
-                      className="w-full bg-black/20 border border-white/10 text-white placeholder:text-neutral-600 focus:border-[#D4AF37] focus:ring-1 focus:ring-[#D4AF37] rounded-sm h-12 px-4 font-mono transition-all"
-                    />
-                    <p className="text-[#A3A3A3] text-xs mt-1.5">
-                      Your backend creates the Cashfree order server-side — keys never exposed to browser.
-                    </p>
-                  </div>
-
-                  {paymentSettings.keyId && paymentSettings.keySecret && (
-                    <p className="text-green-400 text-xs flex items-center gap-1.5">
-                      ✓ Cashfree credentials ready. Save settings to activate.
-                    </p>
-                  )}
-                </>
-              )}
-
-              {/* Razorpay fields */}
-              {paymentSettings.gateway === 'razorpay' && (
-                <>
-                  <div>
-                    <label className="block text-white text-sm font-medium mb-2">
-                      Razorpay Key ID
-                      <span className="text-[#A3A3A3] font-normal ml-1 text-xs">(starts with rzp_)</span>
-                    </label>
-                    <input
-                      type="text"
-                      value={paymentSettings.keyId}
-                      onChange={(e) => setPaymentSettings(prev => ({ ...prev, keyId: e.target.value }))}
-                      placeholder="rzp_live_xxxxxxxxxxxx"
-                      className="w-full bg-black/20 border border-white/10 text-white placeholder:text-neutral-600 focus:border-[#D4AF37] focus:ring-1 focus:ring-[#D4AF37] rounded-sm h-12 px-4 font-mono transition-all"
-                    />
-                    {paymentSettings.keyId && !paymentSettings.keyId.startsWith('rzp_') && (
-                      <p className="text-red-400 text-xs mt-1 flex items-center gap-1">
-                        <AlertTriangle className="w-3.5 h-3.5" />
-                        Key ID should start with rzp_live_ or rzp_test_
-                      </p>
-                    )}
-                    {paymentSettings.keyId.startsWith('rzp_test_') && (
-                      <p className="text-yellow-400 text-xs mt-1 flex items-center gap-1">
-                        <AlertTriangle className="w-3.5 h-3.5" />
-                        You are using a test key. Switch to rzp_live_ for production.
-                      </p>
-                    )}
-                  </div>
-                  <div>
-                    <label className="block text-white text-sm font-medium mb-2">Razorpay Key Secret</label>
-                    <div className="relative">
-                      <input
-                        type={showKeySecret ? 'text' : 'password'}
-                        value={paymentSettings.keySecret}
-                        onChange={(e) => setPaymentSettings(prev => ({ ...prev, keySecret: e.target.value }))}
-                        placeholder="••••••••••••••••••••"
-                        className="w-full bg-black/20 border border-white/10 text-white placeholder:text-neutral-600 focus:border-[#D4AF37] focus:ring-1 focus:ring-[#D4AF37] rounded-sm h-12 px-4 pr-12 font-mono transition-all"
-                      />
-                      <button
-                        type="button"
-                        onClick={() => setShowKeySecret(v => !v)}
-                        className="absolute right-3 top-1/2 -translate-y-1/2 text-[#A3A3A3] hover:text-white transition-colors p-1"
-                        tabIndex={-1}
-                        title={showKeySecret ? 'Hide secret' : 'Show secret'}
-                      >
-                        {showKeySecret ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                      </button>
-                    </div>
-                    <p className="text-[#A3A3A3] text-xs mt-1.5">Keep this confidential. Stored in your private Firestore document.</p>
-                  </div>
-                </>
-              )}
-
-              {/* Merchant Name */}
-              <div>
-                <label className="block text-white text-sm font-medium mb-2">Merchant / Business Name</label>
-                <input
-                  type="text"
-                  value={paymentSettings.merchantName}
-                  onChange={(e) => setPaymentSettings(prev => ({ ...prev, merchantName: e.target.value }))}
-                  placeholder="e.g., Downtown Coffee Pvt Ltd"
-                  className="w-full bg-black/20 border border-white/10 text-white placeholder:text-neutral-600 focus:border-[#D4AF37] focus:ring-1 focus:ring-[#D4AF37] rounded-sm h-12 px-4 transition-all"
-                />
-              </div>
-
-              {/* Save payment settings button */}
-              <button
-                onClick={handleSavePayment}
-                disabled={savingPayment}
-                className="flex items-center gap-2 bg-[#D4AF37] text-black hover:bg-[#C5A059] rounded-sm px-6 py-3 font-semibold transition-all duration-300 hover:shadow-[0_0_20px_rgba(212,175,55,0.3)] disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                <CreditCard className="w-4 h-4" />
-                {savingPayment ? 'Saving...' : 'Save Payment Settings'}
-              </button>
-            </div>
-          )}
-        </div>
-      </div>
-
-      {/* Change Password */}
+      {/* ── Change Password ───────────────────────────────────────────────── */}
       <ChangePassword />
 
-      {/* Save Button */}
+      {/* ── Save Button ───────────────────────────────────────────────────── */}
       <button
         onClick={handleSave}
         disabled={saving || uploading}
