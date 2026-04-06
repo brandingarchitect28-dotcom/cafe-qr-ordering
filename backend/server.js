@@ -104,14 +104,16 @@ try {
     if (cafeDoc.exists) {
       const cafeData = cafeDoc.data();
 
-      if (cafeData?.cashfree_app_id && cafeData?.cashfree_secret_key) {
-        APP_ID = cafeData.cashfree_app_id;
-        SECRET_KEY = cafeData.cashfree_secret_key;
+      const payment = cafeData?.paymentSettings;
 
-        console.log("[create-order] Using CLIENT Cashfree keys:", APP_ID);
-      } else {
-        console.log("[create-order] Client keys missing, using DEFAULT keys");
-      }
+    if (payment?.keyId && payment?.keySecret) {
+      APP_ID = payment.keyId;
+      SECRET_KEY = payment.keySecret;
+
+    console.log("[create-order] Using CLIENT Cashfree keys:", APP_ID);
+    } else {
+    console.log("[create-order] Client keys missing, using DEFAULT keys");
+  }
     } else {
       console.log("[create-order] Cafe not found, using DEFAULT keys");
     }
