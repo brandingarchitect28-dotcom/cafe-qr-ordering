@@ -154,6 +154,9 @@ const AdvancedAnalytics = () => {
           `${import.meta.env.VITE_BACKEND_URL}/api/service-charge-total?cafeId=${cafeId}&from=${fromDate}&to=${toDate}`
         );
         const json = await res.json();
+
+        console.log("SERVICE CHARGE API:", json);
+        
         setServiceCharge(json.total || 0);
       } catch (err) {
         console.error("Service charge fetch error:", err.message);
