@@ -388,7 +388,7 @@ const AdvancedAnalytics = () => {
               { label:'Total Orders',   value:data.revenue.totalOrders,                        sub:`${fromDate} → ${toDate}`,                  icon:Package,     color:'#F59E0B', index:3 },
               { label:'GST Collected',  value:`${CUR}${data.gst.totalGST.toFixed(2)}`,         sub:`${data.gst.byRate?.length||0} slabs`,      icon:FileText,    color:'#8B5CF6', index:4 },
               { label:'Net Profit',     value:`${CUR}${data.profit.netProfit.toFixed(2)}`,     sub:`Margin: ${data.profit.margin}%`,            icon:Star,        color:data.profit.netProfit>=0?'#10B981':'#EF4444', index:5 },
-              { label:'Service Charges',value:`${CUR}${(serviceCharge || 0).toFixed(2)}`,      sub:'Total service charges',                    icon: FileText,   color: '#EC4899', index: 6},
+              { label:'Service Charges',value:`${CUR}${(serviceCharge || 0).toFixed(2)}`,      sub: 'Collected from paid orders',                    icon: FileText,   color: '#EC4899', index: 6},
             ].map(s => <StatCard T={T} key={s.label} {...s} />)}
           </div>
 
