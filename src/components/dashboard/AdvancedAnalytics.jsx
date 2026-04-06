@@ -10,7 +10,7 @@
  */
 
 import { formatWhatsAppNumber } from '../../utils/whatsapp';
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
 import { useDocument, useCollection } from '../../hooks/useFirestore';
 import { useAdvancedAnalytics } from '../../hooks/useAdvancedAnalytics';
