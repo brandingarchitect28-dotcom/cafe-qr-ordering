@@ -9,7 +9,17 @@ require('dotenv').config();
 const admin = require("firebase-admin");
 
 if (!admin.apps.length) {
-  admin.initializeApp();
+  try {
+    admin.initializeApp({
+      credential: admin.credential.cert(
+        JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT)
+      )
+    });
+    console.log("[Firebase] Initialized with service account");
+  } catch (e) {
+    console.log("[Firebase] Fallback to default init");
+    admin.initializeApp();
+  }
 }
 
 const db = admin.firestore();
