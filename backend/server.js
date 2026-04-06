@@ -890,16 +890,25 @@ app.get("/api/service-charge-total", async (req, res) => {
 
     let total = 0;
 
-    snapshot.forEach(doc => {
-      const data = doc.data();
+snapshot.forEach(doc => {
+  const data = doc.data();
 
-      if (from && to && data.createdAt) {
-        const date = new Date(data.createdAt);
-        if (date < new Date(from) || date > new Date(to)) return;
-      }
+  // ✅ Date filter (keep same)
+  if (from && to && data.createdAt) {
+    const date = new Date(data.createdAt);
+    if (date < new Date(from) || date > new Date(to)) return;
+  }
 
-      total += data.serviceCharge || 0;
-    });
+  // ✅ ONLY COUNT PAID ORDERS (SAFE VERSION)
+  const isPaid =
+    data.paymentStatus === 'paid' ||
+    data.paymentStatus === 'SUCCESS' ||
+    data.status === 'paid';
+
+  if (isPaid) {
+    total += data.serviceCharge || 0;
+  }
+});
 
     res.json({ total });
 
