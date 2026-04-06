@@ -875,6 +875,40 @@ app.post('/api/send-whatsapp-campaign', async (req, res) => {
   console.log(`[WA-Campaign] Completed for cafeId=${cafeId}: ${sent} sent, ${failed} failed`);
 });
 
+// ✅ Service Charge Total API (SAFE ADDITION)
+app.get("/api/service-charge-total", async (req, res) => {
+  try {
+    const { cafeId, from, to } = req.query;
+
+    if (!cafeId) {
+      return res.status(400).json({ error: "cafeId required" });
+    }
+
+    const snapshot = await db.collection("orders")
+      .where("cafeId", "==", cafeId)
+      .get();
+
+    let total = 0;
+
+    snapshot.forEach(doc => {
+      const data = doc.data();
+
+      if (from && to && data.createdAt) {
+        const date = new Date(data.createdAt);
+        if (date < new Date(from) || date > new Date(to)) return;
+      }
+
+      total += data.serviceCharge || 0;
+    });
+
+    res.json({ total });
+
+  } catch (err) {
+    console.error("Service charge error:", err);
+    res.status(500).json({ total: 0 });
+  }
+  
+});
 // ─── 404 — must be AFTER all routes ──────────────────────────────────────────
 app.use((req, res) => {
   res.status(404).json({ error: `Route ${req.method} ${req.path} not found.` });
