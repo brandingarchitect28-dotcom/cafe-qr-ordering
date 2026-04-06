@@ -37,8 +37,20 @@ export const useAdvancedAnalytics = (cafeId, fromDate = null, toDate = null) => 
         const t = o.createdAt?.toDate?.() || new Date(0);
         return t >= from && t <= to;
       });
+      let serviceChargeTotal = 0;
 
+      filtered.forEach(order => {
+       const isPaid =
+         order.paymentStatus === 'paid' ||
+         order.paymentStatus === 'SUCCESS' ||
+         order.status === 'paid';
+
+       if (isPaid) {
+        serviceChargeTotal += order.serviceChargeAmount || 0;
+       }
+     });
       const snapshot = buildAnalyticsSnapshot(filtered, menu, inventory, recipes);
+      snapshot.serviceChargeTotal = serviceChargeTotal;
       setData(snapshot);
       setLastFetch(new Date());
     } catch (err) {
