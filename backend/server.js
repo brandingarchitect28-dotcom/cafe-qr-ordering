@@ -74,8 +74,36 @@ app.post('/create-order', async (req, res) => {
   }
 
   // ── Check API keys are configured ─────────────────────────────────────────
-  const APP_ID     = process.env.APP_ID;
-  const SECRET_KEY = process.env.SECRET_KEY;
+  let APP_ID = process.env.APP_ID;
+let SECRET_KEY = process.env.SECRET_KEY;
+
+try {
+  if (cafeId) {
+    console.log("[create-order] Fetching cafe keys for:", cafeId);
+
+    const cafeDoc = await db.collection("cafes").doc(cafeId).get();
+
+    if (cafeDoc.exists) {
+      const cafeData = cafeDoc.data();
+
+      if (cafeData?.cashfree_app_id && cafeData?.cashfree_secret_key) {
+        APP_ID = cafeData.cashfree_app_id;
+        SECRET_KEY = cafeData.cashfree_secret_key;
+
+        console.log("[create-order] Using CLIENT Cashfree keys:", APP_ID);
+      } else {
+        console.log("[create-order] Client keys missing, using DEFAULT keys");
+      }
+    } else {
+      console.log("[create-order] Cafe not found, using DEFAULT keys");
+    }
+  } else {
+    console.log("[create-order] No cafeId provided, using DEFAULT keys");
+  }
+} catch (err) {
+  console.error("[create-order] Error fetching cafe keys:", err.message);
+  console.log("[create-order] Falling back to DEFAULT keys");
+}
 
   if (!APP_ID || !SECRET_KEY) {
     console.error('[create-order] FAIL — APP_ID or SECRET_KEY not set in Render env');
