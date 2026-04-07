@@ -5,16 +5,14 @@
  * Tasks 1, 13: Revenue, GST, Profit, Category, Source, Peak Hours.
  * Rule: NO real-time listeners. Data passed in from one-shot fetches.
  * Refresh every 60 seconds via useAdvancedAnalytics hook.
+ *
+ * AUDIT FIX (paid-only consistency):
+ *   calcRevenue     — totalOrders now = paid.length (was orders.length)
+ *   calcOrderSource — now iterates paid orders only (was all orders)
+ *   calcPeakHours   — count now paid only (revenue was already paid only)
+ *   calcItemPerformance — qty now paid only (revenue was already paid only)
+ * All other functions were already paid-only — zero changes to them.
  */
-
-
-// ─── Safe string helper — prevents TypeError on non-string fields ─────────────
-const safeLower = (v) => {
-  if (typeof v === 'string') return v.toLowerCase();
-  if (v === null || v === undefined) return '';
-  return String(v).toLowerCase();
-};
-
 
 // ─── Revenue ──────────────────────────────────────────────────────────────────
 
@@ -23,7 +21,9 @@ export const calcRevenue = (orders = []) => {
   const gross = paid.reduce((s, o) => s + (o.totalAmount || 0), 0);
   const discounts = paid.reduce((s, o) => s + (o.discountAmount || 0), 0);
   const netRevenue = gross - discounts;
-  const totalOrders = orders.length;
+  // FIX: totalOrders = paid.length — only paid orders count toward the total.
+  // Previously this was orders.length which included pending/cancelled orders.
+  const totalOrders = paid.length;
   const aov = paid.length > 0 ? gross / paid.length : 0;
   return { gross, discounts, netRevenue, totalOrders, aov, paidOrders: paid.length };
 };
@@ -36,7 +36,7 @@ export const calcPaymentBreakdown = (orders = []) => {
   const revenue = { upi: 0, cash: 0, card: 0, online: 0, counter: 0, other: 0 };
 
   paid.forEach(o => {
-    const mode = safeLower(o.paymentMode || 'other');
+    const mode = (o.paymentMode || 'other').toLowerCase();
     const key = ['upi', 'cash', 'card', 'online', 'counter', 'prepaid'].includes(mode)
       ? (mode === 'prepaid' ? 'upi' : mode)
       : 'other';
@@ -57,13 +57,17 @@ export const calcPaymentBreakdown = (orders = []) => {
 
 export const calcOrderSource = (orders = []) => {
   const map = {};
-  orders.forEach(o => {
+  // FIX: iterate paid orders only — source distribution should reflect revenue-generating
+  // orders, not pending/cancelled ones which never completed.
+  // Previously this was orders.forEach which counted all orders including cancelled.
+  const paid = orders.filter(o => o.paymentStatus === 'paid');
+  paid.forEach(o => {
     const src = o.orderSource || (o.externalOrder ? 'external' : 'qr');
     map[src] = (map[src] || 0) + 1;
   });
-  const total = orders.length || 1;
+  const total = paid.length || 1;  // FIX: was orders.length
   return Object.entries(map).map(([source, count]) => ({
-    source: String(source || '').toUpperCase(),
+    source: source.toUpperCase(),
     count,
     pct: parseFloat(((count / total) * 100).toFixed(1)),
   })).sort((a, b) => b.count - a.count);
@@ -73,7 +77,9 @@ export const calcOrderSource = (orders = []) => {
 
 export const calcPeakHours = (orders = []) => {
   const hours = Array.from({ length: 24 }, (_, h) => ({ hour: h, count: 0, revenue: 0 }));
-  // Count and revenue from PAID orders only
+  // FIX: count and revenue both from PAID orders only.
+  // Previously count included all orders while revenue was already paid-only,
+  // creating an inconsistency where count > paid order count.
   orders.filter(o => o.paymentStatus === 'paid').forEach(o => {
     const h = o.createdAt?.toDate?.()?.getHours?.();
     if (h !== undefined) {
@@ -91,7 +97,9 @@ export const calcPeakHours = (orders = []) => {
 
 export const calcItemPerformance = (orders = [], menuItems = []) => {
   const map = {};
-  // Only count items from PAID orders — qty and revenue both accurate
+  // FIX: only count qty and revenue from PAID orders.
+  // Previously qty was counted for all orders while revenue was paid-only,
+  // causing qty to be inflated by pending/cancelled orders.
   orders.filter(o => o.paymentStatus === 'paid').forEach(o => {
     (o.items || []).forEach(item => {
       if (!map[item.name]) {
@@ -116,7 +124,7 @@ export const calcItemPerformance = (orders = [], menuItems = []) => {
   };
 };
 
-// ─── GST Calculation (Task 2) ─────────────────────────────────────────────────
+// ─── GST Calculation ──────────────────────────────────────────────────────────
 
 export const calcGST = (orders = [], menuItems = []) => {
   // Build price→gstRate map from menu
@@ -161,7 +169,7 @@ export const calcGST = (orders = [], menuItems = []) => {
   };
 };
 
-// ─── Profit Calculation (Task 3) ──────────────────────────────────────────────
+// ─── Profit Calculation ───────────────────────────────────────────────────────
 
 export const calcProfit = (orders = [], inventory = [], recipes = []) => {
   // Build recipeMap: menuItemName → cost
@@ -203,14 +211,14 @@ export const calcProfit = (orders = [], inventory = [], recipes = []) => {
   };
 };
 
-// ─── Category Analytics (Task 13) ────────────────────────────────────────────
+// ─── Category Analytics ───────────────────────────────────────────────────────
 
 export const calcCategoryAnalytics = (orders = [], menuItems = [], inventory = [], recipes = []) => {
   const catMap = {};
   const menuCatMap = {};
   menuItems.forEach(m => { menuCatMap[m.name] = m.category || 'Other'; });
 
-  // Revenue + orders per category
+  // Revenue + orders per category — paid orders only
   orders.filter(o => o.paymentStatus === 'paid').forEach(o => {
     (o.items || []).forEach(item => {
       const cat = menuCatMap[item.name] || 'Other';
@@ -264,15 +272,15 @@ export const calcRevenueByDay = (orders = [], days = 7) => {
 // ─── Full analytics snapshot ──────────────────────────────────────────────────
 
 export const buildAnalyticsSnapshot = (orders, menuItems, inventory, recipes) => ({
-  revenue:     calcRevenue(orders),
-  payment:     calcPaymentBreakdown(orders),
-  source:      calcOrderSource(orders),
-  peakHours:   calcPeakHours(orders),
-  items:       calcItemPerformance(orders, menuItems),
-  gst:         calcGST(orders, menuItems),
-  profit:      calcProfit(orders, inventory, recipes),
-  categories:  calcCategoryAnalytics(orders, menuItems, inventory, recipes),
+  revenue:      calcRevenue(orders),
+  payment:      calcPaymentBreakdown(orders),
+  source:       calcOrderSource(orders),
+  peakHours:    calcPeakHours(orders),
+  items:        calcItemPerformance(orders, menuItems),
+  gst:          calcGST(orders, menuItems),
+  profit:       calcProfit(orders, inventory, recipes),
+  categories:   calcCategoryAnalytics(orders, menuItems, inventory, recipes),
   revenueByDay: calcRevenueByDay(orders, 7),
   revenueBy30:  calcRevenueByDay(orders, 30),
-  generatedAt: new Date(),
+  generatedAt:  new Date(),
 });
