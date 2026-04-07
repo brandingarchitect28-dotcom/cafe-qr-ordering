@@ -370,7 +370,7 @@ const AdvancedAnalytics = () => {
               { label:'Gross Revenue',  value:`${CUR}${data.revenue.gross.toFixed(2)}`,       sub:`${data.revenue.paidOrders} paid orders`,   icon:IndianRupee, color:'#10B981', index:0 },
               { label:'Net Revenue',    value:`${CUR}${data.revenue.netRevenue.toFixed(2)}`,   sub:'After discounts',                          icon:TrendingUp,  color:'#D4AF37', index:1 },
               { label:'Avg Order',      value:`${CUR}${data.revenue.aov.toFixed(2)}`,          sub:'Per paid order',                           icon:ShoppingBag, color:'#3B82F6', index:2 },
-              { label:'Total Orders',   value:data.revenue.totalOrders,                        sub:`${fromDate} → ${toDate}`,                  icon:Package,     color:'#F59E0B', index:3 },
+              { label:'Orders (Paid)',  value:data.revenue.totalOrders,                        sub:`${fromDate} → ${toDate}`,                  icon:Package,     color:'#F59E0B', index:3 },
               { label:'GST Collected',  value:`${CUR}${data.gst.totalGST.toFixed(2)}`,         sub:`${data.gst.byRate?.length||0} slabs`,      icon:FileText,    color:'#8B5CF6', index:4 },
               { label:'Net Profit',     value:`${CUR}${data.profit.netProfit.toFixed(2)}`,     sub:`Margin: ${data.profit.margin}%`,            icon:Star,        color:data.profit.netProfit>=0?'#10B981':'#EF4444', index:5 },
               { label:'Service Charges',value:`${CUR}${Number(serviceCharge).toFixed(2)}`, sub:'Collected from paid orders',               icon:FileText,    color:'#EC4899', index:6 },
