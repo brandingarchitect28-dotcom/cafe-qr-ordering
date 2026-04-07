@@ -51,10 +51,13 @@ const Overview = () => {
       avgOrderValue: 0, activeOrders: 0,
     };
 
+    // Exclude soft-deleted orders before any calculation
+    const activeOrders_ = orders.filter(o => !o.isDeleted);
+
     const todayStart = new Date();
     todayStart.setHours(0, 0, 0, 0);
 
-    const todayOrders = orders.filter(o => {
+    const todayOrders = activeOrders_.filter(o => {
       const d = o.createdAt?.toDate?.() || new Date(0);
       return d >= todayStart;
     });
@@ -68,7 +71,7 @@ const Overview = () => {
     const avgOrderValue  = ordersToday > 0 ? todayRevenue / ordersToday : 0;
 
     // Active = in-progress (not finished, not cancelled)
-    const activeOrders = orders.filter(
+    const activeOrders = activeOrders_.filter(
       o => o.orderStatus !== 'completed' && o.orderStatus !== 'cancelled'
     ).length;
 
@@ -160,9 +163,10 @@ const Overview = () => {
       <AnimatePresence>
         {showSummary && orders?.length > 0 && (() => {
           // Compute from already-loaded orders array — no Firestore calls
+          // Exclude soft-deleted orders before any calculation
           const todayStart = new Date(); todayStart.setHours(0, 0, 0, 0);
           const todayOrders = orders.filter(
-            o => (o.createdAt?.toDate?.() || new Date(0)) >= todayStart
+            o => !o.isDeleted && (o.createdAt?.toDate?.() || new Date(0)) >= todayStart
           );
 
           const paid    = todayOrders.filter(isPaid);
@@ -310,7 +314,7 @@ const Overview = () => {
           Recent Orders
         </h3>
         <div className="space-y-3">
-          {orders?.slice(0, 5).map((order) => (
+          {orders?.filter(o => !o.isDeleted).slice(0, 5).map((order) => (
             <div
               key={order.id}
               className="flex items-center justify-between bg-black/20 p-4 rounded-sm"
