@@ -34,6 +34,8 @@ export const useAdvancedAnalytics = (cafeId, fromDate = null, toDate = null) => 
       to.setHours(23, 59, 59, 999); // include full end day
 
       const filtered = orders.filter(o => {
+        // Exclude soft-deleted orders before any calculation
+        if (o.isDeleted) return false;
         const t = o.createdAt?.toDate?.() || new Date(0);
         return t >= from && t <= to;
       });
