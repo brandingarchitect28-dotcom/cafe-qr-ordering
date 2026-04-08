@@ -732,7 +732,13 @@ app.post('/api/ai-assistant', async (req, res) => {
 
     const userMessage = `Café ID: ${cafeId}${contextBlock}\n\nQuestion: ${question}`;
 
-    console.log(\`[AI-Assistant] context attached: \${ctx ? 'yes' : 'no'}, question length: \${question.length}\`);
+    const safeQuestionLength = question ? question.length : 0;
+    console.log(
+      '[AI-Assistant] context attached:',
+      ctx ? 'yes' : 'no',
+      'question length:',
+      safeQuestionLength
+    );
 
     const payload = JSON.stringify({
       model: 'gpt-4o-mini',
