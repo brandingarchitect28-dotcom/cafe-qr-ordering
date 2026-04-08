@@ -332,6 +332,9 @@ const Overview = () => {
   // ── WhatsApp Daily Report ──────────────────────────────────────────────────
   const [reportSending, setReportSending] = useState(false);
 
+  // Toggle for Today's Business Summary (hidden by default)
+  const [showSummary, setShowSummary] = useState(false);
+
   useEffect(() => {
     if (!cafeId || !cafe?.whatsappNumber) return;
     const stop = startDailyReportScheduler(
@@ -383,10 +386,9 @@ const Overview = () => {
         })}
       </div>
 
-      {/* ── Today's Business Summary ───────────────────────────────────────── */}
-      {/* Always-visible inline IIFE — no extra network calls, uses liveOrders */}
-      {(() => {
-        if (!liveOrders.length) return null;
+      {/* ── Today's Business Summary (toggle) ──────────────────────────────── */}
+      {/* Calculations run only when liveOrders exist — values unchanged */}
+      {liveOrders.length > 0 && (() => {
         const today = new Date(); today.setHours(0, 0, 0, 0);
 
         // isDeleted already excluded via liveOrders
@@ -422,9 +424,12 @@ const Overview = () => {
             animate={{ opacity: 1, y: 0 }}
             className="bg-[#0F0F0F] border border-[#D4AF37]/20 rounded-xl overflow-hidden"
           >
-            {/* Header */}
-            <div className="flex items-center justify-between px-5 py-4 border-b border-white/5"
-              style={{ background: 'linear-gradient(135deg, rgba(212,175,55,0.08), transparent)' }}>
+            {/* Header — clickable toggle */}
+            <div
+              onClick={() => setShowSummary(prev => !prev)}
+              className="cursor-pointer flex items-center justify-between px-5 py-4 border-b border-white/5 hover:bg-white/2 transition-colors"
+              style={{ background: 'linear-gradient(135deg, rgba(212,175,55,0.08), transparent)' }}
+            >
               <div className="flex items-center gap-3">
                 <div className="w-8 h-8 rounded-lg bg-[#D4AF37]/15 flex items-center justify-center">
                   <TrendingUp className="w-4 h-4 text-[#D4AF37]" />
@@ -438,93 +443,83 @@ const Overview = () => {
                   </p>
                 </div>
               </div>
-              <span className="text-[#D4AF37] text-xs font-semibold px-2 py-1 rounded-full bg-[#D4AF37]/10 border border-[#D4AF37]/20">
-                {todayOrders.length} orders today
-              </span>
-            </div>
-
-            {/* 4 financial figures — all paid-only */}
-            <div className="p-5 grid grid-cols-2 sm:grid-cols-4 gap-4">
-              <div className="space-y-1">
-                <p className="text-[#555] text-xs uppercase tracking-wide">Revenue</p>
-                <p className="text-[#10B981] font-black text-xl">{CUR}{totalRev.toFixed(2)}</p>
-                <p className="text-[#555] text-xs">{paid.length} paid orders</p>
-              </div>
-              <div className="space-y-1">
-                <p className="text-[#555] text-xs uppercase tracking-wide">Pending</p>
-                <p className="text-[#F59E0B] font-black text-xl">{pending.length}</p>
-                <p className="text-[#555] text-xs">awaiting payment</p>
-              </div>
-              <div className="space-y-1">
-                <p className="text-[#555] text-xs uppercase tracking-wide">GST Collected</p>
-                <p className="text-[#8B5CF6] font-black text-xl">{CUR}{totalGST.toFixed(2)}</p>
-                <p className="text-[#555] text-xs">incl. in revenue</p>
-              </div>
-              <div className="space-y-1">
-                <p className="text-[#555] text-xs uppercase tracking-wide">Service Charge</p>
-                <p className="text-[#3B82F6] font-black text-xl">{CUR}{totalSC.toFixed(2)}</p>
-                <p className="text-[#555] text-xs">collected today</p>
+              <div className="flex items-center gap-3">
+                <span className="text-[#D4AF37] text-xs font-semibold px-2 py-1 rounded-full bg-[#D4AF37]/10 border border-[#D4AF37]/20">
+                  {todayOrders.length} orders today
+                </span>
+                <span className="text-[#A3A3A3] text-sm opacity-70 select-none">
+                  {showSummary ? 'Hide ▲' : 'View ▼'}
+                </span>
               </div>
             </div>
 
-            {/* Top items + category breakdown */}
-            {(topItems.length > 0 || topCats.length > 0) && (
-              <div className="px-5 pb-5 grid grid-cols-1 sm:grid-cols-2 gap-4">
-                {topItems.length > 0 && (
-                  <div className="bg-white/3 rounded-lg p-3">
-                    <p className="text-[#A3A3A3] text-xs uppercase tracking-wide mb-2 flex items-center gap-1">
-                      🏆 Top Selling Items
-                    </p>
-                    {topItems.map(([name, qty], i) => (
-                      <div key={name} className="flex justify-between items-center py-1 text-xs border-b border-white/5 last:border-0">
-                        <span className="text-white flex items-center gap-1.5">
-                          <span className="text-[#D4AF37] font-bold">{i + 1}.</span>{name}
-                        </span>
-                        <span className="text-[#A3A3A3]">{qty} sold</span>
+            {/* Content — visible only when showSummary is true */}
+            {showSummary && (
+              <>
+                {/* 4 financial figures — all paid-only */}
+                <div className="p-5 grid grid-cols-2 sm:grid-cols-4 gap-4">
+                  <div className="space-y-1">
+                    <p className="text-[#555] text-xs uppercase tracking-wide">Revenue</p>
+                    <p className="text-[#10B981] font-black text-xl">{CUR}{totalRev.toFixed(2)}</p>
+                    <p className="text-[#555] text-xs">{paid.length} paid orders</p>
+                  </div>
+                  <div className="space-y-1">
+                    <p className="text-[#555] text-xs uppercase tracking-wide">Pending</p>
+                    <p className="text-[#F59E0B] font-black text-xl">{pending.length}</p>
+                    <p className="text-[#555] text-xs">awaiting payment</p>
+                  </div>
+                  <div className="space-y-1">
+                    <p className="text-[#555] text-xs uppercase tracking-wide">GST Collected</p>
+                    <p className="text-[#8B5CF6] font-black text-xl">{CUR}{totalGST.toFixed(2)}</p>
+                    <p className="text-[#555] text-xs">incl. in revenue</p>
+                  </div>
+                  <div className="space-y-1">
+                    <p className="text-[#555] text-xs uppercase tracking-wide">Service Charge</p>
+                    <p className="text-[#3B82F6] font-black text-xl">{CUR}{totalSC.toFixed(2)}</p>
+                    <p className="text-[#555] text-xs">collected today</p>
+                  </div>
+                </div>
+
+                {/* Top items + category breakdown */}
+                {(topItems.length > 0 || topCats.length > 0) && (
+                  <div className="px-5 pb-5 grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    {topItems.length > 0 && (
+                      <div className="bg-white/3 rounded-lg p-3">
+                        <p className="text-[#A3A3A3] text-xs uppercase tracking-wide mb-2 flex items-center gap-1">
+                          🏆 Top Selling Items
+                        </p>
+                        {topItems.map(([name, qty], i) => (
+                          <div key={name} className="flex justify-between items-center py-1 text-xs border-b border-white/5 last:border-0">
+                            <span className="text-white flex items-center gap-1.5">
+                              <span className="text-[#D4AF37] font-bold">{i + 1}.</span>{name}
+                            </span>
+                            <span className="text-[#A3A3A3]">{qty} sold</span>
+                          </div>
+                        ))}
                       </div>
-                    ))}
+                    )}
+                    {topCats.length > 0 && (
+                      <div className="bg-white/3 rounded-lg p-3">
+                        <p className="text-[#A3A3A3] text-xs uppercase tracking-wide mb-2 flex items-center gap-1">
+                          📊 Category Revenue
+                        </p>
+                        {topCats.map(([cat, rev], i) => (
+                          <div key={cat} className="flex justify-between items-center py-1 text-xs border-b border-white/5 last:border-0">
+                            <span className="text-white flex items-center gap-1.5">
+                              <span className="text-[#D4AF37] font-bold">{i + 1}.</span>{cat}
+                            </span>
+                            <span className="text-[#10B981] font-semibold">{CUR}{rev.toFixed(2)}</span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
                   </div>
                 )}
-                {topCats.length > 0 && (
-                  <div className="bg-white/3 rounded-lg p-3">
-                    <p className="text-[#A3A3A3] text-xs uppercase tracking-wide mb-2 flex items-center gap-1">
-                      📊 Category Revenue
-                    </p>
-                    {topCats.map(([cat, rev], i) => (
-                      <div key={cat} className="flex justify-between items-center py-1 text-xs border-b border-white/5 last:border-0">
-                        <span className="text-white flex items-center gap-1.5">
-                          <span className="text-[#D4AF37] font-bold">{i + 1}.</span>{cat}
-                        </span>
-                        <span className="text-[#10B981] font-semibold">{CUR}{rev.toFixed(2)}</span>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
+              </>
             )}
           </motion.div>
         );
       })()}
-
-      {/* ── WhatsApp Daily Report Button ───────────────────────────────────── */}
-      <div className="bg-[#0F0F0F] border border-white/5 rounded-sm px-5 py-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
-        <div>
-          <p className="text-white font-semibold text-sm">📊 Daily Analytics Report</p>
-          <p className="text-[#A3A3A3] text-xs mt-0.5">
-            Auto-sends to WhatsApp at 11:00 PM · or send now manually
-          </p>
-        </div>
-        <button
-          onClick={handleSendReport}
-          disabled={reportSending}
-          className="flex items-center gap-2 px-4 py-2 bg-green-600 hover:bg-green-700 text-white font-bold rounded-sm text-sm transition-all disabled:opacity-50 flex-shrink-0"
-        >
-          {reportSending
-            ? <><RefreshCw className="w-4 h-4 animate-spin" /> Generating…</>
-            : <><Send className="w-4 h-4" /> Send Report Now</>
-          }
-        </button>
-      </div>
 
       {/* ── Low Stock Alert ────────────────────────────────────────────────── */}
       <AnimatePresence>
