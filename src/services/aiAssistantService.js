@@ -80,8 +80,22 @@ export const askAIAssistant = async (cafeId, question, context = null) => {
     throw new Error(data.error || `AI request failed (${res.status})`);
   }
 
+  // FIX: backend returns { reply: "..." } — also accept data.answer and data.message
+  // for forward-compatibility with future backend upgrades.
+  console.log('[AI-Response] raw data:', JSON.stringify(data).slice(0, 200));
+
+  const answerText =
+    data.reply        ||   // ← current backend field (server.js → res.json({ reply }))
+    data.answer       ||   // ← future-proof alias
+    data.message      ||   // ← fallback alias
+    "I'm having trouble responding right now. Please try again.";
+
+  if (!data.reply && !data.answer && !data.message) {
+    console.warn('[AI-Response] Unexpected response shape — no reply/answer/message field:', data);
+  }
+
   return {
-    answer:       data.answer       || data.message || 'No response from AI.',
+    answer:       answerText,
     type:         data.type         || 'data_answer',
     actionIntent: data.actionIntent || null,
     intent:       data.intent       || '',
