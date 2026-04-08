@@ -11,7 +11,6 @@ import {
   updateDoc,
   query,
   where,
-  orderBy,
   onSnapshot,
   runTransaction,
   serverTimestamp,
@@ -70,9 +69,9 @@ export const createInvoiceForOrder = async (orderData, orderId, cafeData) => {
       : (orderData.serviceChargeAmount ?? 0);
 
     // GST applied on subtotal + serviceCharge (per task spec)
-    const gstEnabled   = cafeData?.gstEnabled || false;
-    const gstRate      = parseFloat(cafeData?.gstRate) || 0;
-    const gstAmount    = gstEnabled
+    const gstEnabled = cafeData?.gstEnabled || false;
+    const gstRate    = parseFloat(cafeData?.gstRate) || 0;
+    const gstAmount  = gstEnabled
       ? (subtotal + serviceChargeAmount) * gstRate / 100
       : (orderData.gstAmount ?? 0);
 
@@ -88,13 +87,13 @@ export const createInvoiceForOrder = async (orderData, orderId, cafeData) => {
     const invoiceDoc = {
       // Linking fields
       orderId,
-      cafeId: orderData.cafeId,
+      cafeId:      orderData.cafeId,
       orderNumber: orderData.orderNumber ?? null,
 
       // Cafe info snapshot (denormalised so invoice is self-contained)
-      cafeName:      cafeData?.name     || 'Café',
-      cafeAddress:   cafeData?.address  || '',
-      cafePhone:     cafeData?.phone    || '',
+      cafeName:      cafeData?.name      || 'Café',
+      cafeAddress:   cafeData?.address   || '',
+      cafePhone:     cafeData?.phone     || '',
       cafeGstNumber: cafeData?.gstNumber || cafeData?.cafeGstNumber || '',
       currencySymbol: orderData.currencySymbol || cafeData?.currencySymbol || '₹',
       currencyCode:   orderData.currencyCode   || cafeData?.currencyCode   || 'INR',
@@ -104,6 +103,12 @@ export const createInvoiceForOrder = async (orderData, orderId, cafeData) => {
       customerPhone: orderData.customerPhone || '',
       tableNumber:   orderData.tableNumber   || '',
       orderType:     orderData.orderType     || 'dine-in',
+
+      // FEATURE 3 FIX: store deliveryAddress so InvoiceModal can render it.
+      // Previously this field was missing → invoice always showed 'N/A' for
+      // delivery orders even though OrdersManagement and InvoiceModal already
+      // had the conditional render logic in place.
+      deliveryAddress: orderData.deliveryAddress || '',
 
       // Items (array of { name, price, quantity })
       items: orderData.items || [],
@@ -233,13 +238,13 @@ export const subscribeToInvoicesByCafe = (cafeId, callback) => {
  */
 export const ensureInvoiceForOrder = async (orderId, orderData, cafeData) => {
   try {
-    // ── Guard 1: order already has an invoiceId ──────────────────────────
+    // ── Guard 1: order already has an invoiceId ───────────────────────────────
     if (orderData?.invoiceId) {
       console.log(`[InvoiceService] Order ${orderId} already has invoiceId — skipping`);
       return { invoiceId: orderData.invoiceId, skipped: true, error: null };
     }
 
-    // ── Guard 2: invoice already exists in Firestore for this orderId ────
+    // ── Guard 2: invoice already exists in Firestore for this orderId ─────────
     const { data: existing } = await getInvoiceByOrderId(orderId);
     if (existing) {
       console.log(`[InvoiceService] Invoice already exists for order ${orderId} — linking`);
@@ -250,7 +255,7 @@ export const ensureInvoiceForOrder = async (orderId, orderData, cafeData) => {
       return { invoiceId: existing.id, skipped: true, error: null };
     }
 
-    // ── Create invoice ────────────────────────────────────────────────────
+    // ── Create invoice ─────────────────────────────────────────────────────────
     const { invoiceId, error } = await createInvoiceForOrder(
       orderData,
       orderId,
@@ -262,7 +267,7 @@ export const ensureInvoiceForOrder = async (orderId, orderData, cafeData) => {
       return { invoiceId: null, skipped: false, error };
     }
 
-    // ── Link invoiceId back to order (adds only — never overwrites other fields) ──
+    // ── Link invoiceId back to order (adds only — never overwrites other fields) ─
     try {
       await updateDoc(doc(db, 'orders', orderId), { invoiceId });
     } catch (linkErr) {
@@ -278,171 +283,4 @@ export const ensureInvoiceForOrder = async (orderId, orderData, cafeData) => {
     console.error(`[InvoiceService] ensureInvoiceForOrder unexpected error:`, err);
     return { invoiceId: null, skipped: false, error: err.message };
   }
-};
-
-// ─────────────────────────────────────────────────────────────────────────────
-// generateInvoiceMessage(source)
-//
-// Generates a premium, structured WhatsApp invoice message from any
-// order or invoice document.
-//
-// ✅ Works with both `order` objects (from orders collection) and
-//    `invoice` objects (from invoices collection) — field names overlap.
-// ✅ Fully defensive — optional chaining + defaults on every field.
-// ✅ Add-ons appear indented under each item.
-// ✅ Bill summary shows all charges individually.
-// ✅ Scalable: same data structure feeds PDF generation later.
-//
-// @param {object} source     — order or invoice document
-// @param {object} [cafeInfo] — optional { name, currencySymbol } override
-// @returns {string}          — formatted WhatsApp message
-// ─────────────────────────────────────────────────────────────────────────────
-export const generateInvoiceMessage = (source = {}, cafeInfo = {}) => {
-
-  // ── Safe helpers ────────────────────────────────────────────────────────────
-  const n   = (v, d = 0) => (isNaN(parseFloat(v)) ? d : parseFloat(v));
-  const fmtAmt = (v) => n(v, 0).toFixed(2);
-
-  // ── Field resolution (order + invoice share most names) ─────────────────────
-  const cur         = source.currencySymbol || cafeInfo.currencySymbol || '₹';
-  const cafeName    = source.cafeName       || cafeInfo.name           || '';
-  const invNo       = source.invoiceNumber  || '';
-  const orderNo     = String(source.orderNumber || '').padStart(3, '0');
-  const custName    = source.customerName   || '';
-  const custPhone   = source.customerPhone  || '';
-  const orderType   = source.orderType      || 'dine-in';
-  const tableNo     = source.tableNumber    || '';
-  const deliveryAddr= source.deliveryAddress|| '';
-  const items       = Array.isArray(source.items) ? source.items : [];
-  const payStatus   = source.paymentStatus  || 'pending';
-  const payMode     = source.paymentMode    || 'counter';
-  const specialNote = source.specialInstructions || '';
-
-  // ── Timestamp ────────────────────────────────────────────────────────────────
-  const rawTime = source.orderTime || source.createdAt;
-  let timeStr = '';
-  try {
-    const d = rawTime?.toDate ? rawTime.toDate() : rawTime ? new Date(rawTime) : new Date();
-    timeStr = d.toLocaleString('en-IN', {
-      day: '2-digit', month: 'short', year: 'numeric',
-      hour: '2-digit', minute: '2-digit', hour12: true,
-    });
-  } catch (_) { timeStr = ''; }
-
-  // ── Amount calculation (safe, with fallbacks) ────────────────────────────────
-  // Compute subtotal from items if not stored (handles legacy orders)
-  const computedItemsSubtotal = items.reduce((sum, item) => {
-    const base = n(item.basePrice ?? item.price, 0);
-    return sum + base * n(item.quantity, 1);
-  }, 0);
-  const computedAddonsTotal = items.reduce((sum, item) => {
-    return sum + (Array.isArray(item.addons) ? item.addons.reduce((s, a) => s + n(a.price, 0), 0) * n(item.quantity, 1) : n(item.addonTotal, 0) * n(item.quantity, 1));
-  }, 0);
-
-  const subtotal      = n(source.subtotalAmount,      computedItemsSubtotal + computedAddonsTotal);
-  const gstAmt        = n(source.gstAmount,           0);
-  const taxAmt        = n(source.taxAmount,           0);
-  const scAmt         = n(source.serviceChargeAmount, 0);
-  const platformFee   = n(source.platformFeeAmount,   0);
-  const discount      = n(source.discountAmount,      0);
-  const computedTotal = subtotal + gstAmt + taxAmt + scAmt + platformFee - discount;
-  const total         = n(source.totalAmount, computedTotal);
-
-  // ── Order type label ─────────────────────────────────────────────────────────
-  const orderTypeLabel = {
-    'dine-in':  `🪑 Dine-In${tableNo ? ` · Table ${tableNo}` : ''}`,
-    'takeaway': '🥡 Takeaway',
-    'delivery': `🛵 Delivery${deliveryAddr ? `\n📍 ${deliveryAddr}` : ''}`,
-  }[orderType] || orderType;
-
-  // ── Payment mode label ───────────────────────────────────────────────────────
-  const payModeLabel = {
-    'counter':  'Pay at Counter',
-    'table':    'Pay at Table',
-    'prepaid':  'UPI (Prepaid)',
-    'online':   'Online Payment',
-  }[payMode] || payMode;
-
-  // ── Build message ────────────────────────────────────────────────────────────
-  const LINE  = '─────────────────────────';
-  const lines = [];
-
-  // Header
-  lines.push(`🧾 *${cafeName || 'Invoice'}*`);
-  if (invNo)    lines.push(`📋 Invoice: *${invNo}*`);
-  lines.push(`🔢 Order:   *#${orderNo}*`);
-  if (timeStr)  lines.push(`🕐 Time:    ${timeStr}`);
-  lines.push(`📦 Type:    ${orderTypeLabel}`);
-  lines.push('');
-
-  // Customer
-  if (custName || custPhone) {
-    lines.push('👤 *Customer*');
-    if (custName)  lines.push(`   Name:  ${custName}`);
-    if (custPhone) lines.push(`   Phone: ${custPhone}`);
-    lines.push('');
-  }
-
-  // Items
-  lines.push(LINE);
-  lines.push('🛒 *Items*');
-  lines.push('');
-
-  items.forEach(item => {
-    const basePrice  = n(item.basePrice ?? item.price, 0);
-    const qty        = n(item.quantity, 1);
-    const addons     = Array.isArray(item.addons) ? item.addons : [];
-    const addonsAmt  = addons.reduce((s, a) => s + n(a.price, 0), 0);
-    const lineTotal  = (basePrice + addonsAmt) * qty;
-
-    // Item row: name × qty  = total
-    lines.push(`▸ *${item.name}* × ${qty}   ${cur}${fmtAmt(lineTotal)}`);
-
-    // Base price (only show if there are add-ons to disambiguate)
-    if (addons.length > 0) {
-      lines.push(`   Base: ${cur}${fmtAmt(basePrice)} × ${qty}`);
-    }
-
-    // Add-on sub-rows
-    addons.forEach(a => {
-      lines.push(`   ╰ ${a.name}: +${cur}${fmtAmt(n(a.price, 0))}`);
-    });
-  });
-
-  // Bill summary
-  lines.push('');
-  lines.push(LINE);
-  lines.push('💰 *Bill Summary*');
-  lines.push('');
-  lines.push(`   Items Subtotal     ${cur}${fmtAmt(subtotal)}`);
-  if (gstAmt > 0)       lines.push(`   GST               +${cur}${fmtAmt(gstAmt)}`);
-  if (taxAmt > 0)       lines.push(`   Tax               +${cur}${fmtAmt(taxAmt)}`);
-  if (scAmt > 0)        lines.push(`   Service Charge    +${cur}${fmtAmt(scAmt)}`);
-  if (platformFee > 0)  lines.push(`   Platform Fee      +${cur}${fmtAmt(platformFee)}`);
-  if (discount > 0)     lines.push(`   Discount          -${cur}${fmtAmt(discount)}`);
-  lines.push('');
-  lines.push(`   *TOTAL             ${cur}${fmtAmt(total)}*`);
-  lines.push('');
-
-  // Payment
-  lines.push(LINE);
-  lines.push('💳 *Payment*');
-  lines.push('');
-  lines.push(`   Status: ${payStatus === 'paid' ? '✅ Paid' : payStatus === 'failed' ? '❌ Failed' : '⏳ Pending'}`);
-  lines.push(`   Mode:   ${payModeLabel}`);
-
-  // Special instructions
-  if (specialNote) {
-    lines.push('');
-    lines.push(LINE);
-    lines.push(`📝 *Note:* ${specialNote}`);
-  }
-
-  // Footer
-  lines.push('');
-  lines.push(LINE);
-  if (cafeName) lines.push(`Thank you for choosing *${cafeName}* ☕`);
-  lines.push('_Powered by SmartCafé OS_');
-
-  return lines.join('\n');
 };
