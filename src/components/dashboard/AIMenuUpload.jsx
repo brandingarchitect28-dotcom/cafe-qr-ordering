@@ -13,6 +13,11 @@
  *  3. Response shape updated: server returns { preview: [...] } not
  *     { success, items } — check and setItems corrected accordingly.
  *  Everything else (UI, handleSave, handleChange, JSX) is unchanged.
+ *
+ * ADDED (Part 3 — category inference):
+ *  4. inferCategory() helper — maps item name keywords to category strings.
+ *     Applied to every extracted item that has no category set.
+ *     Does NOT touch items that already have a category from the AI response.
  */
 
 import React, { useState, useRef, useCallback } from 'react';
@@ -30,6 +35,49 @@ import {
 const CATEGORIES = ['Beverages', 'Food', 'Snacks', 'Desserts', 'Main Course', 'Starters', 'Other'];
 
 const inputCls = 'w-full bg-black/20 border border-white/10 text-white placeholder:text-neutral-600 focus:border-[#D4AF37] focus:ring-1 focus:ring-[#D4AF37] rounded-sm px-3 h-9 text-sm transition-all';
+
+// ─── NEW: Category inference helper (Part 3) ──────────────────────────────────
+// Applied ONLY when the AI response leaves category empty/missing.
+// Keyword list is additive — expand without touching anything else.
+const inferCategory = (name = '') => {
+  const n = name.toLowerCase();
+
+  if (
+    n.includes('coffee') || n.includes('tea') || n.includes('juice') ||
+    n.includes('latte')  || n.includes('cappuccino') || n.includes('chai') ||
+    n.includes('smoothie')|| n.includes('shake') || n.includes('soda') ||
+    n.includes('water')  || n.includes('lassi') || n.includes('mojito')
+  ) return 'Beverages';
+
+  if (
+    n.includes('pizza')  || n.includes('burger') || n.includes('pasta') ||
+    n.includes('rice')   || n.includes('noodle') || n.includes('sandwich') ||
+    n.includes('biryani')|| n.includes('curry')  || n.includes('wrap') ||
+    n.includes('roll')   || n.includes('thali')  || n.includes('roti') ||
+    n.includes('dosa')   || n.includes('idli')   || n.includes('uttapam')
+  ) return 'Main Course';
+
+  if (
+    n.includes('cake')   || n.includes('ice cream') || n.includes('dessert') ||
+    n.includes('brownie')|| n.includes('pastry')    || n.includes('pudding') ||
+    n.includes('mousse') || n.includes('gulab')     || n.includes('kheer') ||
+    n.includes('halwa')  || n.includes('mithai')
+  ) return 'Desserts';
+
+  if (
+    n.includes('fries')  || n.includes('nugget')    || n.includes('spring roll') ||
+    n.includes('samosa') || n.includes('pakora')    || n.includes('tikka') ||
+    n.includes('soup')   || n.includes('salad')     || n.includes('bruschetta') ||
+    n.includes('nachos') || n.includes('wings')
+  ) return 'Starters';
+
+  if (
+    n.includes('snack')  || n.includes('biscuit')   || n.includes('cookie') ||
+    n.includes('chips')  || n.includes('popcorn')   || n.includes('toast')
+  ) return 'Snacks';
+
+  return 'Other';
+};
 
 // ─── Item edit row ────────────────────────────────────────────────────────────
 
@@ -169,8 +217,6 @@ const AIMenuUpload = ({ onClose }) => {
       });
 
       // FIX 1 continued: only check backendUrl after Firestore has loaded.
-      // When cafeLoading is true, cafe is null → backendUrl would be
-      // undefined → false error. Guard here prevents that.
       if (cafeLoading) {
         toast.error('Loading café settings, please try again in a moment.');
         setLoading(false);
@@ -201,10 +247,18 @@ const AIMenuUpload = ({ onClose }) => {
       }
 
       // FIX 3: Server returns { preview: [...] } not { success, items }.
-      // The old check `result.success && result.items` was always falsy
-      // against the current server response, causing silent failure.
       if (result.preview?.length > 0) {
-        setItems(result.preview);
+        // PART 3 — Category inference: apply inferCategory() to every item
+        // that has no category assigned by the AI response.
+        // Items that already have a category are left untouched.
+        const itemsWithCategory = result.preview.map(item => ({
+          ...item,
+          category: item.category && item.category !== 'Other' && item.category !== ''
+            ? item.category
+            : inferCategory(item.name),
+        }));
+
+        setItems(itemsWithCategory);
         setStep('preview');
         toast.success(`${result.preview.length} items extracted ✨`);
       } else {
@@ -267,7 +321,7 @@ const AIMenuUpload = ({ onClose }) => {
     }
   };
 
-  // ── Locked state (feature not enabled for this café) ──────────────────────
+  // ── Locked state ───────────────────────────────────────────────────────────
   if (isEnabled === false) {
     return (
       <div className="flex flex-col items-center justify-center py-16 text-center">
