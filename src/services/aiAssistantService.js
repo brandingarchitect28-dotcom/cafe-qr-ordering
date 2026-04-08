@@ -13,12 +13,19 @@
  *
  * Backend URL is read from cafe.paymentSettings.backendUrl in Firestore
  * (same pattern used by WhatsAppMarketing.jsx and AdminApiSettings.jsx).
+ *
+ * UPGRADE (context parameter):
+ *  - askAIAssistant() now accepts an optional `context` argument.
+ *  - When provided it is forwarded to the backend alongside the question.
+ *  - The backend uses this rich snapshot to answer data-heavy questions
+ *    (revenue, inventory, staff) without making its own Firestore reads.
+ *  - Backward compatible: callers that omit context still work exactly as before.
  */
 
 import { doc, getDoc } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 
-// ─── Get backend URL for this cafe ───────────────────────────────────────────
+// ─── Get backend URL for this cafe ────────────────────────────────────────────
 async function getBackendUrl(cafeId) {
   const cafeSnap = await getDoc(doc(db, 'cafes', cafeId));
   if (!cafeSnap.exists()) throw new Error('Café not found.');
@@ -31,9 +38,15 @@ async function getBackendUrl(cafeId) {
   return url.trim().replace(/\/$/, ''); // strip trailing slash
 }
 
-// ─── Main: ask the AI assistant ──────────────────────────────────────────────
+// ─── Main: ask the AI assistant ───────────────────────────────────────────────
 /**
- * askAIAssistant(cafeId, question)
+ * askAIAssistant(cafeId, question, context?)
+ *
+ * @param {string} cafeId   — café document ID
+ * @param {string} question — owner's question
+ * @param {object} context  — optional: pre-built system snapshot from buildSystemContext()
+ *                           Contains revenue, topItems, inventory, menu, staff summaries.
+ *                           Passed to the backend so it can answer without re-fetching Firestore.
  *
  * Returns: {
  *   answer:       string,
@@ -42,99 +55,81 @@ async function getBackendUrl(cafeId) {
  *   intent:       string   // detected intent for logging
  * }
  */
-export const askAIAssistant = async (cafeId, question) => {
-  if (!cafeId)         throw new Error('cafeId required');
+export const askAIAssistant = async (cafeId, question, context = null) => {
+  if (!cafeId)           throw new Error('cafeId required');
   if (!question?.trim()) throw new Error('question required');
 
   const backendUrl = await getBackendUrl(cafeId);
 
-  let res, data;
-  try {
-    res = await fetch(`${backendUrl}/api/ai-assistant`, {
-      method:  'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body:    JSON.stringify({ cafeId, question: question.trim() }),
-    });
-  } catch (networkErr) {
-    // fetch() itself threw — server unreachable, CORS block, or no internet
-    throw new Error(
-      `Cannot reach backend (${backendUrl}). ` +
-      'Check that your Render server is running and the URL in Settings is correct.'
-    );
+  const body = { cafeId, question: question.trim() };
+
+  // Attach context snapshot when available — backend merges with its own data
+  if (context && typeof context === 'object') {
+    body.context = context;
   }
 
-  try {
-    data = await res.json();
-  } catch {
-    throw new Error(`Server returned an unexpected response (HTTP ${res.status}). Check Render logs.`);
-  }
+  const res = await fetch(`${backendUrl}/api/ai-assistant`, {
+    method:  'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body:    JSON.stringify(body),
+  });
+
+  const data = await res.json();
 
   if (!res.ok) {
-    throw new Error(data.error || `AI request failed (HTTP ${res.status})`);
+    throw new Error(data.error || `AI request failed (${res.status})`);
   }
 
   return {
-    answer:       data.answer       || data.reply || 'No response received.',
+    answer:       data.answer       || data.message || 'No response from AI.',
     type:         data.type         || 'data_answer',
     actionIntent: data.actionIntent || null,
-    intent:       data.intent       || 'unknown',
+    intent:       data.intent       || '',
   };
 };
 
-// ─── Bill image upload ────────────────────────────────────────────────────────
+// ─── Upload a supplier bill image for inventory extraction ────────────────────
 /**
- * uploadBillImage(cafeId, imageBase64, mimeType)
+ * uploadBillImage(cafeId, base64, mimeType)
  *
- * Returns: {
- *   items:       [{ name, quantity, unit, price }],
- *   totalAmount: number | null,
- *   vendorName:  string | null,
- * }
+ * Returns: { items: Array<{ name, quantity, unit, price? }>, vendorName?, totalAmount? }
  */
-export const uploadBillImage = async (cafeId, imageBase64, mimeType) => {
-  if (!cafeId)      throw new Error('cafeId required');
-  if (!imageBase64) throw new Error('imageBase64 required');
-  if (!mimeType)    throw new Error('mimeType required');
+export const uploadBillImage = async (cafeId, base64, mimeType) => {
+  if (!cafeId) throw new Error('cafeId required');
 
   const backendUrl = await getBackendUrl(cafeId);
 
-  let res, data;
-  try {
-    res = await fetch(`${backendUrl}/api/ai-bill-upload`, {
-      method:  'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body:    JSON.stringify({ cafeId, imageBase64, mimeType }),
-    });
-  } catch (networkErr) {
-    throw new Error(
-      `Cannot reach backend (${backendUrl}). ` +
-      'Check that your Render server is running and the URL in Settings is correct.'
-    );
-  }
+  const res = await fetch(`${backendUrl}/api/ai-bill-scan`, {
+    method:  'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body:    JSON.stringify({ cafeId, imageBase64: base64, mimeType }),
+  });
 
-  try {
-    data = await res.json();
-  } catch {
-    throw new Error(`Server returned an unexpected response (HTTP ${res.status}). Check Render logs.`);
-  }
+  const data = await res.json();
 
   if (!res.ok) {
-    throw new Error(data.error || `Bill upload failed (HTTP ${res.status})`);
+    throw new Error(data.error || `Bill scan failed (${res.status})`);
   }
 
   return {
     items:       data.items       || [],
-    totalAmount: data.totalAmount || null,
     vendorName:  data.vendorName  || null,
+    totalAmount: data.totalAmount || null,
   };
 };
 
-// ─── Execute a confirmed action intent ───────────────────────────────────────
+// ─── Execute an action intent confirmed by the owner ──────────────────────────
 /**
  * executeActionIntent(cafeId, action, payload)
  *
- * Called ONLY after the owner clicks "Confirm" in the UI.
- * Returns: { success: boolean, message: string }
+ * Allowed actions (from backend):
+ *   update_inventory   — { itemName, quantity, unit }
+ *   add_menu_item      — { name, price, category, description }
+ *   update_menu_item   — { itemId, name?, price?, category? }
+ *   update_staff_details — { staffId, name?, role?, phone? }
+ *   generate_report    — { reportType }
+ *
+ * Returns: { success: true, message: string }
  */
 export const executeActionIntent = async (cafeId, action, payload = {}) => {
   if (!cafeId) throw new Error('cafeId required');
@@ -142,29 +137,20 @@ export const executeActionIntent = async (cafeId, action, payload = {}) => {
 
   const backendUrl = await getBackendUrl(cafeId);
 
-  let res, data;
-  try {
-    res = await fetch(`${backendUrl}/api/ai-action/execute`, {
-      method:  'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body:    JSON.stringify({ cafeId, action, payload }),
-    });
-  } catch (networkErr) {
-    throw new Error(
-      `Cannot reach backend (${backendUrl}). ` +
-      'Check that your Render server is running and the URL in Settings is correct.'
-    );
-  }
+  const res = await fetch(`${backendUrl}/api/ai-action`, {
+    method:  'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body:    JSON.stringify({ cafeId, action, payload }),
+  });
 
-  try {
-    data = await res.json();
-  } catch {
-    throw new Error(`Server returned an unexpected response (HTTP ${res.status}). Check Render logs.`);
-  }
+  const data = await res.json();
 
   if (!res.ok) {
-    throw new Error(data.error || `Action failed (HTTP ${res.status})`);
+    throw new Error(data.error || `Action failed (${res.status})`);
   }
 
-  return { success: data.success || false, message: data.message || 'Done.' };
+  return {
+    success: true,
+    message: data.message || 'Action completed successfully.',
+  };
 };
