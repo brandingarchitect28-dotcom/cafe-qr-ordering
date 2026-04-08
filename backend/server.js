@@ -5,24 +5,6 @@ const cors    = require('cors');
 const https   = require('https');
 require('dotenv').config();
 
-// 🔥 Firebase Admin Init (REQUIRED FOR DB ACCESS)
-const admin = require("firebase-admin");
-
-if (!admin.apps.length) {
-  try {
-    admin.initializeApp({
-      credential: admin.credential.cert(
-        JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT)
-      )
-    });
-    console.log("[Firebase] Initialized with service account");
-  } catch (e) {
-    console.log("[Firebase] Fallback to default init");
-    admin.initializeApp();
-  }
-}
-
-const db = admin.firestore();
 const app  = express();
 const PORT = process.env.PORT || 5000;
 
@@ -92,50 +74,55 @@ app.post('/create-order', async (req, res) => {
   }
 
   // ── Check API keys are configured ─────────────────────────────────────────
-  let APP_ID = process.env.APP_ID;
-let SECRET_KEY = process.env.SECRET_KEY;
+  // MULTI-TENANT: try to fetch THIS café's own Cashfree keys from Firestore.
+  // If the café has its own keys saved in paymentSettings, use those.
+  // Otherwise fall back to the global Render environment variables so that
+  // existing cafés with no per-café keys configured continue working exactly
+  // as before — zero breaking change.
+  let selectedAppId  = process.env.APP_ID;
+  let selectedSecret = process.env.SECRET_KEY;
 
-try {
-  if (cafeId) {
-    console.log("[create-order] Fetching cafe keys for:", cafeId);
-
-    const cafeDoc = await db.collection("cafes").doc(cafeId).get();
-
-    if (cafeDoc.exists) {
-      const cafeData = cafeDoc.data();
-
-      const payment = cafeData?.paymentSettings;
-
-    if (payment?.keyId && payment?.keySecret) {
-      APP_ID = payment.keyId;
-      SECRET_KEY = payment.keySecret;
-
-    console.log("[create-order] Using CLIENT Cashfree keys:", APP_ID);
-    } else {
-    console.log("[create-order] Client keys missing, using DEFAULT keys");
-  }
-    } else {
-      console.log("[create-order] Cafe not found, using DEFAULT keys");
+  if (cafeId && firestoreDb) {
+    try {
+      const cafeSnap = await firestoreDb.collection('cafes').doc(cafeId).get();
+      if (cafeSnap.exists) {
+        const cafeData = cafeSnap.data();
+        const ps = cafeData?.paymentSettings;
+        // Accept either cashfree_app_id / cashfree_secret_key (new dedicated fields)
+        // or the generic keyId / keySecret already stored by the Settings page.
+        const cafeAppId  = ps?.cashfree_app_id  || ps?.keyId;
+        const cafeSecret = ps?.cashfree_secret_key || ps?.keySecret;
+        if (cafeAppId && cafeSecret) {
+          selectedAppId  = cafeAppId;
+          selectedSecret = cafeSecret;
+          console.log('[create-order] Using per-café Cashfree keys for cafeId:', cafeId);
+        } else {
+          console.log('[create-order] No per-café keys found — using global env keys for cafeId:', cafeId);
+        }
+      } else {
+        console.warn('[create-order] Café doc not found in Firestore for cafeId:', cafeId);
+      }
+    } catch (lookupErr) {
+      // Non-fatal: if Firestore lookup fails, fall back to global keys so payment still works
+      console.error('[create-order] Firestore key lookup failed (using global env fallback):', lookupErr.message);
     }
-  } else {
-    console.log("[create-order] No cafeId provided, using DEFAULT keys");
   }
-} catch (err) {
-  console.error("[create-order] Error fetching cafe keys:", err.message);
-  console.log("[create-order] Falling back to DEFAULT keys");
-}
 
-  if (!APP_ID || !SECRET_KEY) {
-    console.error('[create-order] FAIL — APP_ID or SECRET_KEY not set in Render env');
+  // Verification log (required by spec)
+  console.log('Using Cashfree App ID:', selectedAppId);
+
+  if (!selectedAppId || !selectedSecret) {
+    console.error('[create-order] FAIL — no Cashfree keys available (env or per-café)');
     return res.status(503).json({
       error: 'Payment service not configured. Contact the café owner.',
     });
   }
 
   // ── Build Cashfree order payload ───────────────────────────────────────────
-  // uniqueOrderId format: {firestoreDocId}_{timestamp}
-  // This lets the webhook extract the Firestore doc ID later.
-  const uniqueOrderId = `${orderId}_${Date.now()}`;
+  // uniqueOrderId format: {cafeId}_{firestoreDocId}_{timestamp}
+  // Using cafeId prefix ensures order IDs are unique per café account
+  // and the webhook can still extract the Firestore doc ID later.
+  const uniqueOrderId = cafeId ? `${cafeId}_${orderId}_${Date.now()}` : `${orderId}_${Date.now()}`;
 
   const orderPayload = {
     order_id:       uniqueOrderId,
@@ -164,8 +151,8 @@ try {
         method:   'POST',
         headers: {
           'Content-Type':    'application/json',
-          'x-client-id':     APP_ID,
-          'x-client-secret': SECRET_KEY,
+          'x-client-id':     selectedAppId,
+          'x-client-secret': selectedSecret,
           'x-api-version':   '2023-08-01',
           'Content-Length':  Buffer.byteLength(body),
         },
@@ -691,23 +678,69 @@ app.post('/api/ai-assistant', async (req, res) => {
     console.log(`[AI-Assistant] cafeId=${cafeId} question="${question.slice(0, 80)}"`);
 
     // ── 3. Build OpenAI request ────────────────────────────────────────────
+    // FIX: read the context snapshot sent by the frontend (AskAI.jsx → buildSystemContext).
+    // This makes the AI aware of real revenue, inventory, staff, and order data
+    // without requiring any extra Firestore reads on the backend.
+    const ctx = req.body?.context || null;
+
+    // Build a human-readable data block from the context snapshot if present
+    let contextBlock = '';
+    if (ctx && typeof ctx === 'object') {
+      const r = ctx.revenue || {};
+      const inv = ctx.inventory || {};
+      const st = ctx.staff || {};
+      const lines = [
+        '=== LIVE CAFÉ DATA (use this to answer the question accurately) ===',
+        '',
+        '--- REVENUE ---',
+        `Today: ₹${(r.today || 0).toFixed(2)} from ${r.ordersToday || 0} paid orders`,
+        `This week: ₹${(r.thisWeek || 0).toFixed(2)} from ${r.ordersWeek || 0} orders`,
+        `This month: ₹${(r.thisMonth || 0).toFixed(2)} from ${r.ordersMonth || 0} orders`,
+        `Avg order value: ₹${r.avgOrderValue || 0}`,
+        `Cancelled today: ${r.cancelledToday || 0}`,
+        `Peak hour: ${ctx.peakHour || 'N/A'}`,
+        '',
+        '--- TOP SELLING ITEMS ---',
+        ...(ctx.topItems || []).slice(0, 5).map((i, n) => `${n+1}. ${i.name} — ${i.qty} sold, ₹${(i.revenue||0).toFixed(0)} revenue`),
+        '',
+        '--- INVENTORY ---',
+        `Total items: ${inv.total || 0}`,
+        `Low stock: ${(inv.lowStock || []).map(i => `${i.name} (${i.qty} ${i.unit})`).join(', ') || 'none'}`,
+        `Out of stock: ${(inv.outOfStock || []).map(i => i.name).join(', ') || 'none'}`,
+        '',
+        '--- STAFF ---',
+        `Total staff: ${st.total || 0}`,
+        `Present today: ${st.presentToday || 0}`,
+        `Absent: ${(st.absentToday || []).map(s => s.name).join(', ') || 'none'}`,
+        '',
+        '--- PAYMENT MODES ---',
+        ...Object.entries(ctx.paymentModes || {}).map(([m, v]) => `${m}: ₹${(v||0).toFixed(2)}`),
+        '',
+        '=== END OF DATA ===',
+      ];
+      contextBlock = '\n\n' + lines.join('\n');
+    }
+
+    const systemPrompt =
+      'You are an expert café business analyst and assistant for SmartCafé OS. ' +
+      'You have access to real-time data about this café — revenue, orders, inventory, staff, and menu. ' +
+      'Use the provided data to give accurate, specific, and actionable insights. ' +
+      'When data is available, always quote the exact numbers. ' +
+      'If asked for suggestions, give concrete and practical ones. ' +
+      'Keep answers under 150 words unless a detailed breakdown is requested. ' +
+      'Respond in the same language as the question.';
+
+    const userMessage = `Café ID: ${cafeId}${contextBlock}\n\nQuestion: ${question}`;
+
+    console.log(\`[AI-Assistant] context attached: \${ctx ? 'yes' : 'no'}, question length: \${question.length}\`);
+
     const payload = JSON.stringify({
       model: 'gpt-4o-mini',
       messages: [
-        {
-          role: 'system',
-          content:
-            'You are a café business assistant for SmartCafé OS. ' +
-            'Answer questions clearly and concisely based only on what you are told. ' +
-            'If you lack enough information, say so honestly. ' +
-            'Keep answers under 120 words unless a detailed breakdown is explicitly requested.',
-        },
-        {
-          role: 'user',
-          content: `Café ID: ${cafeId}\n\nQuestion: ${question}`,
-        },
+        { role: 'system', content: systemPrompt },
+        { role: 'user',   content: userMessage  },
       ],
-      max_tokens: 400,
+      max_tokens: 500,
       temperature: 0.4,
     });
 
@@ -875,47 +908,6 @@ app.post('/api/send-whatsapp-campaign', async (req, res) => {
   console.log(`[WA-Campaign] Completed for cafeId=${cafeId}: ${sent} sent, ${failed} failed`);
 });
 
-// ✅ Service Charge Total API (SAFE ADDITION)
-app.get("/api/service-charge-total", async (req, res) => {
-  try {
-    const { cafeId, from, to } = req.query;
-
-    if (!cafeId) {
-      return res.status(400).json({ error: "cafeId required" });
-    }
-
-    const snapshot = await db.collection("orders")
-      .where("cafeId", "==", cafeId)
-      .get();
-
-    let total = 0;
-
-snapshot.forEach(doc => {
-  const data = doc.data();
-
-  console.log("ORDER:", data);
-
-  const isPaid =
-    data.paymentStatus === 'paid' ||
-    data.paymentStatus === 'SUCCESS' ||
-    data.status === 'paid';
-
-  console.log("isPaid:", isPaid);
-  console.log("serviceChargeAmount:", data.serviceChargeAmount);
-
-  if (isPaid) {
-    total += data.serviceChargeAmount || 0;
-  }
-});
-
-    res.json({ total });
-
-  } catch (err) {
-    console.error("Service charge error:", err);
-    res.status(500).json({ total: 0 });
-  }
-  
-});
 // ─── 404 — must be AFTER all routes ──────────────────────────────────────────
 app.use((req, res) => {
   res.status(404).json({ error: `Route ${req.method} ${req.path} not found.` });
