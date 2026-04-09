@@ -135,19 +135,32 @@ const ExternalOrderModal = ({ onClose, onSuccess }) => {
         quantity: parseInt(i.quantity, 10) || 1,
       }));
 
-      const totalAmount = formattedItems.reduce(
-        (sum, i) => sum + i.price * i.quantity, 0
-      );
+      // ── Tax calculation — identical formula used by QR orders ─────────────
+      // Reads the same cafe settings (gstEnabled/gstRate, serviceChargeEnabled/
+      // serviceChargeRate, taxEnabled/taxRate) so external order invoices match
+      // QR order invoices exactly.
+      const subtotal          = formattedItems.reduce((sum, i) => sum + i.price * i.quantity, 0);
+      const taxAmount         = cafe?.taxEnabled          ? subtotal * (parseFloat(cafe.taxRate)          || 0) / 100 : 0;
+      const serviceChargeAmount = cafe?.serviceChargeEnabled ? subtotal * (parseFloat(cafe.serviceChargeRate) || 0) / 100 : 0;
+      const gstAmount         = cafe?.gstEnabled          ? subtotal * (parseFloat(cafe.gstRate)          || 0) / 100 : 0;
+      const totalAmount       = subtotal + taxAmount + serviceChargeAmount + gstAmount;
 
       const orderData = {
         // Standard fields — identical shape to QR-placed orders
         cafeId,
         orderNumber,
         items:               formattedItems,
-        subtotalAmount:      totalAmount,
-        taxAmount:           0,
-        serviceChargeAmount: 0,
-        gstAmount:           0,
+        subtotalAmount:      subtotal,
+        taxAmount,
+        taxEnabled:          cafe?.taxEnabled          || false,
+        taxName:             cafe?.taxName             || 'Tax',
+        taxRate:             parseFloat(cafe?.taxRate) || 0,
+        serviceChargeAmount,
+        serviceChargeEnabled: cafe?.serviceChargeEnabled || false,
+        serviceChargeRate:   parseFloat(cafe?.serviceChargeRate) || 0,
+        gstAmount,
+        gstEnabled:          cafe?.gstEnabled          || false,
+        gstRate:             parseFloat(cafe?.gstRate) || 0,
         totalAmount,
         currencyCode:        cafe?.currencyCode   || 'INR',
         currencySymbol:      cafe?.currencySymbol || '₹',
