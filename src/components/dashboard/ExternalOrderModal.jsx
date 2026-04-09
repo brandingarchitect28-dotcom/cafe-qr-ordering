@@ -25,9 +25,9 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { toast } from 'sonner';
 import {
   X, Plus, Trash2, RefreshCw, ShoppingBag,
-  AlertCircle, Check,
+  AlertCircle, Check, MessageSquare,
 } from 'lucide-react';
-import { createInvoiceForOrder } from '../../services/invoiceService';
+import { createInvoiceForOrder, generateInvoiceMessage } from '../../services/invoiceService';
 
 // ─── Platform source definitions ──────────────────────────────────────────────
 // Exported so Analytics.jsx and order card badges can reference the same list
@@ -69,13 +69,16 @@ const ExternalOrderModal = ({ onClose, onSuccess }) => {
   const [submitting, setSubmitting] = useState(false);
 
   // Form state
-  const [source,        setSource       ] = useState('zomato');
-  const [customerName,  setCustomerName ] = useState('');
-  const [tableNumber,   setTableNumber  ] = useState('');
-  const [notes,         setNotes        ] = useState('');
-  const [paymentMode,   setPaymentMode  ] = useState('counter');
-  const [paymentStatus, setPaymentStatus] = useState('pending');
-  const [items,         setItems        ] = useState([{ ...EMPTY_ITEM }]);
+  const [source,          setSource         ] = useState('zomato');
+  const [customerName,    setCustomerName   ] = useState('');
+  const [customerPhone,   setCustomerPhone  ] = useState('');
+  const [tableNumber,     setTableNumber    ] = useState('');
+  const [orderMode,       setOrderMode      ] = useState('takeaway'); // 'dine-in' | 'takeaway' | 'delivery'
+  const [deliveryAddress, setDeliveryAddress] = useState('');
+  const [notes,           setNotes          ] = useState('');
+  const [paymentMode,     setPaymentMode    ] = useState('counter');
+  const [paymentStatus,   setPaymentStatus  ] = useState('pending');
+  const [items,           setItems          ] = useState([{ ...EMPTY_ITEM }]);
 
   // ── Item CRUD ───────────────────────────────────────────────────────────────
   const updateItem = (idx, field, value) => {
@@ -151,11 +154,12 @@ const ExternalOrderModal = ({ onClose, onSuccess }) => {
         paymentStatus,
         paymentMode,
         orderStatus:         'new',
-        orderType:           tableNumber ? 'dine-in' : 'takeaway',
+        orderType:           orderMode,
         customerName:        customerName.trim() || getSourceMeta(source).label,
-        customerPhone:       '',
-        ...(tableNumber && { tableNumber: tableNumber.trim() }),
-        ...(notes        && { specialInstructions: notes.trim() }),
+        customerPhone:       customerPhone.trim(),
+        ...(orderMode === 'dine-in'  && tableNumber    && { tableNumber: tableNumber.trim() }),
+        ...(orderMode === 'delivery' && deliveryAddress && { deliveryAddress: deliveryAddress.trim() }),
+        ...(notes && { specialInstructions: notes.trim() }),
 
         // External-order fields (read by Analytics source charts + KDS badges)
         orderSource:   source,   // 'zomato' | 'swiggy' | 'phone' | 'walkin' | 'other'
@@ -175,6 +179,9 @@ const ExternalOrderModal = ({ onClose, onSuccess }) => {
         cafe
       ).catch(err => console.error('[ExternalOrder] Invoice generation failed:', err));
 
+      // Store for WA button (shown in footer when paymentStatus === 'paid')
+      setLastCreatedOrder({ id: orderDocRef.id, ...orderData, orderNumber });
+
       toast.success(
         `External order #${formattedNum} added from ${getSourceMeta(source).label}!`
       );
@@ -187,6 +194,33 @@ const ExternalOrderModal = ({ onClose, onSuccess }) => {
       toast.error('Failed to add order. Please try again.');
     } finally {
       setSubmitting(false);
+    }
+  };
+
+  // ── WhatsApp Invoice (shown in footer after paid order is created) ───────────
+  const [lastCreatedOrder, setLastCreatedOrder] = useState(null);
+
+  const fmtWANumber = (raw) => {
+    if (!raw) return '';
+    const digits = String(raw).replace(/\D/g, '');
+    if (!digits) return '';
+    if (digits.length === 10) return `91${digits}`;
+    return digits;
+  };
+
+  const handleSendInvoiceWA = () => {
+    if (!lastCreatedOrder) return;
+    const phone = fmtWANumber(lastCreatedOrder.customerPhone || '');
+    if (!phone) { toast.error('No phone number on this order'); return; }
+    try {
+      const msg = generateInvoiceMessage(lastCreatedOrder, {
+        name:           cafe?.name           || '',
+        currencySymbol: lastCreatedOrder.currencySymbol || CUR,
+      });
+      window.location.href = `https://wa.me/${phone}?text=${encodeURIComponent(msg)}`;
+    } catch (err) {
+      console.error('[ExternalOrder] WA send error:', err);
+      toast.error('Failed to open WhatsApp');
     }
   };
 
@@ -273,7 +307,7 @@ const ExternalOrderModal = ({ onClose, onSuccess }) => {
               </div>
             </div>
 
-            {/* Customer + Table row */}
+            {/* Customer + Phone row */}
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <label className={labelCls}>
@@ -291,6 +325,50 @@ const ExternalOrderModal = ({ onClose, onSuccess }) => {
               </div>
               <div>
                 <label className={labelCls}>
+                  Phone Number
+                  <span className="text-[#A3A3A3] font-normal ml-1">(optional)</span>
+                </label>
+                <input
+                  type="tel"
+                  value={customerPhone}
+                  onChange={e => setCustomerPhone(e.target.value)}
+                  placeholder="e.g., 9876543210"
+                  className={inputCls}
+                  data-testid="ext-customer-phone"
+                />
+              </div>
+            </div>
+
+            {/* Order Mode selector */}
+            <div>
+              <label className={labelCls}>Order Mode</label>
+              <div className="grid grid-cols-3 gap-2">
+                {[
+                  { value: 'takeaway', label: '🥡 Takeaway' },
+                  { value: 'dine-in',  label: '🪑 Dine-In'  },
+                  { value: 'delivery', label: '🛵 Delivery'  },
+                ].map(m => (
+                  <button
+                    key={m.value}
+                    type="button"
+                    onClick={() => setOrderMode(m.value)}
+                    className={`py-2.5 px-3 rounded-sm border-2 text-sm font-semibold transition-all ${
+                      orderMode === m.value
+                        ? 'border-[#D4AF37] bg-[#D4AF37]/10 text-[#D4AF37]'
+                        : 'border-white/10 text-[#A3A3A3] hover:border-white/20 hover:text-white'
+                    }`}
+                    data-testid={`ext-mode-${m.value}`}
+                  >
+                    {m.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Dine-In: table number */}
+            {orderMode === 'dine-in' && (
+              <div>
+                <label className={labelCls}>
                   Table Number
                   <span className="text-[#A3A3A3] font-normal ml-1">(optional)</span>
                 </label>
@@ -303,7 +381,22 @@ const ExternalOrderModal = ({ onClose, onSuccess }) => {
                   data-testid="ext-table-number"
                 />
               </div>
-            </div>
+            )}
+
+            {/* Delivery: address input */}
+            {orderMode === 'delivery' && (
+              <div>
+                <label className={labelCls}>Delivery Address</label>
+                <input
+                  type="text"
+                  value={deliveryAddress}
+                  onChange={e => setDeliveryAddress(e.target.value)}
+                  placeholder="Enter full delivery address"
+                  className={inputCls}
+                  data-testid="ext-delivery-address"
+                />
+              </div>
+            )}
 
             {/* Items ordered */}
             <div>
@@ -441,7 +534,21 @@ const ExternalOrderModal = ({ onClose, onSuccess }) => {
               {items.filter(i => i.name.trim()).length} item{items.filter(i => i.name.trim()).length !== 1 ? 's' : ''} ·{' '}
               <span className="text-[#D4AF37] font-semibold">{CUR}{calculatedTotal.toFixed(2)}</span>
             </div>
-            <div className="flex gap-3">
+            <div className="flex gap-3 flex-wrap justify-end">
+              {/* WhatsApp Invoice — visible after a paid order is created with a phone number */}
+              {lastCreatedOrder &&
+               lastCreatedOrder.paymentStatus === 'paid' &&
+               lastCreatedOrder.customerPhone && (
+                <button
+                  type="button"
+                  onClick={handleSendInvoiceWA}
+                  className="flex items-center gap-2 px-4 py-2.5 bg-green-500/10 hover:bg-green-500/20 border border-green-500/20 text-green-400 font-bold rounded-sm text-sm transition-all"
+                  data-testid="ext-wa-invoice-btn"
+                >
+                  <MessageSquare className="w-4 h-4" />
+                  Send Invoice via WhatsApp
+                </button>
+              )}
               <button
                 type="button"
                 onClick={onClose}
