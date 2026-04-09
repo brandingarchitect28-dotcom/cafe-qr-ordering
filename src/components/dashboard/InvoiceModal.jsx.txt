@@ -1,0 +1,476 @@
+/**
+ * InvoiceModal.jsx
+ *
+ * Renders a printable / downloadable invoice in a modal overlay.
+ * Uses the browser's built-in print dialog for PDF generation
+ * (no extra library needed — works on iPad and desktop).
+ *
+ * Props:
+ *   invoice  – Firestore invoice document object
+ *   onClose  – callback to close the modal
+ */
+
+import { formatWhatsAppNumber } from '../../utils/whatsapp';
+import React, { useRef } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { X, Download, Printer, FileText, CheckCircle } from 'lucide-react';
+
+/* ─── helpers ────────────────────────────────────────────────── */
+const fmt = (num) => (parseFloat(num) || 0).toFixed(2);
+
+const formatDate = (ts) => {
+  if (!ts) return '—';
+  const d = ts.toDate ? ts.toDate() : new Date(ts);
+  return d.toLocaleString('en-IN', {
+    day: '2-digit',
+    month: 'short',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: true,
+  });
+};
+
+/* ─── printable receipt HTML ─────────────────────────────────── */
+const buildPrintHTML = (inv) => {
+  const cur = inv.currencySymbol || '₹';
+  // Support both field name conventions (gstRate / gstPercentage)
+  const gstPct = inv.gstPercentage  ?? inv.gstRate  ?? 0;
+  const scPct  = inv.serviceChargePercentage ?? inv.serviceChargeRate ?? 0;
+  const taxPct = inv.taxRate ?? 0;
+  const hasExtras =
+    (inv.taxEnabled && inv.taxAmount > 0) ||
+    (inv.serviceChargeEnabled && inv.serviceChargeAmount > 0) ||
+    (inv.gstEnabled && inv.gstAmount > 0);
+
+  const itemRows = (inv.items || [])
+    .map(
+      (item) => {
+        const addonRows = (item.addons || []).map(a =>
+          `<tr class="addon-row">
+            <td style="padding-left:20px;color:#A3A3A3">↳ ${a.name}</td>
+            <td class="center" style="color:#A3A3A3">—</td>
+            <td class="right" style="color:#A3A3A3">+${cur}${fmt(a.price || 0)}</td>
+            <td class="right" style="color:#A3A3A3">+${cur}${fmt(a.price || 0)}</td>
+          </tr>`
+        ).join('');
+        return `
+    <tr>
+      <td>${item.name}</td>
+      <td class="center">${item.quantity}</td>
+      <td class="right">${cur}${fmt(item.basePrice ?? item.price)}</td>
+      <td class="right">${cur}${fmt(item.price * item.quantity)}</td>
+    </tr>${addonRows}`;
+      }
+    )
+    .join('');
+
+  const extrasRows = hasExtras
+    ? `
+    <tr class="sub-row">
+      <td colspan="3">Subtotal</td>
+      <td class="right">${cur}${fmt(inv.subtotalAmount)}</td>
+    </tr>
+    ${
+      inv.serviceChargeEnabled && inv.serviceChargeAmount > 0
+        ? `<tr class="sub-row"><td colspan="3">Service Charge (${scPct}%)</td><td class="right">${cur}${fmt(inv.serviceChargeAmount)}</td></tr>`
+        : ''
+    }
+    ${
+      inv.taxEnabled && inv.taxAmount > 0
+        ? `<tr class="sub-row"><td colspan="3">${inv.taxName || 'Tax'} (${taxPct}%)</td><td class="right">${cur}${fmt(inv.taxAmount)}</td></tr>`
+        : ''
+    }
+    ${
+      inv.gstEnabled && inv.gstAmount > 0
+        ? `<tr class="sub-row"><td colspan="3">GST (${gstPct}%)</td><td class="right">${cur}${fmt(inv.gstAmount)}</td></tr>`
+        : ''
+    }`
+    : '';
+
+  return `<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8" />
+  <title>Invoice ${inv.invoiceNumber}</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700&family=Manrope:wght@400;500;600;700&display=swap');
+    * { margin:0; padding:0; box-sizing:border-box; }
+    body { font-family:'Manrope',sans-serif; font-size:13px; color:#1a1a1a; background:#fff; padding:32px; max-width:600px; margin:0 auto; }
+    .header { text-align:center; margin-bottom:24px; border-bottom:2px solid #D4AF37; padding-bottom:16px; }
+    .header h1 { font-family:'Playfair Display',serif; font-size:26px; color:#D4AF37; letter-spacing:1px; }
+    .header p { color:#555; font-size:12px; margin-top:4px; }
+    .inv-meta { display:flex; justify-content:space-between; margin-bottom:20px; }
+    .inv-meta div { font-size:12px; color:#555; line-height:1.8; }
+    .inv-meta strong { color:#1a1a1a; }
+    .badge { display:inline-block; padding:3px 10px; border-radius:999px; font-size:11px; font-weight:700; background:#D4AF37; color:#000; }
+    table { width:100%; border-collapse:collapse; margin-bottom:16px; }
+    thead tr { background:#1a1a1a; color:#D4AF37; }
+    thead th { padding:10px 12px; text-align:left; font-size:12px; font-weight:700; letter-spacing:.5px; }
+    thead th.right, td.right { text-align:right; }
+    thead th.center, td.center { text-align:center; }
+    tbody tr { border-bottom:1px solid #eee; }
+    tbody tr:nth-child(even) { background:#fafafa; }
+    td { padding:9px 12px; }
+    .sub-row td { color:#555; font-size:12px; background:#fafafa; }
+    .total-row td { border-top:2px solid #D4AF37; padding-top:12px; font-weight:700; font-size:15px; color:#1a1a1a; }
+    .footer { text-align:center; margin-top:28px; font-size:11px; color:#888; border-top:1px solid #eee; padding-top:16px; }
+    .payment-badge { display:inline-block; padding:2px 8px; border-radius:4px; font-size:11px; font-weight:700; }
+    .paid { background:#d1fae5; color:#065f46; }
+    .pending { background:#fef3c7; color:#92400e; }
+    @media print {
+      body { padding:0; }
+      @page { margin:1cm; }
+    }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <h1>${inv.cafeName || 'Café'}</h1>
+    ${inv.cafeAddress ? `<p>${inv.cafeAddress}</p>` : ''}
+    ${inv.cafePhone ? `<p>📞 ${inv.cafePhone}</p>` : ''}
+    ${inv.cafeGstNumber ? `<p>GST: ${inv.cafeGstNumber}</p>` : ''}
+  </div>
+
+  <div class="inv-meta">
+    <div>
+      <p><strong>Invoice #</strong> ${inv.invoiceNumber}</p>
+      <p><strong>Order #</strong> ${inv.orderNumber ? `#${String(inv.orderNumber).padStart(3, '0')}` : inv.orderId?.slice(0, 8)}</p>
+      <p><strong>Date</strong> ${formatDate(inv.orderTime || inv.createdAt)}</p>
+    </div>
+    <div style="text-align:right">
+      <p><strong>Customer</strong> ${inv.customerName || '—'}</p>
+      ${inv.customerPhone ? `<p><strong>Phone</strong> ${inv.customerPhone}</p>` : ''}
+      ${inv.orderType === 'dine-in' && inv.tableNumber ? `<p><strong>Table</strong> ${inv.tableNumber}</p>` : ''}
+      <p>
+        <span class="payment-badge ${inv.paymentStatus === 'paid' ? 'paid' : 'pending'}">
+          ${inv.paymentStatus === 'paid' ? '✓ PAID' : 'PAYMENT PENDING'}
+        </span>
+      </p>
+    </div>
+  </div>
+
+  <table>
+    <thead>
+      <tr>
+        <th>Item</th>
+        <th class="center">Qty</th>
+        <th class="right">Price</th>
+        <th class="right">Amount</th>
+      </tr>
+    </thead>
+    <tbody>
+      ${itemRows}
+      ${extrasRows}
+      <tr class="total-row">
+        <td colspan="3">TOTAL</td>
+        <td class="right">${cur}${fmt(inv.totalAmount)}</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <p style="font-size:12px; color:#555;">
+    Payment Method: <strong>${
+      inv.paymentMode === 'counter'
+        ? 'Pay at Counter'
+        : inv.paymentMode === 'table'
+        ? 'Pay on Table'
+        : 'Prepaid (UPI)'
+    }</strong>
+  </p>
+
+  <div class="footer">
+    <p>Thank you for dining with us! 🙏</p>
+    <p style="margin-top:4px; font-size:10px; color:#aaa;">Generated by Branding Architect · SmartCafé OS</p>
+  </div>
+</body>
+</html>`;
+};
+
+/* ─── component ──────────────────────────────────────────────── */
+const InvoiceModal = ({ invoice, onClose }) => {
+  const printFrameRef = useRef(null);
+
+  if (!invoice) return null;
+
+  const cur = invoice.currencySymbol || '₹';
+  const hasExtras =
+    (invoice.taxEnabled && invoice.taxAmount > 0) ||
+    (invoice.serviceChargeEnabled && invoice.serviceChargeAmount > 0) ||
+    (invoice.gstEnabled && invoice.gstAmount > 0);
+
+  /* trigger browser print-to-PDF */
+  const handleDownload = () => {
+    const html = buildPrintHTML(invoice);
+    const printWindow = window.open('', '_blank', 'width=700,height=900');
+    if (!printWindow) {
+      // fallback: inject into hidden iframe
+      const iframe = printFrameRef.current;
+      if (iframe) {
+        iframe.contentDocument.open();
+        iframe.contentDocument.write(html);
+        iframe.contentDocument.close();
+        iframe.contentWindow.print();
+      }
+      return;
+    }
+    printWindow.document.open();
+    printWindow.document.write(html);
+    printWindow.document.close();
+    printWindow.onload = () => {
+      printWindow.focus();
+      printWindow.print();
+    };
+  };
+
+  return (
+    <AnimatePresence>
+      <motion.div
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        exit={{ opacity: 0 }}
+        className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4"
+        onClick={onClose}
+      >
+        {/* hidden iframe fallback for PDF */}
+        <iframe ref={printFrameRef} className="hidden" title="print-frame" />
+
+        <motion.div
+          initial={{ scale: 0.92, opacity: 0, y: 30 }}
+          animate={{ scale: 1, opacity: 1, y: 0 }}
+          exit={{ scale: 0.92, opacity: 0, y: 20 }}
+          transition={{ type: 'spring', damping: 22, stiffness: 280 }}
+          onClick={(e) => e.stopPropagation()}
+          className="w-full max-w-lg bg-[#0A0A0A] border border-white/10 rounded-xl overflow-hidden shadow-2xl max-h-[90vh] flex flex-col"
+        >
+          {/* ── Modal Header ── */}
+          <div className="flex items-center justify-between px-6 py-4 border-b border-white/10 bg-[#0F0F0F]">
+            <div className="flex items-center gap-3">
+              <div className="w-9 h-9 rounded-lg bg-[#D4AF37]/15 flex items-center justify-center">
+                <FileText className="w-5 h-5 text-[#D4AF37]" />
+              </div>
+              <div>
+                <p className="text-white font-semibold text-sm" style={{ fontFamily: 'Playfair Display, serif' }}>
+                  Invoice
+                </p>
+                <p className="text-[#D4AF37] text-xs font-mono">{invoice.invoiceNumber}</p>
+              </div>
+            </div>
+            <div className="flex items-center gap-2">
+              {/* Public invoice link */}
+              <button
+                onClick={() => {
+                  const url = `${window.location.origin}/invoice/${invoice.id}`;
+                  navigator.clipboard.writeText(url);
+                  const msg =
+                    `Thank you for visiting ${invoice.cafeName || 'our café'} ☕\n\n` +
+                    `Your invoice is ready.\n` +
+                    `Invoice No: ${invoice.invoiceNumber}\n` +
+                    `Amount: ${invoice.currencySymbol || '₹'}${(parseFloat(invoice.totalAmount) || 0).toFixed(2)}\n\n` +
+                    `View invoice: ${url}`;
+                  window.location.href = `https://wa.me/${(invoice.customerPhone || '')}?text=${encodeURIComponent(msg)}`;
+                }}
+                className="flex items-center gap-2 px-3 py-2 bg-green-600 hover:bg-green-700 text-white font-semibold rounded-lg text-sm transition-all"
+                title="Send invoice via WhatsApp"
+              >
+                📱 <span className="hidden sm:inline">WhatsApp</span>
+              </button>
+              <button
+                onClick={handleDownload}
+                className="flex items-center gap-2 px-4 py-2 bg-[#D4AF37] hover:bg-[#C5A059] text-black font-semibold rounded-lg text-sm transition-all"
+                title="Download / Print as PDF"
+              >
+                <Download className="w-4 h-4" />
+                <span className="hidden sm:inline">Download PDF</span>
+              </button>
+              <button
+                onClick={onClose}
+                className="p-2 text-[#A3A3A3] hover:text-white hover:bg-white/10 rounded-lg transition-all"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+          </div>
+
+          {/* ── Scrollable body ── */}
+          <div className="overflow-y-auto flex-1 p-6 space-y-5">
+
+            {/* Cafe + Invoice info */}
+            <div className="text-center pb-4 border-b border-white/10">
+              <h2
+                className="text-2xl font-bold text-[#D4AF37] mb-1"
+                style={{ fontFamily: 'Playfair Display, serif' }}
+              >
+                {invoice.cafeName}
+              </h2>
+              {invoice.cafeAddress && (
+                <p className="text-[#A3A3A3] text-xs">{invoice.cafeAddress}</p>
+              )}
+              {invoice.cafeGstNumber && (
+                <p className="text-[#A3A3A3] text-xs mt-1">GST: {invoice.cafeGstNumber}</p>
+              )}
+            </div>
+
+            {/* Meta row */}
+            <div className="grid grid-cols-2 gap-4 text-sm">
+              <div className="space-y-1.5">
+                <div>
+                  <span className="text-[#A3A3A3] text-xs uppercase tracking-wide">Invoice #</span>
+                  <p className="text-white font-mono font-semibold">{invoice.invoiceNumber}</p>
+                </div>
+                <div>
+                  <span className="text-[#A3A3A3] text-xs uppercase tracking-wide">Order #</span>
+                  <p className="text-white font-semibold">
+                    {invoice.orderNumber
+                      ? `#${String(invoice.orderNumber).padStart(3, '0')}`
+                      : invoice.orderId?.slice(0, 8)}
+                  </p>
+                </div>
+                <div>
+                  <span className="text-[#A3A3A3] text-xs uppercase tracking-wide">Date & Time</span>
+                  <p className="text-white">{formatDate(invoice.orderTime || invoice.createdAt)}</p>
+                </div>
+              </div>
+              <div className="space-y-1.5 text-right">
+                <div>
+                  <span className="text-[#A3A3A3] text-xs uppercase tracking-wide">Customer</span>
+                  <p className="text-white font-semibold">{invoice.customerName || '—'}</p>
+                </div>
+                {invoice.customerPhone && (
+                  <div>
+                    <span className="text-[#A3A3A3] text-xs uppercase tracking-wide">Phone</span>
+                    <p className="text-white">{invoice.customerPhone}</p>
+                  </div>
+                )}
+                {invoice.orderType === 'dine-in' && invoice.tableNumber && (
+                  <div>
+                    <span className="text-[#A3A3A3] text-xs uppercase tracking-wide">Table</span>
+                    <p className="text-white font-semibold">{invoice.tableNumber}</p>
+                  </div>
+                )}
+                <div>
+                  <span
+                    className={`inline-block px-2 py-0.5 rounded text-xs font-bold mt-1 ${
+                      invoice.paymentStatus === 'paid'
+                        ? 'bg-green-500/20 text-green-400 border border-green-500/30'
+                        : 'bg-yellow-500/20 text-yellow-400 border border-yellow-500/30'
+                    }`}
+                  >
+                    {invoice.paymentStatus === 'paid' ? '✓ PAID' : 'PAYMENT PENDING'}
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            {/* Items table */}
+            <div className="rounded-lg overflow-hidden border border-white/10">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="bg-[#D4AF37]/10 border-b border-white/10">
+                    <th className="text-left px-4 py-3 text-[#D4AF37] font-semibold text-xs uppercase tracking-wide">
+                      Item
+                    </th>
+                    <th className="text-center px-3 py-3 text-[#D4AF37] font-semibold text-xs uppercase tracking-wide">
+                      Qty
+                    </th>
+                    <th className="text-right px-3 py-3 text-[#D4AF37] font-semibold text-xs uppercase tracking-wide">
+                      Price
+                    </th>
+                    <th className="text-right px-4 py-3 text-[#D4AF37] font-semibold text-xs uppercase tracking-wide">
+                      Amount
+                    </th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {(invoice.items || []).map((item, idx) => (
+                    <React.Fragment key={idx}>
+                      <tr className={`border-b border-white/5 ${idx % 2 === 0 ? 'bg-black/10' : ''}`}>
+                        <td className="px-4 py-3 text-white">{item.name}</td>
+                        <td className="px-3 py-3 text-center text-[#A3A3A3]">{item.quantity}</td>
+                        <td className="px-3 py-3 text-right text-[#A3A3A3]">
+                          {cur}{fmt(item.basePrice ?? item.price)}
+                        </td>
+                        <td className="px-4 py-3 text-right text-white font-medium">
+                          {cur}{fmt(item.price * item.quantity)}
+                        </td>
+                      </tr>
+                      {item.addons?.map((a, ai) => (
+                        <tr key={`${idx}-addon-${ai}`} className="border-b border-white/3">
+                          <td className="px-4 py-1.5 text-[#555] text-xs pl-8">↳ {a.name}</td>
+                          <td className="px-3 py-1.5 text-center text-[#555] text-xs">—</td>
+                          <td className="px-3 py-1.5 text-right text-[#555] text-xs">+{cur}{fmt(a.price || 0)}</td>
+                          <td className="px-4 py-1.5 text-right text-[#555] text-xs">+{cur}{fmt(a.price || 0)}</td>
+                        </tr>
+                      ))}
+                    </React.Fragment>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            {/* Totals */}
+            <div className="bg-[#0F0F0F] border border-white/10 rounded-lg p-4 space-y-2 text-sm">
+              {hasExtras ? (
+                <>
+                  <div className="flex justify-between text-[#A3A3A3]">
+                    <span>Subtotal</span>
+                    <span>{cur}{fmt(invoice.subtotalAmount)}</span>
+                  </div>
+                  {invoice.serviceChargeEnabled && invoice.serviceChargeAmount > 0 && (
+                    <div className="flex justify-between text-[#A3A3A3]">
+                      <span>Service Charge ({invoice.serviceChargePercentage ?? invoice.serviceChargeRate ?? 0}%)</span>
+                      <span>{cur}{fmt(invoice.serviceChargeAmount)}</span>
+                    </div>
+                  )}
+                  {invoice.taxEnabled && invoice.taxAmount > 0 && (
+                    <div className="flex justify-between text-[#A3A3A3]">
+                      <span>{invoice.taxName || 'Tax'} ({invoice.taxRate ?? 0}%)</span>
+                      <span>{cur}{fmt(invoice.taxAmount)}</span>
+                    </div>
+                  )}
+                  {invoice.gstEnabled && invoice.gstAmount > 0 && (
+                    <div className="flex justify-between text-[#A3A3A3]">
+                      <span>GST ({invoice.gstPercentage ?? invoice.gstRate ?? 0}%)</span>
+                      <span>{cur}{fmt(invoice.gstAmount)}</span>
+                    </div>
+                  )}
+                  <div className="border-t border-white/10 pt-2 flex justify-between font-bold text-base">
+                    <span className="text-white">TOTAL</span>
+                    <span className="text-[#D4AF37] text-lg">{cur}{fmt(invoice.totalAmount)}</span>
+                  </div>
+                </>
+              ) : (
+                <div className="flex justify-between font-bold text-base">
+                  <span className="text-white">TOTAL</span>
+                  <span className="text-[#D4AF37] text-lg">{cur}{fmt(invoice.totalAmount)}</span>
+                </div>
+              )}
+            </div>
+
+            {/* Payment mode */}
+            <div className="flex items-center gap-2 text-sm text-[#A3A3A3]">
+              <CheckCircle className="w-4 h-4 text-[#D4AF37]" />
+              <span>
+                Payment:{' '}
+                <span className="text-white font-medium">
+                  {invoice.paymentMode === 'counter'
+                    ? 'Pay at Counter'
+                    : invoice.paymentMode === 'table'
+                    ? 'Pay on Table'
+                    : 'Prepaid (UPI)'}
+                </span>
+              </span>
+            </div>
+
+            {/* Footer note */}
+            <p className="text-center text-[#555] text-xs pt-2 border-t border-white/5">
+              Thank you for dining with us 🙏 · Generated by Branding Architect SmartCafé OS
+            </p>
+          </div>
+        </motion.div>
+      </motion.div>
+    </AnimatePresence>
+  );
+};
+
+export default InvoiceModal;
