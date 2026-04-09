@@ -158,6 +158,10 @@ const InvoicesTab = () => {
   const [search,         setSearch        ] = useState('');
   const [statusFilter,   setStatusFilter  ] = useState('all');
 
+  // Date range filter (additive — does not change existing search/status logic)
+  const [startDate, setStartDate] = useState('');
+  const [endDate,   setEndDate  ] = useState('');
+
   const filtered = useMemo(() => {
     return invoices.filter(inv => {
       const matchStatus = statusFilter === 'all' || inv.paymentStatus === statusFilter;
@@ -167,9 +171,29 @@ const InvoicesTab = () => {
         String(inv.orderNumber   || '').toLowerCase().includes(q) ||
         (inv.customerName  || '').toLowerCase().includes(q) ||
         (inv.customerPhone || '').includes(q);
-      return matchStatus && matchSearch;
+
+      // Date range filter — applied only when a date is entered
+      let matchDate = true;
+      if (startDate || endDate) {
+        try {
+          const ts  = inv.createdAt;
+          const date = ts?.toDate ? ts.toDate() : new Date(ts);
+          if (startDate) {
+            const from = new Date(startDate);
+            from.setHours(0, 0, 0, 0);
+            if (date < from) matchDate = false;
+          }
+          if (endDate && matchDate) {
+            const to = new Date(endDate);
+            to.setHours(23, 59, 59, 999);
+            if (date > to) matchDate = false;
+          }
+        } catch (_) { matchDate = true; }
+      }
+
+      return matchStatus && matchSearch && matchDate;
     });
-  }, [invoices, search, statusFilter]);
+  }, [invoices, search, statusFilter, startDate, endDate]);
 
   // ── Stats (IMPROVEMENT 3: all from paid orders / real invoices) ────────────
   const paidInvoices    = invoices.filter(i => i.paymentStatus === 'paid');
@@ -281,6 +305,36 @@ const InvoicesTab = () => {
             {invoices.length} total · {paidInvoices.length} paid
           </p>
         </div>
+      </div>
+
+      {/* Date range filter — additive, does not change existing search/status UI */}
+      <div className="flex flex-col sm:flex-row gap-3">
+        <div className="flex items-center gap-2 flex-1">
+          <label className="text-[#555] text-xs whitespace-nowrap">From</label>
+          <input
+            type="date"
+            value={startDate}
+            onChange={e => setStartDate(e.target.value)}
+            className="flex-1 h-10 bg-black/20 border border-white/10 text-white focus:border-[#D4AF37] focus:ring-1 focus:ring-[#D4AF37] rounded-sm px-3 text-sm outline-none"
+          />
+        </div>
+        <div className="flex items-center gap-2 flex-1">
+          <label className="text-[#555] text-xs whitespace-nowrap">To</label>
+          <input
+            type="date"
+            value={endDate}
+            onChange={e => setEndDate(e.target.value)}
+            className="flex-1 h-10 bg-black/20 border border-white/10 text-white focus:border-[#D4AF37] focus:ring-1 focus:ring-[#D4AF37] rounded-sm px-3 text-sm outline-none"
+          />
+        </div>
+        {(startDate || endDate) && (
+          <button
+            onClick={() => { setStartDate(''); setEndDate(''); }}
+            className="h-10 px-3 text-xs text-[#A3A3A3] hover:text-white border border-white/10 rounded-sm transition-all whitespace-nowrap"
+          >
+            Clear dates
+          </button>
+        )}
       </div>
 
       {/* Filters + CSV button */}
