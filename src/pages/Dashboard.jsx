@@ -11,6 +11,7 @@ import {
   FileText, Users,
 } from 'lucide-react';
 import { useTheme } from '../hooks/useTheme';
+import { useGlobalOrderNotification } from '../hooks/useGlobalOrderNotification';
 
 import Overview            from '../components/dashboard/Overview';
 import OrdersManagement    from '../components/dashboard/OrdersManagement';
@@ -50,6 +51,9 @@ const Dashboard = () => {
   const cafeId   = user?.cafeId;
   const navigate = useNavigate();
   const { T, isLight } = useTheme();
+
+  // Global new-order notification — sound + vibration, works on every tab
+  useGlobalOrderNotification(cafeId);
 
   const { data: cafe } = useDocument('cafes', cafeId);
 
