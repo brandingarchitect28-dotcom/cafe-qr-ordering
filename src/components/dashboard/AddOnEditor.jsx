@@ -5,14 +5,14 @@
  *
  * Add-on schema (stored inside menuItems/{id}.addons[]):
  * {
- *   id:       string  — client-generated UUID
- *   name:     string  — "Extra Shot", "Oat Milk"
- *   price:    number  — 0 = free
- *   group:    string  — optional group label
- *   type:     "multi" | "single" — default "multi"
+ *   id:       string  \u2014 client-generated UUID
+ *   name:     string  \u2014 "Extra Shot", "Oat Milk"
+ *   price:    number  \u2014 0 = free
+ *   group:    string  \u2014 optional group label
+ *   type:     "multi" | "single" \u2014 default "multi"
  * }
  *
- * No new collection — addons live inside the menu item document.
+ * No new collection \u2014 addons live inside the menu item document.
  * Fully backward-compatible: items with no addons array behave exactly as before.
  */
 
@@ -28,7 +28,7 @@ const inputCls =
 
 const EMPTY_ADDON = { id: '', name: '', price: '', group: '', type: 'multi' };
 
-const AddOnEditor = ({ addons = [], onChange, currencySymbol = '₹', disabled = false }) => {
+const AddOnEditor = ({ addons = [], onChange, currencySymbol = '\u20b9', disabled = false }) => {
   const [expanded, setExpanded] = useState(false);
   const [draft, setDraft] = useState({ ...EMPTY_ADDON, id: uid() });
   const [error, setError] = useState('');
@@ -148,7 +148,7 @@ const AddOnEditor = ({ addons = [], onChange, currencySymbol = '₹', disabled =
                   />
                   <input
                     className={inputCls}
-                    placeholder={`Price (${currencySymbol}) — 0 = free`}
+                    placeholder={`Price (${currencySymbol}) \u2014 0 = free`}
                     type="number"
                     min="0"
                     step="0.5"
@@ -170,8 +170,8 @@ const AddOnEditor = ({ addons = [], onChange, currencySymbol = '₹', disabled =
                     onChange={e => setDraftField('type', e.target.value)}
                     disabled={disabled}
                   >
-                    <option value="multi" className="bg-[#0F0F0F]">Multi-select (tick ✓)</option>
-                    <option value="single" className="bg-[#0F0F0F]">Single-select (radio ○)</option>
+                    <option value="multi" className="bg-[#0F0F0F]">Multi-select (tick \u2713)</option>
+                    <option value="single" className="bg-[#0F0F0F]">Single-select (radio \u25cb)</option>
                   </select>
                 </div>
 

@@ -6,6 +6,7 @@ import { db } from '../../lib/firebase';
 import { Plus, Edit, Trash2, X, RefreshCw } from 'lucide-react';
 import { toast } from 'sonner';
 import MediaUpload, { MediaPreview } from '../MediaUpload';
+import AddOnEditor from './AddOnEditor';
 
 const MenuManagement = () => {
   const { user } = useAuth();
@@ -19,7 +20,9 @@ const MenuManagement = () => {
   const [saving,       setSaving      ] = useState(false);
 
   const [formData, setFormData] = useState({
-    name: '', price: '', category: '', image: '', available: true
+    name: '', price: '', category: '', image: '', available: true,
+    addons: [],
+    sizePricing: { enabled: false, small: '', medium: '', large: '' },
   });
 
   // ── UI-only: which item has its inline edit accordion open ───────────────────
@@ -49,11 +52,13 @@ const MenuManagement = () => {
     setSaving(true);
     try {
       const itemData = {
-        name:      formData.name,
-        price:     parseFloat(formData.price),
-        category:  formData.category,
-        image:     formData.image,
-        available: formData.available,
+        name:        formData.name,
+        price:       parseFloat(formData.price),
+        category:    formData.category,
+        image:       formData.image,
+        available:   formData.available,
+        addons:      formData.addons      || [],   // [] = no add-ons; backward-compatible
+        sizePricing: formData.sizePricing || null, // null = no size pricing; backward-compatible
         cafeId,
       };
 
@@ -77,11 +82,13 @@ const MenuManagement = () => {
   const handleEdit = (item) => {
     setEditingItem(item);
     setFormData({
-      name:      item.name,
-      price:     item.price,
-      category:  item.category || '',
-      image:     item.image    || '',
-      available: item.available,
+      name:        item.name,
+      price:       item.price,
+      category:    item.category    || '',
+      image:       item.image       || '',
+      available:   item.available,
+      addons:      item.addons      || [],
+      sizePricing: item.sizePricing || { enabled: false, small: '', medium: '', large: '' },
     });
     setShowForm(true);
   };
@@ -190,6 +197,74 @@ const MenuManagement = () => {
           <label className="text-white">Available for order</label>
         </div>
 
+        {/* Add-ons / Customisations — restored from original build */}
+        <AddOnEditor
+          addons={formData.addons || []}
+          onChange={(updated) => setFormData(prev => ({ ...prev, addons: updated }))}
+          currencySymbol={CUR}
+          disabled={saving}
+        />
+
+        {/* Size-based pricing — new feature */}
+        <div className="border border-white/10 rounded-sm p-4 space-y-3">
+          <label className="flex items-center gap-2 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={formData.sizePricing?.enabled || false}
+              onChange={(e) => setFormData(prev => ({
+                ...prev,
+                sizePricing: { ...prev.sizePricing, enabled: e.target.checked },
+              }))}
+              disabled={saving}
+              className="w-4 h-4 rounded border-white/10 bg-black/20 text-[#D4AF37] focus:ring-[#D4AF37]"
+            />
+            <span className="text-white text-sm font-medium">Enable Size Pricing (S / M / L)</span>
+          </label>
+          {formData.sizePricing?.enabled && (
+            <div className="grid grid-cols-3 gap-2 mt-2">
+              <input
+                type="number"
+                min="0"
+                step="0.01"
+                placeholder={`Small ${CUR}`}
+                value={formData.sizePricing?.small || ''}
+                onChange={(e) => setFormData(prev => ({
+                  ...prev,
+                  sizePricing: { ...prev.sizePricing, small: e.target.value },
+                }))}
+                disabled={saving}
+                className="w-full bg-black/20 border border-white/10 text-white placeholder:text-neutral-600 focus:border-[#D4AF37] focus:ring-1 focus:ring-[#D4AF37] rounded-sm h-11 px-3 text-sm transition-all"
+              />
+              <input
+                type="number"
+                min="0"
+                step="0.01"
+                placeholder={`Medium ${CUR}`}
+                value={formData.sizePricing?.medium || ''}
+                onChange={(e) => setFormData(prev => ({
+                  ...prev,
+                  sizePricing: { ...prev.sizePricing, medium: e.target.value },
+                }))}
+                disabled={saving}
+                className="w-full bg-black/20 border border-white/10 text-white placeholder:text-neutral-600 focus:border-[#D4AF37] focus:ring-1 focus:ring-[#D4AF37] rounded-sm h-11 px-3 text-sm transition-all"
+              />
+              <input
+                type="number"
+                min="0"
+                step="0.01"
+                placeholder={`Large ${CUR}`}
+                value={formData.sizePricing?.large || ''}
+                onChange={(e) => setFormData(prev => ({
+                  ...prev,
+                  sizePricing: { ...prev.sizePricing, large: e.target.value },
+                }))}
+                disabled={saving}
+                className="w-full bg-black/20 border border-white/10 text-white placeholder:text-neutral-600 focus:border-[#D4AF37] focus:ring-1 focus:ring-[#D4AF37] rounded-sm h-11 px-3 text-sm transition-all"
+              />
+            </div>
+          )}
+        </div>
+
         {/* Buttons */}
         <div className="flex gap-3">
           <button
@@ -258,7 +333,17 @@ const MenuManagement = () => {
                     <h3 className="text-xl font-semibold text-white">{item.name}</h3>
                     {item.category && <p className="text-[#A3A3A3] text-sm">{item.category}</p>}
                   </div>
-                  <span className="text-lg font-bold text-[#D4AF37]">{CUR}{item.price.toFixed(2)}</span>
+                  <div className="text-right">
+                    {item.sizePricing?.enabled ? (
+                      <div className="text-xs space-y-0.5">
+                        {item.sizePricing.small  && <p className="text-[#D4AF37] font-semibold">S {CUR}{parseFloat(item.sizePricing.small).toFixed(2)}</p>}
+                        {item.sizePricing.medium && <p className="text-[#D4AF37] font-semibold">M {CUR}{parseFloat(item.sizePricing.medium).toFixed(2)}</p>}
+                        {item.sizePricing.large  && <p className="text-[#D4AF37] font-semibold">L {CUR}{parseFloat(item.sizePricing.large).toFixed(2)}</p>}
+                      </div>
+                    ) : (
+                      <span className="text-lg font-bold text-[#D4AF37]">{CUR}{item.price.toFixed(2)}</span>
+                    )}
+                  </div>
                 </div>
                 <div className="flex items-center gap-2 mb-4">
                   <div className={`px-2 py-1 rounded-sm text-xs font-medium ${item.available ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-red-400'}`}>
