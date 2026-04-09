@@ -3,12 +3,12 @@ import { useAuth } from '../../contexts/AuthContext';
 import { useCollection, useDocument } from '../../hooks/useFirestore';
 import { where, doc, updateDoc } from 'firebase/firestore';
 import { db } from '../../lib/firebase';
-import { AlertCircle, Search, Download, Phone, MapPin, Clock, Bell, Volume2, X, FileText, Eye, Trash2 } from 'lucide-react';
+import { AlertCircle, Search, Download, Phone, MapPin, Clock, Bell, Volume2, X, FileText, Eye, Trash2, MessageSquare } from 'lucide-react';
 import { toast } from 'sonner';
 import { CSVLink } from 'react-csv';
 import { motion, AnimatePresence } from 'framer-motion';
 import InvoiceModal from './InvoiceModal';
-import { getInvoiceByOrderId, ensureInvoiceForOrder } from '../../services/invoiceService';
+import { getInvoiceByOrderId, ensureInvoiceForOrder, generateInvoiceMessage } from '../../services/invoiceService';
 
 // Notification sound (base64 encoded short beep)
 const NOTIFICATION_SOUND = 'data:audio/mp3;base64,SUQzBAAAAAAAI1RTU0UAAAAPAAADTGF2ZjU4Ljc2LjEwMAAAAAAAAAAAAAAA/+M4wAAAAAAAAAAAAEluZm8AAAAPAAAAAwAAAbAAqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV////////////////////////////////////////////AAAAAExhdmM1OC4xMwAAAAAAAAAAAAAAACQDgAAAAAAAAAGw3X+VkgAAAAAAAAAAAAAAAAD/4xjEAAJQAVAAAAAAvYCCB4P+UBn//+D4PoGH/ygM///KAHAY////4Pg+D7/8EMOD4f/6gYf///wfB9///5QGf/lAZ//+UAcH0GH////+oGH//6gYf5QBwfD4fygDg//+D5//ygMAAAAAAA/+MYxBYCwAFYAAAAAPHjx4sePHjx5OTk5FRUVFRU9PT09PT09PT0/////////////////////////////////+MYxCMAAADSAAAAAP///////////////////////////////////////////////+MYxDAAAADSAAAAAP///////////////////////////////////////////////+MYxD4AAADSAAAAAP//////////////////////////////////////////////'
@@ -397,6 +397,37 @@ const OrdersManagement = () => {
     }
   };
 
+  // ── WhatsApp Invoice Send ────────────────────────────────────────────────────
+  // Strips non-digits, adds India country code for 10-digit numbers
+  const formatWhatsAppNumber = (raw) => {
+    if (!raw) return '';
+    const digits = String(raw).replace(/\D/g, '');
+    if (!digits) return '';
+    if (digits.length === 10) return `91${digits}`;
+    return digits;
+  };
+
+  // Sends a formatted invoice message to the customer via WhatsApp
+  const handleSendInvoiceWA = (order, e) => {
+    if (e) e.stopPropagation();
+    if (!order) return;
+    const phone = formatWhatsAppNumber(order.customerPhone || '');
+    if (!phone) {
+      toast.error('No customer phone number on this order');
+      return;
+    }
+    try {
+      const msg = generateInvoiceMessage(order, {
+        name:           cafe?.name           || '',
+        currencySymbol: order.currencySymbol || cafeCurrency,
+      });
+      window.location.href = `https://wa.me/${phone}?text=${encodeURIComponent(msg)}`;
+    } catch (err) {
+      console.error('[WA-Invoice]', err);
+      toast.error('Failed to open WhatsApp');
+    }
+  };
+
   return (
     <div className="space-y-6 relative">
       {/* ── Feature 1: Invoice Modal ─────────────────────────────────────── */}
@@ -645,6 +676,18 @@ const OrdersManagement = () => {
                                 <FileText className="w-3 h-3" />
                                 PDF
                               </button>
+                              {/* WhatsApp Send Invoice — shown when customer phone exists */}
+                              {order.customerPhone && (
+                                <button
+                                  onClick={(e) => handleSendInvoiceWA(order, e)}
+                                  data-testid={`wa-invoice-${order.id}`}
+                                  className="flex items-center gap-1 px-2.5 py-1.5 bg-green-500/10 hover:bg-green-500/20 border border-green-500/20 text-green-400 rounded text-xs font-medium transition-all"
+                                  title="Send Invoice via WhatsApp"
+                                >
+                                  <MessageSquare className="w-3 h-3" />
+                                  WA
+                                </button>
+                              )}
                               {/* Delete button */}
                               {deleteConfirmId === order.id ? (
                                 <div className="flex gap-1">
@@ -857,6 +900,18 @@ const OrdersManagement = () => {
                         Download PDF
                       </button>
                     </div>
+                    {/* WhatsApp Send Invoice (mobile) — shown when customer phone exists */}
+                    {order.customerPhone && (
+                      <div onClick={(e) => e.stopPropagation()}>
+                        <button
+                          onClick={(e) => handleSendInvoiceWA(order, e)}
+                          className="w-full flex items-center justify-center gap-2 py-2.5 bg-green-500/10 hover:bg-green-500/20 border border-green-500/20 text-green-400 rounded text-sm font-medium transition-all"
+                        >
+                          <MessageSquare className="w-4 h-4" />
+                          Send Invoice via WhatsApp
+                        </button>
+                      </div>
+                    )}
 
                     {/* Delete button (mobile) */}
                     <div onClick={(e) => e.stopPropagation()}>
