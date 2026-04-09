@@ -8,14 +8,17 @@
  * Props:
  *   invoice  – Firestore invoice document object
  *   onClose  – callback to close the modal
+ *
+ * ADDED (Feature 3):
+ *   - Delivery address shown in modal view (only for delivery orders)
+ *   - Delivery address included in print/PDF HTML (only for delivery orders)
  */
 
-import { formatWhatsAppNumber } from '../../utils/whatsapp';
-import React, { useRef } from 'react';
+import React, { useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, Download, Printer, FileText, CheckCircle } from 'lucide-react';
+import { X, Download, FileText, CheckCircle } from 'lucide-react';
 
-/* ─── helpers ────────────────────────────────────────────────── */
+/* ─── helpers ────────────────────────────────────────────────────────────── */
 const fmt = (num) => (parseFloat(num) || 0).toFixed(2);
 
 const formatDate = (ts) => {
@@ -31,13 +34,9 @@ const formatDate = (ts) => {
   });
 };
 
-/* ─── printable receipt HTML ─────────────────────────────────── */
+/* ─── printable receipt HTML ─────────────────────────────────────────────── */
 const buildPrintHTML = (inv) => {
   const cur = inv.currencySymbol || '₹';
-  // Support both field name conventions (gstRate / gstPercentage)
-  const gstPct = inv.gstPercentage  ?? inv.gstRate  ?? 0;
-  const scPct  = inv.serviceChargePercentage ?? inv.serviceChargeRate ?? 0;
-  const taxPct = inv.taxRate ?? 0;
   const hasExtras =
     (inv.taxEnabled && inv.taxAmount > 0) ||
     (inv.serviceChargeEnabled && inv.serviceChargeAmount > 0) ||
@@ -45,23 +44,13 @@ const buildPrintHTML = (inv) => {
 
   const itemRows = (inv.items || [])
     .map(
-      (item) => {
-        const addonRows = (item.addons || []).map(a =>
-          `<tr class="addon-row">
-            <td style="padding-left:20px;color:#A3A3A3">↳ ${a.name}</td>
-            <td class="center" style="color:#A3A3A3">—</td>
-            <td class="right" style="color:#A3A3A3">+${cur}${fmt(a.price || 0)}</td>
-            <td class="right" style="color:#A3A3A3">+${cur}${fmt(a.price || 0)}</td>
-          </tr>`
-        ).join('');
-        return `
+      (item) => `
     <tr>
       <td>${item.name}</td>
       <td class="center">${item.quantity}</td>
-      <td class="right">${cur}${fmt(item.basePrice ?? item.price)}</td>
+      <td class="right">${cur}${fmt(item.price)}</td>
       <td class="right">${cur}${fmt(item.price * item.quantity)}</td>
-    </tr>${addonRows}`;
-      }
+    </tr>`
     )
     .join('');
 
@@ -72,21 +61,27 @@ const buildPrintHTML = (inv) => {
       <td class="right">${cur}${fmt(inv.subtotalAmount)}</td>
     </tr>
     ${
-      inv.serviceChargeEnabled && inv.serviceChargeAmount > 0
-        ? `<tr class="sub-row"><td colspan="3">Service Charge (${scPct}%)</td><td class="right">${cur}${fmt(inv.serviceChargeAmount)}</td></tr>`
+      inv.taxEnabled && inv.taxAmount > 0
+        ? `<tr class="sub-row"><td colspan="3">${inv.taxName || 'Tax'} (${inv.taxRate}%)</td><td class="right">${cur}${fmt(inv.taxAmount)}</td></tr>`
         : ''
     }
     ${
-      inv.taxEnabled && inv.taxAmount > 0
-        ? `<tr class="sub-row"><td colspan="3">${inv.taxName || 'Tax'} (${taxPct}%)</td><td class="right">${cur}${fmt(inv.taxAmount)}</td></tr>`
+      inv.serviceChargeEnabled && inv.serviceChargeAmount > 0
+        ? `<tr class="sub-row"><td colspan="3">Service Charge (${inv.serviceChargeRate}%)</td><td class="right">${cur}${fmt(inv.serviceChargeAmount)}</td></tr>`
         : ''
     }
     ${
       inv.gstEnabled && inv.gstAmount > 0
-        ? `<tr class="sub-row"><td colspan="3">GST (${gstPct}%)</td><td class="right">${cur}${fmt(inv.gstAmount)}</td></tr>`
+        ? `<tr class="sub-row"><td colspan="3">GST (${inv.gstRate}%)</td><td class="right">${cur}${fmt(inv.gstAmount)}</td></tr>`
         : ''
     }`
     : '';
+
+  // Feature 3: delivery address block in print HTML
+  const deliveryBlock =
+    inv.orderType === 'delivery' && inv.deliveryAddress
+      ? `<p style="margin-top:8px"><strong>Delivery Address:</strong> ${inv.deliveryAddress}</p>`
+      : '';
 
   return `<!DOCTYPE html>
 <html>
@@ -142,6 +137,7 @@ const buildPrintHTML = (inv) => {
       <p><strong>Customer</strong> ${inv.customerName || '—'}</p>
       ${inv.customerPhone ? `<p><strong>Phone</strong> ${inv.customerPhone}</p>` : ''}
       ${inv.orderType === 'dine-in' && inv.tableNumber ? `<p><strong>Table</strong> ${inv.tableNumber}</p>` : ''}
+      ${deliveryBlock}
       <p>
         <span class="payment-badge ${inv.paymentStatus === 'paid' ? 'paid' : 'pending'}">
           ${inv.paymentStatus === 'paid' ? '✓ PAID' : 'PAYMENT PENDING'}
@@ -187,11 +183,9 @@ const buildPrintHTML = (inv) => {
 </html>`;
 };
 
-/* ─── component ──────────────────────────────────────────────── */
+/* ─── component ──────────────────────────────────────────────────────────── */
 const InvoiceModal = ({ invoice, onClose }) => {
   const printFrameRef = useRef(null);
-
-  if (!invoice) return null;
 
   const cur = invoice.currencySymbol || '₹';
   const hasExtras =
@@ -201,27 +195,45 @@ const InvoiceModal = ({ invoice, onClose }) => {
 
   /* trigger browser print-to-PDF */
   const handleDownload = () => {
-    const html = buildPrintHTML(invoice);
-    const printWindow = window.open('', '_blank', 'width=700,height=900');
-    if (!printWindow) {
-      // fallback: inject into hidden iframe
-      const iframe = printFrameRef.current;
-      if (iframe) {
-        iframe.contentDocument.open();
-        iframe.contentDocument.write(html);
-        iframe.contentDocument.close();
-        iframe.contentWindow.print();
+    try {
+      const html = buildPrintHTML(invoice);
+      const printWindow = window.open('', '_blank', 'width=700,height=900');
+      if (!printWindow) {
+        // fallback: inject into hidden iframe
+        const iframe = printFrameRef.current;
+        if (iframe) {
+          iframe.contentDocument.open();
+          iframe.contentDocument.write(html);
+          iframe.contentDocument.close();
+          iframe.contentWindow.print();
+        }
+        return;
       }
-      return;
+      printWindow.document.open();
+      printWindow.document.write(html);
+      printWindow.document.close();
+      printWindow.onload = () => {
+        printWindow.focus();
+        printWindow.print();
+      };
+    } catch (err) {
+      // Feature 4: failsafe
+      console.error('Invoice error:', err);
     }
-    printWindow.document.open();
-    printWindow.document.write(html);
-    printWindow.document.close();
-    printWindow.onload = () => {
-      printWindow.focus();
-      printWindow.print();
-    };
   };
+
+  // Auto-trigger PDF print when opened via "Download PDF" button.
+  // _autoPrint flag is set by handleDownloadInvoice in OrdersManagement.
+  // useEffect is placed here so handleDownload is already in scope.
+  // eslint-disable-next-line react-hooks/rules-of-hooks
+  useEffect(() => {
+    if (invoice?._autoPrint) {
+      const t = setTimeout(() => handleDownload(), 300);
+      return () => clearTimeout(t);
+    }
+  // handleDownload is stable within this render — intentionally omitted from deps
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [invoice?._autoPrint]);
 
   return (
     <AnimatePresence>
@@ -243,7 +255,7 @@ const InvoiceModal = ({ invoice, onClose }) => {
           onClick={(e) => e.stopPropagation()}
           className="w-full max-w-lg bg-[#0A0A0A] border border-white/10 rounded-xl overflow-hidden shadow-2xl max-h-[90vh] flex flex-col"
         >
-          {/* ── Modal Header ── */}
+          {/* Modal Header */}
           <div className="flex items-center justify-between px-6 py-4 border-b border-white/10 bg-[#0F0F0F]">
             <div className="flex items-center gap-3">
               <div className="w-9 h-9 rounded-lg bg-[#D4AF37]/15 flex items-center justify-center">
@@ -257,24 +269,6 @@ const InvoiceModal = ({ invoice, onClose }) => {
               </div>
             </div>
             <div className="flex items-center gap-2">
-              {/* Public invoice link */}
-              <button
-                onClick={() => {
-                  const url = `${window.location.origin}/invoice/${invoice.id}`;
-                  navigator.clipboard.writeText(url);
-                  const msg =
-                    `Thank you for visiting ${invoice.cafeName || 'our café'} ☕\n\n` +
-                    `Your invoice is ready.\n` +
-                    `Invoice No: ${invoice.invoiceNumber}\n` +
-                    `Amount: ${invoice.currencySymbol || '₹'}${(parseFloat(invoice.totalAmount) || 0).toFixed(2)}\n\n` +
-                    `View invoice: ${url}`;
-                  window.location.href = `https://wa.me/${(invoice.customerPhone || '')}?text=${encodeURIComponent(msg)}`;
-                }}
-                className="flex items-center gap-2 px-3 py-2 bg-green-600 hover:bg-green-700 text-white font-semibold rounded-lg text-sm transition-all"
-                title="Send invoice via WhatsApp"
-              >
-                📱 <span className="hidden sm:inline">WhatsApp</span>
-              </button>
               <button
                 onClick={handleDownload}
                 className="flex items-center gap-2 px-4 py-2 bg-[#D4AF37] hover:bg-[#C5A059] text-black font-semibold rounded-lg text-sm transition-all"
@@ -292,7 +286,7 @@ const InvoiceModal = ({ invoice, onClose }) => {
             </div>
           </div>
 
-          {/* ── Scrollable body ── */}
+          {/* Scrollable body */}
           <div className="overflow-y-auto flex-1 p-6 space-y-5">
 
             {/* Cafe + Invoice info */}
@@ -320,18 +314,18 @@ const InvoiceModal = ({ invoice, onClose }) => {
                 </div>
                 <div>
                   <span className="text-[#A3A3A3] text-xs uppercase tracking-wide">Order #</span>
-                  <p className="text-white font-semibold">
+                  <p className="text-white">
                     {invoice.orderNumber
                       ? `#${String(invoice.orderNumber).padStart(3, '0')}`
                       : invoice.orderId?.slice(0, 8)}
                   </p>
                 </div>
                 <div>
-                  <span className="text-[#A3A3A3] text-xs uppercase tracking-wide">Date & Time</span>
+                  <span className="text-[#A3A3A3] text-xs uppercase tracking-wide">Date</span>
                   <p className="text-white">{formatDate(invoice.orderTime || invoice.createdAt)}</p>
                 </div>
               </div>
-              <div className="space-y-1.5 text-right">
+              <div className="space-y-1.5">
                 <div>
                   <span className="text-[#A3A3A3] text-xs uppercase tracking-wide">Customer</span>
                   <p className="text-white font-semibold">{invoice.customerName || '—'}</p>
@@ -348,123 +342,92 @@ const InvoiceModal = ({ invoice, onClose }) => {
                     <p className="text-white font-semibold">{invoice.tableNumber}</p>
                   </div>
                 )}
+                {/* Feature 3: Delivery address in modal view */}
+                {invoice?.orderType === 'delivery' && (
+                  <div style={{ marginTop: 8 }}>
+                    <span className="text-[#A3A3A3] text-xs uppercase tracking-wide">Delivery Address</span>
+                    <p className="text-white mt-0.5">{invoice?.deliveryAddress || 'N/A'}</p>
+                  </div>
+                )}
                 <div>
-                  <span
-                    className={`inline-block px-2 py-0.5 rounded text-xs font-bold mt-1 ${
-                      invoice.paymentStatus === 'paid'
-                        ? 'bg-green-500/20 text-green-400 border border-green-500/30'
-                        : 'bg-yellow-500/20 text-yellow-400 border border-yellow-500/30'
-                    }`}
-                  >
-                    {invoice.paymentStatus === 'paid' ? '✓ PAID' : 'PAYMENT PENDING'}
-                  </span>
+                  <span className="text-[#A3A3A3] text-xs uppercase tracking-wide">Status</span>
+                  <p className={`font-bold flex items-center gap-1 mt-0.5 ${
+                    invoice.paymentStatus === 'paid' ? 'text-green-400' : 'text-amber-400'
+                  }`}>
+                    {invoice.paymentStatus === 'paid'
+                      ? <><CheckCircle className="w-3.5 h-3.5" /> PAID</>
+                      : 'PAYMENT PENDING'}
+                  </p>
                 </div>
               </div>
             </div>
 
             {/* Items table */}
-            <div className="rounded-lg overflow-hidden border border-white/10">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="bg-[#D4AF37]/10 border-b border-white/10">
-                    <th className="text-left px-4 py-3 text-[#D4AF37] font-semibold text-xs uppercase tracking-wide">
-                      Item
-                    </th>
-                    <th className="text-center px-3 py-3 text-[#D4AF37] font-semibold text-xs uppercase tracking-wide">
-                      Qty
-                    </th>
-                    <th className="text-right px-3 py-3 text-[#D4AF37] font-semibold text-xs uppercase tracking-wide">
-                      Price
-                    </th>
-                    <th className="text-right px-4 py-3 text-[#D4AF37] font-semibold text-xs uppercase tracking-wide">
-                      Amount
-                    </th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {(invoice.items || []).map((item, idx) => (
-                    <React.Fragment key={idx}>
-                      <tr className={`border-b border-white/5 ${idx % 2 === 0 ? 'bg-black/10' : ''}`}>
-                        <td className="px-4 py-3 text-white">{item.name}</td>
-                        <td className="px-3 py-3 text-center text-[#A3A3A3]">{item.quantity}</td>
-                        <td className="px-3 py-3 text-right text-[#A3A3A3]">
-                          {cur}{fmt(item.basePrice ?? item.price)}
-                        </td>
-                        <td className="px-4 py-3 text-right text-white font-medium">
-                          {cur}{fmt(item.price * item.quantity)}
-                        </td>
-                      </tr>
-                      {item.addons?.map((a, ai) => (
-                        <tr key={`${idx}-addon-${ai}`} className="border-b border-white/3">
-                          <td className="px-4 py-1.5 text-[#555] text-xs pl-8">↳ {a.name}</td>
-                          <td className="px-3 py-1.5 text-center text-[#555] text-xs">—</td>
-                          <td className="px-3 py-1.5 text-right text-[#555] text-xs">+{cur}{fmt(a.price || 0)}</td>
-                          <td className="px-4 py-1.5 text-right text-[#555] text-xs">+{cur}{fmt(a.price || 0)}</td>
-                        </tr>
-                      ))}
-                    </React.Fragment>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+            <div>
+              <div className="grid grid-cols-12 text-xs text-[#A3A3A3] uppercase tracking-wide pb-2 border-b border-white/10 font-semibold">
+                <span className="col-span-6">Item</span>
+                <span className="col-span-2 text-center">Qty</span>
+                <span className="col-span-2 text-right">Price</span>
+                <span className="col-span-2 text-right">Total</span>
+              </div>
+              <div className="space-y-1 mt-2">
+                {(invoice.items || []).map((item, idx) => (
+                  <div key={idx} className="grid grid-cols-12 text-sm py-1.5 border-b border-white/5">
+                    <span className="col-span-6 text-white">{item.name}</span>
+                    <span className="col-span-2 text-center text-[#A3A3A3]">{item.quantity}</span>
+                    <span className="col-span-2 text-right text-[#A3A3A3]">{cur}{fmt(item.price)}</span>
+                    <span className="col-span-2 text-right text-white">{cur}{fmt(item.price * item.quantity)}</span>
+                  </div>
+                ))}
+              </div>
 
-            {/* Totals */}
-            <div className="bg-[#0F0F0F] border border-white/10 rounded-lg p-4 space-y-2 text-sm">
-              {hasExtras ? (
-                <>
+              {/* Extras + total */}
+              <div className="mt-3 space-y-1.5 text-sm">
+                {hasExtras && (
                   <div className="flex justify-between text-[#A3A3A3]">
                     <span>Subtotal</span>
                     <span>{cur}{fmt(invoice.subtotalAmount)}</span>
                   </div>
-                  {invoice.serviceChargeEnabled && invoice.serviceChargeAmount > 0 && (
-                    <div className="flex justify-between text-[#A3A3A3]">
-                      <span>Service Charge ({invoice.serviceChargePercentage ?? invoice.serviceChargeRate ?? 0}%)</span>
-                      <span>{cur}{fmt(invoice.serviceChargeAmount)}</span>
-                    </div>
-                  )}
-                  {invoice.taxEnabled && invoice.taxAmount > 0 && (
-                    <div className="flex justify-between text-[#A3A3A3]">
-                      <span>{invoice.taxName || 'Tax'} ({invoice.taxRate ?? 0}%)</span>
-                      <span>{cur}{fmt(invoice.taxAmount)}</span>
-                    </div>
-                  )}
-                  {invoice.gstEnabled && invoice.gstAmount > 0 && (
-                    <div className="flex justify-between text-[#A3A3A3]">
-                      <span>GST ({invoice.gstPercentage ?? invoice.gstRate ?? 0}%)</span>
-                      <span>{cur}{fmt(invoice.gstAmount)}</span>
-                    </div>
-                  )}
-                  <div className="border-t border-white/10 pt-2 flex justify-between font-bold text-base">
-                    <span className="text-white">TOTAL</span>
-                    <span className="text-[#D4AF37] text-lg">{cur}{fmt(invoice.totalAmount)}</span>
+                )}
+                {invoice.taxEnabled && invoice.taxAmount > 0 && (
+                  <div className="flex justify-between text-[#A3A3A3]">
+                    <span>{invoice.taxName || 'Tax'} ({invoice.taxRate}%)</span>
+                    <span>{cur}{fmt(invoice.taxAmount)}</span>
                   </div>
-                </>
-              ) : (
-                <div className="flex justify-between font-bold text-base">
-                  <span className="text-white">TOTAL</span>
+                )}
+                {invoice.serviceChargeEnabled && invoice.serviceChargeAmount > 0 && (
+                  <div className="flex justify-between text-[#A3A3A3]">
+                    <span>Service Charge ({invoice.serviceChargeRate}%)</span>
+                    <span>{cur}{fmt(invoice.serviceChargeAmount)}</span>
+                  </div>
+                )}
+                {invoice.gstEnabled && invoice.gstAmount > 0 && (
+                  <div className="flex justify-between text-[#A3A3A3]">
+                    <span>GST ({invoice.gstRate}%)</span>
+                    <span>{cur}{fmt(invoice.gstAmount)}</span>
+                  </div>
+                )}
+                <div className="flex justify-between pt-2 border-t border-[#D4AF37]/30 font-bold">
+                  <span className="text-[#D4AF37] text-lg">TOTAL</span>
                   <span className="text-[#D4AF37] text-lg">{cur}{fmt(invoice.totalAmount)}</span>
                 </div>
-              )}
+              </div>
             </div>
 
             {/* Payment mode */}
-            <div className="flex items-center gap-2 text-sm text-[#A3A3A3]">
-              <CheckCircle className="w-4 h-4 text-[#D4AF37]" />
-              <span>
-                Payment:{' '}
-                <span className="text-white font-medium">
-                  {invoice.paymentMode === 'counter'
-                    ? 'Pay at Counter'
-                    : invoice.paymentMode === 'table'
-                    ? 'Pay on Table'
-                    : 'Prepaid (UPI)'}
-                </span>
+            <p className="text-[#A3A3A3] text-xs pb-2 border-b border-white/5">
+              Payment:{' '}
+              <span className="text-white font-medium">
+                {invoice.paymentMode === 'counter'
+                  ? 'Pay at Counter'
+                  : invoice.paymentMode === 'table'
+                  ? 'Pay on Table'
+                  : 'Prepaid (UPI)'}
               </span>
-            </div>
+            </p>
 
-            {/* Footer note */}
-            <p className="text-center text-[#555] text-xs pt-2 border-t border-white/5">
-              Thank you for dining with us 🙏 · Generated by Branding Architect SmartCafé OS
+            <p className="text-center text-[#555] text-xs">
+              Thank you for dining with us! 🙏
             </p>
           </div>
         </motion.div>

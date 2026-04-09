@@ -234,7 +234,7 @@ const OrdersManagement = () => {
 
   // ── Feature 2: Invoice handlers (with safety checks) ─────────────────────
   const handleViewInvoice = async (orderId, e) => {
-    e.stopPropagation();
+    if (e) e.stopPropagation();
     // Safety check
     if (!orderId) {
       console.error('Invalid order for invoice');
@@ -317,7 +317,7 @@ const OrdersManagement = () => {
   };
 
   const handleDownloadInvoice = async (orderId, e) => {
-    e.stopPropagation();
+    if (e) e.stopPropagation();
     // Safety check
     if (!orderId) {
       console.error('Invalid order for invoice');
