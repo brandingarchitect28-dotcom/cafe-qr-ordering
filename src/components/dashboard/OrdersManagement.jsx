@@ -1,14 +1,15 @@
 import React, { useState, useMemo, useEffect, useRef, useCallback } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
 import { useCollection, useDocument } from '../../hooks/useFirestore';
-import { where, doc, updateDoc } from 'firebase/firestore';
+import { where, doc, updateDoc, collection, addDoc, runTransaction, serverTimestamp } from 'firebase/firestore';
 import { db } from '../../lib/firebase';
-import { AlertCircle, Search, Download, Phone, MapPin, Clock, Bell, Volume2, X, FileText, Eye, Trash2, MessageSquare } from 'lucide-react';
+import { AlertCircle, Search, Download, Phone, MapPin, Clock, Bell, Volume2, X, FileText, Eye, Trash2, MessageSquare, PlusCircle } from 'lucide-react';
 import { toast } from 'sonner';
 import { CSVLink } from 'react-csv';
 import { motion, AnimatePresence } from 'framer-motion';
 import InvoiceModal from './InvoiceModal';
-import { getInvoiceByOrderId, ensureInvoiceForOrder, generateInvoiceMessage } from '../../services/invoiceService';
+import { getInvoiceByOrderId, ensureInvoiceForOrder, generateInvoiceMessage, createInvoiceForOrder } from '../../services/invoiceService';
+import ExternalOrderModal from './ExternalOrderModal';
 
 // Notification sound (base64 encoded short beep)
 const NOTIFICATION_SOUND = 'data:audio/mp3;base64,SUQzBAAAAAAAI1RTU0UAAAAPAAADTGF2ZjU4Ljc2LjEwMAAAAAAAAAAAAAAA/+M4wAAAAAAAAAAAAEluZm8AAAAPAAAAAwAAAbAAqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV////////////////////////////////////////////AAAAAExhdmM1OC4xMwAAAAAAAAAAAAAAACQDgAAAAAAAAAGw3X+VkgAAAAAAAAAAAAAAAAD/4xjEAAJQAVAAAAAAvYCCB4P+UBn//+D4PoGH/ygM///KAHAY////4Pg+D7/8EMOD4f/6gYf///wfB9///5QGf/lAZ//+UAcH0GH////+oGH//6gYf5QBwfD4fygDg//+D5//ygMAAAAAAA/+MYxBYCwAFYAAAAAPHjx4sePHjx5OTk5FRUVFRU9PT09PT09PT0/////////////////////////////////+MYxCMAAADSAAAAAP///////////////////////////////////////////////+MYxDAAAADSAAAAAP///////////////////////////////////////////////+MYxD4AAADSAAAAAP//////////////////////////////////////////////'
@@ -31,6 +32,9 @@ const OrdersManagement = () => {
   // ── Feature 1: Invoice state ─────────────────────────────────────────────
   const [viewingInvoice, setViewingInvoice]   = useState(null);  // invoice object
   const [invoiceLoading, setInvoiceLoading]   = useState(null);  // orderId being loaded
+
+  // ── External Orders: modal state ─────────────────────────────────────────
+  const [showExternalModal, setShowExternalModal] = useState(false);
 
   // ── Fix 3: Soft-delete state ─────────────────────────────────────────────
   const [deleteConfirmId, setDeleteConfirmId] = useState(null);
@@ -438,6 +442,16 @@ const OrdersManagement = () => {
         />
       )}
 
+      {/* ── External Order Modal ──────────────────────────────────────────── */}
+      {showExternalModal && (
+        <ExternalOrderModal
+          onClose={() => setShowExternalModal(false)}
+          onSuccess={(id, num) => {
+            toast.success(`Order #${String(num).padStart(3, '0')} added to kitchen queue`);
+          }}
+        />
+      )}
+
       {/* New Order Notification Popup */}
       <AnimatePresence>
         {newOrderNotification && (
@@ -477,22 +491,33 @@ const OrdersManagement = () => {
       </AnimatePresence>
 
       {/* Header with Sound Toggle */}
-      <div className="flex justify-between items-center">
+      <div className="flex flex-wrap justify-between items-center gap-3">
         <h2 className="text-2xl font-bold text-white" style={{ fontFamily: 'Playfair Display, serif' }}>
           Orders Management
         </h2>
-        <button
-          onClick={() => setSoundEnabled(!soundEnabled)}
-          className={`flex items-center gap-2 px-4 py-2 rounded-sm transition-all ${
-            soundEnabled
-              ? 'bg-[#D4AF37]/20 text-[#D4AF37] border border-[#D4AF37]/30'
-              : 'bg-white/5 text-[#A3A3A3] border border-white/10'
-          }`}
-          data-testid="sound-toggle"
-        >
-          <Volume2 className="w-4 h-4" />
-          {soundEnabled ? 'Sound On' : 'Sound Off'}
-        </button>
+        <div className="flex items-center gap-2">
+          {/* ── Add External Order Button ── */}
+          <button
+            onClick={() => setShowExternalModal(true)}
+            data-testid="add-external-order-btn"
+            className="flex items-center gap-2 px-4 py-2 bg-[#D4AF37] hover:bg-[#C5A059] text-black font-bold rounded-sm text-sm transition-all"
+          >
+            <PlusCircle className="w-4 h-4" />
+            Add External Order
+          </button>
+          <button
+            onClick={() => setSoundEnabled(!soundEnabled)}
+            className={`flex items-center gap-2 px-4 py-2 rounded-sm transition-all ${
+              soundEnabled
+                ? 'bg-[#D4AF37]/20 text-[#D4AF37] border border-[#D4AF37]/30'
+                : 'bg-white/5 text-[#A3A3A3] border border-white/10'
+            }`}
+            data-testid="sound-toggle"
+          >
+            <Volume2 className="w-4 h-4" />
+            {soundEnabled ? 'Sound On' : 'Sound Off'}
+          </button>
+        </div>
       </div>
 
       {/* Search and Export */}

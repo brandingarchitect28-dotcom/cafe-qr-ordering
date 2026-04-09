@@ -1,18 +1,20 @@
 /**
  * ExternalOrderModal.jsx
  *
- * Modal form for manually adding external orders (Zomato, Swiggy, Phone, Walk-in).
- * Saves to the SAME orders/{orderId} collection with identical structure to QR orders.
- * Adds two new fields: orderSource, externalOrder: true
+ * Modal form for manually adding external orders from Zomato, Swiggy,
+ * Phone orders, Walk-in customers, or any other platform.
  *
- * Rules:
- *  - Does NOT touch CafeOrdering.jsx order flow
- *  - Does NOT break invoice generation (createInvoiceForOrder called after save)
- *  - Does NOT break kitchen display (uses same orderStatus: 'new')
- *  - Matches existing Tailwind dark dashboard design exactly
+ * Creates orders with the IDENTICAL schema used by QR orders so they flow
+ * into the same Analytics, Kitchen Display, Invoice system, and Notifications
+ * without any separate handling.
+ *
+ * Exports:
+ *  - default  ExternalOrderModal  (the modal component)
+ *  - named    ORDER_SOURCES       (platform list used by Analytics source badges)
+ *  - named    getSourceMeta       (colour/label lookup used by order cards)
  */
 
-import React, { useState, useCallback } from 'react';
+import React, { useState } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
 import { useDocument } from '../../hooks/useFirestore';
 import {
@@ -23,18 +25,19 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { toast } from 'sonner';
 import {
   X, Plus, Trash2, RefreshCw, ShoppingBag,
-  ChevronDown, AlertCircle, Check,
+  AlertCircle, Check,
 } from 'lucide-react';
 import { createInvoiceForOrder } from '../../services/invoiceService';
 
-// ─── constants ────────────────────────────────────────────────────────────────
+// ─── Platform source definitions ──────────────────────────────────────────────
+// Exported so Analytics.jsx and order card badges can reference the same list
 
 export const ORDER_SOURCES = [
-  { value: 'zomato',  label: 'Zomato',       color: '#EF4444', bg: 'bg-red-500/15 border-red-500/30 text-red-400'       },
-  { value: 'swiggy',  label: 'Swiggy',       color: '#F97316', bg: 'bg-orange-500/15 border-orange-500/30 text-orange-400' },
-  { value: 'phone',   label: 'Phone Order',  color: '#3B82F6', bg: 'bg-blue-500/15 border-blue-500/30 text-blue-400'    },
+  { value: 'zomato',  label: 'Zomato',       color: '#EF4444', bg: 'bg-red-500/15 border-red-500/30 text-red-400'              },
+  { value: 'swiggy',  label: 'Swiggy',       color: '#F97316', bg: 'bg-orange-500/15 border-orange-500/30 text-orange-400'    },
+  { value: 'phone',   label: 'Phone Order',  color: '#3B82F6', bg: 'bg-blue-500/15 border-blue-500/30 text-blue-400'          },
   { value: 'walkin',  label: 'Walk-in',      color: '#10B981', bg: 'bg-emerald-500/15 border-emerald-500/30 text-emerald-400' },
-  { value: 'other',   label: 'Other',        color: '#8B5CF6', bg: 'bg-purple-500/15 border-purple-500/30 text-purple-400' },
+  { value: 'other',   label: 'Other',        color: '#8B5CF6', bg: 'bg-purple-500/15 border-purple-500/30 text-purple-400'    },
 ];
 
 export const getSourceMeta = (source) =>
@@ -42,10 +45,10 @@ export const getSourceMeta = (source) =>
     value: source || 'other',
     label: source?.toUpperCase() || 'DIRECT',
     color: '#A3A3A3',
-    bg: 'bg-white/10 border-white/20 text-[#A3A3A3]',
+    bg:    'bg-white/10 border-white/20 text-[#A3A3A3]',
   };
 
-// ─── helpers ─────────────────────────────────────────────────────────────────
+// ─── Internal helpers ─────────────────────────────────────────────────────────
 
 const EMPTY_ITEM = { name: '', quantity: 1, price: '' };
 
@@ -55,11 +58,11 @@ const inputCls =
 
 const labelCls = 'block text-white text-sm font-medium mb-1.5';
 
-// ─── ExternalOrderModal ──────────────────────────────────────────────────────
+// ─── ExternalOrderModal ───────────────────────────────────────────────────────
 
 const ExternalOrderModal = ({ onClose, onSuccess }) => {
   const { user } = useAuth();
-  const cafeId = user?.cafeId;
+  const cafeId   = user?.cafeId;
   const { data: cafe } = useDocument('cafes', cafeId);
   const CUR = cafe?.currencySymbol || '₹';
 
@@ -74,32 +77,31 @@ const ExternalOrderModal = ({ onClose, onSuccess }) => {
   const [paymentStatus, setPaymentStatus] = useState('pending');
   const [items,         setItems        ] = useState([{ ...EMPTY_ITEM }]);
 
-  // ── item CRUD ─────────────────────────────────────────────────────────────
+  // ── Item CRUD ───────────────────────────────────────────────────────────────
   const updateItem = (idx, field, value) => {
     setItems(prev => prev.map((item, i) =>
       i === idx ? { ...item, [field]: value } : item
     ));
   };
 
-  const addItem = () => setItems(prev => [...prev, { ...EMPTY_ITEM }]);
+  const addItem    = () => setItems(prev => [...prev, { ...EMPTY_ITEM }]);
 
   const removeItem = (idx) => {
-    if (items.length === 1) return; // always keep at least 1
+    if (items.length === 1) return; // always keep at least one row
     setItems(prev => prev.filter((_, i) => i !== idx));
   };
 
-  // ── totals ────────────────────────────────────────────────────────────────
+  // ── Running total ───────────────────────────────────────────────────────────
   const calculatedTotal = items.reduce((sum, item) => {
     const qty   = parseFloat(item.quantity) || 0;
     const price = parseFloat(item.price)    || 0;
     return sum + qty * price;
   }, 0);
 
-  // ── submit ────────────────────────────────────────────────────────────────
+  // ── Submit — creates order with IDENTICAL schema to QR orders ───────────────
   const handleSubmit = async (e) => {
-    e.preventDefault();
+    if (e) e.preventDefault();
 
-    // Validation
     const validItems = items.filter(i => i.name.trim() && parseFloat(i.price) > 0);
     if (validItems.length === 0) {
       toast.error('Add at least one item with a name and price');
@@ -109,7 +111,7 @@ const ExternalOrderModal = ({ onClose, onSuccess }) => {
     setSubmitting(true);
 
     try {
-      // Sequential order number (same transaction used by QR orders)
+      // Sequential order number — same transaction used by QR orders
       const counterRef = doc(db, 'system', 'counters');
       let orderNumber;
 
@@ -126,8 +128,8 @@ const ExternalOrderModal = ({ onClose, onSuccess }) => {
 
       const formattedItems = validItems.map(i => ({
         name:     i.name.trim(),
-        price:    parseFloat(i.price) || 0,
-        quantity: parseInt(i.quantity) || 1,
+        price:    parseFloat(i.price)    || 0,
+        quantity: parseInt(i.quantity, 10) || 1,
       }));
 
       const totalAmount = formattedItems.reduce(
@@ -135,30 +137,30 @@ const ExternalOrderModal = ({ onClose, onSuccess }) => {
       );
 
       const orderData = {
-        // ── standard order fields (identical shape to QR orders) ──
+        // Standard fields — identical shape to QR-placed orders
         cafeId,
         orderNumber,
-        items:         formattedItems,
-        subtotalAmount: totalAmount,
-        taxAmount:      0,
+        items:               formattedItems,
+        subtotalAmount:      totalAmount,
+        taxAmount:           0,
         serviceChargeAmount: 0,
-        gstAmount:      0,
+        gstAmount:           0,
         totalAmount,
-        currencyCode:   cafe?.currencyCode   || 'INR',
-        currencySymbol: cafe?.currencySymbol || '₹',
+        currencyCode:        cafe?.currencyCode   || 'INR',
+        currencySymbol:      cafe?.currencySymbol || '₹',
         paymentStatus,
         paymentMode,
-        orderStatus:   'new',
-        orderType:     tableNumber ? 'dine-in' : 'takeaway',
-        customerName:  customerName.trim() || getSourceMeta(source).label,
-        customerPhone: '',
+        orderStatus:         'new',
+        orderType:           tableNumber ? 'dine-in' : 'takeaway',
+        customerName:        customerName.trim() || getSourceMeta(source).label,
+        customerPhone:       '',
         ...(tableNumber && { tableNumber: tableNumber.trim() }),
-        ...(notes && { specialInstructions: notes.trim() }),
+        ...(notes        && { specialInstructions: notes.trim() }),
 
-        // ── external order fields ──
-        orderSource:   source,        // 'zomato' | 'swiggy' | 'phone' | 'walkin' | 'other'
+        // External-order fields (read by Analytics source charts + KDS badges)
+        orderSource:   source,   // 'zomato' | 'swiggy' | 'phone' | 'walkin' | 'other'
         externalOrder: true,
-        source,                        // kept for backward compat with KDS + Overview badges
+        source,                  // kept for backward-compat with KDS + Overview badges
 
         createdAt: serverTimestamp(),
       };
@@ -166,14 +168,16 @@ const ExternalOrderModal = ({ onClose, onSuccess }) => {
       const orderDocRef = await addDoc(collection(db, 'orders'), orderData);
       const formattedNum = String(orderNumber).padStart(3, '0');
 
-      // Non-blocking invoice generation (same as QR orders)
+      // Non-blocking invoice generation — same as QR orders
       createInvoiceForOrder(
         { ...orderData, orderNumber },
         orderDocRef.id,
         cafe
       ).catch(err => console.error('[ExternalOrder] Invoice generation failed:', err));
 
-      toast.success(`External order #${formattedNum} added from ${getSourceMeta(source).label}!`);
+      toast.success(
+        `External order #${formattedNum} added from ${getSourceMeta(source).label}!`
+      );
 
       if (onSuccess) onSuccess(orderDocRef.id, orderNumber);
       onClose();
@@ -186,7 +190,7 @@ const ExternalOrderModal = ({ onClose, onSuccess }) => {
     }
   };
 
-  // ── render ────────────────────────────────────────────────────────────────
+  // ── Render ──────────────────────────────────────────────────────────────────
   const sourceMeta = getSourceMeta(source);
 
   return (
@@ -206,7 +210,7 @@ const ExternalOrderModal = ({ onClose, onSuccess }) => {
           onClick={e => e.stopPropagation()}
           className="w-full max-w-2xl bg-[#0A0A0A] border border-white/10 rounded-xl shadow-2xl overflow-hidden flex flex-col max-h-[92vh]"
         >
-          {/* ── Header ──────────────────────────────────────────────────── */}
+          {/* Header */}
           <div className="flex items-center justify-between px-6 py-4 border-b border-white/10 bg-[#0F0F0F] flex-shrink-0">
             <div className="flex items-center gap-3">
               <div className="w-9 h-9 rounded-lg bg-[#D4AF37]/10 flex items-center justify-center">
@@ -229,7 +233,7 @@ const ExternalOrderModal = ({ onClose, onSuccess }) => {
             </button>
           </div>
 
-          {/* ── Scrollable form body ─────────────────────────────────────── */}
+          {/* Scrollable form body */}
           <form onSubmit={handleSubmit} className="overflow-y-auto flex-1 p-6 space-y-5">
 
             {/* Platform Source */}
@@ -243,7 +247,7 @@ const ExternalOrderModal = ({ onClose, onSuccess }) => {
                     onClick={() => setSource(s.value)}
                     className={`flex flex-col items-center gap-1.5 py-3 px-2 rounded-sm border-2 text-xs font-bold transition-all ${
                       source === s.value
-                        ? `border-[${s.color}] bg-[${s.color}]/10 text-white`
+                        ? 'border-white/40 text-white'
                         : 'border-white/10 text-[#A3A3A3] hover:border-white/20 hover:text-white'
                     }`}
                     style={
@@ -260,7 +264,6 @@ const ExternalOrderModal = ({ onClose, onSuccess }) => {
                   </button>
                 ))}
               </div>
-
               {/* Selected source badge preview */}
               <div className="mt-2 flex items-center gap-2">
                 <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded border text-xs font-bold ${sourceMeta.bg}`}>
@@ -327,7 +330,6 @@ const ExternalOrderModal = ({ onClose, onSuccess }) => {
 
                 {items.map((item, idx) => (
                   <div key={idx} className="grid grid-cols-12 gap-2 items-center">
-                    {/* Name */}
                     <input
                       type="text"
                       value={item.name}
@@ -336,7 +338,6 @@ const ExternalOrderModal = ({ onClose, onSuccess }) => {
                       className={`${inputCls} col-span-6`}
                       data-testid={`ext-item-name-${idx}`}
                     />
-                    {/* Quantity */}
                     <input
                       type="number"
                       min="1"
@@ -345,7 +346,6 @@ const ExternalOrderModal = ({ onClose, onSuccess }) => {
                       className={`${inputCls} col-span-2 text-center`}
                       data-testid={`ext-item-qty-${idx}`}
                     />
-                    {/* Price */}
                     <input
                       type="number"
                       min="0"
@@ -356,7 +356,6 @@ const ExternalOrderModal = ({ onClose, onSuccess }) => {
                       className={`${inputCls} col-span-3`}
                       data-testid={`ext-item-price-${idx}`}
                     />
-                    {/* Remove */}
                     <button
                       type="button"
                       onClick={() => removeItem(idx)}
@@ -436,7 +435,7 @@ const ExternalOrderModal = ({ onClose, onSuccess }) => {
             </div>
           </form>
 
-          {/* ── Footer actions ───────────────────────────────────────────── */}
+          {/* Footer actions */}
           <div className="px-6 py-4 border-t border-white/10 bg-[#0A0A0A] flex items-center justify-between gap-3 flex-shrink-0">
             <div className="text-sm text-[#A3A3A3]">
               {items.filter(i => i.name.trim()).length} item{items.filter(i => i.name.trim()).length !== 1 ? 's' : ''} ·{' '}
