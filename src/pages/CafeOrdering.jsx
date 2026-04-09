@@ -1,130 +1,9 @@
-import { formatWhatsAppNumber } from '../utils/whatsapp';
-import React, { useState, useEffect, useMemo, useRef } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
-import { collection, query, where, doc, addDoc, updateDoc, serverTimestamp, runTransaction, onSnapshot } from 'firebase/firestore';
-import { db } from '../lib/firebase';
-import { createInvoiceForOrder } from '../services/invoiceService';
-import { deductStockForOrder } from '../services/inventoryService';
-import { deductStockByRecipe } from '../services/recipeService';
-import { motion, AnimatePresence } from 'framer-motion';
-import { ShoppingCart, Plus, Minus, X, Search, Coffee, Package, ChevronDown, RefreshCw, AlertCircle } from 'lucide-react';
-import AddOnModal from '../components/AddOnModal';
-import { toast } from 'sonner';
-import { QRCodeSVG } from 'qrcode.react';
-
-// Function to generate theme colors based on cafe settings
-const getThemeColors = (primaryColor = '#D4AF37', mode = 'light') => {
-  const isLight = mode === 'light';
-  
-  // Calculate a lighter/darker version of primary color for accents
-  const hexToRgb = (hex) => {
-    const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
-    return result ? {
-      r: parseInt(result[1], 16),
-      g: parseInt(result[2], 16),
-      b: parseInt(result[3], 16)
-    } : { r: 212, g: 175, b: 55 };
-  };
-  
-  const rgb = hexToRgb(primaryColor);
-  const shadowColor = `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, 0.15)`;
-  const shadowColorDark = `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, 0.25)`;
-  
-  if (isLight) {
-    return {
-      background: '#FDF8F3',
-      backgroundSecondary: '#F5EDE4',
-      warmWhite: '#FFFBF7',
-      text: '#2C1810',
-      textLight: '#6B5344',
-      textMuted: '#9A8B7A',
-      cardBg: '#FFFFFF',
-      primary: primaryColor,
-      primaryDark: primaryColor,
-      shadow: shadowColor,
-      shadowDark: shadowColorDark,
-      border: '#E5E5E5',
-      beige: '#F5EDE4',
-    };
-  } else {
-    return {
-      background: '#0f0f0f',
-      backgroundSecondary: '#1a1a1a',
-      warmWhite: '#151515',
-      text: '#ffffff',
-      textLight: '#d4d4d4',
-      textMuted: '#a3a3a3',
-      cardBg: '#1a1a1a',
-      primary: primaryColor,
-      primaryDark: primaryColor,
-      shadow: 'rgba(0, 0, 0, 0.3)',
-      shadowDark: 'rgba(0, 0, 0, 0.5)',
-      border: '#2a2a2a',
-      beige: '#1a1a1a',
-    };
-  }
-};
-
-// Animation variants
-const fadeInUp = {
-  hidden: { opacity: 0, y: 30 },
-  visible: { opacity: 1, y: 0, transition: { duration: 0.6, ease: [0.25, 0.46, 0.45, 0.94] } }
-};
-
-const staggerContainer = {
-  hidden: { opacity: 0 },
-  visible: { opacity: 1, transition: { staggerChildren: 0.1, delayChildren: 0.2 } }
-};
-
-// Error Fallback Component
-const ErrorFallback = ({ title, message, onRetry, icon: Icon = AlertCircle, colors }) => (
-  <motion.div
-    initial={{ opacity: 0, y: 20 }}
-    animate={{ opacity: 1, y: 0 }}
-    className="flex flex-col items-center justify-center p-8 text-center"
-    style={{ backgroundColor: colors.background }}
-  >
-    <Icon className="w-16 h-16 mb-4" style={{ color: colors.primary }} />
-    <h2 className="text-2xl font-bold mb-2" style={{ fontFamily: 'Playfair Display, serif', color: colors.text }}>
-      {title}
-    </h2>
-    <p className="mb-6" style={{ color: colors.textMuted }}>{message}</p>
-    {onRetry && (
-      <motion.button
-        whileHover={{ scale: 1.05 }}
-        whileTap={{ scale: 0.95 }}
-        onClick={onRetry}
-        className="px-6 py-3 rounded-full text-white font-semibold flex items-center gap-2"
-        style={{ backgroundColor: colors.primary }}
-      >
-        <RefreshCw className="w-5 h-5" />
-        Try Again
-      </motion.button>
-    )}
-  </motion.div>
-);
-
-// Loading Skeleton Component
-const LoadingSkeleton = ({ message = "Loading...", colors }) => (
-  <div className="min-h-screen flex flex-col items-center justify-center" style={{ backgroundColor: colors?.background || '#FDF8F3' }}>
-    <motion.div
-      animate={{ rotate: 360 }}
-      transition={{ duration: 1.5, repeat: Infinity, ease: "linear" }}
-      className="w-16 h-16 rounded-full border-4 mb-4"
-      style={{ borderColor: colors?.primary || '#D4AF37', borderTopColor: 'transparent' }}
-    />
-    <p style={{ color: colors?.textMuted || '#9A8B7A' }}>{message}</p>
-  </div>
-);
-
 const CafeOrdering = () => {
   const { cafeId } = useParams();
-  const navigate = useNavigate();
   const [cafe, setCafe] = useState(null);
   const [menuItems, setMenuItems] = useState([]);
   const [offers, setOffers] = useState([]);
   const [cart, setCart] = useState([]);
-  const [addonModal, setAddonModal] = useState(null); // item waiting for add-on selection
   const [loading, setLoading] = useState(true);
   const [menuLoading, setMenuLoading] = useState(true);
   const [offersLoading, setOffersLoading] = useState(true);
@@ -154,8 +33,8 @@ const CafeOrdering = () => {
     return getThemeColors(cafe?.primaryColor || '#D4AF37', cafe?.mode || 'light');
   }, [cafe?.primaryColor, cafe?.mode]);
 
-  // Currency symbol from cafe settings (falls back to ₹)
-  const CUR = cafe?.currencySymbol || '₹';
+  // Currency symbol from cafe settings (falls back to \u20b9)
+  const CUR = cafe?.currencySymbol || '\u20b9';
 
   // Cleanup all listeners on unmount
   useEffect(() => {
@@ -175,7 +54,7 @@ const CafeOrdering = () => {
       <div className="min-h-screen" style={{ backgroundColor: defaultColors.background }}>
         <ErrorFallback
           title="Invalid Link"
-          message="No café ID found in the URL. Please scan a valid QR code or use the correct link."
+          message="No caf\u00e9 ID found in the URL. Please scan a valid QR code or use the correct link."
           icon={AlertCircle}
           colors={defaultColors}
         />
@@ -337,32 +216,30 @@ const CafeOrdering = () => {
   }, [cafeId]);
 
   // Cart functions
-  // Items with add-ons → open AddOnModal first (no change for items without add-ons)
-  const addToCart = (item) => {
-    if (item.addons?.length > 0) {
-      setAddonModal(item);
-      return;
-    }
-    directAddToCart({ ...item, quantity: 1, addons: [], addonTotal: 0 });
-  };
-
-  const directAddToCart = (cartEntry) => {
-    setAddingItemId(cartEntry.id);
+  const addToCart = (item, size = null) => {
+    const selectedPrice = size && item.sizePricing?.[size]
+      ? parseFloat(item.sizePricing[size])
+      : item.price;
+    const cartEntry = { ...item, price: selectedPrice, selectedSize: size || null };
+    setAddingItemId(item.id);
     setTimeout(() => setAddingItemId(null), 600);
-    // Items with add-ons always get their own cart row (different selection = different entry)
-    if (cartEntry.addons?.length > 0) {
-      setCart(prev => [...prev, cartEntry]);
-    } else {
-      const existingItem = cart.find(i => i.id === cartEntry.id && !i.addons?.length);
-      if (existingItem) {
-        setCart(cart.map(i =>
-          i.id === cartEntry.id && !i.addons?.length ? { ...i, quantity: i.quantity + 1 } : i
-        ));
+    if (size) {
+      const existing = cart.find(i => i.id === item.id && i.selectedSize === size);
+      if (existing) {
+        setCart(cart.map(i => i.id === item.id && i.selectedSize === size ? { ...i, quantity: i.quantity + 1 } : i));
       } else {
-        setCart([...cart, cartEntry]);
+        setCart([...cart, { ...cartEntry, quantity: 1 }]);
+      }
+    } else {
+      const existingItem = cart.find(i => i.id === item.id && !i.selectedSize);
+      if (existingItem) {
+        setCart(cart.map(i => i.id === item.id && !i.selectedSize ? { ...i, quantity: i.quantity + 1 } : i));
+      } else {
+        setCart([...cart, { ...cartEntry, quantity: 1 }]);
       }
     }
-    toast.success(`${cartEntry.name} added to cart`, { duration: 2000 });
+    const sizeLabel = size ? ` (${size.charAt(0).toUpperCase() + size.slice(1)})` : '';
+    toast.success(`${item.name}${sizeLabel} added to cart`, { duration: 2000 });
   };
 
   const updateQuantity = (itemId, change) => {
@@ -380,63 +257,28 @@ const CafeOrdering = () => {
     setCart(cart.filter(item => item.id !== itemId));
   };
 
-  // ── Unified safe pricing system ───────────────────────────────────────────
-  // Single source of truth for all charge calculations.
-  // - All values default to 0 (no undefined/NaN possible)
-  // - finalAmount is always a safe integer (Math.round)
-  // - UI, order data, and payment all use the same values
-
-  const safeNum = (v) => {
-    const n = parseFloat(v);
-    return isNaN(n) || !isFinite(n) ? 0 : n;
+  const calculateSubtotal = () => {
+    return cart.reduce((sum, item) => sum + (item.price * item.quantity), 0);
   };
 
-  const itemsTotal = cart.reduce((sum, item) =>
-    sum + (safeNum(item.price) * safeNum(item.quantity)), 0);
+  const calculateTax = () => {
+    if (!cafe?.taxEnabled) return 0;
+    return calculateSubtotal() * (parseFloat(cafe.taxRate) || 0) / 100;
+  };
 
-  // GST (legacy field — kept for backward compat with existing orders)
-  const gstAmount = cafe?.gstEnabled
-    ? itemsTotal * safeNum(cafe.gstRate) / 100
-    : 0;
+  const calculateServiceCharge = () => {
+    if (!cafe?.serviceChargeEnabled) return 0;
+    return calculateSubtotal() * (parseFloat(cafe.serviceChargeRate) || 0) / 100;
+  };
 
-  // Tax (separate named tax — shown as taxName label)
-  const taxAmount = cafe?.taxEnabled
-    ? itemsTotal * safeNum(cafe.taxRate) / 100
-    : 0;
+  const calculateTotal = () => {
+    return calculateSubtotal() + calculateTax() + calculateServiceCharge();
+  };
 
-  // Service charge
-  const serviceChargeAmount = cafe?.serviceChargeEnabled
-    ? itemsTotal * safeNum(cafe.serviceChargeRate) / 100
-    : 0;
-
-  // Platform fee — fixed amount set by owner
-  const platformFeeAmount = cafe?.platformFeeEnabled
-    ? safeNum(cafe.platformFeeAmount)
-    : 0;
-
-  // Final total — integer (Math.round prevents decimals sent to payment gateway)
-  const finalAmount = Math.round(
-    itemsTotal + gstAmount + taxAmount + serviceChargeAmount + platformFeeAmount
-  );
-
-  // Legacy calc wrappers — keep existing code that calls these working unchanged
-  const calculateSubtotal      = () => itemsTotal;
-  const calculateTax           = () => taxAmount;
-  const calculateServiceCharge = () => serviceChargeAmount;
-  const calculateGST           = () => gstAmount;
-  const calculateTotal         = () => finalAmount;
-  const CUR_SYMBOL             = cafe?.currencySymbol || '₹';
-
-  // Debug log — called before payment to confirm UI = payment amount
-  const logAmountBreakdown = () => {
-    console.log('──── Order Amount Breakdown ────');
-    console.log('Items:    ', itemsTotal.toFixed(2));
-    console.log('GST:      ', gstAmount.toFixed(2));
-    console.log('Tax:      ', taxAmount.toFixed(2));
-    console.log('Service:  ', serviceChargeAmount.toFixed(2));
-    console.log('Platform: ', platformFeeAmount.toFixed(2));
-    console.log('Final:    ', finalAmount);
-    console.log('────────────────────────────────');
+  // Keep legacy GST for backward compat with existing orders
+  const calculateGST = () => {
+    if (!cafe?.gstEnabled) return 0;
+    return calculateSubtotal() * (parseFloat(cafe.gstRate) || 0) / 100;
   };
 
   const cartItemsCount = cart.reduce((sum, item) => sum + item.quantity, 0);
@@ -496,7 +338,7 @@ const CafeOrdering = () => {
           }));
           
           setCart(adjustedItems);
-          toast.success(`🎉 ${offer.title} added! You save ₹${(totalOriginal - comboPrice).toFixed(0)}!`);
+          toast.success(`\ud83c\udf89 ${offer.title} added! You save \u20b9${(totalOriginal - comboPrice).toFixed(0)}!`);
         } else if (offer.type === 'discount') {
           const discountMultiplier = offer.discountType === 'percentage' 
             ? (1 - parseFloat(offer.discountAmount) / 100)
@@ -512,7 +354,7 @@ const CafeOrdering = () => {
           }));
           
           setCart(prev => [...prev, ...adjustedItems]);
-          toast.success(`🎉 ${offer.title} applied!`);
+          toast.success(`\ud83c\udf89 ${offer.title} applied!`);
         } else if (offer.type === 'buy_x_get_y' && offer.getItemId) {
           setCart(prev => [...prev, ...newCartItems]);
           
@@ -527,7 +369,7 @@ const CafeOrdering = () => {
               offerTitle: offer.title
             };
             setCart(prev => [...prev, freeCartItem]);
-            toast.success(`🎁 ${offer.title}! ${freeItem.name} added FREE!`);
+            toast.success(`\ud83c\udf81 ${offer.title}! ${freeItem.name} added FREE!`);
           }
         } else {
           setCart(prev => [...prev, ...newCartItems]);
@@ -573,42 +415,26 @@ const CafeOrdering = () => {
         }
       });
 
-      // All values come from the unified pricing system defined above
-      // No recalculation — same numbers shown in UI = sent to backend = sent to payment
       const subtotal = calculateSubtotal();
-      const total    = calculateTotal(); // finalAmount — already Math.round integer
-
-      // Transparency log — verifies UI amount = payment amount
-      logAmountBreakdown();
+      const taxAmount = calculateTax();
+      const serviceChargeAmount = calculateServiceCharge();
+      const gstAmount = calculateGST(); // legacy
+      const total = calculateTotal();
 
       const orderData = {
         cafeId,
         orderNumber,
-        items: cart.map(item => ({
-          name:       item.name,
-          price:      item.basePrice ?? item.price,  // base price (without add-ons)
-          quantity:   item.quantity,
-          addons:     item.addons     || [],
-          addonTotal: item.addonTotal || 0,
-        })),
-        subtotalAmount:      subtotal,
-        taxAmount:           taxAmount,
+        items: cart.map(item => ({ name: item.name, price: item.price, quantity: item.quantity, selectedSize: item.selectedSize || null })),
+        subtotalAmount: subtotal,
+        taxAmount: taxAmount,
         serviceChargeAmount: serviceChargeAmount,
-        gstAmount:           gstAmount,
-        platformFeeAmount:   platformFeeAmount,
-        totalAmount:         total,
+        gstAmount: gstAmount,
+        totalAmount: total,
         currencyCode: cafe?.currencyCode || 'INR',
-        currencySymbol: cafe?.currencySymbol || '₹',
-        // TASK 1 FIX: Always 'pending' at creation.
-        // Never mark paid before actual payment confirmation.
-        // Only updated to 'paid' by: owner manual action OR future webhook.
-        paymentStatus: 'pending',
+        currencySymbol: cafe?.currencySymbol || '\u20b9',
+        paymentStatus: paymentMode === 'prepaid' ? 'paid' : 'pending',
         paymentMode,
         orderStatus: 'new',
-        // calculationStatus: tracks whether prices have been confirmed post-creation.
-        // 'pending' → order is live in kitchen immediately, summary loads on tracking page.
-        // 'done'    → set right after addDoc (background, non-blocking).
-        calculationStatus: 'pending',
         orderType,
         customerName,
         customerPhone,
@@ -618,158 +444,69 @@ const CafeOrdering = () => {
         createdAt: serverTimestamp()
       };
 
-      const orderDocRef = await addDoc(collection(db, 'orders'), orderData);
-
-      // Mark calculationStatus:'done' immediately after write — non-blocking background update.
-      // All prices are already calculated before addDoc, so this is just a status flag.
-      // Kitchen and real-time listeners already have the order by this point.
-      updateDoc(orderDocRef, { calculationStatus: 'done' }).catch(() => {});
-
-      // ── Feature 1: Auto-generate invoice (non-blocking, does not affect order flow) ──
-      createInvoiceForOrder(
-        { ...orderData, orderNumber },
-        orderDocRef.id,
-        cafe
-      ).catch((err) => console.error('[Invoice] Background generation failed:', err));
-
-      // ── Feature 5: Auto-deduct inventory stock (non-blocking, safe) ──
-      deductStockForOrder(cafeId, orderData.items, menuItems)
-        .catch((err) => console.error('[Inventory] Stock deduction failed (non-fatal):', err));
-
-      // ── Recipe-based stock deduction (non-blocking, safe) ──
-      deductStockByRecipe(cafeId, orderData.items, menuItems)
-        .catch((err) => console.error('[Recipe] Stock deduction failed (non-fatal):', err));
-
-      // TASK 7: Log order creation (no sensitive data logged)
-      console.log('[Order] Created successfully:', {
-        orderId:     orderDocRef.id,
-        orderNumber: String(orderNumber).padStart(3, '0'),
-        paymentMode,
-        paymentStatus: 'pending',
-        totalAmount: total,
-      });
-
-      // ── Cashfree payment via backend proxy (Tasks 2, 4, 5) ─────────────
-      // TASK 2: Direct browser call to api.cashfree.com is CORS-blocked.
-      //         Call your Render/backend instead — it holds the keys server-side.
-      // TASK 5: Frontend sends ONLY orderId, amount, phone, cafeId.
-      //         Keys NEVER leave the backend.
-      // TASK 4: orderId passed consistently so webhook can match it later.
-      if (
-        paymentMode === 'online' &&
-        cafe?.paymentSettings?.enabled &&
-        cafe?.paymentSettings?.gateway === 'cashfree'
-      ) {
-        try {
-          // ── REPLACE THIS URL with your Render backend URL ──────────────
-          // e.g. https://your-app.onrender.com/create-order
-          const BACKEND_URL = cafe?.paymentSettings?.backendUrl || '';
-
-          if (!BACKEND_URL) {
-            console.warn('[Payment] Backend URL not configured. Set paymentSettings.backendUrl in café settings.');
-            toast.error('Payment backend not configured. Please pay at counter.');
-          } else {
-            // TASK 7: Log payment initiation (no keys)
-            console.log('[Payment] Initiating Cashfree via backend:', {
-              orderId: orderDocRef.id,
-              amount:  total,
-              cafeId,
-            });
-
-            const resp = await fetch(`${BACKEND_URL}/create-order`, {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              // TASK 5: Only non-sensitive data sent from frontend
-              body: JSON.stringify({
-                orderId:  orderDocRef.id,  // TASK 4: consistent orderId for webhook
-                amount:   total,
-                phone:    customerPhone,
-                cafeId,
-                currency: cafe?.currencyCode || 'INR',
-                customerName,
-                returnUrl: `${window.location.origin}/track/${orderDocRef.id}`,
-              }),
-            });
-
-            const data = await resp.json();
-            console.log('[Payment] Backend response received:', {
-              status:             resp.status,
-              has_session_id:     !!data?.payment_session_id,
-              payment_session_id: data?.payment_session_id || 'MISSING',
-            });
-
-            if (data?.payment_session_id) {
-              const sessionId = data.payment_session_id;
-
-              // Confirm session received before using it
-              console.log('[Payment] Session confirmed — launching Cashfree SDK');
-              console.log('[Payment] payment_session_id:', sessionId);
-              console.log('[Payment] orderId:', orderDocRef.id);
-
-              // Use Cashfree JS SDK — no redirect delay, no stale session
-              // SDK is loaded in index.html via <script src="https://sdk.cashfree.com/js/v3/cashfree.js">
-              const cashfree = window.Cashfree({ mode: 'production' });
-              cashfree.checkout({ paymentSessionId: sessionId });
-              return;
-            } else {
-              console.error('[Payment] No payment_session_id in response:', data?.error || data);
-              toast.error('Payment gateway error. Please pay at counter.');
-            }
-          }
-        } catch (cfErr) {
-          // TASK 6: On any failure, order stays 'pending' — no data lost
-          console.error('[Payment] Backend call failed (order preserved as pending):', cfErr.message);
-          toast.error('Payment unavailable. Your order is saved — please pay at counter.');
-        }
-      }
-
+      await addDoc(collection(db, 'orders'), orderData);
+      
       const formattedOrderNumber = String(orderNumber).padStart(3, '0');
 
-      const cur = cafe?.currencySymbol || '₹';
-      let orderSummary = `*🚀 New Order*\n\n`;
-      orderSummary += `*Order #${formattedOrderNumber}*\n`;
-      orderSummary += `*Customer:* ${customerName}\n`;
-      orderSummary += `*Phone:* ${customerPhone}\n`;
-      orderSummary += `*Type:* ${orderType.charAt(0).toUpperCase() + orderType.slice(1)}\n`;
+      const cur = cafe?.currencySymbol || '\u20b9';
+      let orderSummary = `*\ud83d\ude80 New Order*\
+\
+`;
+      orderSummary += `*Order #${formattedOrderNumber}*\
+`;
+      orderSummary += `*Customer:* ${customerName}\
+`;
+      orderSummary += `*Phone:* ${customerPhone}\
+`;
+      orderSummary += `*Type:* ${orderType.charAt(0).toUpperCase() + orderType.slice(1)}\
+`;
       
       if (orderType === 'dine-in') {
-        orderSummary += `*Table:* ${tableNumber}\n`;
+        orderSummary += `*Table:* ${tableNumber}\
+`;
       } else if (orderType === 'delivery') {
-        orderSummary += `*Address:* ${deliveryAddress}\n`;
+        orderSummary += `*Address:* ${deliveryAddress}\
+`;
       }
       
-      orderSummary += `\n*Items:*\n`;
+      orderSummary += `\
+*Items:*\
+`;
       cart.forEach(item => {
-        const basePrice = item.basePrice ?? item.price;
-        const lineTotal = (item.price * item.quantity).toFixed(2); // item.price already = base + addons
-        orderSummary += `• ${item.name} x${item.quantity} ${cur}${lineTotal}\n`;
-        if (item.addons?.length > 0) {
-          item.addons.forEach(a => {
-            orderSummary += `   ↳ ${a.name}: +${cur}${(a.price || 0).toFixed(2)}\n`;
-          });
-        }
+        orderSummary += `\u2022 ${item.name} x${item.quantity} ${cur}${(item.price * item.quantity).toFixed(2)}\
+`;
       });
 
       const hasExtras = (cafe?.taxEnabled && taxAmount > 0) || (cafe?.serviceChargeEnabled && serviceChargeAmount > 0) || (cafe?.gstEnabled && gstAmount > 0);
       if (hasExtras) {
-        orderSummary += `\n*Subtotal: ${cur}${subtotal.toFixed(2)}*\n`;
+        orderSummary += `\
+*Subtotal: ${cur}${subtotal.toFixed(2)}*\
+`;
         if (cafe?.taxEnabled && taxAmount > 0) {
-          orderSummary += `*${cafe.taxName || 'Tax'} (${cafe.taxRate}%): ${cur}${taxAmount.toFixed(2)}*\n`;
+          orderSummary += `*${cafe.taxName || 'Tax'} (${cafe.taxRate}%): ${cur}${taxAmount.toFixed(2)}*\
+`;
         }
         if (cafe?.serviceChargeEnabled && serviceChargeAmount > 0) {
-          orderSummary += `*Service Charge (${cafe.serviceChargeRate}%): ${cur}${serviceChargeAmount.toFixed(2)}*\n`;
+          orderSummary += `*Service Charge (${cafe.serviceChargeRate}%): ${cur}${serviceChargeAmount.toFixed(2)}*\
+`;
         }
         if (cafe?.gstEnabled && gstAmount > 0) {
-          orderSummary += `*GST (${cafe.gstRate}%): ${cur}${gstAmount.toFixed(2)}*\n`;
+          orderSummary += `*GST (${cafe.gstRate}%): ${cur}${gstAmount.toFixed(2)}*\
+`;
         }
-        orderSummary += `*Total: ${cur}${total.toFixed(2)}*\n`;
+        orderSummary += `*Total: ${cur}${total.toFixed(2)}*\
+`;
       } else {
-        orderSummary += `\n*Total: ${cur}${total.toFixed(2)}*\n`;
+        orderSummary += `\
+*Total: ${cur}${total.toFixed(2)}*\
+`;
       }
-      orderSummary += `*Payment Mode:* ${paymentMode === 'counter' ? 'Pay at Counter' : paymentMode === 'table' ? 'Pay on Table' : paymentMode === 'online' ? 'Online Payment (Razorpay)' : 'Prepaid (UPI)'}`;
+      orderSummary += `*Payment Mode:* ${paymentMode === 'counter' ? 'Pay at Counter' : paymentMode === 'table' ? 'Pay on Table' : 'Prepaid (UPI)'}`;
       
       if (specialInstructions) {
-        orderSummary += `\n\n*Special Instructions:* ${specialInstructions}`;
+        orderSummary += `\
+\
+*Special Instructions:* ${specialInstructions}`;
       }
 
       const whatsappNumber = cafe?.whatsappNumber || '';
@@ -778,7 +515,7 @@ const CafeOrdering = () => {
         : `https://wa.me/?text=${encodeURIComponent(orderSummary)}`;
       
       toast.success(`Order #${formattedOrderNumber} placed successfully!`);
-
+      
       setCart([]);
       setCustomerName('');
       setCustomerPhone('');
@@ -788,10 +525,8 @@ const CafeOrdering = () => {
       setPaymentMode('counter');
       setSpecialInstructions('');
       setShowCheckout(false);
-
-      // Navigate customer to in-app order tracking (no WhatsApp redirect — stays in app)
-      // Owner is notified via their WhatsApp from the dashboard order notification system.
-      navigate(`/track/${orderDocRef.id}`);
+      
+      window.location.href = whatsappUrl;
       
     } catch (error) {
       console.error('Error placing order:', error);
@@ -826,35 +561,10 @@ const CafeOrdering = () => {
         >
           <Coffee className="w-16 h-16 mx-auto mb-4" style={{ color: defaultColors.primary }} />
           <h1 className="text-3xl font-bold mb-2" style={{ fontFamily: 'Playfair Display, serif', color: defaultColors.text }}>
-            Café Not Found
+            Caf\u00e9 Not Found
           </h1>
-          <p style={{ color: defaultColors.textMuted }}>The café you're looking for doesn't exist.</p>
+          <p style={{ color: defaultColors.textMuted }}>The caf\u00e9 you're looking for doesn't exist.</p>
           <p className="text-sm mt-2" style={{ color: defaultColors.textMuted }}>ID: {cafeId}</p>
-        </motion.div>
-      </div>
-    );
-  }
-
-  // ── isActive gate — show service unavailable if admin disabled this café ──
-  if (cafe.isActive === false) {
-    return (
-      <div className="min-h-screen flex items-center justify-center" style={{ backgroundColor: defaultColors.background }}>
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="text-center p-8 max-w-sm"
-        >
-          <div className="w-20 h-20 rounded-full mx-auto mb-5 flex items-center justify-center"
-            style={{ background: `${defaultColors.primary}15`, border: `2px solid ${defaultColors.primary}30` }}>
-            <Coffee className="w-10 h-10" style={{ color: defaultColors.primary }} />
-          </div>
-          <h1 className="text-2xl font-bold mb-3"
-            style={{ fontFamily: 'Playfair Display, serif', color: defaultColors.text }}>
-            Service Temporarily Unavailable
-          </h1>
-          <p className="text-sm leading-relaxed" style={{ color: defaultColors.textMuted }}>
-            We're sorry — this café is currently not accepting online orders. Please visit us in person or try again later.
-          </p>
         </motion.div>
       </div>
     );
@@ -863,7 +573,7 @@ const CafeOrdering = () => {
   return (
     <div className="min-h-screen" style={{ backgroundColor: COLORS.background, fontFamily: 'Inter, sans-serif' }}>
       
-      {/* Dynamic placeholder color — follows dark/light mode */}
+      {/* Dynamic placeholder color \u2014 follows dark/light mode */}
       <style>{`
         .cafe-input::placeholder { color: ${COLORS.textMuted}; opacity: 1; }
         .cafe-input:focus { outline: none; box-shadow: 0 0 0 2px ${COLORS.primary}44; }
@@ -907,7 +617,7 @@ const CafeOrdering = () => {
                 )}
               </motion.div>
 
-              {/* Café name */}
+              {/* Caf\u00e9 name */}
               <motion.h1 
                 variants={fadeInUp}
                 className="text-4xl md:text-6xl font-bold mb-4"
@@ -962,7 +672,7 @@ const CafeOrdering = () => {
               className="text-2xl md:text-3xl font-bold mb-8 flex items-center gap-3"
               style={{ fontFamily: 'Playfair Display, serif', color: COLORS.text }}
             >
-              <span>🔥</span> Today's Offers
+              <span>\ud83d\udd25</span> Today's Offers
             </motion.h2>
 
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -1033,14 +743,14 @@ const CafeOrdering = () => {
                       )}
                       {offer.type === 'discount' && (
                         <span className="font-bold" style={{ color: COLORS.primary }}>
-                          {offer.discountType === 'percentage' ? `${offer.discountAmount}% OFF` : `₹${offer.discountAmount} OFF`}
+                          {offer.discountType === 'percentage' ? `${offer.discountAmount}% OFF` : `\u20b9${offer.discountAmount} OFF`}
                         </span>
                       )}
                       <span 
                         className="text-sm font-semibold group-hover:translate-x-1 transition-transform"
                         style={{ color: COLORS.primary }}
                       >
-                        Add →
+                        Add \u2192
                       </span>
                     </div>
                   </div>
@@ -1129,8 +839,8 @@ const CafeOrdering = () => {
                 initial="rest"
                 whileHover="hover"
                 animate={addingItemId === item.id ? { scale: [1, 0.95, 1] } : "rest"}
-                className="rounded-2xl overflow-hidden shadow-md group"
-                style={{ backgroundColor: COLORS.cardBg, boxShadow: `0 4px 20px ${COLORS.shadow}` }}
+                className="rounded-2xl overflow-hidden shadow-md group" style={{ backgroundColor: COLORS.cardBg }}
+                style={{ boxShadow: `0 4px 20px ${COLORS.shadow}` }}
               >
                 {/* Item Image */}
                 <div className="aspect-square overflow-hidden relative">
@@ -1175,21 +885,44 @@ const CafeOrdering = () => {
                       {item.description}
                     </p>
                   )}
-                  <div className="flex items-center justify-between">
-                    <span className="text-lg font-bold" style={{ color: COLORS.primary }}>
-                      {CUR}{item.price}
-                    </span>
-                    <motion.button
-                      whileHover={{ scale: 1.05 }}
-                      whileTap={{ scale: 0.95 }}
-                      onClick={() => addToCart(item)}
-                      className="px-4 py-2 rounded-full text-sm font-semibold text-white transition-all"
-                      style={{ backgroundColor: COLORS.primary }}
-                      data-testid={`add-${item.id}`}
-                    >
-                      Add
-                    </motion.button>
-                  </div>
+                  {item.sizePricing?.enabled ? (
+                    <div className="space-y-1.5 mt-2">
+                      {item.sizePricing.small && (
+                        <motion.button whileTap={{ scale: 0.97 }}
+                          onClick={() => addToCart(item, 'small')}
+                          className="w-full py-1.5 px-3 rounded-full text-sm font-semibold text-white flex justify-between"
+                          style={{ backgroundColor: COLORS.primary }}
+                          data-testid={`add-small-${item.id}`}
+                        ><span>Small</span><span>{CUR}{parseFloat(item.sizePricing.small).toFixed(2)}</span></motion.button>
+                      )}
+                      {item.sizePricing.medium && (
+                        <motion.button whileTap={{ scale: 0.97 }}
+                          onClick={() => addToCart(item, 'medium')}
+                          className="w-full py-1.5 px-3 rounded-full text-sm font-semibold text-white flex justify-between"
+                          style={{ backgroundColor: COLORS.primary }}
+                          data-testid={`add-medium-${item.id}`}
+                        ><span>Medium</span><span>{CUR}{parseFloat(item.sizePricing.medium).toFixed(2)}</span></motion.button>
+                      )}
+                      {item.sizePricing.large && (
+                        <motion.button whileTap={{ scale: 0.97 }}
+                          onClick={() => addToCart(item, 'large')}
+                          className="w-full py-1.5 px-3 rounded-full text-sm font-semibold text-white flex justify-between"
+                          style={{ backgroundColor: COLORS.primary }}
+                          data-testid={`add-large-${item.id}`}
+                        ><span>Large</span><span>{CUR}{parseFloat(item.sizePricing.large).toFixed(2)}</span></motion.button>
+                      )}
+                    </div>
+                  ) : (
+                    <div className="flex items-center justify-between">
+                      <span className="text-lg font-bold" style={{ color: COLORS.primary }}>{CUR}{item.price}</span>
+                      <motion.button whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}
+                        onClick={() => addToCart(item)}
+                        className="px-4 py-2 rounded-full text-sm font-semibold text-white transition-all"
+                        style={{ backgroundColor: COLORS.primary }}
+                        data-testid={`add-${item.id}`}
+                      >Add</motion.button>
+                    </div>
+                  )}
                 </div>
               </motion.div>
             ))}
@@ -1225,7 +958,7 @@ const CafeOrdering = () => {
               <ShoppingCart className="w-6 h-6" />
             </motion.div>
             <span>{cartItemsCount} {cartItemsCount === 1 ? 'item' : 'items'}</span>
-            <span className="font-bold">— {CUR}{calculateTotal().toFixed(0)}</span>
+            <span className="font-bold">\u2014 {CUR}{calculateTotal().toFixed(0)}</span>
           </motion.button>
         )}
       </AnimatePresence>
@@ -1277,12 +1010,12 @@ const CafeOrdering = () => {
                       )}
                       <div className="flex-1">
                         <h4 className="font-semibold" style={{ color: COLORS.text }}>{item.name}</h4>
-                        <p className="text-sm" style={{ color: COLORS.primary }}>{CUR}{parseFloat(item.basePrice ?? item.price).toFixed(2)} each</p>
-                        {item.addons?.length > 0 && (
-                          <p className="text-xs mt-0.5" style={{ color: COLORS.textMuted }}>
-                            + {item.addons.map(a => a.name).join(', ')}
-                          </p>
+                        {item.selectedSize && (
+                          <span className="text-xs capitalize" style={{ color: COLORS.textMuted }}>
+                            Size: {item.selectedSize}
+                          </span>
                         )}
+                        <p className="text-sm" style={{ color: COLORS.primary }}>{CUR}{parseFloat(item.price).toFixed(2)} each</p>
                         {item.isFreeItem && <span className="text-xs text-green-500 font-bold">FREE!</span>}
                       </div>
                       <div className="flex items-center gap-2">
@@ -1306,58 +1039,43 @@ const CafeOrdering = () => {
                   ))}
                 </div>
 
-                {/* Order Total Breakdown — always shown for full transparency */}
+                {/* Order Total Breakdown */}
                 <div className="p-4 rounded-xl space-y-2" style={{ backgroundColor: `${COLORS.primary}15` }}>
-                  <div className="flex justify-between items-center">
-                    <span className="text-sm" style={{ color: COLORS.textMuted }}>Items Total</span>
-                    <span className="font-medium" style={{ color: COLORS.text }}>{CUR}{itemsTotal.toFixed(2)}</span>
-                  </div>
-                  {cafe?.taxEnabled && (
+                  {(cafe?.taxEnabled || cafe?.serviceChargeEnabled || cafe?.gstEnabled) ? (
+                    <>
+                      <div className="flex justify-between items-center">
+                        <span className="text-sm" style={{ color: COLORS.textMuted }}>Subtotal</span>
+                        <span className="font-medium" style={{ color: COLORS.text }}>{CUR}{calculateSubtotal().toFixed(2)}</span>
+                      </div>
+                      {cafe?.taxEnabled && calculateTax() > 0 && (
+                        <div className="flex justify-between items-center">
+                          <span className="text-sm" style={{ color: COLORS.textMuted }}>{cafe.taxName || 'Tax'} ({cafe.taxRate}%)</span>
+                          <span className="font-medium" style={{ color: COLORS.text }}>{CUR}{calculateTax().toFixed(2)}</span>
+                        </div>
+                      )}
+                      {cafe?.serviceChargeEnabled && calculateServiceCharge() > 0 && (
+                        <div className="flex justify-between items-center">
+                          <span className="text-sm" style={{ color: COLORS.textMuted }}>Service Charge ({cafe.serviceChargeRate}%)</span>
+                          <span className="font-medium" style={{ color: COLORS.text }}>{CUR}{calculateServiceCharge().toFixed(2)}</span>
+                        </div>
+                      )}
+                      {cafe?.gstEnabled && calculateGST() > 0 && (
+                        <div className="flex justify-between items-center">
+                          <span className="text-sm" style={{ color: COLORS.textMuted }}>GST ({cafe.gstRate}%)</span>
+                          <span className="font-medium" style={{ color: COLORS.text }}>{CUR}{calculateGST().toFixed(2)}</span>
+                        </div>
+                      )}
+                      <div className="border-t pt-2 flex justify-between items-center" style={{ borderColor: `${COLORS.primary}30` }}>
+                        <span className="font-semibold" style={{ color: COLORS.text }}>Total</span>
+                        <span className="text-2xl font-bold" style={{ color: COLORS.primary }}>{CUR}{calculateTotal().toFixed(2)}</span>
+                      </div>
+                    </>
+                  ) : (
                     <div className="flex justify-between items-center">
-                      <span className="text-sm" style={{ color: COLORS.textMuted }}>
-                        {cafe.taxName || 'Tax'} ({cafe.taxRate}%)
-                      </span>
-                      <span className="font-medium" style={{ color: COLORS.text }}>
-                        {taxAmount > 0 ? `${CUR}${taxAmount.toFixed(2)}` : '—'}
-                      </span>
+                      <span className="font-semibold" style={{ color: COLORS.text }}>Total</span>
+                      <span className="text-2xl font-bold" style={{ color: COLORS.primary }}>{CUR}{calculateTotal().toFixed(2)}</span>
                     </div>
                   )}
-                  {cafe?.serviceChargeEnabled && (
-                    <div className="flex justify-between items-center">
-                      <span className="text-sm" style={{ color: COLORS.textMuted }}>
-                        Service Charge ({cafe.serviceChargeRate}%)
-                      </span>
-                      <span className="font-medium" style={{ color: COLORS.text }}>
-                        {serviceChargeAmount > 0 ? `${CUR}${serviceChargeAmount.toFixed(2)}` : '—'}
-                      </span>
-                    </div>
-                  )}
-                  {cafe?.gstEnabled && (
-                    <div className="flex justify-between items-center">
-                      <span className="text-sm" style={{ color: COLORS.textMuted }}>
-                        GST ({cafe.gstRate}%)
-                      </span>
-                      <span className="font-medium" style={{ color: COLORS.text }}>
-                        {gstAmount > 0 ? `${CUR}${gstAmount.toFixed(2)}` : '—'}
-                      </span>
-                    </div>
-                  )}
-                  {cafe?.platformFeeEnabled && platformFeeAmount > 0 && (
-                    <div className="flex justify-between items-center">
-                      <span className="text-sm" style={{ color: COLORS.textMuted }}>Platform Fee</span>
-                      <span className="font-medium" style={{ color: COLORS.text }}>{CUR}{platformFeeAmount.toFixed(2)}</span>
-                    </div>
-                  )}
-                  {!cafe?.taxEnabled && !cafe?.serviceChargeEnabled && !cafe?.gstEnabled && !cafe?.platformFeeEnabled && (
-                    <div className="flex justify-between items-center">
-                      <span className="text-xs" style={{ color: COLORS.textMuted }}>No additional charges</span>
-                      <span className="text-xs" style={{ color: COLORS.textMuted }}>✓</span>
-                    </div>
-                  )}
-                  <div className="border-t pt-2 flex justify-between items-center" style={{ borderColor: `${COLORS.primary}30` }}>
-                    <span className="font-semibold" style={{ color: COLORS.text }}>Total</span>
-                    <span className="text-2xl font-bold" style={{ color: COLORS.primary }}>{CUR}{finalAmount}</span>
-                  </div>
                 </div>
 
                 {/* Customer Details */}
@@ -1430,14 +1148,11 @@ const CafeOrdering = () => {
                   {/* Payment Mode */}
                   <div className="space-y-2">
                     <label className="text-sm font-medium" style={{ color: COLORS.textMuted }}>Payment</label>
-                    <div className="flex gap-3 flex-wrap">
-                      {/* Always show counter + table */}
+                    <div className="flex gap-3">
                       {[
                         { id: 'counter', label: 'At Counter' },
-                        { id: 'table',   label: 'On Table'  },
-                        { id: 'prepaid', label: 'UPI'       },
-                        // Feature 3: show Pay Online only if cafe has it enabled
-                        ...(cafe?.paymentSettings?.enabled ? [{ id: 'online', label: '💳 Pay Online' }] : []),
+                        { id: 'table', label: 'On Table' },
+                        { id: 'prepaid', label: 'UPI' }
                       ].map((mode) => (
                         <button
                           key={mode.id}
@@ -1445,30 +1160,13 @@ const CafeOrdering = () => {
                           className="flex-1 py-3 rounded-xl font-medium transition-all text-sm"
                           style={{
                             backgroundColor: paymentMode === mode.id ? COLORS.primary : COLORS.backgroundSecondary,
-                            color: paymentMode === mode.id ? 'white' : COLORS.textLight,
-                            minWidth: mode.id === 'online' ? '100%' : undefined,
+                            color: paymentMode === mode.id ? 'white' : COLORS.textLight
                           }}
                         >
                           {mode.label}
                         </button>
                       ))}
                     </div>
-
-                    {/* Feature 3: Razorpay "Pay Online" info strip */}
-                    {paymentMode === 'online' && cafe?.paymentSettings?.enabled && (
-                      <div
-                        className="flex items-center gap-3 px-4 py-3 rounded-xl text-sm"
-                        style={{ backgroundColor: `${COLORS.primary}15`, border: `1px solid ${COLORS.primary}30` }}
-                      >
-                        <span style={{ color: COLORS.primary }}>💳</span>
-                        <span style={{ color: COLORS.textLight }}>
-                          You will be taken to a secure Razorpay payment page after placing your order.
-                          {cafe.paymentSettings.merchantName && (
-                            <span style={{ color: COLORS.primary }}> · {cafe.paymentSettings.merchantName}</span>
-                          )}
-                        </span>
-                      </div>
-                    )}
                   </div>
                 </div>
 
@@ -1487,57 +1185,22 @@ const CafeOrdering = () => {
                 )}
 
                 {/* Place Order Button */}
-                <div className="relative">
-                  {/* Pulse ring — visible only while placing */}
-                  {orderPlacing && (
-                    <motion.span
-                      className="absolute inset-0 rounded-xl pointer-events-none"
-                      initial={{ opacity: 0.7, scale: 1 }}
-                      animate={{ opacity: 0, scale: 1.06 }}
-                      transition={{ duration: 0.9, repeat: Infinity, ease: 'easeOut' }}
-                      style={{ background: 'transparent', border: `2px solid ${COLORS.primary}`, borderRadius: 12 }}
-                    />
-                  )}
-                  <motion.button
-                    whileHover={!orderPlacing ? { scale: 1.02 } : {}}
-                    whileTap={!orderPlacing ? { scale: 0.96 } : {}}
-                    onClick={confirmOrder}
-                    disabled={!customerName || !customerPhone || orderPlacing}
-                    className="w-full py-4 rounded-xl text-white font-semibold text-lg shadow-lg disabled:opacity-50 disabled:cursor-not-allowed transition-all flex items-center justify-center gap-2.5"
-                    style={{ backgroundColor: COLORS.primary }}
-                    data-testid="place-order-btn"
-                  >
-                    {orderPlacing ? (
-                      <>
-                        <motion.span
-                          className="w-5 h-5 rounded-full border-2 border-white/30 border-t-white block flex-shrink-0"
-                          animate={{ rotate: 360 }}
-                          transition={{ duration: 0.8, repeat: Infinity, ease: 'linear' }}
-                        />
-                        Placing Order…
-                      </>
-                    ) : (
-                      `Place Order — ${CUR}${calculateTotal().toFixed(0)}`
-                    )}
-                  </motion.button>
-                </div>
+                <motion.button
+                  whileHover={{ scale: 1.02 }}
+                  whileTap={{ scale: 0.98 }}
+                  onClick={confirmOrder}
+                  disabled={!customerName || !customerPhone || orderPlacing}
+                  className="w-full py-4 rounded-xl text-white font-semibold text-lg shadow-lg disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+                  style={{ backgroundColor: COLORS.primary }}
+                  data-testid="place-order-btn"
+                >
+                  {orderPlacing ? 'Placing Order...' : `Place Order \u2014 ${CUR}${calculateTotal().toFixed(0)}`}
+                </motion.button>
               </div>
             </motion.div>
           </motion.div>
         )}
       </AnimatePresence>
-
-      {/* Add-on selection modal — shown when customer taps item with add-ons */}
-      {addonModal && (
-        <AddOnModal
-          item={addonModal}
-          onConfirm={(entry) => { directAddToCart(entry); setAddonModal(null); }}
-          onClose={() => setAddonModal(null)}
-          currencySymbol={CUR}
-          primaryColor={cafe?.primaryColor}
-          theme={cafe?.mode}
-        />
-      )}
     </div>
   );
 };
