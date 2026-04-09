@@ -12,6 +12,7 @@ import {
 } from 'lucide-react';
 import { useTheme } from '../hooks/useTheme';
 import { useGlobalOrderNotification } from '../hooks/useGlobalOrderNotification';
+import GlobalOrderPopup              from '../components/dashboard/GlobalOrderPopup';
 
 import Overview            from '../components/dashboard/Overview';
 import OrdersManagement    from '../components/dashboard/OrdersManagement';
@@ -52,8 +53,8 @@ const Dashboard = () => {
   const navigate = useNavigate();
   const { T, isLight } = useTheme();
 
-  // Global new-order notification — sound + vibration, works on every tab
-  useGlobalOrderNotification(cafeId);
+  // Global new-order notification — sound + vibration + popup, works on every tab
+  const { newOrder, clearNewOrder } = useGlobalOrderNotification(cafeId);
 
   const { data: cafe } = useDocument('cafes', cafeId);
 
@@ -102,6 +103,9 @@ const Dashboard = () => {
 
   return (
     <div className={`min-h-screen ${pageBg}`} style={{ fontFamily: 'Manrope, sans-serif' }}>
+
+      {/* Global new-order popup — renders on top of every page */}
+      <GlobalOrderPopup order={newOrder} onClose={clearNewOrder} />
 
       {/* Mobile overlay */}
       {sidebarOpen && (
