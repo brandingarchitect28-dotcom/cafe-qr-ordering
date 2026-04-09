@@ -13,13 +13,12 @@
  * IMPORTANT: Does NOT modify existing CafeOrdering.jsx
  */
 
-import { formatWhatsAppNumber } from '../utils/whatsapp';
 import React, {
   useState, useEffect, useMemo, useRef, useCallback,
 } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
-  collection, query, where, doc, addDoc, updateDoc,
+  collection, query, where, doc, addDoc,
   serverTimestamp, runTransaction, onSnapshot,
 } from 'firebase/firestore';
 import { db } from '../lib/firebase';
@@ -271,17 +270,45 @@ const MenuCard = React.memo(({ item, CUR, cartQty, onAdd, onAddWithAnim, primary
           <span className="font-black text-base flex-shrink-0" style={{ color: primary }}>{CUR}{fmt(item.price)}</span>
         </div>
 
-        {/* Add button with ripple */}
-        <motion.button
-          whileTap={{ scale: 0.94 }}
-          whileHover={{ scale: 1.02 }}
-          onClick={(e) => onAddWithAnim(e, item)}
-          className="w-full py-2.5 rounded-xl text-black font-bold text-sm flex items-center justify-center gap-2 transition-all"
-          style={{ background: `linear-gradient(135deg, ${primary}, ${primary}dd)`, boxShadow: `0 4px 16px ${primary}30` }}
-        >
-          <Plus className="w-4 h-4" />
-          Add to Cart
-        </motion.button>
+        {/* Add button — size-aware or single */}
+        {(() => {
+          const hasSizes = item?.sizePricing != null && item.sizePricing.enabled === true;
+          return hasSizes ? (
+            <div className="space-y-1.5">
+              {item.sizePricing.small && (
+                <motion.button whileTap={{ scale: 0.97 }}
+                  onClick={(e) => onAddWithAnim(e, item, 'small')}
+                  className="w-full py-2 rounded-xl text-black font-bold text-sm flex justify-between items-center px-3"
+                  style={{ background: `linear-gradient(135deg, ${primary}, ${primary}dd)` }}
+                  data-testid={`add-small-${item.id}`}
+                ><span>Small</span><span>{CUR}{parseFloat(item.sizePricing.small).toFixed(2)}</span></motion.button>
+              )}
+              {item.sizePricing.medium && (
+                <motion.button whileTap={{ scale: 0.97 }}
+                  onClick={(e) => onAddWithAnim(e, item, 'medium')}
+                  className="w-full py-2 rounded-xl text-black font-bold text-sm flex justify-between items-center px-3"
+                  style={{ background: `linear-gradient(135deg, ${primary}, ${primary}dd)` }}
+                  data-testid={`add-medium-${item.id}`}
+                ><span>Medium</span><span>{CUR}{parseFloat(item.sizePricing.medium).toFixed(2)}</span></motion.button>
+              )}
+              {item.sizePricing.large && (
+                <motion.button whileTap={{ scale: 0.97 }}
+                  onClick={(e) => onAddWithAnim(e, item, 'large')}
+                  className="w-full py-2 rounded-xl text-black font-bold text-sm flex justify-between items-center px-3"
+                  style={{ background: `linear-gradient(135deg, ${primary}, ${primary}dd)` }}
+                  data-testid={`add-large-${item.id}`}
+                ><span>Large</span><span>{CUR}{parseFloat(item.sizePricing.large).toFixed(2)}</span></motion.button>
+              )}
+            </div>
+          ) : (
+            <motion.button
+              whileTap={{ scale: 0.94 }} whileHover={{ scale: 1.02 }}
+              onClick={(e) => onAddWithAnim(e, item)}
+              className="w-full py-2.5 rounded-xl text-black font-bold text-sm flex items-center justify-center gap-2 transition-all"
+              style={{ background: `linear-gradient(135deg, ${primary}, ${primary}dd)`, boxShadow: `0 4px 16px ${primary}30` }}
+            ><Plus className="w-4 h-4" />Add to Cart</motion.button>
+          );
+        })()}
       </div>
     </motion.div>
   );
@@ -426,23 +453,42 @@ const CafeOrderingPremium = () => {
   const directAddToCart = useCallback((cartEntry) => {
     setCart(prev => {
       if (cartEntry.addons?.length > 0) {
-        // Items with add-ons always get their own row
         return [...prev, cartEntry];
       }
-      const ex = prev.find(i => i.id === cartEntry.id && !i.addons?.length);
+      // Size items: S/M/L are separate cart rows keyed by selectedSize
+      if (cartEntry.selectedSize) {
+        const ex = prev.find(i => i.id === cartEntry.id && i.selectedSize === cartEntry.selectedSize);
+        if (ex) return prev.map(i =>
+          i.id === cartEntry.id && i.selectedSize === cartEntry.selectedSize
+            ? { ...i, quantity: i.quantity + 1 } : i
+        );
+        return [...prev, cartEntry];
+      }
+      const ex = prev.find(i => i.id === cartEntry.id && !i.addons?.length && !i.selectedSize);
       if (ex) return prev.map(i =>
-        i.id === cartEntry.id && !i.addons?.length ? { ...i, quantity: i.quantity + 1 } : i
+        i.id === cartEntry.id && !i.addons?.length && !i.selectedSize
+          ? { ...i, quantity: i.quantity + 1 } : i
       );
       return [...prev, cartEntry];
     });
   }, []);
 
-  const addToCart = useCallback((item) => {
-    if (item.addons?.length > 0) {
+  const addToCart = useCallback((item, size = null) => {
+    if (!size && item.addons?.length > 0) {
       setAddonModal(item);
       return;
     }
-    directAddToCart({ ...item, quantity: 1, addons: [], addonTotal: 0 });
+    const selectedPrice = size && item.sizePricing?.[size]
+      ? parseFloat(item.sizePricing[size])
+      : item.price;
+    directAddToCart({
+      ...item,
+      price:        selectedPrice,
+      selectedSize: size || null,
+      quantity:     1,
+      addons:       [],
+      addonTotal:   0,
+    });
   }, [directAddToCart]);
 
   const removeFromCart = useCallback((id) => {
@@ -455,8 +501,8 @@ const CafeOrderingPremium = () => {
   }, []);
 
   // ── Flying dot animation ───────────────────────────────────────────────────
-  const addWithAnim = useCallback((e, item) => {
-    addToCart(item);
+  const addWithAnim = useCallback((e, item, size = null) => {
+    addToCart(item, size);
     const rect    = e.currentTarget.getBoundingClientRect();
     const cartRect = cartBtnRef.current?.getBoundingClientRect();
     if (!cartRect) return;
@@ -520,11 +566,12 @@ const CafeOrderingPremium = () => {
         cafeId,
         orderNumber: oNum,
         items: cart.map(i => ({
-          name:       i.name,
-          price:      i.basePrice ?? i.price,
-          quantity:   i.quantity,
-          addons:     i.addons     || [],
-          addonTotal: i.addonTotal || 0,
+          name:         i.name,
+          price:        i.basePrice ?? i.price,
+          quantity:     i.quantity,
+          addons:       i.addons       || [],
+          addonTotal:   i.addonTotal   || 0,
+          selectedSize: i.selectedSize || null,
         })),
         subtotalAmount: subtotal,
         taxAmount,
@@ -538,8 +585,6 @@ const CafeOrderingPremium = () => {
         paymentStatus: 'pending',
         paymentMode,
         orderStatus: 'new',
-        // calculationStatus: 'pending' → set to 'done' right after addDoc (background)
-        calculationStatus: 'pending',
         orderType,
         customerName,
         customerPhone,
@@ -550,9 +595,6 @@ const CafeOrderingPremium = () => {
       };
 
       const orderRef = await addDoc(collection(db, 'orders'), orderData);
-
-      // Mark calculationStatus:'done' — non-blocking background flag.
-      updateDoc(orderRef, { calculationStatus: 'done' }).catch(() => {});
 
       createInvoiceForOrder({ ...orderData, orderNumber: oNum }, orderRef.id, cafe)
         .catch(console.error);
@@ -1271,34 +1313,17 @@ const CafeOrderingPremium = () => {
                 </div>
               </div>
 
-              <div className="px-5 py-4 border-t flex-shrink-0 relative" style={{ borderColor: T.borderLight }}>
-                {/* Pulse ring — fires on tap, guides eye to the action */}
-                {orderPlacing && (
-                  <motion.span
-                    className="absolute inset-x-5 rounded-xl pointer-events-none"
-                    style={{ top: 16, bottom: 16, border: `2px solid ${primary}`, borderRadius: 12 }}
-                    initial={{ opacity: 0.8, scale: 1 }}
-                    animate={{ opacity: 0, scale: 1.05 }}
-                    transition={{ duration: 0.9, repeat: Infinity, ease: 'easeOut' }}
-                  />
-                )}
+              <div className="px-5 py-4 border-t flex-shrink-0" style={{ borderColor: T.borderLight }}>
                 <motion.button
-                  whileHover={!orderPlacing ? { scale: 1.02 } : {}}
-                  whileTap={!orderPlacing ? { scale: 0.96 } : {}}
+                  whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}
                   onClick={handlePlaceOrder}
                   disabled={orderPlacing}
                   className="w-full py-4 rounded-xl text-black font-bold text-base disabled:opacity-60 flex items-center justify-center gap-2"
-                  style={{ background: `linear-gradient(135deg, ${primary}, ${primary}cc)`, boxShadow: orderPlacing ? 'none' : `0 4px 24px ${glow}` }}
+                  style={{ background: `linear-gradient(135deg, ${primary}, ${primary}cc)`, boxShadow: `0 4px 24px ${glow}` }}
                 >
                   {orderPlacing
-                    ? <>
-                        <motion.span
-                          className="w-5 h-5 rounded-full border-2 border-black/30 border-t-black block flex-shrink-0"
-                          animate={{ rotate: 360 }}
-                          transition={{ duration: 0.8, repeat: Infinity, ease: 'linear' }}
-                        />
-                        Placing Order…
-                      </>
+                    ? <><motion.div animate={{ rotate: 360 }} transition={{ duration: 1, repeat: Infinity, ease: 'linear' }}
+                        className="w-5 h-5 rounded-full border-2 border-black/30 border-t-black" />Placing Order…</>
                     : `Place Order • ${CUR}${fmt(totalWithCharges)}`
                   }
                 </motion.button>

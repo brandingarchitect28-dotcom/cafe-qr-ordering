@@ -1,3 +1,120 @@
+import React, { useState, useEffect, useMemo, useRef } from 'react';
+import { useParams } from 'react-router-dom';
+import { collection, query, where, doc, addDoc, serverTimestamp, runTransaction, onSnapshot } from 'firebase/firestore';
+import { db } from '../lib/firebase';
+import { createInvoiceForOrder } from '../services/invoiceService';
+import { deductStockForOrder } from '../services/inventoryService';
+import { deductStockByRecipe } from '../services/recipeService';
+import { motion, AnimatePresence } from 'framer-motion';
+import { ShoppingCart, Plus, Minus, X, Search, Coffee, Package, ChevronDown, RefreshCw, AlertCircle } from 'lucide-react';
+import { toast } from 'sonner';
+import { QRCodeSVG } from 'qrcode.react';
+
+// Function to generate theme colors based on cafe settings
+const getThemeColors = (primaryColor = '#D4AF37', mode = 'light') => {
+  const isLight = mode === 'light';
+  
+  // Calculate a lighter/darker version of primary color for accents
+  const hexToRgb = (hex) => {
+    const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+    return result ? {
+      r: parseInt(result[1], 16),
+      g: parseInt(result[2], 16),
+      b: parseInt(result[3], 16)
+    } : { r: 212, g: 175, b: 55 };
+  };
+  
+  const rgb = hexToRgb(primaryColor);
+  const shadowColor = `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, 0.15)`;
+  const shadowColorDark = `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, 0.25)`;
+  
+  if (isLight) {
+    return {
+      background: '#FDF8F3',
+      backgroundSecondary: '#F5EDE4',
+      warmWhite: '#FFFBF7',
+      text: '#2C1810',
+      textLight: '#6B5344',
+      textMuted: '#9A8B7A',
+      cardBg: '#FFFFFF',
+      primary: primaryColor,
+      primaryDark: primaryColor,
+      shadow: shadowColor,
+      shadowDark: shadowColorDark,
+      border: '#E5E5E5',
+      beige: '#F5EDE4',
+    };
+  } else {
+    return {
+      background: '#0f0f0f',
+      backgroundSecondary: '#1a1a1a',
+      warmWhite: '#151515',
+      text: '#ffffff',
+      textLight: '#d4d4d4',
+      textMuted: '#a3a3a3',
+      cardBg: '#1a1a1a',
+      primary: primaryColor,
+      primaryDark: primaryColor,
+      shadow: 'rgba(0, 0, 0, 0.3)',
+      shadowDark: 'rgba(0, 0, 0, 0.5)',
+      border: '#2a2a2a',
+      beige: '#1a1a1a',
+    };
+  }
+};
+
+// Animation variants
+const fadeInUp = {
+  hidden: { opacity: 0, y: 30 },
+  visible: { opacity: 1, y: 0, transition: { duration: 0.6, ease: [0.25, 0.46, 0.45, 0.94] } }
+};
+
+const staggerContainer = {
+  hidden: { opacity: 0 },
+  visible: { opacity: 1, transition: { staggerChildren: 0.1, delayChildren: 0.2 } }
+};
+
+// Error Fallback Component
+const ErrorFallback = ({ title, message, onRetry, icon: Icon = AlertCircle, colors }) => (
+  <motion.div
+    initial={{ opacity: 0, y: 20 }}
+    animate={{ opacity: 1, y: 0 }}
+    className="flex flex-col items-center justify-center p-8 text-center"
+    style={{ backgroundColor: colors.background }}
+  >
+    <Icon className="w-16 h-16 mb-4" style={{ color: colors.primary }} />
+    <h2 className="text-2xl font-bold mb-2" style={{ fontFamily: 'Playfair Display, serif', color: colors.text }}>
+      {title}
+    </h2>
+    <p className="mb-6" style={{ color: colors.textMuted }}>{message}</p>
+    {onRetry && (
+      <motion.button
+        whileHover={{ scale: 1.05 }}
+        whileTap={{ scale: 0.95 }}
+        onClick={onRetry}
+        className="px-6 py-3 rounded-full text-white font-semibold flex items-center gap-2"
+        style={{ backgroundColor: colors.primary }}
+      >
+        <RefreshCw className="w-5 h-5" />
+        Try Again
+      </motion.button>
+    )}
+  </motion.div>
+);
+
+// Loading Skeleton Component
+const LoadingSkeleton = ({ message = "Loading...", colors }) => (
+  <div className="min-h-screen flex flex-col items-center justify-center" style={{ backgroundColor: colors?.background || '#FDF8F3' }}>
+    <motion.div
+      animate={{ rotate: 360 }}
+      transition={{ duration: 1.5, repeat: Infinity, ease: "linear" }}
+      className="w-16 h-16 rounded-full border-4 mb-4"
+      style={{ borderColor: colors?.primary || '#D4AF37', borderTopColor: 'transparent' }}
+    />
+    <p style={{ color: colors?.textMuted || '#9A8B7A' }}>{message}</p>
+  </div>
+);
+
 const CafeOrdering = () => {
   const { cafeId } = useParams();
   const [cafe, setCafe] = useState(null);
@@ -33,8 +150,8 @@ const CafeOrdering = () => {
     return getThemeColors(cafe?.primaryColor || '#D4AF37', cafe?.mode || 'light');
   }, [cafe?.primaryColor, cafe?.mode]);
 
-  // Currency symbol from cafe settings (falls back to \u20b9)
-  const CUR = cafe?.currencySymbol || '\u20b9';
+  // Currency symbol from cafe settings (falls back to ₹)
+  const CUR = cafe?.currencySymbol || '₹';
 
   // Cleanup all listeners on unmount
   useEffect(() => {
@@ -54,7 +171,7 @@ const CafeOrdering = () => {
       <div className="min-h-screen" style={{ backgroundColor: defaultColors.background }}>
         <ErrorFallback
           title="Invalid Link"
-          message="No caf\u00e9 ID found in the URL. Please scan a valid QR code or use the correct link."
+          message="No café ID found in the URL. Please scan a valid QR code or use the correct link."
           icon={AlertCircle}
           colors={defaultColors}
         />
@@ -338,7 +455,7 @@ const CafeOrdering = () => {
           }));
           
           setCart(adjustedItems);
-          toast.success(`\ud83c\udf89 ${offer.title} added! You save \u20b9${(totalOriginal - comboPrice).toFixed(0)}!`);
+          toast.success(`🎉 ${offer.title} added! You save ₹${(totalOriginal - comboPrice).toFixed(0)}!`);
         } else if (offer.type === 'discount') {
           const discountMultiplier = offer.discountType === 'percentage' 
             ? (1 - parseFloat(offer.discountAmount) / 100)
@@ -354,7 +471,7 @@ const CafeOrdering = () => {
           }));
           
           setCart(prev => [...prev, ...adjustedItems]);
-          toast.success(`\ud83c\udf89 ${offer.title} applied!`);
+          toast.success(`🎉 ${offer.title} applied!`);
         } else if (offer.type === 'buy_x_get_y' && offer.getItemId) {
           setCart(prev => [...prev, ...newCartItems]);
           
@@ -369,7 +486,7 @@ const CafeOrdering = () => {
               offerTitle: offer.title
             };
             setCart(prev => [...prev, freeCartItem]);
-            toast.success(`\ud83c\udf81 ${offer.title}! ${freeItem.name} added FREE!`);
+            toast.success(`🎁 ${offer.title}! ${freeItem.name} added FREE!`);
           }
         } else {
           setCart(prev => [...prev, ...newCartItems]);
@@ -431,8 +548,8 @@ const CafeOrdering = () => {
         gstAmount: gstAmount,
         totalAmount: total,
         currencyCode: cafe?.currencyCode || 'INR',
-        currencySymbol: cafe?.currencySymbol || '\u20b9',
-        paymentStatus: paymentMode === 'prepaid' ? 'paid' : 'pending',
+        currencySymbol: cafe?.currencySymbol || '₹',
+        paymentStatus: (paymentMode === 'prepaid' || paymentMode === 'online') ? 'paid' : 'pending',
         paymentMode,
         orderStatus: 'new',
         orderType,
@@ -444,69 +561,63 @@ const CafeOrdering = () => {
         createdAt: serverTimestamp()
       };
 
-      await addDoc(collection(db, 'orders'), orderData);
-      
+      const orderDocRef = await addDoc(collection(db, 'orders'), orderData);
+
+      // ── Feature 1: Auto-generate invoice (non-blocking, does not affect order flow) ──
+      createInvoiceForOrder(
+        { ...orderData, orderNumber },
+        orderDocRef.id,
+        cafe
+      ).catch((err) => console.error('[Invoice] Background generation failed:', err));
+
+      // ── Feature 5: Auto-deduct inventory stock (non-blocking, safe) ──
+      deductStockForOrder(cafeId, orderData.items, menuItems)
+        .catch((err) => console.error('[Inventory] Stock deduction failed (non-fatal):', err));
+
+      // ── Recipe-based stock deduction (non-blocking, safe) ──
+      deductStockByRecipe(cafeId, orderData.items, menuItems)
+        .catch((err) => console.error('[Recipe] Stock deduction failed (non-fatal):', err));
+
       const formattedOrderNumber = String(orderNumber).padStart(3, '0');
 
-      const cur = cafe?.currencySymbol || '\u20b9';
-      let orderSummary = `*\ud83d\ude80 New Order*\
-\
-`;
-      orderSummary += `*Order #${formattedOrderNumber}*\
-`;
-      orderSummary += `*Customer:* ${customerName}\
-`;
-      orderSummary += `*Phone:* ${customerPhone}\
-`;
-      orderSummary += `*Type:* ${orderType.charAt(0).toUpperCase() + orderType.slice(1)}\
-`;
+      const cur = cafe?.currencySymbol || '₹';
+      let orderSummary = `*🚀 New Order*\n\n`;
+      orderSummary += `*Order #${formattedOrderNumber}*\n`;
+      orderSummary += `*Customer:* ${customerName}\n`;
+      orderSummary += `*Phone:* ${customerPhone}\n`;
+      orderSummary += `*Type:* ${orderType.charAt(0).toUpperCase() + orderType.slice(1)}\n`;
       
       if (orderType === 'dine-in') {
-        orderSummary += `*Table:* ${tableNumber}\
-`;
+        orderSummary += `*Table:* ${tableNumber}\n`;
       } else if (orderType === 'delivery') {
-        orderSummary += `*Address:* ${deliveryAddress}\
-`;
+        orderSummary += `*Address:* ${deliveryAddress}\n`;
       }
       
-      orderSummary += `\
-*Items:*\
-`;
+      orderSummary += `\n*Items:*\n`;
       cart.forEach(item => {
-        orderSummary += `\u2022 ${item.name} x${item.quantity} ${cur}${(item.price * item.quantity).toFixed(2)}\
-`;
+        orderSummary += `• ${item.name} x${item.quantity} ${cur}${(item.price * item.quantity).toFixed(2)}\n`;
       });
 
       const hasExtras = (cafe?.taxEnabled && taxAmount > 0) || (cafe?.serviceChargeEnabled && serviceChargeAmount > 0) || (cafe?.gstEnabled && gstAmount > 0);
       if (hasExtras) {
-        orderSummary += `\
-*Subtotal: ${cur}${subtotal.toFixed(2)}*\
-`;
+        orderSummary += `\n*Subtotal: ${cur}${subtotal.toFixed(2)}*\n`;
         if (cafe?.taxEnabled && taxAmount > 0) {
-          orderSummary += `*${cafe.taxName || 'Tax'} (${cafe.taxRate}%): ${cur}${taxAmount.toFixed(2)}*\
-`;
+          orderSummary += `*${cafe.taxName || 'Tax'} (${cafe.taxRate}%): ${cur}${taxAmount.toFixed(2)}*\n`;
         }
         if (cafe?.serviceChargeEnabled && serviceChargeAmount > 0) {
-          orderSummary += `*Service Charge (${cafe.serviceChargeRate}%): ${cur}${serviceChargeAmount.toFixed(2)}*\
-`;
+          orderSummary += `*Service Charge (${cafe.serviceChargeRate}%): ${cur}${serviceChargeAmount.toFixed(2)}*\n`;
         }
         if (cafe?.gstEnabled && gstAmount > 0) {
-          orderSummary += `*GST (${cafe.gstRate}%): ${cur}${gstAmount.toFixed(2)}*\
-`;
+          orderSummary += `*GST (${cafe.gstRate}%): ${cur}${gstAmount.toFixed(2)}*\n`;
         }
-        orderSummary += `*Total: ${cur}${total.toFixed(2)}*\
-`;
+        orderSummary += `*Total: ${cur}${total.toFixed(2)}*\n`;
       } else {
-        orderSummary += `\
-*Total: ${cur}${total.toFixed(2)}*\
-`;
+        orderSummary += `\n*Total: ${cur}${total.toFixed(2)}*\n`;
       }
-      orderSummary += `*Payment Mode:* ${paymentMode === 'counter' ? 'Pay at Counter' : paymentMode === 'table' ? 'Pay on Table' : 'Prepaid (UPI)'}`;
+      orderSummary += `*Payment Mode:* ${paymentMode === 'counter' ? 'Pay at Counter' : paymentMode === 'table' ? 'Pay on Table' : paymentMode === 'online' ? 'Online Payment (Razorpay)' : 'Prepaid (UPI)'}`;
       
       if (specialInstructions) {
-        orderSummary += `\
-\
-*Special Instructions:* ${specialInstructions}`;
+        orderSummary += `\n\n*Special Instructions:* ${specialInstructions}`;
       }
 
       const whatsappNumber = cafe?.whatsappNumber || '';
@@ -561,9 +672,9 @@ const CafeOrdering = () => {
         >
           <Coffee className="w-16 h-16 mx-auto mb-4" style={{ color: defaultColors.primary }} />
           <h1 className="text-3xl font-bold mb-2" style={{ fontFamily: 'Playfair Display, serif', color: defaultColors.text }}>
-            Caf\u00e9 Not Found
+            Café Not Found
           </h1>
-          <p style={{ color: defaultColors.textMuted }}>The caf\u00e9 you're looking for doesn't exist.</p>
+          <p style={{ color: defaultColors.textMuted }}>The café you're looking for doesn't exist.</p>
           <p className="text-sm mt-2" style={{ color: defaultColors.textMuted }}>ID: {cafeId}</p>
         </motion.div>
       </div>
@@ -573,7 +684,7 @@ const CafeOrdering = () => {
   return (
     <div className="min-h-screen" style={{ backgroundColor: COLORS.background, fontFamily: 'Inter, sans-serif' }}>
       
-      {/* Dynamic placeholder color \u2014 follows dark/light mode */}
+      {/* Dynamic placeholder color — follows dark/light mode */}
       <style>{`
         .cafe-input::placeholder { color: ${COLORS.textMuted}; opacity: 1; }
         .cafe-input:focus { outline: none; box-shadow: 0 0 0 2px ${COLORS.primary}44; }
@@ -617,7 +728,7 @@ const CafeOrdering = () => {
                 )}
               </motion.div>
 
-              {/* Caf\u00e9 name */}
+              {/* Café name */}
               <motion.h1 
                 variants={fadeInUp}
                 className="text-4xl md:text-6xl font-bold mb-4"
@@ -672,7 +783,7 @@ const CafeOrdering = () => {
               className="text-2xl md:text-3xl font-bold mb-8 flex items-center gap-3"
               style={{ fontFamily: 'Playfair Display, serif', color: COLORS.text }}
             >
-              <span>\ud83d\udd25</span> Today's Offers
+              <span>🔥</span> Today's Offers
             </motion.h2>
 
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -743,14 +854,14 @@ const CafeOrdering = () => {
                       )}
                       {offer.type === 'discount' && (
                         <span className="font-bold" style={{ color: COLORS.primary }}>
-                          {offer.discountType === 'percentage' ? `${offer.discountAmount}% OFF` : `\u20b9${offer.discountAmount} OFF`}
+                          {offer.discountType === 'percentage' ? `${offer.discountAmount}% OFF` : `₹${offer.discountAmount} OFF`}
                         </span>
                       )}
                       <span 
                         className="text-sm font-semibold group-hover:translate-x-1 transition-transform"
                         style={{ color: COLORS.primary }}
                       >
-                        Add \u2192
+                        Add →
                       </span>
                     </div>
                   </div>
@@ -885,44 +996,47 @@ const CafeOrdering = () => {
                       {item.description}
                     </p>
                   )}
-                  {item.sizePricing?.enabled ? (
-                    <div className="space-y-1.5 mt-2">
-                      {item.sizePricing.small && (
-                        <motion.button whileTap={{ scale: 0.97 }}
-                          onClick={() => addToCart(item, 'small')}
-                          className="w-full py-1.5 px-3 rounded-full text-sm font-semibold text-white flex justify-between"
+                  {(() => {
+                    const hasSizes = item?.sizePricing != null && item.sizePricing.enabled === true;
+                    return hasSizes ? (
+                      <div className="space-y-1.5 mt-2">
+                        {item.sizePricing.small && (
+                          <motion.button whileTap={{ scale: 0.97 }}
+                            onClick={() => addToCart(item, 'small')}
+                            className="w-full py-1.5 px-3 rounded-full text-sm font-semibold text-white flex justify-between items-center"
+                            style={{ backgroundColor: COLORS.primary }}
+                            data-testid={`add-small-${item.id}`}
+                          ><span>Small</span><span>{CUR}{parseFloat(item.sizePricing.small).toFixed(2)}</span></motion.button>
+                        )}
+                        {item.sizePricing.medium && (
+                          <motion.button whileTap={{ scale: 0.97 }}
+                            onClick={() => addToCart(item, 'medium')}
+                            className="w-full py-1.5 px-3 rounded-full text-sm font-semibold text-white flex justify-between items-center"
+                            style={{ backgroundColor: COLORS.primary }}
+                            data-testid={`add-medium-${item.id}`}
+                          ><span>Medium</span><span>{CUR}{parseFloat(item.sizePricing.medium).toFixed(2)}</span></motion.button>
+                        )}
+                        {item.sizePricing.large && (
+                          <motion.button whileTap={{ scale: 0.97 }}
+                            onClick={() => addToCart(item, 'large')}
+                            className="w-full py-1.5 px-3 rounded-full text-sm font-semibold text-white flex justify-between items-center"
+                            style={{ backgroundColor: COLORS.primary }}
+                            data-testid={`add-large-${item.id}`}
+                          ><span>Large</span><span>{CUR}{parseFloat(item.sizePricing.large).toFixed(2)}</span></motion.button>
+                        )}
+                      </div>
+                    ) : (
+                      <div className="flex items-center justify-between">
+                        <span className="text-lg font-bold" style={{ color: COLORS.primary }}>{CUR}{item.price}</span>
+                        <motion.button whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}
+                          onClick={() => addToCart(item)}
+                          className="px-4 py-2 rounded-full text-sm font-semibold text-white transition-all"
                           style={{ backgroundColor: COLORS.primary }}
-                          data-testid={`add-small-${item.id}`}
-                        ><span>Small</span><span>{CUR}{parseFloat(item.sizePricing.small).toFixed(2)}</span></motion.button>
-                      )}
-                      {item.sizePricing.medium && (
-                        <motion.button whileTap={{ scale: 0.97 }}
-                          onClick={() => addToCart(item, 'medium')}
-                          className="w-full py-1.5 px-3 rounded-full text-sm font-semibold text-white flex justify-between"
-                          style={{ backgroundColor: COLORS.primary }}
-                          data-testid={`add-medium-${item.id}`}
-                        ><span>Medium</span><span>{CUR}{parseFloat(item.sizePricing.medium).toFixed(2)}</span></motion.button>
-                      )}
-                      {item.sizePricing.large && (
-                        <motion.button whileTap={{ scale: 0.97 }}
-                          onClick={() => addToCart(item, 'large')}
-                          className="w-full py-1.5 px-3 rounded-full text-sm font-semibold text-white flex justify-between"
-                          style={{ backgroundColor: COLORS.primary }}
-                          data-testid={`add-large-${item.id}`}
-                        ><span>Large</span><span>{CUR}{parseFloat(item.sizePricing.large).toFixed(2)}</span></motion.button>
-                      )}
-                    </div>
-                  ) : (
-                    <div className="flex items-center justify-between">
-                      <span className="text-lg font-bold" style={{ color: COLORS.primary }}>{CUR}{item.price}</span>
-                      <motion.button whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}
-                        onClick={() => addToCart(item)}
-                        className="px-4 py-2 rounded-full text-sm font-semibold text-white transition-all"
-                        style={{ backgroundColor: COLORS.primary }}
-                        data-testid={`add-${item.id}`}
-                      >Add</motion.button>
-                    </div>
-                  )}
+                          data-testid={`add-${item.id}`}
+                        >Add</motion.button>
+                      </div>
+                    );
+                  })()}
                 </div>
               </motion.div>
             ))}
@@ -958,7 +1072,7 @@ const CafeOrdering = () => {
               <ShoppingCart className="w-6 h-6" />
             </motion.div>
             <span>{cartItemsCount} {cartItemsCount === 1 ? 'item' : 'items'}</span>
-            <span className="font-bold">\u2014 {CUR}{calculateTotal().toFixed(0)}</span>
+            <span className="font-bold">— {CUR}{calculateTotal().toFixed(0)}</span>
           </motion.button>
         )}
       </AnimatePresence>
@@ -1011,9 +1125,7 @@ const CafeOrdering = () => {
                       <div className="flex-1">
                         <h4 className="font-semibold" style={{ color: COLORS.text }}>{item.name}</h4>
                         {item.selectedSize && (
-                          <span className="text-xs capitalize" style={{ color: COLORS.textMuted }}>
-                            Size: {item.selectedSize}
-                          </span>
+                          <span className="text-xs capitalize" style={{ color: COLORS.textMuted }}>Size: {item.selectedSize}</span>
                         )}
                         <p className="text-sm" style={{ color: COLORS.primary }}>{CUR}{parseFloat(item.price).toFixed(2)} each</p>
                         {item.isFreeItem && <span className="text-xs text-green-500 font-bold">FREE!</span>}
@@ -1148,11 +1260,14 @@ const CafeOrdering = () => {
                   {/* Payment Mode */}
                   <div className="space-y-2">
                     <label className="text-sm font-medium" style={{ color: COLORS.textMuted }}>Payment</label>
-                    <div className="flex gap-3">
+                    <div className="flex gap-3 flex-wrap">
+                      {/* Always show counter + table */}
                       {[
                         { id: 'counter', label: 'At Counter' },
-                        { id: 'table', label: 'On Table' },
-                        { id: 'prepaid', label: 'UPI' }
+                        { id: 'table',   label: 'On Table'  },
+                        { id: 'prepaid', label: 'UPI'       },
+                        // Feature 3: show Pay Online only if cafe has it enabled
+                        ...(cafe?.paymentSettings?.enabled ? [{ id: 'online', label: '💳 Pay Online' }] : []),
                       ].map((mode) => (
                         <button
                           key={mode.id}
@@ -1160,13 +1275,30 @@ const CafeOrdering = () => {
                           className="flex-1 py-3 rounded-xl font-medium transition-all text-sm"
                           style={{
                             backgroundColor: paymentMode === mode.id ? COLORS.primary : COLORS.backgroundSecondary,
-                            color: paymentMode === mode.id ? 'white' : COLORS.textLight
+                            color: paymentMode === mode.id ? 'white' : COLORS.textLight,
+                            minWidth: mode.id === 'online' ? '100%' : undefined,
                           }}
                         >
                           {mode.label}
                         </button>
                       ))}
                     </div>
+
+                    {/* Feature 3: Razorpay "Pay Online" info strip */}
+                    {paymentMode === 'online' && cafe?.paymentSettings?.enabled && (
+                      <div
+                        className="flex items-center gap-3 px-4 py-3 rounded-xl text-sm"
+                        style={{ backgroundColor: `${COLORS.primary}15`, border: `1px solid ${COLORS.primary}30` }}
+                      >
+                        <span style={{ color: COLORS.primary }}>💳</span>
+                        <span style={{ color: COLORS.textLight }}>
+                          You will be taken to a secure Razorpay payment page after placing your order.
+                          {cafe.paymentSettings.merchantName && (
+                            <span style={{ color: COLORS.primary }}> · {cafe.paymentSettings.merchantName}</span>
+                          )}
+                        </span>
+                      </div>
+                    )}
                   </div>
                 </div>
 
@@ -1194,7 +1326,7 @@ const CafeOrdering = () => {
                   style={{ backgroundColor: COLORS.primary }}
                   data-testid="place-order-btn"
                 >
-                  {orderPlacing ? 'Placing Order...' : `Place Order \u2014 ${CUR}${calculateTotal().toFixed(0)}`}
+                  {orderPlacing ? 'Placing Order...' : `Place Order — ${CUR}${calculateTotal().toFixed(0)}`}
                 </motion.button>
               </div>
             </motion.div>

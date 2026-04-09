@@ -67,14 +67,28 @@ const CafeOrderingThemed = () => {
     loadCafeData();
   }, [cafeId]);
 
-  const addToCart = (item) => {
-    const existing = cart.find(i => i.id === item.id);
-    if (existing) {
-      setCart(cart.map(i => i.id === item.id ? { ...i, quantity: i.quantity + 1 } : i));
+  const addToCart = (item, size = null) => {
+    const selectedPrice = size && item.sizePricing?.[size]
+      ? parseFloat(item.sizePricing[size])
+      : item.price;
+    const cartEntry = { ...item, price: selectedPrice, selectedSize: size || null };
+    if (size) {
+      const existing = cart.find(i => i.id === item.id && i.selectedSize === size);
+      if (existing) {
+        setCart(cart.map(i => i.id === item.id && i.selectedSize === size ? { ...i, quantity: i.quantity + 1 } : i));
+      } else {
+        setCart([...cart, { ...cartEntry, quantity: 1 }]);
+      }
     } else {
-      setCart([...cart, { ...item, quantity: 1 }]);
+      const existing = cart.find(i => i.id === item.id && !i.selectedSize);
+      if (existing) {
+        setCart(cart.map(i => i.id === item.id && !i.selectedSize ? { ...i, quantity: i.quantity + 1 } : i));
+      } else {
+        setCart([...cart, { ...cartEntry, quantity: 1 }]);
+      }
     }
-    toast.success(`${item.name} added to cart`);
+    const sizeLabel = size ? ` (${size.charAt(0).toUpperCase() + size.slice(1)})` : '';
+    toast.success(`${item.name}${sizeLabel} added to cart`);
   };
 
   const updateQuantity = (itemId, change) => {
@@ -380,7 +394,296 @@ const CafeOrderingThemed = () => {
         </div>
       </motion.div>
 
-      {/* Rest of the component continues in next file... */}
+      {/* ── Search + Category Filter ─────────────────────────────────── */}
+      <div className="max-w-7xl mx-auto px-4 py-6">
+        <div className="flex flex-col sm:flex-row gap-3 mb-6">
+          <div className="relative flex-1">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4" style={{ color: theme.colors.textSecondary }} />
+            <input
+              type="text"
+              placeholder="Search menu..."
+              value={searchQuery}
+              onChange={e => setSearchQuery(e.target.value)}
+              className="w-full pl-9 pr-4 py-2.5 rounded-full text-sm outline-none"
+              style={{ background: theme.colors.surface, color: theme.colors.text, border: `1px solid ${theme.colors.border || 'rgba(255,255,255,0.1)'}` }}
+            />
+          </div>
+        </div>
+
+        {/* Category pills */}
+        <div className="flex gap-2 overflow-x-auto pb-2 mb-6 scrollbar-hide">
+          {categories.map(cat => (
+            <button
+              key={cat}
+              onClick={() => setSelectedCategory(cat)}
+              className="flex-shrink-0 px-4 py-1.5 rounded-full text-sm font-semibold capitalize transition-all"
+              style={{
+                background: selectedCategory === cat ? theme.colors.primary : theme.colors.surface,
+                color: selectedCategory === cat ? theme.colors.background : theme.colors.textSecondary,
+              }}
+            >
+              {cat}
+            </button>
+          ))}
+        </div>
+
+        {/* ── Menu Grid ───────────────────────────────────────────────────── */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+          {filteredMenuItems.map(item => {
+            const hasSizes = item?.sizePricing != null && item.sizePricing.enabled === true;
+            return (
+              <motion.div
+                key={item.id}
+                initial={{ opacity: 0, y: 16 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="rounded-2xl overflow-hidden"
+                style={{ background: theme.colors.surface, border: `1px solid ${theme.colors.border || 'rgba(255,255,255,0.08)'}` }}
+              >
+                {item.image && (
+                  <div className="aspect-[4/3] overflow-hidden">
+                    <img src={item.image} alt={item.name} loading="lazy" className="w-full h-full object-cover" />
+                  </div>
+                )}
+                <div className="p-4">
+                  <div className="flex items-start justify-between gap-2 mb-1">
+                    <h3 className="font-semibold text-base leading-tight" style={{ color: theme.colors.text }}>{item.name}</h3>
+                    {!hasSizes && (
+                      <span className="font-black text-base flex-shrink-0" style={{ color: theme.colors.primary }}>
+                        {cafe?.currencySymbol || '₹'}{item.price}
+                      </span>
+                    )}
+                  </div>
+                  {item.description && (
+                    <p className="text-xs mb-3 line-clamp-2" style={{ color: theme.colors.textSecondary }}>{item.description}</p>
+                  )}
+                  {/* Size pricing OR single Add button */}
+                  {hasSizes ? (
+                    <div className="space-y-1.5 mt-2">
+                      {item.sizePricing.small && (
+                        <button
+                          onClick={() => addToCart(item, 'small')}
+                          className="w-full py-2 px-3 rounded-full text-sm font-semibold flex justify-between items-center transition-all"
+                          style={{ background: theme.colors.primary, color: theme.colors.background }}
+                          data-testid={`add-small-${item.id}`}
+                        >
+                          <span>Small</span>
+                          <span>{cafe?.currencySymbol || '₹'}{parseFloat(item.sizePricing.small).toFixed(2)}</span>
+                        </button>
+                      )}
+                      {item.sizePricing.medium && (
+                        <button
+                          onClick={() => addToCart(item, 'medium')}
+                          className="w-full py-2 px-3 rounded-full text-sm font-semibold flex justify-between items-center transition-all"
+                          style={{ background: theme.colors.primary, color: theme.colors.background }}
+                          data-testid={`add-medium-${item.id}`}
+                        >
+                          <span>Medium</span>
+                          <span>{cafe?.currencySymbol || '₹'}{parseFloat(item.sizePricing.medium).toFixed(2)}</span>
+                        </button>
+                      )}
+                      {item.sizePricing.large && (
+                        <button
+                          onClick={() => addToCart(item, 'large')}
+                          className="w-full py-2 px-3 rounded-full text-sm font-semibold flex justify-between items-center transition-all"
+                          style={{ background: theme.colors.primary, color: theme.colors.background }}
+                          data-testid={`add-large-${item.id}`}
+                        >
+                          <span>Large</span>
+                          <span>{cafe?.currencySymbol || '₹'}{parseFloat(item.sizePricing.large).toFixed(2)}</span>
+                        </button>
+                      )}
+                    </div>
+                  ) : (
+                    <button
+                      onClick={() => addToCart(item)}
+                      className="w-full py-2 rounded-full text-sm font-semibold flex items-center justify-center gap-2 transition-all"
+                      style={{ background: theme.colors.primary, color: theme.colors.background }}
+                      data-testid={`add-${item.id}`}
+                    >
+                      <Plus className="w-4 h-4" />
+                      Add to Cart
+                    </button>
+                  )}
+                </div>
+              </motion.div>
+            );
+          })}
+        </div>
+
+        {filteredMenuItems.length === 0 && (
+          <div className="text-center py-16" style={{ color: theme.colors.textSecondary }}>
+            No items found
+          </div>
+        )}
+      </div>
+
+      {/* ── Floating Cart Button ─────────────────────────────────────────── */}
+      {cart.length > 0 && (
+        <motion.div
+          initial={{ y: 80 }} animate={{ y: 0 }}
+          className="fixed bottom-6 left-0 right-0 flex justify-center z-40 px-4"
+        >
+          <button
+            onClick={() => setShowCart(true)}
+            className="px-8 py-4 rounded-full font-bold flex items-center gap-3 shadow-2xl"
+            style={{ background: theme.colors.primary, color: theme.colors.background }}
+          >
+            <ShoppingCart className="w-5 h-5" />
+            View Cart ({cart.reduce((s, i) => s + i.quantity, 0)} items) — {cafe?.currencySymbol || '₹'}{calculateTotal().toFixed(2)}
+          </button>
+        </motion.div>
+      )}
+
+      {/* ── Cart Drawer ──────────────────────────────────────────────────── */}
+      <AnimatePresence>
+        {showCart && (
+          <motion.div
+            initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 flex justify-end"
+            style={{ backgroundColor: 'rgba(0,0,0,0.6)' }}
+            onClick={() => setShowCart(false)}
+          >
+            <motion.div
+              initial={{ x: '100%' }} animate={{ x: 0 }} exit={{ x: '100%' }}
+              transition={{ type: 'spring', damping: 28, stiffness: 300 }}
+              onClick={e => e.stopPropagation()}
+              className="w-full max-w-sm h-full flex flex-col overflow-hidden"
+              style={{ background: theme.colors.background }}
+            >
+              <div className="flex items-center justify-between p-5 border-b" style={{ borderColor: theme.colors.border || 'rgba(255,255,255,0.1)' }}>
+                <h2 className="text-xl font-bold" style={{ color: theme.colors.text }}>Your Cart</h2>
+                <button onClick={() => setShowCart(false)} style={{ color: theme.colors.textSecondary }}><X className="w-6 h-6" /></button>
+              </div>
+              <div className="flex-1 overflow-y-auto p-5 space-y-4">
+                {cart.map(item => (
+                  <div key={`${item.id}-${item.selectedSize || 'none'}`} className="flex items-center gap-3 p-3 rounded-xl" style={{ background: theme.colors.surface }}>
+                    <div className="flex-1 min-w-0">
+                      <p className="font-semibold text-sm truncate" style={{ color: theme.colors.text }}>{item.name}</p>
+                      {item.selectedSize && (
+                        <p className="text-xs capitalize" style={{ color: theme.colors.textSecondary }}>Size: {item.selectedSize}</p>
+                      )}
+                      <p className="text-sm font-bold" style={{ color: theme.colors.primary }}>{cafe?.currencySymbol || '₹'}{(item.price * item.quantity).toFixed(2)}</p>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <button onClick={() => updateQuantity(item.id, -1)} className="w-7 h-7 rounded-full flex items-center justify-center" style={{ background: theme.colors.background, color: theme.colors.text }}>
+                        <Minus className="w-3 h-3" />
+                      </button>
+                      <span className="w-6 text-center font-bold text-sm" style={{ color: theme.colors.text }}>{item.quantity}</span>
+                      <button onClick={() => updateQuantity(item.id, 1)} className="w-7 h-7 rounded-full flex items-center justify-center" style={{ background: theme.colors.primary, color: theme.colors.background }}>
+                        <Plus className="w-3 h-3" />
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+              <div className="p-5 border-t" style={{ borderColor: theme.colors.border || 'rgba(255,255,255,0.1)' }}>
+                <div className="flex justify-between mb-4">
+                  <span style={{ color: theme.colors.textSecondary }}>Total</span>
+                  <span className="font-black text-lg" style={{ color: theme.colors.primary }}>{cafe?.currencySymbol || '₹'}{calculateTotal().toFixed(2)}</span>
+                </div>
+                <button
+                  onClick={proceedToCheckout}
+                  className="w-full py-4 rounded-full font-bold text-base"
+                  style={{ background: theme.colors.primary, color: theme.colors.background }}
+                >
+                  Proceed to Checkout
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* ── Checkout Modal ───────────────────────────────────────────────── */}
+      <AnimatePresence>
+        {showCheckout && (
+          <motion.div
+            initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4"
+            style={{ backgroundColor: 'rgba(0,0,0,0.7)' }}
+          >
+            <motion.div
+              initial={{ y: 60, opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ y: 60, opacity: 0 }}
+              className="w-full max-w-md rounded-2xl overflow-hidden"
+              style={{ background: theme.colors.background }}
+            >
+              <div className="flex items-center justify-between p-5 border-b" style={{ borderColor: theme.colors.border || 'rgba(255,255,255,0.1)' }}>
+                <h2 className="text-xl font-bold" style={{ color: theme.colors.text }}>Checkout</h2>
+                <button onClick={() => setShowCheckout(false)} style={{ color: theme.colors.textSecondary }}><X className="w-6 h-6" /></button>
+              </div>
+              <div className="p-5 space-y-4 max-h-[60vh] overflow-y-auto">
+                <input
+                  placeholder="Your Name *"
+                  value={customerName}
+                  onChange={e => setCustomerName(e.target.value)}
+                  className="w-full px-4 py-3 rounded-xl outline-none"
+                  style={{ background: theme.colors.surface, color: theme.colors.text, border: `1px solid ${theme.colors.border || 'rgba(255,255,255,0.1)'}` }}
+                />
+                <input
+                  placeholder="Phone Number *"
+                  value={customerPhone}
+                  onChange={e => setCustomerPhone(e.target.value)}
+                  type="tel"
+                  className="w-full px-4 py-3 rounded-xl outline-none"
+                  style={{ background: theme.colors.surface, color: theme.colors.text, border: `1px solid ${theme.colors.border || 'rgba(255,255,255,0.1)'}` }}
+                />
+                <div className="grid grid-cols-3 gap-2">
+                  {['dine-in', 'takeaway', 'delivery'].map(type => (
+                    <button
+                      key={type}
+                      onClick={() => setOrderType(type)}
+                      className="py-2 rounded-xl text-sm font-semibold capitalize transition-all"
+                      style={{
+                        background: orderType === type ? theme.colors.primary : theme.colors.surface,
+                        color: orderType === type ? theme.colors.background : theme.colors.textSecondary,
+                      }}
+                    >
+                      {type}
+                    </button>
+                  ))}
+                </div>
+                {orderType === 'dine-in' && (
+                  <input
+                    placeholder="Table Number *"
+                    value={tableNumber}
+                    onChange={e => setTableNumber(e.target.value)}
+                    className="w-full px-4 py-3 rounded-xl outline-none"
+                    style={{ background: theme.colors.surface, color: theme.colors.text, border: `1px solid ${theme.colors.border || 'rgba(255,255,255,0.1)'}` }}
+                  />
+                )}
+                {orderType === 'delivery' && (
+                  <input
+                    placeholder="Delivery Address *"
+                    value={deliveryAddress}
+                    onChange={e => setDeliveryAddress(e.target.value)}
+                    className="w-full px-4 py-3 rounded-xl outline-none"
+                    style={{ background: theme.colors.surface, color: theme.colors.text, border: `1px solid ${theme.colors.border || 'rgba(255,255,255,0.1)'}` }}
+                  />
+                )}
+                <textarea
+                  placeholder="Special instructions (optional)"
+                  value={specialInstructions}
+                  onChange={e => setSpecialInstructions(e.target.value)}
+                  rows={2}
+                  className="w-full px-4 py-3 rounded-xl outline-none resize-none"
+                  style={{ background: theme.colors.surface, color: theme.colors.text, border: `1px solid ${theme.colors.border || 'rgba(255,255,255,0.1)'}` }}
+                />
+              </div>
+              <div className="p-5 border-t" style={{ borderColor: theme.colors.border || 'rgba(255,255,255,0.1)' }}>
+                <button
+                  onClick={placeOrder}
+                  disabled={orderPlacing}
+                  className="w-full py-4 rounded-full font-bold text-base disabled:opacity-60 flex items-center justify-center gap-2"
+                  style={{ background: theme.colors.primary, color: theme.colors.background }}
+                >
+                  <Send className="w-4 h-4" />
+                  {orderPlacing ? 'Placing Order…' : `Place Order — ${cafe?.currencySymbol || '₹'}${calculateTotal().toFixed(2)}`}
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 };
