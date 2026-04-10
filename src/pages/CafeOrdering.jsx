@@ -116,6 +116,7 @@ const LoadingSkeleton = ({ message = "Loading...", colors }) => (
 );
 
 import FoodDetailPremium from '../components/dashboard/FoodDetailPremium';
+import CafeDisabled     from './CafeDisabled';
 
 const CafeOrdering = () => {
   const { cafeId } = useParams();
@@ -682,6 +683,11 @@ const CafeOrdering = () => {
         </motion.div>
       </div>
     );
+  }
+
+  // ── isActive check — add-only: blocks disabled cafes without changing any existing logic ──
+  if (cafe.isActive === false) {
+    return <CafeDisabled isAdmin={false} />;
   }
 
   return (

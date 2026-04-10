@@ -31,6 +31,7 @@ import QRGenerator         from '../components/dashboard/QRGenerator';
 import LoyaltyDashboard    from '../components/dashboard/LoyaltyDashboard';
 import StaffManagement     from '../components/dashboard/StaffManagement';
 import Settings            from '../components/dashboard/Settings';
+import CafeDisabled        from './CafeDisabled';
 
 // ─── Locked feature placeholder ───────────────────────────────────────────────
 const LockedFeature = ({ label, icon: Icon }) => {
@@ -103,6 +104,12 @@ const Dashboard = () => {
   const headerBg  = isLight ? 'bg-white/90' : 'bg-[#050505]/80';
   const pageBg    = isLight ? 'bg-[#F5F5F5]' : 'bg-[#050505]';
 
+  // ── isActive check — add-only: blocks disabled cafe owners without touching any existing logic ──
+  // cafe doc is already loaded via useDocument above. Only blocks when explicitly set to false.
+  if (cafe && cafe.isActive === false) {
+    return <CafeDisabled isAdmin={true} />;
+  }
+
   return (
     <div className={`min-h-screen ${pageBg}`} style={{ fontFamily: 'Manrope, sans-serif' }}>
 
@@ -139,8 +146,11 @@ const Dashboard = () => {
           </button>
         </div>
 
-        {/* Nav items */}
-        <nav className="flex-1 space-y-1 overflow-y-auto">
+        {/* Nav items — overflow-y-auto + touch-friendly scrolling */}
+        <nav
+          className="flex-1 space-y-1 overflow-y-auto overscroll-contain"
+          style={{ WebkitOverflowScrolling: 'touch' }}
+        >
           {menuItems.map((item) => {
             const Icon     = item.icon;
             const isActive = activeTab === item.id;
@@ -165,8 +175,8 @@ const Dashboard = () => {
           })}
         </nav>
 
-        {/* Bottom: user + logout */}
-        <div className="border-t border-white/5 pt-4">
+        {/* Bottom: user + logout — flex-shrink-0 keeps it always visible */}
+        <div className="border-t border-white/5 pt-4 flex-shrink-0">
           <div className="px-4 py-3 mb-2">
             <p className="text-[#A3A3A3] text-sm">Logged in as</p>
             <p className="text-white font-semibold truncate">{user?.email}</p>
