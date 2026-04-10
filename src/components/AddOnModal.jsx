@@ -70,6 +70,7 @@ const AddOnModal = ({
     // Items without addons use the same fields, addons/addonTotal just default to []
     onConfirm({
       ...item,
+      selectedSize: item.selectedSize || null, // 
       quantity,
       addons:     selectedAddons.map(a => ({ id: a.id, name: a.name, price: a.price })),
       addonTotal, // extra amount from addons only
