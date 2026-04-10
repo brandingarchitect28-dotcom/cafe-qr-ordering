@@ -33,6 +33,7 @@ import {
   Search, UserPlus, Star, MessageSquare, Phone, User,
   Award, TrendingUp, RefreshCw, Gift,
 } from 'lucide-react';
+import GoogleReviewSettings from './GoogleReviewSettings';
 
 // ── Discount ladder ────────────────────────────────────────────────────────────
 const discountForVisits = (visits) => {
@@ -392,6 +393,10 @@ const LoyaltyDashboard = () => {
           })}
         </div>
       )}
+
+      {/* ── Google Review Link setting — feeds OrderTracking promo button ── */}
+      <GoogleReviewSettings />
+
     </div>
   );
 };
