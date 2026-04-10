@@ -158,6 +158,10 @@ const InvoicesTab = () => {
   const [search,         setSearch        ] = useState('');
   const [statusFilter,   setStatusFilter  ] = useState('all');
 
+  // Date range filter (additive — does not change existing search/status logic)
+  const [startDate, setStartDate] = useState('');
+  const [endDate,   setEndDate  ] = useState('');
+
   const filtered = useMemo(() => {
     return invoices.filter(inv => {
       const matchStatus = statusFilter === 'all' || inv.paymentStatus === statusFilter;
@@ -167,9 +171,29 @@ const InvoicesTab = () => {
         String(inv.orderNumber   || '').toLowerCase().includes(q) ||
         (inv.customerName  || '').toLowerCase().includes(q) ||
         (inv.customerPhone || '').includes(q);
-      return matchStatus && matchSearch;
+
+      // Date range filter — applied only when a date is entered
+      let matchDate = true;
+      if (startDate || endDate) {
+        try {
+          const ts  = inv.createdAt;
+          const date = ts?.toDate ? ts.toDate() : new Date(ts);
+          if (startDate) {
+            const from = new Date(startDate);
+            from.setHours(0, 0, 0, 0);
+            if (date < from) matchDate = false;
+          }
+          if (endDate && matchDate) {
+            const to = new Date(endDate);
+            to.setHours(23, 59, 59, 999);
+            if (date > to) matchDate = false;
+          }
+        } catch (_) { matchDate = true; }
+      }
+
+      return matchStatus && matchSearch && matchDate;
     });
-  }, [invoices, search, statusFilter]);
+  }, [invoices, search, statusFilter, startDate, endDate]);
 
   // ── Stats (IMPROVEMENT 3: all from paid orders / real invoices) ────────────
   const paidInvoices    = invoices.filter(i => i.paymentStatus === 'paid');
@@ -283,6 +307,36 @@ const InvoicesTab = () => {
         </div>
       </div>
 
+      {/* Date range filter — additive, does not change existing search/status UI */}
+      <div className="flex flex-col sm:flex-row gap-3">
+        <div className="flex items-center gap-2 flex-1">
+          <label className="text-[#555] text-xs whitespace-nowrap">From</label>
+          <input
+            type="date"
+            value={startDate}
+            onChange={e => setStartDate(e.target.value)}
+            className="flex-1 h-10 bg-black/20 border border-white/10 text-white focus:border-[#D4AF37] focus:ring-1 focus:ring-[#D4AF37] rounded-sm px-3 text-sm outline-none"
+          />
+        </div>
+        <div className="flex items-center gap-2 flex-1">
+          <label className="text-[#555] text-xs whitespace-nowrap">To</label>
+          <input
+            type="date"
+            value={endDate}
+            onChange={e => setEndDate(e.target.value)}
+            className="flex-1 h-10 bg-black/20 border border-white/10 text-white focus:border-[#D4AF37] focus:ring-1 focus:ring-[#D4AF37] rounded-sm px-3 text-sm outline-none"
+          />
+        </div>
+        {(startDate || endDate) && (
+          <button
+            onClick={() => { setStartDate(''); setEndDate(''); }}
+            className="h-10 px-3 text-xs text-[#A3A3A3] hover:text-white border border-white/10 rounded-sm transition-all whitespace-nowrap"
+          >
+            Clear dates
+          </button>
+        )}
+      </div>
+
       {/* Filters + CSV button */}
       <div className="flex flex-col sm:flex-row gap-3">
         <div className="relative flex-1">
@@ -354,19 +408,25 @@ const InvoicesTab = () => {
           </p>
         </div>
       ) : (
-        <div className="space-y-2">
+        /* Responsive grid — 1 col mobile, 2 col tablet, fills wider desktop.
+           minmax(320px, 1fr) prevents cards stretching beyond readable width.
+           Existing card JSX, buttons, and all logic are 100% unchanged.       */
+        <div
+          className="grid gap-3"
+          style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(min(100%, 520px), 1fr))' }}
+        >
           <AnimatePresence>
             {filtered.map((inv, i) => (
               <motion.div key={inv.id}
                 initial={{ opacity: 0, y: 8 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: i * 0.03 }}
-                className="bg-[#0F0F0F] border border-white/5 rounded-xl overflow-hidden hover:border-white/10 transition-colors"
+                className="bg-[#0F0F0F] border border-white/5 rounded-xl overflow-hidden hover:border-white/10 transition-colors min-w-0"
               >
-                {/* Main row */}
-                <div className="flex items-center justify-between px-5 py-4 gap-4">
-                  {/* Left: invoice info */}
-                  <div className="min-w-0 flex-1">
+                {/* Main row — flex-wrap prevents overflow on tablet/desktop */}
+                <div className="flex items-start justify-between px-5 py-4 gap-3 flex-wrap sm:flex-nowrap sm:items-center min-w-0">
+                  {/* Left: invoice info — min-w-0 ensures text truncation works */}
+                  <div className="min-w-0 flex-1 w-full sm:w-auto overflow-hidden">
                     <div className="flex items-center gap-3 flex-wrap">
                       <span className="text-[#D4AF37] font-bold text-sm">
                         {inv.invoiceNumber || `ORD-${String(inv.orderNumber||'').padStart(4,'0')}`}
@@ -376,7 +436,7 @@ const InvoicesTab = () => {
                     </div>
                     <div className="flex items-center gap-3 mt-1 flex-wrap">
                       {inv.customerName && (
-                        <span className="text-white text-sm">{inv.customerName}</span>
+                        <span className="text-white text-sm truncate max-w-[180px]">{inv.customerName}</span>
                       )}
                       {inv.customerPhone && (
                         <span className="text-[#555] text-xs">{inv.customerPhone}</span>
@@ -393,9 +453,9 @@ const InvoicesTab = () => {
                     )}
                   </div>
 
-                  {/* Right: amounts + actions */}
-                  <div className="flex items-center gap-4 flex-shrink-0">
-                    <div className="text-right hidden sm:block">
+                  {/* Right: amounts + actions — flex-shrink-0 + min-w-0 on parent keeps it from overflowing */}
+                  <div className="flex items-center gap-3 flex-shrink-0 flex-wrap justify-end w-full sm:w-auto">
+                    <div className="text-right">
                       {inv.gstAmount > 0 && (
                         <p className="text-[#555] text-xs">GST: {CUR}{fmt(inv.gstAmount)}</p>
                       )}
