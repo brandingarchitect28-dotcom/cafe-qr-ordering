@@ -31,7 +31,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { toast } from 'sonner';
 import {
   Search, UserPlus, Star, MessageSquare, Phone, User,
-  Award, TrendingUp, RefreshCw, Gift, Undo2, Trash2, Repeat, Calendar,
+  Award, TrendingUp, RefreshCw, Gift, Undo2, Trash2, Repeat, Calendar, Pencil, Check,
 } from 'lucide-react';
 import GoogleReviewSettings from './GoogleReviewSettings';
 
@@ -95,6 +95,11 @@ const LoyaltyDashboard = () => {
   const [newPhone,      setNewPhone     ] = useState('');
   const [validityDays,  setValidityDays ] = useState(''); // optional validity in days
   const [customDiscount, setCustomDiscount] = useState(''); // optional manual discount override
+
+  // ── Inline edit state (per-customer accordion) ───────────────────────────────
+  const [editingCustomerId, setEditingCustomerId] = useState(null);
+  const [editDiscount,      setEditDiscount     ] = useState('');
+  const [editValidity,      setEditValidity     ] = useState('');
 
   // ── Derived / filtered list ──────────────────────────────────────────────────
   const filtered = useMemo(() => {
@@ -234,6 +239,35 @@ const LoyaltyDashboard = () => {
     } catch (err) {
       console.error('[Loyalty] ❌ deleteDoc failed:', err.code, err.message, err);
       toast.error(`Delete failed: ${err.message || 'Unknown error'}`);
+    }
+  };
+
+  // ── Save inline edit (discount + validity override) ─────────────────────────
+  // Does NOT affect mark visit logic — only manually overrides stored values.
+  const handleSaveEdit = async (customer) => {
+    try {
+      const newDisc  = editDiscount ? Number(editDiscount) : customer.currentDiscount;
+      const newDays  = editValidity ? Number(editValidity) : (customer.validityDays || 0);
+      const expiry   = newDays > 0
+        ? (() => { const d = new Date(); d.setDate(d.getDate() + newDays); return d; })()
+        : null;
+
+      console.log('[Loyalty] Saving edit for', customer.name,
+        '→ discount:', newDisc, 'validityDays:', newDays);
+
+      await updateDoc(doc(db, 'loyaltyCustomers', customer.id), {
+        currentDiscount: newDisc,
+        validityDays:    newDays,
+        ...(expiry !== null && { expiryDate: expiry }),
+      });
+
+      toast.success(`${customer.name} updated ✓ — ${newDisc}% OFF${newDays ? `, valid ${newDays}d` : ''}`);
+      setEditingCustomerId(null);
+      setEditDiscount('');
+      setEditValidity('');
+    } catch (err) {
+      console.error('[Loyalty] ❌ saveEdit failed:', err.code, err.message, err);
+      toast.error(`Update failed: ${err.message || 'Unknown error'}`);
     }
   };
 
@@ -551,7 +585,93 @@ const LoyaltyDashboard = () => {
                       <Trash2 className="w-3.5 h-3.5" />
                       Delete
                     </button>
+                    {/* ── Edit card ────────────────────────────────────────── */}
+                    <button
+                      onClick={() => {
+                        if (editingCustomerId === customer.id) {
+                          // toggle off
+                          setEditingCustomerId(null);
+                          setEditDiscount('');
+                          setEditValidity('');
+                        } else {
+                          setEditingCustomerId(customer.id);
+                          setEditDiscount(String(customer.currentDiscount || ''));
+                          setEditValidity(String(customer.validityDays    || ''));
+                        }
+                      }}
+                      className={`flex items-center gap-1.5 px-4 py-2 border font-bold rounded-sm text-xs transition-all ${
+                        editingCustomerId === customer.id
+                          ? 'bg-[#D4AF37]/20 border-[#D4AF37]/40 text-[#D4AF37]'
+                          : 'bg-white/5 hover:bg-white/10 border-white/10 text-[#A3A3A3] hover:text-white'
+                      }`}
+                      data-testid={`edit-loyalty-${customer.id}`}
+                      title="Edit discount / validity"
+                    >
+                      <Pencil className="w-3.5 h-3.5" />
+                      {editingCustomerId === customer.id ? 'Cancel' : 'Edit'}
+                    </button>
                   </div>
+
+                  {/* ── Inline edit panel (accordion — only for this customer) ─ */}
+                  {editingCustomerId === customer.id && (
+                    <div
+                      className="mt-3 pt-3 border-t border-white/10 space-y-3"
+                      data-testid={`edit-panel-${customer.id}`}
+                    >
+                      <p className="text-[#A3A3A3] text-xs font-medium uppercase tracking-widest">
+                        Edit Loyalty Card
+                      </p>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <div>
+                          <label className="block text-[#A3A3A3] text-xs mb-1">
+                            Discount (%)
+                          </label>
+                          <input
+                            type="number"
+                            min="0"
+                            max="100"
+                            value={editDiscount}
+                            onChange={e => setEditDiscount(e.target.value)}
+                            placeholder={`Current: ${customer.currentDiscount || 10}%`}
+                            className="w-full bg-black/20 border border-white/10 text-white placeholder:text-neutral-600 focus:border-[#D4AF37] focus:ring-1 focus:ring-[#D4AF37] rounded-sm h-9 px-3 text-sm transition-all"
+                            data-testid={`edit-discount-${customer.id}`}
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-[#A3A3A3] text-xs mb-1">
+                            Validity (days)
+                          </label>
+                          <input
+                            type="number"
+                            min="0"
+                            value={editValidity}
+                            onChange={e => setEditValidity(e.target.value)}
+                            placeholder={`Current: ${customer.validityDays || 0}d`}
+                            className="w-full bg-black/20 border border-white/10 text-white placeholder:text-neutral-600 focus:border-[#D4AF37] focus:ring-1 focus:ring-[#D4AF37] rounded-sm h-9 px-3 text-sm transition-all"
+                            data-testid={`edit-validity-${customer.id}`}
+                          />
+                        </div>
+                      </div>
+                      <div className="flex gap-2">
+                        <button
+                          onClick={() => handleSaveEdit(customer)}
+                          className="flex items-center gap-1.5 px-5 py-2 bg-[#D4AF37] hover:bg-[#C5A059] text-black font-bold rounded-sm text-xs transition-all"
+                          data-testid={`save-edit-${customer.id}`}
+                        >
+                          <Check className="w-3.5 h-3.5" />
+                          Save Changes
+                        </button>
+                        <button
+                          onClick={() => handleSendWA(customer)}
+                          className="flex items-center gap-1.5 px-5 py-2 bg-green-500/10 hover:bg-green-500/20 border border-green-500/20 text-green-400 font-bold rounded-sm text-xs transition-all"
+                          data-testid={`resend-wa-${customer.id}`}
+                        >
+                          <MessageSquare className="w-3.5 h-3.5" />
+                          Resend WhatsApp
+                        </button>
+                      </div>
+                    </div>
+                  )}
 
                 </div>
               </motion.div>
