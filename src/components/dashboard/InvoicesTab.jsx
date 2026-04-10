@@ -417,10 +417,10 @@ const InvoicesTab = () => {
                 transition={{ delay: i * 0.03 }}
                 className="bg-[#0F0F0F] border border-white/5 rounded-xl overflow-hidden hover:border-white/10 transition-colors"
               >
-                {/* Main row */}
-                <div className="flex items-center justify-between px-5 py-4 gap-4">
-                  {/* Left: invoice info */}
-                  <div className="min-w-0 flex-1">
+                {/* Main row — flex-wrap prevents overflow on tablet/desktop */}
+                <div className="flex items-start justify-between px-5 py-4 gap-3 flex-wrap sm:flex-nowrap sm:items-center">
+                  {/* Left: invoice info — min-w-0 ensures text truncation works */}
+                  <div className="min-w-0 flex-1 w-full sm:w-auto">
                     <div className="flex items-center gap-3 flex-wrap">
                       <span className="text-[#D4AF37] font-bold text-sm">
                         {inv.invoiceNumber || `ORD-${String(inv.orderNumber||'').padStart(4,'0')}`}
@@ -430,7 +430,7 @@ const InvoicesTab = () => {
                     </div>
                     <div className="flex items-center gap-3 mt-1 flex-wrap">
                       {inv.customerName && (
-                        <span className="text-white text-sm">{inv.customerName}</span>
+                        <span className="text-white text-sm truncate max-w-[180px]">{inv.customerName}</span>
                       )}
                       {inv.customerPhone && (
                         <span className="text-[#555] text-xs">{inv.customerPhone}</span>
@@ -447,9 +447,9 @@ const InvoicesTab = () => {
                     )}
                   </div>
 
-                  {/* Right: amounts + actions */}
-                  <div className="flex items-center gap-4 flex-shrink-0">
-                    <div className="text-right hidden sm:block">
+                  {/* Right: amounts + actions — flex-shrink-0 + min-w-0 on parent keeps it from overflowing */}
+                  <div className="flex items-center gap-3 flex-shrink-0 flex-wrap justify-end w-full sm:w-auto">
+                    <div className="text-right">
                       {inv.gstAmount > 0 && (
                         <p className="text-[#555] text-xs">GST: {CUR}{fmt(inv.gstAmount)}</p>
                       )}
