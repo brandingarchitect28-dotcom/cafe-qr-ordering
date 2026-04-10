@@ -12,21 +12,26 @@
  */
 
 import React, { useState, useEffect } from 'react';
+import { useAuth } from '../../contexts/AuthContext';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { db } from '../../lib/firebase';
 import { toast } from 'sonner';
 import { RefreshCw, Link, CheckCircle } from 'lucide-react';
 
 const GoogleReviewSettings = () => {
+  const { user } = useAuth();
+  const cafeId   = user?.cafeId;
+
   const [link,    setLink   ] = useState('');
   const [loading, setLoading] = useState(true);
   const [saving,  setSaving ] = useState(false);
 
-  // ── Load existing link on mount ───────────────────────────────────────────
+  // ── Load per-café link on mount ───────────────────────────────────────────
   useEffect(() => {
+    if (!cafeId) return;
     const load = async () => {
       try {
-        const snap = await getDoc(doc(db, 'appSettings', 'global'));
+        const snap = await getDoc(doc(db, 'cafes', cafeId));
         if (snap.exists()) {
           setLink(snap.data()?.googleReviewLink || '');
         }
@@ -37,12 +42,15 @@ const GoogleReviewSettings = () => {
       }
     };
     load();
-  }, []);
+  }, [cafeId]);
 
   // ── Save link to Firestore ────────────────────────────────────────────────
   const handleSave = async (e) => {
     e.preventDefault();
     const trimmed = link.trim();
+    // ── DEBUG: confirm db + value ─────────────────────────────────────────
+    console.log('[GoogleReviewSettings] DB instance:', db);
+    console.log('[GoogleReviewSettings] Saving link:', trimmed || '(empty)');
 
     if (trimmed && !trimmed.startsWith('http')) {
       toast.error('Please enter a valid URL starting with http');
@@ -51,15 +59,17 @@ const GoogleReviewSettings = () => {
 
     setSaving(true);
     try {
+      // Save per-café — merge: true so no other cafe document fields are overwritten
       await setDoc(
-        doc(db, 'appSettings', 'global'),
+        doc(db, 'cafes', cafeId),
         { googleReviewLink: trimmed },
-        { merge: true }          // merge: true — never overwrites other fields
+        { merge: true }
       );
+      console.log('[GoogleReviewSettings] ✅ Saved to cafes/' + cafeId);
       toast.success('Google Review link saved ✓');
     } catch (err) {
-      console.error('[GoogleReviewSettings] save error:', err);
-      toast.error('Failed to save link');
+      console.error('[GoogleReviewSettings] ❌ setDoc failed:', err.code, err.message, err);
+      toast.error(`Failed to save link: ${err.message || 'Unknown error'}`);
     } finally {
       setSaving(false);
     }
