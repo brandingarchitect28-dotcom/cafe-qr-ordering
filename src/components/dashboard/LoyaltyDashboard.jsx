@@ -31,7 +31,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { toast } from 'sonner';
 import {
   Search, UserPlus, Star, MessageSquare, Phone, User,
-  Award, TrendingUp, RefreshCw, Gift, Undo2, Trash2, Repeat, Calendar, Pencil, Check,
+  Award, TrendingUp, RefreshCw, Gift, Undo2, Trash2, Repeat, Calendar, Pencil, Check, ChevronDown,
 } from 'lucide-react';
 import GoogleReviewSettings from './GoogleReviewSettings';
 
@@ -100,6 +100,10 @@ const LoyaltyDashboard = () => {
   const [editingCustomerId, setEditingCustomerId] = useState(null);
   const [editDiscount,      setEditDiscount     ] = useState('');
   const [editValidity,      setEditValidity     ] = useState('');
+
+  // ── Expandable card state — add-only, zero effect on data or logic ───────────
+  const [expandedCustomerId, setExpandedCustomerId] = useState(null);
+  const toggleCard = (id) => setExpandedCustomerId(prev => prev === id ? null : id);
 
   // ── Derived / filtered list ──────────────────────────────────────────────────
   const filtered = useMemo(() => {
@@ -464,12 +468,13 @@ const LoyaltyDashboard = () => {
           </p>
         </div>
       ) : (
-        <div className="space-y-3">
+        <div className="space-y-2">
           {filtered.map(customer => {
             const disc    = customer.currentDiscount || 10;
             const visits  = customer.visits || 0;
             const isFree  = disc >= 30;
             const marking = markingId === customer.id;
+            const isOpen  = expandedCustomerId === customer.id;
 
             return (
               <motion.div
@@ -477,203 +482,225 @@ const LoyaltyDashboard = () => {
                 layout
                 initial={{ opacity: 0, y: 8 }}
                 animate={{ opacity: 1, y: 0 }}
-                className="bg-[#0F0F0F] border border-white/5 rounded-sm p-4 hover:border-white/10 transition-colors"
+                className="bg-[#0F0F0F] border border-white/5 rounded-sm hover:border-white/10 transition-colors overflow-hidden"
                 data-testid={`loyalty-customer-${customer.id}`}
               >
-                <div className="flex flex-col sm:flex-row sm:items-center gap-4">
+                {/* ── Always-visible header — click to expand / collapse ─────── */}
+                <button
+                  onClick={() => toggleCard(customer.id)}
+                  className="w-full flex items-center gap-3 px-4 py-3 text-left"
+                  aria-expanded={isOpen}
+                  data-testid={`loyalty-toggle-${customer.id}`}
+                >
+                  {/* Avatar */}
+                  <div className="w-9 h-9 rounded-full bg-[#D4AF37]/10 flex items-center justify-center flex-shrink-0">
+                    <User className="w-4 h-4 text-[#D4AF37]" />
+                  </div>
 
-                  {/* Customer info */}
-                  <div className="flex items-start gap-3 flex-1 min-w-0">
-                    <div className="w-10 h-10 rounded-full bg-[#D4AF37]/10 flex items-center justify-center flex-shrink-0">
-                      <User className="w-5 h-5 text-[#D4AF37]" />
-                    </div>
-                    <div className="min-w-0">
-                      <p className="text-white font-semibold truncate">{customer.name}</p>
-                      <div className="flex items-center gap-1.5 mt-0.5">
-                        <Phone className="w-3 h-3 text-[#A3A3A3]" />
-                        <p className="text-[#A3A3A3] text-sm">{customer.phone}</p>
-                      </div>
+                  {/* Name + phone */}
+                  <div className="min-w-0 flex-1">
+                    <p className="text-white font-semibold text-sm truncate">{customer.name}</p>
+                    <div className="flex items-center gap-1.5 mt-0.5">
+                      <Phone className="w-3 h-3 text-[#A3A3A3] flex-shrink-0" />
+                      <p className="text-[#A3A3A3] text-xs truncate">{customer.phone}</p>
                     </div>
                   </div>
 
-                  {/* Visit + discount badges */}
-                  <div className="flex items-center gap-3 flex-shrink-0">
-                    <div className="flex items-center gap-1.5 bg-white/5 rounded-sm px-3 py-1.5">
-                      <TrendingUp className="w-3.5 h-3.5 text-[#A3A3A3]" />
-                      <span className="text-white text-sm font-semibold">{visits}</span>
-                      <span className="text-[#A3A3A3] text-xs">visit{visits !== 1 ? 's' : ''}</span>
-                    </div>
-                    <div
-                      className="flex items-center gap-1.5 rounded-sm px-3 py-1.5"
-                      style={{
-                        backgroundColor: isFree ? '#10B98118' : '#D4AF3718',
-                        border:          isFree ? '1px solid #10B98140' : '1px solid #D4AF3740',
-                      }}
-                    >
-                      <Star className="w-3.5 h-3.5" style={{ color: isFree ? '#10B981' : '#D4AF37' }} />
-                      <span className="text-sm font-bold" style={{ color: isFree ? '#10B981' : '#D4AF37' }}>
-                        {isFree ? 'Free Item' : `${disc}% OFF`}
-                      </span>
-                    </div>
+                  {/* Visit count badge */}
+                  <div className="flex items-center gap-1.5 bg-white/5 rounded-sm px-2.5 py-1 flex-shrink-0">
+                    <TrendingUp className="w-3 h-3 text-[#A3A3A3]" />
+                    <span className="text-white text-xs font-semibold">{visits}</span>
+                    <span className="text-[#A3A3A3] text-xs hidden sm:inline">visit{visits !== 1 ? 's' : ''}</span>
                   </div>
 
-                  {/* Valid till — shown only when expiryDate is set ─────────── */}
-                  {customer.expiryDate && (() => {
-                    const exp = customer.expiryDate?.toDate
-                      ? customer.expiryDate.toDate()        // Firestore Timestamp
-                      : new Date(customer.expiryDate);      // plain Date/string
-                    const isExpired = exp < new Date();
-                    return (
-                      <div
-                        className="flex items-center gap-1.5 rounded-sm px-3 py-1.5 flex-shrink-0"
-                        style={{
-                          backgroundColor: isExpired ? 'rgba(239,68,68,0.08)' : 'rgba(255,255,255,0.04)',
-                          border:          isExpired ? '1px solid rgba(239,68,68,0.25)' : '1px solid rgba(255,255,255,0.08)',
-                        }}
+                  {/* Discount / free item badge */}
+                  <div
+                    className="flex items-center gap-1.5 rounded-sm px-2.5 py-1 flex-shrink-0"
+                    style={{
+                      backgroundColor: isFree ? '#10B98118' : '#D4AF3718',
+                      border:          isFree ? '1px solid #10B98140' : '1px solid #D4AF3740',
+                    }}
+                  >
+                    <Star className="w-3 h-3" style={{ color: isFree ? '#10B981' : '#D4AF37' }} />
+                    <span className="text-xs font-bold" style={{ color: isFree ? '#10B981' : '#D4AF37' }}>
+                      {isFree ? 'Free' : `${disc}%`}
+                    </span>
+                  </div>
+
+                  {/* Expand chevron */}
+                  <ChevronDown
+                    className="w-4 h-4 text-[#A3A3A3] flex-shrink-0 transition-transform duration-300"
+                    style={{ transform: isOpen ? 'rotate(180deg)' : 'rotate(0deg)' }}
+                  />
+                </button>
+
+                {/* ── Collapsible body — all existing content, shown on expand ─ */}
+                <motion.div
+                  initial={false}
+                  animate={{ height: isOpen ? 'auto' : 0, opacity: isOpen ? 1 : 0 }}
+                  transition={{ duration: 0.25, ease: 'easeInOut' }}
+                  style={{ overflow: 'hidden' }}
+                >
+                  <div className="px-4 pb-4 pt-1 space-y-3 border-t border-white/5">
+
+                    {/* Valid till — shown only when expiryDate is set ─────────── */}
+                    {customer.expiryDate && (() => {
+                      const exp = customer.expiryDate?.toDate
+                        ? customer.expiryDate.toDate()        // Firestore Timestamp
+                        : new Date(customer.expiryDate);      // plain Date/string
+                      const isExpired = exp < new Date();
+                      return (
+                        <div
+                          className="inline-flex items-center gap-1.5 rounded-sm px-3 py-1.5"
+                          style={{
+                            backgroundColor: isExpired ? 'rgba(239,68,68,0.08)' : 'rgba(255,255,255,0.04)',
+                            border:          isExpired ? '1px solid rgba(239,68,68,0.25)' : '1px solid rgba(255,255,255,0.08)',
+                          }}
+                        >
+                          <Calendar className="w-3.5 h-3.5" style={{ color: isExpired ? '#EF4444' : '#A3A3A3' }} />
+                          <span
+                            className="text-xs font-medium"
+                            style={{ color: isExpired ? '#EF4444' : '#A3A3A3' }}
+                          >
+                            {isExpired ? 'Expired ' : 'Valid till '}
+                            {exp.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}
+                          </span>
+                        </div>
+                      );
+                    })()}
+
+                    {/* Action buttons — ALL existing, 100% unchanged ─────────── */}
+                    <div className="flex gap-2 flex-wrap">
+                      <button
+                        onClick={() => handleMarkVisit(customer)}
+                        disabled={marking}
+                        className="flex items-center gap-1.5 px-4 py-2 bg-[#D4AF37] hover:bg-[#C5A059] text-black font-bold rounded-sm text-xs transition-all disabled:opacity-50"
+                        data-testid={`mark-visit-${customer.id}`}
                       >
-                        <Calendar className="w-3.5 h-3.5" style={{ color: isExpired ? '#EF4444' : '#A3A3A3' }} />
-                        <span
-                          className="text-xs font-medium"
-                          style={{ color: isExpired ? '#EF4444' : '#A3A3A3' }}
-                        >
-                          {isExpired ? 'Expired ' : 'Valid till '}
-                          {exp.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}
-                        </span>
-                      </div>
-                    );
-                  })()}
-
-                  {/* Action buttons */}
-                  <div className="flex gap-2 flex-shrink-0 flex-wrap justify-end">
-                    <button
-                      onClick={() => handleMarkVisit(customer)}
-                      disabled={marking}
-                      className="flex items-center gap-1.5 px-4 py-2 bg-[#D4AF37] hover:bg-[#C5A059] text-black font-bold rounded-sm text-xs transition-all disabled:opacity-50"
-                      data-testid={`mark-visit-${customer.id}`}
-                    >
-                      {marking
-                        ? <RefreshCw className="w-3.5 h-3.5 animate-spin" />
-                        : <Star className="w-3.5 h-3.5" />}
-                      {marking ? 'Marking…' : 'Mark Visit'}
-                    </button>
-                    <button
-                      onClick={() => handleSendWA(customer)}
-                      className="flex items-center gap-1.5 px-4 py-2 bg-green-500/10 hover:bg-green-500/20 border border-green-500/20 text-green-400 font-bold rounded-sm text-xs transition-all"
-                      data-testid={`wa-loyalty-${customer.id}`}
-                    >
-                      <MessageSquare className="w-3.5 h-3.5" />
-                      WhatsApp
-                    </button>
-                    {/* ── Undo visit ───────────────────────────────────────── */}
-                    <button
-                      onClick={() => handleUndoVisit(customer)}
-                      disabled={marking || (customer.visits || 1) <= 1}
-                      className="flex items-center gap-1.5 px-4 py-2 bg-white/5 hover:bg-white/10 border border-white/10 text-[#A3A3A3] hover:text-white font-bold rounded-sm text-xs transition-all disabled:opacity-30 disabled:cursor-not-allowed"
-                      data-testid={`undo-visit-${customer.id}`}
-                      title="Undo last visit"
-                    >
-                      <Undo2 className="w-3.5 h-3.5" />
-                      Undo
-                    </button>
-                    {/* ── Delete customer ──────────────────────────────────── */}
-                    <button
-                      onClick={() => handleDeleteCustomer(customer)}
-                      className="flex items-center gap-1.5 px-4 py-2 bg-red-500/10 hover:bg-red-500/20 border border-red-500/20 text-red-400 font-bold rounded-sm text-xs transition-all"
-                      data-testid={`delete-loyalty-${customer.id}`}
-                      title="Delete customer permanently"
-                    >
-                      <Trash2 className="w-3.5 h-3.5" />
-                      Delete
-                    </button>
-                    {/* ── Edit card ────────────────────────────────────────── */}
-                    <button
-                      onClick={() => {
-                        if (editingCustomerId === customer.id) {
-                          // toggle off
-                          setEditingCustomerId(null);
-                          setEditDiscount('');
-                          setEditValidity('');
-                        } else {
-                          setEditingCustomerId(customer.id);
-                          setEditDiscount(String(customer.currentDiscount || ''));
-                          setEditValidity(String(customer.validityDays    || ''));
-                        }
-                      }}
-                      className={`flex items-center gap-1.5 px-4 py-2 border font-bold rounded-sm text-xs transition-all ${
-                        editingCustomerId === customer.id
-                          ? 'bg-[#D4AF37]/20 border-[#D4AF37]/40 text-[#D4AF37]'
-                          : 'bg-white/5 hover:bg-white/10 border-white/10 text-[#A3A3A3] hover:text-white'
-                      }`}
-                      data-testid={`edit-loyalty-${customer.id}`}
-                      title="Edit discount / validity"
-                    >
-                      <Pencil className="w-3.5 h-3.5" />
-                      {editingCustomerId === customer.id ? 'Cancel' : 'Edit'}
-                    </button>
-                  </div>
-
-                  {/* ── Inline edit panel (accordion — only for this customer) ─ */}
-                  {editingCustomerId === customer.id && (
-                    <div
-                      className="mt-3 pt-3 border-t border-white/10 space-y-3"
-                      data-testid={`edit-panel-${customer.id}`}
-                    >
-                      <p className="text-[#A3A3A3] text-xs font-medium uppercase tracking-widest">
-                        Edit Loyalty Card
-                      </p>
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                        <div>
-                          <label className="block text-[#A3A3A3] text-xs mb-1">
-                            Discount (%)
-                          </label>
-                          <input
-                            type="number"
-                            min="0"
-                            max="100"
-                            value={editDiscount}
-                            onChange={e => setEditDiscount(e.target.value)}
-                            placeholder={`Current: ${customer.currentDiscount || 10}%`}
-                            className="w-full bg-black/20 border border-white/10 text-white placeholder:text-neutral-600 focus:border-[#D4AF37] focus:ring-1 focus:ring-[#D4AF37] rounded-sm h-9 px-3 text-sm transition-all"
-                            data-testid={`edit-discount-${customer.id}`}
-                          />
-                        </div>
-                        <div>
-                          <label className="block text-[#A3A3A3] text-xs mb-1">
-                            Validity (days)
-                          </label>
-                          <input
-                            type="number"
-                            min="0"
-                            value={editValidity}
-                            onChange={e => setEditValidity(e.target.value)}
-                            placeholder={`Current: ${customer.validityDays || 0}d`}
-                            className="w-full bg-black/20 border border-white/10 text-white placeholder:text-neutral-600 focus:border-[#D4AF37] focus:ring-1 focus:ring-[#D4AF37] rounded-sm h-9 px-3 text-sm transition-all"
-                            data-testid={`edit-validity-${customer.id}`}
-                          />
-                        </div>
-                      </div>
-                      <div className="flex gap-2">
-                        <button
-                          onClick={() => handleSaveEdit(customer)}
-                          className="flex items-center gap-1.5 px-5 py-2 bg-[#D4AF37] hover:bg-[#C5A059] text-black font-bold rounded-sm text-xs transition-all"
-                          data-testid={`save-edit-${customer.id}`}
-                        >
-                          <Check className="w-3.5 h-3.5" />
-                          Save Changes
-                        </button>
-                        <button
-                          onClick={() => handleSendWA(customer)}
-                          className="flex items-center gap-1.5 px-5 py-2 bg-green-500/10 hover:bg-green-500/20 border border-green-500/20 text-green-400 font-bold rounded-sm text-xs transition-all"
-                          data-testid={`resend-wa-${customer.id}`}
-                        >
-                          <MessageSquare className="w-3.5 h-3.5" />
-                          Resend WhatsApp
-                        </button>
-                      </div>
+                        {marking
+                          ? <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                          : <Star className="w-3.5 h-3.5" />}
+                        {marking ? 'Marking…' : 'Mark Visit'}
+                      </button>
+                      <button
+                        onClick={() => handleSendWA(customer)}
+                        className="flex items-center gap-1.5 px-4 py-2 bg-green-500/10 hover:bg-green-500/20 border border-green-500/20 text-green-400 font-bold rounded-sm text-xs transition-all"
+                        data-testid={`wa-loyalty-${customer.id}`}
+                      >
+                        <MessageSquare className="w-3.5 h-3.5" />
+                        WhatsApp
+                      </button>
+                      {/* ── Undo visit ───────────────────────────────────────── */}
+                      <button
+                        onClick={() => handleUndoVisit(customer)}
+                        disabled={marking || (customer.visits || 1) <= 1}
+                        className="flex items-center gap-1.5 px-4 py-2 bg-white/5 hover:bg-white/10 border border-white/10 text-[#A3A3A3] hover:text-white font-bold rounded-sm text-xs transition-all disabled:opacity-30 disabled:cursor-not-allowed"
+                        data-testid={`undo-visit-${customer.id}`}
+                        title="Undo last visit"
+                      >
+                        <Undo2 className="w-3.5 h-3.5" />
+                        Undo
+                      </button>
+                      {/* ── Delete customer ──────────────────────────────────── */}
+                      <button
+                        onClick={() => handleDeleteCustomer(customer)}
+                        className="flex items-center gap-1.5 px-4 py-2 bg-red-500/10 hover:bg-red-500/20 border border-red-500/20 text-red-400 font-bold rounded-sm text-xs transition-all"
+                        data-testid={`delete-loyalty-${customer.id}`}
+                        title="Delete customer permanently"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                        Delete
+                      </button>
+                      {/* ── Edit card ────────────────────────────────────────── */}
+                      <button
+                        onClick={() => {
+                          if (editingCustomerId === customer.id) {
+                            // toggle off
+                            setEditingCustomerId(null);
+                            setEditDiscount('');
+                            setEditValidity('');
+                          } else {
+                            setEditingCustomerId(customer.id);
+                            setEditDiscount(String(customer.currentDiscount || ''));
+                            setEditValidity(String(customer.validityDays    || ''));
+                          }
+                        }}
+                        className={`flex items-center gap-1.5 px-4 py-2 border font-bold rounded-sm text-xs transition-all ${
+                          editingCustomerId === customer.id
+                            ? 'bg-[#D4AF37]/20 border-[#D4AF37]/40 text-[#D4AF37]'
+                            : 'bg-white/5 hover:bg-white/10 border-white/10 text-[#A3A3A3] hover:text-white'
+                        }`}
+                        data-testid={`edit-loyalty-${customer.id}`}
+                        title="Edit discount / validity"
+                      >
+                        <Pencil className="w-3.5 h-3.5" />
+                        {editingCustomerId === customer.id ? 'Cancel' : 'Edit'}
+                      </button>
                     </div>
-                  )}
 
-                </div>
+                    {/* ── Inline edit panel (accordion — only for this customer) ─ */}
+                    {editingCustomerId === customer.id && (
+                      <div
+                        className="mt-3 pt-3 border-t border-white/10 space-y-3"
+                        data-testid={`edit-panel-${customer.id}`}
+                      >
+                        <p className="text-[#A3A3A3] text-xs font-medium uppercase tracking-widest">
+                          Edit Loyalty Card
+                        </p>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                          <div>
+                            <label className="block text-[#A3A3A3] text-xs mb-1">
+                              Discount (%)
+                            </label>
+                            <input
+                              type="number"
+                              min="0"
+                              max="100"
+                              value={editDiscount}
+                              onChange={e => setEditDiscount(e.target.value)}
+                              placeholder={`Current: ${customer.currentDiscount || 10}%`}
+                              className="w-full bg-black/20 border border-white/10 text-white placeholder:text-neutral-600 focus:border-[#D4AF37] focus:ring-1 focus:ring-[#D4AF37] rounded-sm h-9 px-3 text-sm transition-all"
+                              data-testid={`edit-discount-${customer.id}`}
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-[#A3A3A3] text-xs mb-1">
+                              Validity (days)
+                            </label>
+                            <input
+                              type="number"
+                              min="0"
+                              value={editValidity}
+                              onChange={e => setEditValidity(e.target.value)}
+                              placeholder={`Current: ${customer.validityDays || 0}d`}
+                              className="w-full bg-black/20 border border-white/10 text-white placeholder:text-neutral-600 focus:border-[#D4AF37] focus:ring-1 focus:ring-[#D4AF37] rounded-sm h-9 px-3 text-sm transition-all"
+                              data-testid={`edit-validity-${customer.id}`}
+                            />
+                          </div>
+                        </div>
+                        <div className="flex gap-2">
+                          <button
+                            onClick={() => handleSaveEdit(customer)}
+                            className="flex items-center gap-1.5 px-5 py-2 bg-[#D4AF37] hover:bg-[#C5A059] text-black font-bold rounded-sm text-xs transition-all"
+                            data-testid={`save-edit-${customer.id}`}
+                          >
+                            <Check className="w-3.5 h-3.5" />
+                            Save Changes
+                          </button>
+                          <button
+                            onClick={() => handleSendWA(customer)}
+                            className="flex items-center gap-1.5 px-5 py-2 bg-green-500/10 hover:bg-green-500/20 border border-green-500/20 text-green-400 font-bold rounded-sm text-xs transition-all"
+                            data-testid={`resend-wa-${customer.id}`}
+                          >
+                            <MessageSquare className="w-3.5 h-3.5" />
+                            Resend WhatsApp
+                          </button>
+                        </div>
+                      </div>
+                    )}
+
+                  </div>
+                </motion.div>
               </motion.div>
             );
           })}
