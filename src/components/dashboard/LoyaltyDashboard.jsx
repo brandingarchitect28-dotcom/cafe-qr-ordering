@@ -55,11 +55,20 @@ const labelCls = 'block text-white text-sm font-medium mb-1.5';
 const buildWAMessage = (customer) => {
   const disc = customer.currentDiscount;
   const isFree = disc >= 30;
+  // ── Expiry text — shown if expiryDate is set on the customer doc ──────────
+  const expiryText = (() => {
+    if (!customer.expiryDate) return null;
+    const d = customer.expiryDate?.toDate
+      ? customer.expiryDate.toDate()
+      : new Date(customer.expiryDate);
+    return d.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
+  })();
   return (
     `🎉 Welcome back, ${customer.name}!\n\n` +
     (isFree
       ? `🎁 You've unlocked a FREE ITEM on your next visit! 🥳\n`
       : `🔥 You've unlocked *${disc}% OFF* on your next order!\n`) +
+    (expiryText ? `📅 Valid till: ${expiryText}\n` : '') +
     `\nShow this message at the counter to redeem.\n` +
     `\n👀 Keep visiting — your next reward is just around the corner!`
   );
@@ -85,6 +94,7 @@ const LoyaltyDashboard = () => {
   const [newName,       setNewName      ] = useState('');
   const [newPhone,      setNewPhone     ] = useState('');
   const [validityDays,  setValidityDays ] = useState(''); // optional validity in days
+  const [customDiscount, setCustomDiscount] = useState(''); // optional manual discount override
 
   // ── Derived / filtered list ──────────────────────────────────────────────────
   const filtered = useMemo(() => {
@@ -124,12 +134,15 @@ const LoyaltyDashboard = () => {
         ? (() => { const d = new Date(); d.setDate(d.getDate() + days); return d; })()
         : null;
 
+      // ── Custom discount override — falls back to default 10% if empty ────
+      const discountToUse = customDiscount ? Number(customDiscount) : 10;
+
       const ref = await addDoc(collection(db, 'loyaltyCustomers'), {
         cafeId,
         name:            newName.trim(),
         phone:           newPhone.trim(),
         visits:          1,
-        currentDiscount: 10,
+        currentDiscount: discountToUse,
         validityDays:    days,
         expiryDate:      expiryDate,
         createdAt:       serverTimestamp(),
@@ -140,6 +153,7 @@ const LoyaltyDashboard = () => {
       setNewName('');
       setNewPhone('');
       setValidityDays('');
+      setCustomDiscount('');
       setShowAddForm(false);
     } catch (err) {
       // ── Verbose error so the exact failure reason is visible in console ──
@@ -157,16 +171,20 @@ const LoyaltyDashboard = () => {
       const newVisits   = (customer.visits || 0) + 1;
       const newDiscount = discountForVisits(newVisits);
       console.log('[Loyalty] Marking visit for', customer.name, '→ visits:', newVisits, 'discount:', newDiscount);
-      // ── Recalculate expiry based on existing validityDays on the customer ─
-      const existingDays = Number(customer.validityDays) || 0;
-      const newExpiry = existingDays > 0
-        ? (() => { const d = new Date(); d.setDate(d.getDate() + existingDays); return d; })()
+      // ── Custom discount override — empty = use ladder; set = use manual value ─
+      const discountToUse = customDiscount ? Number(customDiscount) : newDiscount;
+
+      // ── Expiry: prefer form input, fall back to customer's existing validityDays
+      const daysToUse = Number(validityDays) || Number(customer.validityDays) || 0;
+      const newExpiry = daysToUse > 0
+        ? (() => { const d = new Date(); d.setDate(d.getDate() + daysToUse); return d; })()
         : null;
 
       await updateDoc(doc(db, 'loyaltyCustomers', customer.id), {
         visits:          newVisits,
-        currentDiscount: newDiscount,
+        currentDiscount: discountToUse,
         lastVisit:       serverTimestamp(),
+        validityDays:    daysToUse,
         ...(newExpiry !== null && { expiryDate: newExpiry }),
       });
       const msg =
@@ -340,6 +358,25 @@ const LoyaltyDashboard = () => {
                   className={inputCls}
                   disabled={saving}
                   data-testid="loyalty-validity-input"
+                />
+              </div>
+
+              {/* ── Custom discount override — add-only field ────────────── */}
+              <div>
+                <label className={labelCls}>
+                  Custom Discount (%)
+                  <span className="text-[#A3A3A3] font-normal ml-1">(optional — overrides default 10%)</span>
+                </label>
+                <input
+                  type="number"
+                  min="0"
+                  max="100"
+                  value={customDiscount}
+                  onChange={e => setCustomDiscount(e.target.value)}
+                  placeholder="e.g. 20"
+                  className={inputCls}
+                  disabled={saving}
+                  data-testid="loyalty-discount-input"
                 />
               </div>
               <p className="text-[#A3A3A3] text-xs">
