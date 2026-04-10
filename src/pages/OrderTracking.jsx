@@ -17,7 +17,7 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { doc, onSnapshot } from 'firebase/firestore';
+import { doc, onSnapshot, getDoc } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
@@ -167,6 +167,23 @@ const OrderTracking = () => {
   const [order,    setOrder   ] = useState(null);
   const [loading,  setLoading ] = useState(true);
   const [notFound, setNotFound] = useState(false);
+
+  // ── Google Review link — fetched from appSettings/global (add-only) ──────────
+  const [googleReviewLink, setGoogleReviewLink] = useState('');
+
+  useEffect(() => {
+    const fetchReviewLink = async () => {
+      try {
+        const snap = await getDoc(doc(db, 'appSettings', 'global'));
+        if (snap.exists()) {
+          setGoogleReviewLink(snap.data()?.googleReviewLink || '');
+        }
+      } catch (err) {
+        console.warn('[OrderTracking] Could not fetch review link:', err.message);
+      }
+    };
+    fetchReviewLink();
+  }, []);
   const [waSending, setWaSending] = useState(false);
 
   // ── Real-time listener — UNCHANGED from existing system ──────────────────────
@@ -490,9 +507,9 @@ const OrderTracking = () => {
             <p className="text-sm mt-1" style={{ color: '#666' }}>
               Leave us a Google review and show it at the counter to redeem.
             </p>
-            {(cafe?.googleReviewUrl || cafe?.googleReviewLink) && (
+            {googleReviewLink ? (
               <a
-                href={cafe.googleReviewUrl || cafe.googleReviewLink}
+                href={googleReviewLink}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="inline-flex items-center gap-2 mt-4 px-5 py-2.5 rounded-full font-bold text-sm text-black transition-all hover:opacity-90"
@@ -501,8 +518,7 @@ const OrderTracking = () => {
               >
                 ⭐ Leave a Google Review
               </a>
-            )}
-            {!(cafe?.googleReviewUrl || cafe?.googleReviewLink) && (
+            ) : (
               <p className="text-xs mt-3" style={{ color: '#888' }}>
                 Ask the café owner to add their Google Review link in Settings.
               </p>
