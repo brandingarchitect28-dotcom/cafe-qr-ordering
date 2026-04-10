@@ -115,6 +115,8 @@ const LoadingSkeleton = ({ message = "Loading...", colors }) => (
   </div>
 );
 
+import FoodDetailPremium from '../components/dashboard/FoodDetailPremium';
+
 const CafeOrdering = () => {
   const { cafeId } = useParams();
   const [cafe, setCafe] = useState(null);
@@ -141,6 +143,7 @@ const CafeOrdering = () => {
   const [selectedCategory, setSelectedCategory] = useState('all');
   const [showHero, setShowHero] = useState(true);
   const [addingItemId, setAddingItemId] = useState(null);
+  const [selectedFoodItem, setSelectedFoodItem] = useState(null); // Food detail overlay
   
   const menuRef = useRef(null);
   const unsubscribersRef = useRef([]);
@@ -684,6 +687,14 @@ const CafeOrdering = () => {
   return (
     <div className="min-h-screen" style={{ backgroundColor: COLORS.background, fontFamily: 'Inter, sans-serif' }}>
       
+      {/* Food Detail Premium Overlay */}
+      {selectedFoodItem && (
+        <FoodDetailPremium
+          item={selectedFoodItem}
+          onClose={() => setSelectedFoodItem(null)}
+        />
+      )}
+
       {/* Dynamic placeholder color — follows dark/light mode */}
       <style>{`
         .cafe-input::placeholder { color: ${COLORS.textMuted}; opacity: 1; }
@@ -1037,6 +1048,17 @@ const CafeOrdering = () => {
                       </div>
                     );
                   })()}
+                  {/* Show Food Details — opens FoodDetailPremium overlay */}
+                  {(item.ingredients || item.calories || item.protein || item.carbs || item.fats) && (
+                    <button
+                      onClick={() => setSelectedFoodItem(item)}
+                      className="w-full text-xs mt-2 py-1.5 text-center transition-colors"
+                      style={{ color: COLORS.textMuted }}
+                      data-testid={`food-detail-${item.id}`}
+                    >
+                      🔍 Show Food Details
+                    </button>
+                  )}
                 </div>
               </motion.div>
             ))}

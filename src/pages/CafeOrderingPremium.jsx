@@ -34,6 +34,7 @@ import { toast } from 'sonner';
 import AddOnModal from '../components/AddOnModal';
 import { QRCodeSVG } from 'qrcode.react';
 import { MediaPreview, getMediaType } from '../components/MediaUpload';
+import FoodDetailPremium from '../components/dashboard/FoodDetailPremium';
 
 // ─── helpers ──────────────────────────────────────────────────────────────────
 
@@ -183,7 +184,7 @@ const OfferDetailModal = ({ offer, menuItems, CUR, onAdd, onClose, primary = '#D
 
 // ─── Menu Item Card (premium) ─────────────────────────────────────────────────
 
-const MenuCard = React.memo(({ item, CUR, cartQty, onAdd, onAddWithAnim, primary = '#D4AF37', theme }) => {
+const MenuCard = React.memo(({ item, CUR, cartQty, onAdd, onAddWithAnim, onShowDetails, primary = '#D4AF37', theme }) => {
   const mediaType = getMediaType(item.image);
   const T = theme || {
     bgCard: 'rgba(255,255,255,0.04)',
@@ -309,6 +310,18 @@ const MenuCard = React.memo(({ item, CUR, cartQty, onAdd, onAddWithAnim, primary
             ><Plus className="w-4 h-4" />Add to Cart</motion.button>
           );
         })()}
+
+        {/* Show Food Details — only when nutrition data exists */}
+        {(item.ingredients || item.calories || item.protein || item.carbs || item.fats) && (
+          <button
+            onClick={() => onShowDetails?.(item)}
+            className="w-full text-xs mt-2 py-1.5 text-center opacity-60 hover:opacity-100 transition-opacity"
+            style={{ color: primary }}
+            data-testid={`food-detail-${item.id}`}
+          >
+            🔍 Show Food Details
+          </button>
+        )}
       </div>
     </motion.div>
   );
@@ -333,6 +346,7 @@ const CafeOrderingPremium = () => {
   const [showCheckout,  setShowCheckout ] = useState(false);
   const [selectedOffer, setSelectedOffer] = useState(null);
   const [flyingDots,    setFlyingDots   ] = useState([]);
+  const [selectedFoodItem, setSelectedFoodItem] = useState(null); // Food detail overlay
   const cartBtnRef = useRef(null);
   const unsubRef   = useRef([]);
 
@@ -806,6 +820,14 @@ const CafeOrderingPremium = () => {
   return (
     <div className="min-h-screen" style={{ background: T.bg, fontFamily: 'Manrope, sans-serif' }}>
 
+      {/* Food Detail Premium Overlay */}
+      {selectedFoodItem && (
+        <FoodDetailPremium
+          item={selectedFoodItem}
+          onClose={() => setSelectedFoodItem(null)}
+        />
+      )}
+
       {/* Flying dots */}
       {flyingDots.map(dot => (
         <FlyingDot
@@ -994,6 +1016,7 @@ const CafeOrderingPremium = () => {
                     cartQty={cartQtyFor(item.id)}
                     onAdd={addToCart}
                     onAddWithAnim={addWithAnim}
+                    onShowDetails={(i) => setSelectedFoodItem(i)}
                     primary={primary}
                     theme={T}
                   />

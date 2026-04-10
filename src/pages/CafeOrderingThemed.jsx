@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
+import FoodDetailPremium from '../components/dashboard/FoodDetailPremium';
 import { useParams } from 'react-router-dom';
 import { collection, query, where, getDocs, doc, getDoc, addDoc, serverTimestamp } from 'firebase/firestore';
 import { db } from '../lib/firebase';
@@ -28,6 +29,7 @@ const CafeOrderingThemed = () => {
   const [orderPlacing, setOrderPlacing] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('all');
+  const [selectedFoodItem, setSelectedFoodItem] = useState(null); // Food detail overlay
 
   // Get theme configuration — respects dark/light mode and custom primary color
   const theme = useMemo(() => {
@@ -293,6 +295,13 @@ const CafeOrderingThemed = () => {
         color: theme.colors.text
       }}
     >
+      {/* Food Detail Premium Overlay */}
+      {selectedFoodItem && (
+        <FoodDetailPremium
+          item={selectedFoodItem}
+          onClose={() => setSelectedFoodItem(null)}
+        />
+      )}
       {/* Hero Section - Animated */}
       <motion.div
         initial={{ opacity: 0 }}
@@ -502,6 +511,18 @@ const CafeOrderingThemed = () => {
                     >
                       <Plus className="w-4 h-4" />
                       Add to Cart
+                    </button>
+                  )}
+
+                  {/* Show Food Details — only when nutrition data exists */}
+                  {(item.ingredients || item.calories || item.protein || item.carbs || item.fats) && (
+                    <button
+                      onClick={() => setSelectedFoodItem(item)}
+                      className="w-full text-xs mt-2 py-1.5 text-center transition-opacity opacity-70 hover:opacity-100"
+                      style={{ color: theme.colors.textSecondary }}
+                      data-testid={`food-detail-${item.id}`}
+                    >
+                      🔍 Show Food Details
                     </button>
                   )}
                 </div>
