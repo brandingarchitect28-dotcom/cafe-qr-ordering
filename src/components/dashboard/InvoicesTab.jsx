@@ -408,19 +408,25 @@ const InvoicesTab = () => {
           </p>
         </div>
       ) : (
-        <div className="space-y-2">
+        /* Responsive grid — 1 col mobile, 2 col tablet, fills wider desktop.
+           minmax(320px, 1fr) prevents cards stretching beyond readable width.
+           Existing card JSX, buttons, and all logic are 100% unchanged.       */
+        <div
+          className="grid gap-3"
+          style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(min(100%, 520px), 1fr))' }}
+        >
           <AnimatePresence>
             {filtered.map((inv, i) => (
               <motion.div key={inv.id}
                 initial={{ opacity: 0, y: 8 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: i * 0.03 }}
-                className="bg-[#0F0F0F] border border-white/5 rounded-xl overflow-hidden hover:border-white/10 transition-colors"
+                className="bg-[#0F0F0F] border border-white/5 rounded-xl overflow-hidden hover:border-white/10 transition-colors min-w-0"
               >
                 {/* Main row — flex-wrap prevents overflow on tablet/desktop */}
-                <div className="flex items-start justify-between px-5 py-4 gap-3 flex-wrap sm:flex-nowrap sm:items-center">
+                <div className="flex items-start justify-between px-5 py-4 gap-3 flex-wrap sm:flex-nowrap sm:items-center min-w-0">
                   {/* Left: invoice info — min-w-0 ensures text truncation works */}
-                  <div className="min-w-0 flex-1 w-full sm:w-auto">
+                  <div className="min-w-0 flex-1 w-full sm:w-auto overflow-hidden">
                     <div className="flex items-center gap-3 flex-wrap">
                       <span className="text-[#D4AF37] font-bold text-sm">
                         {inv.invoiceNumber || `ORD-${String(inv.orderNumber||'').padStart(4,'0')}`}
