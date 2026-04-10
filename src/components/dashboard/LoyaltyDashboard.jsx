@@ -31,7 +31,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { toast } from 'sonner';
 import {
   Search, UserPlus, Star, MessageSquare, Phone, User,
-  Award, TrendingUp, RefreshCw, Gift, Undo2, Trash2, Repeat,
+  Award, TrendingUp, RefreshCw, Gift, Undo2, Trash2, Repeat, Calendar,
 } from 'lucide-react';
 import GoogleReviewSettings from './GoogleReviewSettings';
 
@@ -82,8 +82,9 @@ const LoyaltyDashboard = () => {
   const [saving,       setSaving       ] = useState(false);
   const [markingId,    setMarkingId    ] = useState(null); // id of customer being marked
 
-  const [newName,  setNewName ] = useState('');
-  const [newPhone, setNewPhone] = useState('');
+  const [newName,       setNewName      ] = useState('');
+  const [newPhone,      setNewPhone     ] = useState('');
+  const [validityDays,  setValidityDays ] = useState(''); // optional validity in days
 
   // ── Derived / filtered list ──────────────────────────────────────────────────
   const filtered = useMemo(() => {
@@ -117,12 +118,20 @@ const LoyaltyDashboard = () => {
     setSaving(true);
     try {
       console.log('[Loyalty] Attempting addDoc to loyaltyCustomers…');
+      // ── Expiry calculation (add-only — safe if validityDays is empty) ─────
+      const days = Number(validityDays) || 0;
+      const expiryDate = days > 0
+        ? (() => { const d = new Date(); d.setDate(d.getDate() + days); return d; })()
+        : null;
+
       const ref = await addDoc(collection(db, 'loyaltyCustomers'), {
         cafeId,
         name:            newName.trim(),
         phone:           newPhone.trim(),
         visits:          1,
         currentDiscount: 10,
+        validityDays:    days,
+        expiryDate:      expiryDate,
         createdAt:       serverTimestamp(),
         lastVisit:       serverTimestamp(),
       });
@@ -130,6 +139,7 @@ const LoyaltyDashboard = () => {
       toast.success(`${newName.trim()} added to loyalty program ✓`);
       setNewName('');
       setNewPhone('');
+      setValidityDays('');
       setShowAddForm(false);
     } catch (err) {
       // ── Verbose error so the exact failure reason is visible in console ──
@@ -147,10 +157,17 @@ const LoyaltyDashboard = () => {
       const newVisits   = (customer.visits || 0) + 1;
       const newDiscount = discountForVisits(newVisits);
       console.log('[Loyalty] Marking visit for', customer.name, '→ visits:', newVisits, 'discount:', newDiscount);
+      // ── Recalculate expiry based on existing validityDays on the customer ─
+      const existingDays = Number(customer.validityDays) || 0;
+      const newExpiry = existingDays > 0
+        ? (() => { const d = new Date(); d.setDate(d.getDate() + existingDays); return d; })()
+        : null;
+
       await updateDoc(doc(db, 'loyaltyCustomers', customer.id), {
         visits:          newVisits,
         currentDiscount: newDiscount,
         lastVisit:       serverTimestamp(),
+        ...(newExpiry !== null && { expiryDate: newExpiry }),
       });
       const msg =
         newDiscount >= 30
@@ -307,6 +324,24 @@ const LoyaltyDashboard = () => {
                   />
                 </div>
               </div>
+
+              {/* ── Validity (days) — add-only field ─────────────────────── */}
+              <div>
+                <label className={labelCls}>
+                  Validity (days)
+                  <span className="text-[#A3A3A3] font-normal ml-1">(optional — e.g. 30 for 1 month)</span>
+                </label>
+                <input
+                  type="number"
+                  min="0"
+                  value={validityDays}
+                  onChange={e => setValidityDays(e.target.value)}
+                  placeholder="e.g. 30"
+                  className={inputCls}
+                  disabled={saving}
+                  data-testid="loyalty-validity-input"
+                />
+              </div>
               <p className="text-[#A3A3A3] text-xs">
                 First visit will be recorded automatically. Customer starts with <strong className="text-[#D4AF37]">10% OFF</strong>.
               </p>
@@ -410,6 +445,32 @@ const LoyaltyDashboard = () => {
                       </span>
                     </div>
                   </div>
+
+                  {/* Valid till — shown only when expiryDate is set ─────────── */}
+                  {customer.expiryDate && (() => {
+                    const exp = customer.expiryDate?.toDate
+                      ? customer.expiryDate.toDate()        // Firestore Timestamp
+                      : new Date(customer.expiryDate);      // plain Date/string
+                    const isExpired = exp < new Date();
+                    return (
+                      <div
+                        className="flex items-center gap-1.5 rounded-sm px-3 py-1.5 flex-shrink-0"
+                        style={{
+                          backgroundColor: isExpired ? 'rgba(239,68,68,0.08)' : 'rgba(255,255,255,0.04)',
+                          border:          isExpired ? '1px solid rgba(239,68,68,0.25)' : '1px solid rgba(255,255,255,0.08)',
+                        }}
+                      >
+                        <Calendar className="w-3.5 h-3.5" style={{ color: isExpired ? '#EF4444' : '#A3A3A3' }} />
+                        <span
+                          className="text-xs font-medium"
+                          style={{ color: isExpired ? '#EF4444' : '#A3A3A3' }}
+                        >
+                          {isExpired ? 'Expired ' : 'Valid till '}
+                          {exp.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}
+                        </span>
+                      </div>
+                    );
+                  })()}
 
                   {/* Action buttons */}
                   <div className="flex gap-2 flex-shrink-0 flex-wrap justify-end">
