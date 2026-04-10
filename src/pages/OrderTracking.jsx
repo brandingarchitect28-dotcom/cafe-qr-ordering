@@ -168,13 +168,15 @@ const OrderTracking = () => {
   const [loading,  setLoading ] = useState(true);
   const [notFound, setNotFound] = useState(false);
 
-  // ── Google Review link — fetched from appSettings/global (add-only) ──────────
+  // ── Google Review link — fetched per café from cafes/{cafeId} ───────────────
   const [googleReviewLink, setGoogleReviewLink] = useState('');
 
   useEffect(() => {
+    // Runs once order has loaded and cafeId is available
+    if (!order?.cafeId) return;
     const fetchReviewLink = async () => {
       try {
-        const snap = await getDoc(doc(db, 'appSettings', 'global'));
+        const snap = await getDoc(doc(db, 'cafes', order.cafeId));
         if (snap.exists()) {
           setGoogleReviewLink(snap.data()?.googleReviewLink || '');
         }
@@ -183,7 +185,7 @@ const OrderTracking = () => {
       }
     };
     fetchReviewLink();
-  }, []);
+  }, [order?.cafeId]); // re-runs only if cafeId changes (it won't — but safe
   const [waSending, setWaSending] = useState(false);
 
   // ── Real-time listener — UNCHANGED from existing system ──────────────────────
