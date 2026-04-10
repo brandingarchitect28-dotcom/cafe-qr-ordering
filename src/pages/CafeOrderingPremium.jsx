@@ -488,9 +488,10 @@ const CafeOrderingPremium = () => {
   }, []);
 
   const addToCart = useCallback((item, size = null) => {
-    if (!size && item.addons?.length > 0) {
-      setAddonModal(item);
-      return;
+    if (item.addons?.length > 0) {
+  setAddonModal({ ...item, selectedSize: size });
+  return;
+  }
     }
     const selectedPrice = size && item.sizePricing?.[size]
       ? parseFloat(item.sizePricing[size])
