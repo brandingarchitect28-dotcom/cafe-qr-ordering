@@ -8,7 +8,7 @@ import {
   LayoutDashboard, ShoppingBag, Menu as MenuIcon, Gift,
   BarChart3, Settings as SettingsIcon, QrCode, LogOut, X,
   TrendingUp, MessageSquare, Bot, ChefHat, Package, Sparkles,
-  FileText, Users,
+  FileText, Users, Heart,
 } from 'lucide-react';
 import { useTheme } from '../hooks/useTheme';
 import { useGlobalOrderNotification } from '../hooks/useGlobalOrderNotification';
@@ -28,6 +28,7 @@ import InventoryManagement from '../components/dashboard/InventoryManagement';
 import AIInsights          from '../components/dashboard/AIInsights';
 import AIMenuUpload        from '../components/dashboard/AIMenuUpload';
 import QRGenerator         from '../components/dashboard/QRGenerator';
+import LoyaltyDashboard    from '../components/dashboard/LoyaltyDashboard';
 import StaffManagement     from '../components/dashboard/StaffManagement';
 import Settings            from '../components/dashboard/Settings';
 
@@ -94,6 +95,7 @@ const Dashboard = () => {
     { id: 'aimenu',    label: 'AI Menu',     icon: Sparkles        },
     { id: 'qr',        label: 'QR Code',     icon: QrCode          },
     { id: 'staff',     label: 'Staff',       icon: Users           },
+    { id: 'loyalty',   label: 'Loyalty',     icon: Heart           },
     { id: 'settings',  label: 'Settings',    icon: SettingsIcon    },
   ];
 
@@ -219,6 +221,7 @@ const Dashboard = () => {
           {activeTab === 'aimenu'     && <AIMenuUpload onClose={() => setActiveTab('menu')} />}
           {activeTab === 'qr'         && <QRGenerator />}
           {activeTab === 'staff'      && (features.staff       ? <StaffManagement />   : <LockedFeature label="Staff"        icon={Users}         />)}
+          {activeTab === 'loyalty'    && <LoyaltyDashboard />}
           {activeTab === 'settings'   && <Settings />}
         </main>
 

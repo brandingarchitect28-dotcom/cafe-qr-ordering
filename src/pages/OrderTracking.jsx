@@ -15,8 +15,7 @@
  * - Estimated time hint per status
  */
 
-import { formatWhatsAppNumber } from '../utils/whatsapp';
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { doc, onSnapshot } from 'firebase/firestore';
 import { db } from '../lib/firebase';
@@ -27,45 +26,6 @@ import {
   MapPin, Phone, User, CreditCard,
 } from 'lucide-react';
 import { generateInvoiceMessage } from '../services/invoiceService';
-
-// ─── Loading text sequence — cycles through reassuring messages ───────────────
-// Pure display component, zero side effects, no data fetching.
-const LOADING_STEPS = [
-  'Confirming your order…',
-  'Preparing your summary…',
-  'Almost ready…',
-];
-const LoadingTextSequence = ({ primary }) => {
-  const [step, setStep] = useState(0);
-  useEffect(() => {
-    const timers = [
-      setTimeout(() => setStep(1), 800),
-      setTimeout(() => setStep(2), 1800),
-    ];
-    return () => timers.forEach(clearTimeout);
-  }, []);
-  return (
-    <AnimatePresence mode="wait">
-      <motion.div
-        key={step}
-        initial={{ opacity: 0, y: 4 }}
-        animate={{ opacity: 1, y: 0 }}
-        exit={{ opacity: 0, y: -4 }}
-        transition={{ duration: 0.2 }}
-        className="flex items-center gap-2 text-xs"
-        style={{ color: primary }}
-      >
-        <motion.span
-          className="w-3.5 h-3.5 rounded-full border-2 border-t-transparent flex-shrink-0 block"
-          style={{ borderColor: `${primary}40`, borderTopColor: primary }}
-          animate={{ rotate: 360 }}
-          transition={{ duration: 0.9, repeat: Infinity, ease: 'linear' }}
-        />
-        {LOADING_STEPS[step]}
-      </motion.div>
-    </AnimatePresence>
-  );
-};
 
 // ─── Status config ────────────────────────────────────────────────────────────
 
@@ -232,7 +192,7 @@ const OrderTracking = () => {
   // ── Send invoice to customer via WhatsApp (optional, not auto-redirect) ──────
   const handleSendInvoice = useCallback(() => {
     if (!order) return;
-    const phone = formatWhatsAppNumber(order.customerPhone || '');
+    const phone = (order.customerPhone || '').replace(/\D/g, '');
     if (!phone) { alert('No phone number on this order.'); return; }
     setWaSending(true);
     const msg = generateInvoiceMessage(order);
@@ -247,10 +207,7 @@ const OrderTracking = () => {
   const fmt         = (n) => (parseFloat(n) || 0).toFixed(2);
   const items       = order?.items || [];
   const payStatus   = order?.paymentStatus || 'pending';
-  const calcStatus  = order?.calculationStatus || 'done'; // 'done' default = backward compat
   const orderType   = order?.orderType || 'dine-in';
-  const isPaid      = payStatus === 'paid';
-  const isFailed    = payStatus === 'failed';
 
   const orderTypeLabel = {
     'dine-in':  `Dine-In${order?.tableNumber ? ` · Table ${order.tableNumber}` : ''}`,
@@ -403,136 +360,71 @@ const OrderTracking = () => {
             <p className="text-[#444] text-xs uppercase tracking-widest font-semibold mb-3">
               Your Order
             </p>
+            <div className="space-y-2">
+              {items.map((item, i) => {
+                const basePrice  = parseFloat(item.basePrice ?? item.price) || 0;
+                const qty        = parseInt(item.quantity) || 1;
+                const addons     = Array.isArray(item.addons) ? item.addons : [];
+                const addonAmt   = addons.reduce((s, a) => s + (parseFloat(a.price) || 0), 0);
+                const lineTotal  = (basePrice + addonAmt) * qty;
 
-            {/* calculationStatus === 'pending': premium skeleton + loading sequence */}
-            {calcStatus === 'pending' ? (
-              <motion.div
-                key="skeleton"
-                initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-                className="space-y-4 pb-4"
-              >
-                {/* Animated loading text sequence */}
-                <LoadingTextSequence primary={primary} />
-
-                {/* Animated progress bar */}
-                <div className="h-1 rounded-full overflow-hidden" style={{ background: 'rgba(255,255,255,0.06)' }}>
-                  <motion.div
-                    className="h-full rounded-full"
-                    style={{ background: `linear-gradient(90deg, ${primary}80, ${primary})` }}
-                    initial={{ x: '-100%' }}
-                    animate={{ x: '100%' }}
-                    transition={{ duration: 1.4, repeat: Infinity, ease: 'easeInOut' }}
-                  />
-                </div>
-
-                {/* Shimmer skeleton rows — mimic real item layout */}
-                {[
-                  { nameW: '55%', priceW: '18%' },
-                  { nameW: '45%', priceW: '16%' },
-                  { nameW: '60%', priceW: '20%' },
-                ].map((row, i) => (
-                  <motion.div
-                    key={i}
-                    initial={{ opacity: 0, y: 4 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: i * 0.08 }}
-                    className="flex justify-between items-center gap-3"
-                  >
-                    <div className="h-3 rounded-md" style={{ width: row.nameW, background: 'rgba(255,255,255,0.06)' }}>
-                      <motion.div className="h-full w-full rounded-md overflow-hidden">
-                        <motion.div
-                          className="h-full w-1/3 rounded-md"
-                          style={{ background: 'rgba(255,255,255,0.1)' }}
-                          animate={{ x: ['-100%', '400%'] }}
-                          transition={{ duration: 1.6, repeat: Infinity, ease: 'easeInOut', delay: i * 0.2 }}
-                        />
-                      </motion.div>
+                return (
+                  <div key={i} className="space-y-0.5">
+                    <div className="flex justify-between text-sm">
+                      <span className="text-[#D0D0D0] font-medium">
+                        {item.name} × {qty}
+                      </span>
+                      <span className="text-white font-semibold">{CUR}{fmt(lineTotal)}</span>
                     </div>
-                    <div className="h-3 rounded-md flex-shrink-0" style={{ width: row.priceW, background: 'rgba(255,255,255,0.06)' }} />
-                  </motion.div>
-                ))}
-
-                {/* Skeleton total row */}
-                <div className="pt-3 border-t border-white/5 flex justify-between items-center">
-                  <div className="h-3 w-10 rounded-md" style={{ background: 'rgba(255,255,255,0.06)' }} />
-                  <div className="h-4 w-20 rounded-md" style={{ background: 'rgba(255,255,255,0.06)' }} />
-                </div>
-              </motion.div>
-            ) : (
-              /* calculationStatus === 'done': fade+slide in real data */
-              <motion.div
-                key="real-data"
-                initial={{ opacity: 0, y: 6 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.25, ease: 'easeOut' }}
-                className="space-y-2"
-              >
-                {items.map((item, i) => {
-                  const basePrice  = parseFloat(item.basePrice ?? item.price) || 0;
-                  const qty        = parseInt(item.quantity) || 1;
-                  const addons     = Array.isArray(item.addons) ? item.addons : [];
-                  const addonAmt   = addons.reduce((s, a) => s + (parseFloat(a.price) || 0), 0);
-                  const lineTotal  = (basePrice + addonAmt) * qty;
-
-                  return (
-                    <div key={i} className="space-y-0.5">
-                      <div className="flex justify-between text-sm">
-                        <span className="text-[#D0D0D0] font-medium">
-                          {item.name} × {qty}
-                        </span>
-                        <span className="text-white font-semibold">{CUR}{fmt(lineTotal)}</span>
+                    {/* Add-ons indented */}
+                    {addons.map((a, ai) => (
+                      <div key={ai} className="flex justify-between text-xs pl-3">
+                        <span className="text-[#555]">╰ {a.name}</span>
+                        <span className="text-[#666]">+{CUR}{fmt(parseFloat(a.price) || 0)}</span>
                       </div>
-                      {addons.map((a, ai) => (
-                        <div key={ai} className="flex justify-between text-xs pl-3">
-                          <span className="text-[#555]">╰ {a.name}</span>
-                          <span className="text-[#666]">+{CUR}{fmt(parseFloat(a.price) || 0)}</span>
-                        </div>
-                      ))}
-                    </div>
-                  );
-                })}
-              </motion.div>
-            )}
+                    ))}
+                  </div>
+                );
+              })}
+            </div>
 
-            {/* Bill summary — only show when calculation done */}
-            {calcStatus === 'done' && (
-              <div className="mt-4 pt-3 border-t border-white/5 space-y-1.5">
-                {order.subtotalAmount > 0 && order.subtotalAmount !== order.totalAmount && (
-                  <div className="flex justify-between text-xs text-[#555]">
-                    <span>Subtotal</span>
-                    <span>{CUR}{fmt(order.subtotalAmount)}</span>
-                  </div>
-                )}
-                {(order.gstAmount || 0) > 0 && (
-                  <div className="flex justify-between text-xs text-[#555]">
-                    <span>GST</span>
-                    <span>+{CUR}{fmt(order.gstAmount)}</span>
-                  </div>
-                )}
-                {(order.taxAmount || 0) > 0 && (
-                  <div className="flex justify-between text-xs text-[#555]">
-                    <span>Tax</span>
-                    <span>+{CUR}{fmt(order.taxAmount)}</span>
-                  </div>
-                )}
-                {(order.serviceChargeAmount || 0) > 0 && (
-                  <div className="flex justify-between text-xs text-[#555]">
-                    <span>Service Charge</span>
-                    <span>+{CUR}{fmt(order.serviceChargeAmount)}</span>
-                  </div>
-                )}
-                {(order.platformFeeAmount || 0) > 0 && (
-                  <div className="flex justify-between text-xs text-[#555]">
-                    <span>Platform Fee</span>
-                    <span>+{CUR}{fmt(order.platformFeeAmount)}</span>
-                  </div>
-                )}
-                <div className="flex justify-between font-black text-sm pt-1">
-                  <span className="text-white">Total</span>
-                  <span style={{ color: primary }}>{CUR}{fmt(order.totalAmount)}</span>
+            {/* Bill summary */}
+            <div className="mt-4 pt-3 border-t border-white/5 space-y-1.5">
+              {order.subtotalAmount > 0 && order.subtotalAmount !== order.totalAmount && (
+                <div className="flex justify-between text-xs text-[#555]">
+                  <span>Subtotal</span>
+                  <span>{CUR}{fmt(order.subtotalAmount)}</span>
                 </div>
+              )}
+              {(order.gstAmount || 0) > 0 && (
+                <div className="flex justify-between text-xs text-[#555]">
+                  <span>GST</span>
+                  <span>+{CUR}{fmt(order.gstAmount)}</span>
+                </div>
+              )}
+              {(order.taxAmount || 0) > 0 && (
+                <div className="flex justify-between text-xs text-[#555]">
+                  <span>Tax</span>
+                  <span>+{CUR}{fmt(order.taxAmount)}</span>
+                </div>
+              )}
+              {(order.serviceChargeAmount || 0) > 0 && (
+                <div className="flex justify-between text-xs text-[#555]">
+                  <span>Service Charge</span>
+                  <span>+{CUR}{fmt(order.serviceChargeAmount)}</span>
+                </div>
+              )}
+              {(order.platformFeeAmount || 0) > 0 && (
+                <div className="flex justify-between text-xs text-[#555]">
+                  <span>Platform Fee</span>
+                  <span>+{CUR}{fmt(order.platformFeeAmount)}</span>
+                </div>
+              )}
+              <div className="flex justify-between font-black text-sm pt-1">
+                <span className="text-white">Total</span>
+                <span style={{ color: primary }}>{CUR}{fmt(order.totalAmount)}</span>
               </div>
-            )}
+            </div>
 
             {/* Payment mode */}
             <div className="mt-3 flex items-center justify-between text-xs pb-5">
@@ -546,85 +438,6 @@ const OrderTracking = () => {
                 </p>
               )}
             </div>
-
-            {/* ── Payment action area (shown only when calculation is done) ── */}
-            <AnimatePresence>
-              {calcStatus === 'done' && !isPaid && order.orderStatus !== 'cancelled' && (
-                <motion.div
-                  initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: 6 }}
-                  className="mb-4 space-y-2"
-                >
-                  {/* Failed payment state */}
-                  {isFailed && (
-                    <div className="flex items-center gap-2 p-3 rounded-xl text-xs text-red-400"
-                      style={{ background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.2)' }}>
-                      ❌ Payment failed — please retry or pay at counter
-                    </div>
-                  )}
-
-                  {/* Online payment button — only if cafe supports it */}
-                  {order.paymentMode === 'online' && (
-                    <motion.button
-                      initial={{ opacity: 0, scale: 0.95, y: 4 }}
-                      animate={{ opacity: 1, scale: 1, y: 0 }}
-                      transition={{ type: 'spring', stiffness: 380, damping: 22 }}
-                      whileHover={{ scale: 1.02, boxShadow: `0 6px 28px ${primary}50` }}
-                      whileTap={{ scale: 0.97 }}
-                      onClick={() => navigate(`/cafe/${order.cafeId}`)}
-                      className="w-full py-3.5 rounded-xl font-bold text-sm text-black transition-shadow"
-                      style={{
-                        background: `linear-gradient(135deg, ${primary}, ${primary}cc)`,
-                        boxShadow: `0 4px 20px ${primary}40`,
-                      }}
-                    >
-                      {isFailed ? '🔄 Retry Payment' : '💳 Pay Now'}
-                    </motion.button>
-                  )}
-
-                  {/* Pay at Counter option (for non-prepaid orders) */}
-                  {order.paymentMode !== 'prepaid' && order.paymentMode !== 'online' && (
-                    <div className="p-3 rounded-xl text-center text-xs text-[#A3A3A3]"
-                      style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)' }}>
-                      🏪 Pay at counter when ready — staff will confirm your payment
-                    </div>
-                  )}
-
-                  {/* For failed online payments, offer counter fallback */}
-                  {isFailed && order.paymentMode === 'online' && (
-                    <div className="p-3 rounded-xl text-center text-xs text-[#555]"
-                      style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.05)' }}>
-                      Or pay at counter — your order is saved
-                    </div>
-                  )}
-                </motion.div>
-              )}
-
-              {/* Paid confirmation — scale bounce + green glow */}
-              {isPaid && (
-                <motion.div
-                  initial={{ opacity: 0, scale: 0.88, y: 4 }}
-                  animate={{ opacity: 1, scale: 1, y: 0 }}
-                  transition={{ type: 'spring', stiffness: 420, damping: 20 }}
-                  className="mb-4 p-4 rounded-xl text-center font-bold text-sm text-green-400"
-                  style={{
-                    background: 'rgba(16,185,129,0.08)',
-                    border: '1px solid rgba(16,185,129,0.25)',
-                    boxShadow: '0 0 20px rgba(16,185,129,0.12)',
-                  }}
-                >
-                  <motion.span
-                    initial={{ scale: 0 }}
-                    animate={{ scale: 1 }}
-                    transition={{ delay: 0.1, type: 'spring', stiffness: 500, damping: 18 }}
-                    className="text-xl block mb-1"
-                  >
-                    ✅
-                  </motion.span>
-                  Payment confirmed — enjoy your order!
-                </motion.div>
-              )}
-            </AnimatePresence>
           </div>
         </motion.div>
 
@@ -643,8 +456,8 @@ const OrderTracking = () => {
             </motion.button>
           )}
 
-          {/* Invoice button — ONLY shown when paymentStatus === 'paid' */}
-          {isPaid && order.customerPhone && (
+          {/* Send invoice on WhatsApp — optional, not auto-redirect */}
+          {order.customerPhone && (
             <motion.button
               whileHover={{ scale: 1.03 }} whileTap={{ scale: 0.97 }}
               onClick={handleSendInvoice}
@@ -664,6 +477,37 @@ const OrderTracking = () => {
               Invoice
             </motion.button>
           )}
+        </div>
+
+        {/* ── Loyalty Promo — add-only, zero change to existing logic ────── */}
+        <div className="mt-6 rounded-2xl overflow-hidden"
+          style={{ background: 'linear-gradient(135deg, rgba(212,175,55,0.12), rgba(212,175,55,0.05))', border: '1px solid rgba(212,175,55,0.25)' }}>
+          <div className="p-5 text-center">
+            <div className="text-2xl mb-2">🎁</div>
+            <p className="font-bold text-base" style={{ color: primary }}>
+              Get 10% OFF on your next visit!
+            </p>
+            <p className="text-sm mt-1" style={{ color: '#666' }}>
+              Leave us a Google review and show it at the counter to redeem.
+            </p>
+            {(cafe?.googleReviewUrl || cafe?.googleReviewLink) && (
+              <a
+                href={cafe.googleReviewUrl || cafe.googleReviewLink}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-2 mt-4 px-5 py-2.5 rounded-full font-bold text-sm text-black transition-all hover:opacity-90"
+                style={{ background: `linear-gradient(135deg, ${primary}, ${primary}cc)` }}
+                data-testid="google-review-link"
+              >
+                ⭐ Leave a Google Review
+              </a>
+            )}
+            {!(cafe?.googleReviewUrl || cafe?.googleReviewLink) && (
+              <p className="text-xs mt-3" style={{ color: '#888' }}>
+                Ask the café owner to add their Google Review link in Settings.
+              </p>
+            )}
+          </div>
         </div>
 
         <p className="text-center text-[#2a2a2a] text-xs mt-5">
