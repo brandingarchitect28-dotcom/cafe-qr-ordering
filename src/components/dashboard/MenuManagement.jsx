@@ -23,6 +23,13 @@ const MenuManagement = () => {
     name: '', price: '', category: '', image: '', available: true,
     addons: [],
     sizePricing: { enabled: false, small: '', medium: '', large: '' },
+    // ── Nutrition fields (add-only) ───────────────────────────────────────────
+    ingredients: '',
+    calories:    '',
+    protein:     '',
+    carbs:       '',
+    fats:        '',
+    micros:      '',
   });
 
   // ── UI-only: which item has its inline edit accordion open ───────────────────
@@ -59,6 +66,13 @@ const MenuManagement = () => {
         available:   formData.available,
         addons:      formData.addons      || [],   // [] = no add-ons; backward-compatible
         sizePricing: formData.sizePricing || null, // null = no size pricing; backward-compatible
+        // ── Nutrition fields (additive — existing items without these work unchanged) ──
+        ingredients: formData.ingredients || '',
+        calories:    Number(formData.calories)  || 0,
+        protein:     Number(formData.protein)   || 0,
+        carbs:       Number(formData.carbs)     || 0,
+        fats:        Number(formData.fats)      || 0,
+        micros:      formData.micros      || '',
         cafeId,
       };
 
@@ -89,6 +103,13 @@ const MenuManagement = () => {
       available:   item.available,
       addons:      item.addons      || [],
       sizePricing: item.sizePricing || { enabled: false, small: '', medium: '', large: '' },
+      // ── Nutrition fields ───────────────────────────────────────────────────
+      ingredients: item.ingredients || '',
+      calories:    item.calories    != null ? String(item.calories) : '',
+      protein:     item.protein     != null ? String(item.protein)  : '',
+      carbs:       item.carbs       != null ? String(item.carbs)    : '',
+      fats:        item.fats        != null ? String(item.fats)     : '',
+      micros:      item.micros      || '',
     });
     setShowForm(true);
   };
@@ -263,6 +284,63 @@ const MenuManagement = () => {
               />
             </div>
           )}
+        </div>
+
+        {/* ── Nutrition / Food Details (Add-Only) ──────────────────────────── */}
+        <div className="border border-white/10 rounded-sm p-4 space-y-3">
+          <p className="text-white text-sm font-medium">
+            Food Details <span className="text-[#A3A3A3] font-normal">(optional — shown in customer menu)</span>
+          </p>
+
+          {/* Ingredients */}
+          <div>
+            <label className="block text-[#A3A3A3] text-xs mb-1">Ingredients (comma separated)</label>
+            <input
+              type="text"
+              value={formData.ingredients}
+              onChange={e => setFormData(prev => ({ ...prev, ingredients: e.target.value }))}
+              placeholder="e.g. Espresso, Oat Milk, Cinnamon"
+              disabled={saving}
+              className="w-full bg-black/20 border border-white/10 text-white placeholder:text-neutral-600 focus:border-[#D4AF37] focus:ring-1 focus:ring-[#D4AF37] rounded-sm h-11 px-4 transition-all text-sm"
+            />
+          </div>
+
+          {/* Macros row */}
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+            {[
+              { key: 'calories', label: 'Calories (kcal)' },
+              { key: 'protein',  label: 'Protein (g)'     },
+              { key: 'carbs',    label: 'Carbs (g)'       },
+              { key: 'fats',     label: 'Fats (g)'        },
+            ].map(({ key, label }) => (
+              <div key={key}>
+                <label className="block text-[#A3A3A3] text-xs mb-1">{label}</label>
+                <input
+                  type="number"
+                  min="0"
+                  step="any"
+                  value={formData[key]}
+                  onChange={e => setFormData(prev => ({ ...prev, [key]: e.target.value }))}
+                  placeholder="0"
+                  disabled={saving}
+                  className="w-full bg-black/20 border border-white/10 text-white placeholder:text-neutral-600 focus:border-[#D4AF37] focus:ring-1 focus:ring-[#D4AF37] rounded-sm h-11 px-4 transition-all text-sm"
+                />
+              </div>
+            ))}
+          </div>
+
+          {/* Micros */}
+          <div>
+            <label className="block text-[#A3A3A3] text-xs mb-1">Micronutrients (optional)</label>
+            <input
+              type="text"
+              value={formData.micros}
+              onChange={e => setFormData(prev => ({ ...prev, micros: e.target.value }))}
+              placeholder="e.g. Vitamin C 15mg, Iron 2mg"
+              disabled={saving}
+              className="w-full bg-black/20 border border-white/10 text-white placeholder:text-neutral-600 focus:border-[#D4AF37] focus:ring-1 focus:ring-[#D4AF37] rounded-sm h-11 px-4 transition-all text-sm"
+            />
+          </div>
         </div>
 
         {/* Buttons */}
