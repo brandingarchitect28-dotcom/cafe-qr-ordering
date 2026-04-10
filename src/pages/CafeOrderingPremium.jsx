@@ -492,8 +492,8 @@ const CafeOrderingPremium = () => {
   setAddonModal({ ...item, selectedSize: size });
   return;
   }
-    }
-    const selectedPrice = size && item.sizePricing?.[size]
+  
+  const selectedPrice = size && item.sizePricing?.[size]
       ? parseFloat(item.sizePricing[size])
       : item.price;
     directAddToCart({
