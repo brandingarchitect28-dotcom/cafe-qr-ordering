@@ -23,7 +23,7 @@
 import React, { useState, useMemo } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
 import {
-  collection, addDoc, updateDoc, doc, serverTimestamp, query, where,
+  collection, addDoc, updateDoc, deleteDoc, doc, serverTimestamp, query, where,
 } from 'firebase/firestore';
 import { db } from '../../lib/firebase';
 import { useCollection } from '../../hooks/useFirestore';
@@ -31,7 +31,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { toast } from 'sonner';
 import {
   Search, UserPlus, Star, MessageSquare, Phone, User,
-  Award, TrendingUp, RefreshCw, Gift,
+  Award, TrendingUp, RefreshCw, Gift, Undo2, Trash2, Repeat,
 } from 'lucide-react';
 import GoogleReviewSettings from './GoogleReviewSettings';
 
@@ -100,6 +100,10 @@ const LoyaltyDashboard = () => {
   // ── Add new customer ─────────────────────────────────────────────────────────
   const handleAddCustomer = async (e) => {
     e.preventDefault();
+    // ── DEBUG: confirm db is a valid Firestore instance ──────────────────────
+    console.log('[Loyalty] DB instance:', db);
+    console.log('[Loyalty] cafeId:', cafeId);
+
     if (!newName.trim() || !newPhone.trim()) {
       toast.error('Name and phone are required');
       return;
@@ -112,7 +116,8 @@ const LoyaltyDashboard = () => {
     }
     setSaving(true);
     try {
-      await addDoc(collection(db, 'loyaltyCustomers'), {
+      console.log('[Loyalty] Attempting addDoc to loyaltyCustomers…');
+      const ref = await addDoc(collection(db, 'loyaltyCustomers'), {
         cafeId,
         name:            newName.trim(),
         phone:           newPhone.trim(),
@@ -121,13 +126,15 @@ const LoyaltyDashboard = () => {
         createdAt:       serverTimestamp(),
         lastVisit:       serverTimestamp(),
       });
+      console.log('[Loyalty] ✅ Customer saved, docId:', ref.id);
       toast.success(`${newName.trim()} added to loyalty program ✓`);
       setNewName('');
       setNewPhone('');
       setShowAddForm(false);
     } catch (err) {
-      console.error('[LoyaltyDashboard] add error:', err);
-      toast.error('Failed to add customer');
+      // ── Verbose error so the exact failure reason is visible in console ──
+      console.error('[Loyalty] ❌ addDoc failed:', err.code, err.message, err);
+      toast.error(`Failed to add customer: ${err.message || 'Unknown error'}`);
     } finally {
       setSaving(false);
     }
@@ -139,6 +146,7 @@ const LoyaltyDashboard = () => {
     try {
       const newVisits   = (customer.visits || 0) + 1;
       const newDiscount = discountForVisits(newVisits);
+      console.log('[Loyalty] Marking visit for', customer.name, '→ visits:', newVisits, 'discount:', newDiscount);
       await updateDoc(doc(db, 'loyaltyCustomers', customer.id), {
         visits:          newVisits,
         currentDiscount: newDiscount,
@@ -157,6 +165,43 @@ const LoyaltyDashboard = () => {
     }
   };
 
+  // ── Undo visit (decrement visits + roll back discount) ──────────────────────
+  const handleUndoVisit = async (customer) => {
+    if ((customer.visits || 1) <= 1) {
+      toast.error('Cannot reduce below 1 visit');
+      return;
+    }
+    setMarkingId(customer.id);
+    try {
+      const newVisits   = customer.visits - 1;
+      const newDiscount = discountForVisits(newVisits);
+      console.log('[Loyalty] Undoing visit for', customer.name, '→ visits:', newVisits);
+      await updateDoc(doc(db, 'loyaltyCustomers', customer.id), {
+        visits:          newVisits,
+        currentDiscount: newDiscount,
+      });
+      toast.success(`↩ Visit undone — ${customer.name} now at visit ${newVisits} (${newDiscount}% OFF)`);
+    } catch (err) {
+      console.error('[Loyalty] ❌ undoVisit failed:', err.code, err.message, err);
+      toast.error(`Undo failed: ${err.message || 'Unknown error'}`);
+    } finally {
+      setMarkingId(null);
+    }
+  };
+
+  // ── Delete customer (hard delete) ────────────────────────────────────────────
+  const handleDeleteCustomer = async (customer) => {
+    if (!window.confirm(`Delete ${customer.name} permanently from the loyalty program?`)) return;
+    try {
+      console.log('[Loyalty] Deleting customer:', customer.id, customer.name);
+      await deleteDoc(doc(db, 'loyaltyCustomers', customer.id));
+      toast.success(`${customer.name} removed from loyalty program`);
+    } catch (err) {
+      console.error('[Loyalty] ❌ deleteDoc failed:', err.code, err.message, err);
+      toast.error(`Delete failed: ${err.message || 'Unknown error'}`);
+    }
+  };
+
   // ── Send WhatsApp ─────────────────────────────────────────────────────────────
   const handleSendWA = (customer) => {
     if (!customer.phone) {
@@ -171,20 +216,22 @@ const LoyaltyDashboard = () => {
   };
 
   // ── Stats bar ─────────────────────────────────────────────────────────────────
-  const totalCustomers = customers?.length || 0;
-  const totalVisits    = customers?.reduce((s, c) => s + (c.visits || 0), 0) || 0;
-  const loyalCustomers = customers?.filter(c => (c.visits || 0) >= 3).length || 0;
+  const totalCustomers  = customers?.length || 0;
+  const totalVisits     = customers?.reduce((s, c) => s + (c.visits || 0), 0) || 0;
+  const loyalCustomers  = customers?.filter(c => (c.visits || 0) >= 3).length || 0;
+  const repeatedVisits  = customers?.reduce((s, c) => s + ((c.visits || 0) > 1 ? (c.visits - 1) : 0), 0) || 0;
 
   // ── Render ───────────────────────────────────────────────────────────────────
   return (
     <div className="space-y-6">
 
       {/* ── Stats row ──────────────────────────────────────────────────────────── */}
-      <div className="grid grid-cols-3 gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         {[
-          { label: 'Total Members', value: totalCustomers, icon: User,    color: '#D4AF37' },
-          { label: 'Total Visits',  value: totalVisits,    icon: Star,    color: '#3B82F6' },
-          { label: 'Loyal (3+)',    value: loyalCustomers, icon: Award,   color: '#10B981' },
+          { label: 'Total Members',    value: totalCustomers,  icon: User,    color: '#D4AF37' },
+          { label: 'Total Visits',     value: totalVisits,     icon: Star,    color: '#3B82F6' },
+          { label: 'Loyal (3+)',       value: loyalCustomers,  icon: Award,   color: '#10B981' },
+          { label: 'Repeated Visits',  value: repeatedVisits,  icon: Repeat,  color: '#A855F7' },
         ].map(({ label, value, icon: Icon, color }) => (
           <div key={label} className="bg-[#0F0F0F] border border-white/5 rounded-sm p-4 flex items-center gap-4">
             <div className="w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0"
@@ -365,7 +412,7 @@ const LoyaltyDashboard = () => {
                   </div>
 
                   {/* Action buttons */}
-                  <div className="flex gap-2 flex-shrink-0">
+                  <div className="flex gap-2 flex-shrink-0 flex-wrap justify-end">
                     <button
                       onClick={() => handleMarkVisit(customer)}
                       disabled={marking}
@@ -384,6 +431,27 @@ const LoyaltyDashboard = () => {
                     >
                       <MessageSquare className="w-3.5 h-3.5" />
                       WhatsApp
+                    </button>
+                    {/* ── Undo visit ───────────────────────────────────────── */}
+                    <button
+                      onClick={() => handleUndoVisit(customer)}
+                      disabled={marking || (customer.visits || 1) <= 1}
+                      className="flex items-center gap-1.5 px-4 py-2 bg-white/5 hover:bg-white/10 border border-white/10 text-[#A3A3A3] hover:text-white font-bold rounded-sm text-xs transition-all disabled:opacity-30 disabled:cursor-not-allowed"
+                      data-testid={`undo-visit-${customer.id}`}
+                      title="Undo last visit"
+                    >
+                      <Undo2 className="w-3.5 h-3.5" />
+                      Undo
+                    </button>
+                    {/* ── Delete customer ──────────────────────────────────── */}
+                    <button
+                      onClick={() => handleDeleteCustomer(customer)}
+                      className="flex items-center gap-1.5 px-4 py-2 bg-red-500/10 hover:bg-red-500/20 border border-red-500/20 text-red-400 font-bold rounded-sm text-xs transition-all"
+                      data-testid={`delete-loyalty-${customer.id}`}
+                      title="Delete customer permanently"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                      Delete
                     </button>
                   </div>
 
