@@ -492,7 +492,11 @@ const CafeOrderingPremium = () => {
 
   const addToCart = useCallback((item, size = null, extra = {}) => {
     if (item.addons?.length > 0) {
-  setAddonModal({ ...item, selectedSize: size });
+  setAddonModal({
+     ...item,
+     selectedSize: size,
+     offer: extra?.offer || item.offer || null,
+   });
   return;
   }
   
