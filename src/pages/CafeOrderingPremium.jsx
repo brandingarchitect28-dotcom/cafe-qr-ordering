@@ -570,16 +570,26 @@ const CafeOrderingPremium = () => {
 
   // ── Add offer to cart ──────────────────────────────────────────────────────
   const addOfferToCart = (offer) => {
-    (offer.items || []).forEach(oi => {
+    const comboItems = (offer.items || []).map(oi => {
       const menuItem = menuItems.find(m => m.id === oi.itemId);
-      if (!menuItem) return;
-      for (let i = 0; i < (oi.quantity || 1); i++) {
-        addToCart(menuItem, null, { offer });
-      }
+      return {
+        ...menuItem,
+        quantity: oi.quantity || 1,
+      };
     });
-    toast.success(`${offer.title} added to cart ✓`);
-  };
 
+    directAddToCart({
+      id: `offer-${offer.id}-${Date.now()}`,
+      name: offer.title,
+      price: offer.comboPrice || 0,
+      quantity: 1,
+      isOffer: true,
+      offerType: offer.type,
+      items: comboItems,
+    });
+
+    toast.success(`${offer.title} added to cart ✓`);
+   };
   // ── Order placement ────────────────────────────────────────────────────────
   const handlePlaceOrder = async () => {
     if (!customerName.trim()) { toast.error('Enter your name'); return; }
