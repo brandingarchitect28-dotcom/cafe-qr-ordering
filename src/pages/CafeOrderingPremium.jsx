@@ -169,7 +169,10 @@ const OfferDetailModal = ({ offer, menuItems, CUR, onAdd, onClose, primary = '#D
           <motion.button
             whileHover={{ scale: 1.02 }}
             whileTap={{ scale: 0.97 }}
-            onClick={() => { onAdd(); onClose(); }}
+            onClick={() => {
+              onAdd(offer); // ✅ pass full offer
+              onClose();
+            }}
             className="w-full py-4 rounded-xl text-black font-bold text-base flex items-center justify-center gap-2"
             style={{ background: `linear-gradient(135deg, ${primary}, ${primary}cc)`, boxShadow: `0 4px 20px ${primary}40` }}
           >
@@ -487,15 +490,33 @@ const CafeOrderingPremium = () => {
     });
   }, []);
 
-  const addToCart = useCallback((item, size = null) => {
+  const addToCart = useCallback((item, size = null, extra = {}) => {
     if (item.addons?.length > 0) {
   setAddonModal({ ...item, selectedSize: size });
   return;
   }
   
-  const selectedPrice = size && item.sizePricing?.[size]
+  let selectedPrice = size && item.sizePricing?.[size]
       ? parseFloat(item.sizePricing[size])
       : item.price;
+
+  // ✅ APPLY OFFER LOGIC (SAFE ADDITION)
+  if (extra?.offer) {
+    const offer = extra.offer;
+
+    // 🔹 Percentage Discount
+    if (offer.type === "discount" && offer.discountAmount) {
+    selectedPrice =
+      selectedPrice - (selectedPrice * offer.discountAmount) / 100;
+    }
+
+    // 🔹 Combo Pricing
+    if (offer.type === "combo" && offer.comboPrice) {
+    selectedPrice = offer.comboPrice;
+    }
+
+    // 🔹 Buy X Get Y (price stays same, quantity logic handles it)
+  }
     directAddToCart({
       ...item,
       price:        selectedPrice,
@@ -548,7 +569,9 @@ const CafeOrderingPremium = () => {
     (offer.items || []).forEach(oi => {
       const menuItem = menuItems.find(m => m.id === oi.itemId);
       if (!menuItem) return;
-      for (let i = 0; i < (oi.quantity || 1); i++) addToCart(menuItem);
+      for (let i = 0; i < (oi.quantity || 1); i++) {
+        addToCart(menuItem, null, { offer });
+      }
     });
     toast.success(`${offer.title} added to cart ✓`);
   };
