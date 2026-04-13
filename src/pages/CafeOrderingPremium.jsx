@@ -517,6 +517,121 @@ const CafeOrderingPremium = () => {
     });
   }, []);
 
+  // ── Buy X Get Y — reactive free-item sync ─────────────────────────────────
+  // CHANGE 2/3: NEW useEffect.
+  //
+  // This is the single source of truth for all buy_x_get_y free items in the
+  // cart. It fires whenever cart, offers, or menuItems change and reconciles
+  // the free-item rows in one atomic setCart() call.
+  //
+  // Algorithm per offer:
+  //   1. Collect all active buy_x_get_y offers.
+  //   2. For each offer, sum the quantity of every cart item whose id is in
+  //      offer.buyItems (or legacy offer.buyItemId).
+  //   3. Compute: deservedFreeQty = floor(totalEligibleQty / buyQty) * getQty
+  //   4. Find the existing free-item row keyed by
+  //      { offerType: 'buy_x_get_y_free', linkedOffer: offer.id }
+  //   5a. deservedFreeQty > 0 + no row  → INSERT free item row
+  //   5b. deservedFreeQty > 0 + row exists, wrong qty → UPDATE qty
+  //   5c. deservedFreeQty === 0 + row exists → REMOVE row
+  //
+  // Free items always have price: 0, so all total/tax memos are unaffected.
+  // No other part of the codebase needs to change for this to work.
+  useEffect(() => {
+    const buyXGetYOffers = offers.filter(o => o.type === 'buy_x_get_y');
+    if (buyXGetYOffers.length === 0) return;
+
+    setCart(prev => {
+      let next = [...prev];
+      let changed = false;
+
+      buyXGetYOffers.forEach(offer => {
+        // ── Resolve eligible buy-item id set for this offer ─────────────────
+        // Supports: new array field (buyItems[]), legacy single (buyItemId),
+        // and the older offer.items[] fallback format.
+        let eligibleIds = [];
+        if (Array.isArray(offer.buyItems) && offer.buyItems.length > 0) {
+          eligibleIds = offer.buyItems;
+        } else if (offer.buyItemId) {
+          eligibleIds = [offer.buyItemId];
+        } else if (Array.isArray(offer.items) && offer.items.length > 0) {
+          eligibleIds = offer.items.map(oi => oi.itemId).filter(Boolean);
+        }
+        if (eligibleIds.length === 0) return;
+
+        // ── Count total eligible paid quantity in cart ──────────────────────
+        // Explicitly skip free rows to avoid circular qty inflation.
+        const eligibleSet = new Set(eligibleIds);
+        const totalEligibleQty = next.reduce((sum, item) => {
+          if (item.isFree || item.offerType === 'buy_x_get_y_free') return sum;
+          if (!eligibleSet.has(item.id)) return sum;
+          return sum + (item.quantity || 0);
+        }, 0);
+
+        // ── Compute deserved free quantity ──────────────────────────────────
+        const buyQty = parseInt(offer.buyQty || offer.buyQuantity || 1, 10);
+        const getQty = parseInt(offer.getQty || offer.getQuantity || 1, 10);
+        const deservedFreeQty = Math.floor(totalEligibleQty / buyQty) * getQty;
+
+        // ── Resolve the free (get) menu item ────────────────────────────────
+        const getItemId = offer.getItemId
+          || (Array.isArray(offer.items) && offer.items.length > 0
+              ? offer.items[offer.items.length - 1]?.itemId
+              : null);
+        const freeMenuItem = getItemId ? menuItems.find(m => m.id === getItemId) : null;
+
+        // ── Find existing free-item row for this offer ──────────────────────
+        // Identified by the stable pair (offerType, linkedOffer).
+        const freeRowIdx = next.findIndex(
+          i => i.offerType === 'buy_x_get_y_free' && i.linkedOffer === offer.id
+        );
+
+        if (deservedFreeQty > 0 && freeMenuItem) {
+          if (freeRowIdx === -1) {
+            // INSERT — customer just unlocked the free item
+            next = [
+              ...next,
+              {
+                ...freeMenuItem,
+                price:        0,           // price: 0 keeps all total/tax memos correct
+                basePrice:    0,
+                quantity:     deservedFreeQty,
+                addons:       [],
+                addonTotal:   0,
+                selectedSize: null,
+                comboItems:   [],
+                isOffer:      true,
+                offerType:    'buy_x_get_y_free',
+                isFree:       true,        // consumed by kitchen display & invoice
+                linkedOffer:  offer.id,    // stable identity key for this sync loop
+                name:         `${freeMenuItem.name} (Free)`,
+              },
+            ];
+            changed = true;
+          } else if (next[freeRowIdx].quantity !== deservedFreeQty) {
+            // UPDATE — user added/removed buy items, qty must re-sync
+            next = next.map((item, idx) =>
+              idx === freeRowIdx ? { ...item, quantity: deservedFreeQty } : item
+            );
+            changed = true;
+          }
+          // else: row exists with correct qty — no-op, no new array reference
+        } else if (deservedFreeQty === 0 && freeRowIdx !== -1) {
+          // REMOVE — buy items fell below threshold
+          next = next.filter((_, idx) => idx !== freeRowIdx);
+          changed = true;
+        }
+      });
+
+      // Return prev unchanged when nothing was modified.
+      // This is CRITICAL: returning a new array ref unconditionally would cause
+      // an infinite loop because cart is in this effect's dependency array.
+      return changed ? next : prev;
+    });
+  // `setCart` from useState is stable — safe to omit from deps.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [cart, offers, menuItems]);
+
   // ── Flying dot animation ───────────────────────────────────────────────────
   const addWithAnim = useCallback((e, item, size = null) => {
     addToCart(item, size);
@@ -614,99 +729,73 @@ const CafeOrderingPremium = () => {
       return;
     }
 
-    // --- Buy X Get Y: paid qty at normal price + FREE item (getItemId) at zero ---
+    // ── Buy X Get Y ────────────────────────────────────────────────────────────
+    // CHANGE 1/3: Complete rewrite of this branch.
     //
-    // FIX: The original code used the same menuItem (buy item) for the free slot.
-    // Correct behaviour: look up offer.getItemId to find the FREE item, which is
-    // a DIFFERENT menu item selected when the offer was created.
+    // NEW LOGIC: Owner picks MULTIPLE eligible "buy items". User can mix any of
+    // them. When their combined cart quantity reaches buyQty, they earn getQty
+    // free copies of a DIFFERENT item (getItemId).
     //
-    // Offer schema expected (set by offer creation form):
-    //   offer.buyItemId   — id of the item the customer must buy
-    //   offer.buyQty      — how many they must buy  (also stored as offer.buyQuantity)
-    //   offer.getItemId   — id of the item given for free
-    //   offer.getQty      — how many free items      (also stored as offer.getQuantity)
+    // This handler ONLY adds the buy-side items to the cart at normal price.
+    // Free-item creation, quantity sync, and removal are handled exclusively by
+    // the reactive useEffect below (`syncBuyXGetYFreeItems`). Keeping them
+    // separate avoids race conditions from multiple sequential setCart() calls
+    // inside one event handler.
     //
-    // If the offer still uses the legacy offer.items[] array format we fall back
-    // gracefully so no existing combo/discount order is broken.
+    // Offer document shape (written by the offer-creation form):
+    //   offer.buyItems  — string[]  — itemIds of eligible "buy" items
+    //   offer.buyQty    — number    — how many total eligible items must be bought
+    //   offer.getItemId — string    — itemId of the FREE reward item
+    //   offer.getQty    — number    — how many free reward items to grant
+    //
+    // Legacy single-item format (offer.buyItemId) is also supported for
+    // backwards compatibility with offers created before this change.
     if (offer.type === 'buy_x_get_y') {
-      // ── Resolve buy item ──────────────────────────────────────────────────
-      // Support both new field (buyItemId) and legacy (offer.items[0].itemId)
-      const buyItemId = offer.buyItemId || offer.items?.[0]?.itemId;
-      const buyItem   = menuItems.find(m => m.id === buyItemId);
+      // ── Resolve the set of eligible buy-item ids ─────────────────────────
+      // Support: new array field (buyItems[]), legacy single field (buyItemId),
+      // and the even-older offer.items[] fallback.
+      let eligibleIds = [];
+      if (Array.isArray(offer.buyItems) && offer.buyItems.length > 0) {
+        eligibleIds = offer.buyItems;
+      } else if (offer.buyItemId) {
+        eligibleIds = [offer.buyItemId];
+      } else if (Array.isArray(offer.items) && offer.items.length > 0) {
+        // Legacy: treat the first N-1 items as buy items, last as get item
+        eligibleIds = offer.items.map(oi => oi.itemId).filter(Boolean);
+      }
 
-      // ── Resolve GET (free) item ───────────────────────────────────────────
-      // FIX: use offer.getItemId — the item chosen as the FREE reward.
-      // Previously this was missing and the code reused buyItem, causing the
-      // "Buy Malai Chicken Roll → Get Malai Chicken Roll free" bug.
-      const getItemId = offer.getItemId || offer.items?.[1]?.itemId;
-      const freeItem  = menuItems.find(m => m.id === getItemId);
+      if (eligibleIds.length === 0) {
+        toast.error('Offer configuration error — no buy items defined');
+        return;
+      }
 
-      // ── Quantities ────────────────────────────────────────────────────────
-      const buyQty = parseInt(offer.buyQty || offer.buyQuantity || offer.items?.[0]?.quantity || 1, 10);
-      const getQty = parseInt(offer.getQty || offer.getQuantity || offer.items?.[1]?.quantity || 1, 10);
-
-      // ── Add paid (buy) item ───────────────────────────────────────────────
-      if (buyItem && buyQty > 0) {
-        setCart(prev => {
-          // Prevent duplicate paid entry for this offer: check by id + offerType
-          const alreadyExists = prev.some(
-            i => i.id === buyItem.id && i.offerType === 'buy_x_get_y' && i.isOffer
-          );
-          if (alreadyExists) return prev; // idempotent — don't double-add
-          return [...prev, {
-            ...buyItem,
-            price:        parseFloat(buyItem.price),
-            basePrice:    parseFloat(buyItem.price),
-            quantity:     buyQty,
-            addons:       [],
-            addonTotal:   0,
-            selectedSize: null,
-            isOffer:      true,
-            offerType:    'buy_x_get_y',
-          }];
+      // ── Add each eligible buy item to cart at its normal price ────────────
+      // We do NOT pre-set quantities here; the user adjusts them freely.
+      // The sync engine watches the cart and awards free items automatically.
+      let addedCount = 0;
+      eligibleIds.forEach(itemId => {
+        const menuItem = menuItems.find(m => m.id === itemId);
+        if (!menuItem) return;
+        // Use directAddToCart so it respects the existing stacking logic
+        // (increments qty if item already in cart, otherwise appends row).
+        directAddToCart({
+          ...menuItem,
+          price:        parseFloat(menuItem.price),
+          basePrice:    parseFloat(menuItem.price),
+          quantity:     1,
+          addons:       [],
+          addonTotal:   0,
+          selectedSize: null,
+          comboItems:   [],
         });
-      }
+        addedCount++;
+      });
 
-      // ── Add FREE (get) item ───────────────────────────────────────────────
-      // Uses freeItem (getItemId), NOT buyItem — this was the core bug.
-      // isFree: true ensures price is excluded from all totals/tax calculations.
-      // linkedTo: buyItemId allows future sync logic (removal, qty changes).
-      if (freeItem && getQty > 0) {
-        setCart(prev => {
-          // Prevent duplicate free entry: one free block per offer's getItemId
-          const alreadyExists = prev.some(
-            i => i.id === freeItem.id && i.offerType === 'buy_x_get_y_free' && i.isFree
-          );
-          if (alreadyExists) return prev; // idempotent — don't double-add
-          return [...prev, {
-            ...freeItem,
-            // price: 0 — free item MUST NOT affect cart total, taxes, or service charge
-            price:        0,
-            basePrice:    0,
-            quantity:     getQty,
-            addons:       [],
-            addonTotal:   0,
-            selectedSize: null,
-            isOffer:      true,
-            offerType:    'buy_x_get_y_free',
-            isFree:       true,                     // explicit free flag for kitchen + invoice
-            linkedTo:     buyItemId,                // ties free item to its buy trigger
-            // UI display: show correct free item name e.g. "Masala Fries (Free)"
-            name:         `${freeItem.name} (Free)`,
-          }];
-        });
+      if (addedCount > 0) {
+        toast.success(`${offer.title} added to cart ✓  —  keep adding items to unlock your free reward!`);
+      } else {
+        toast.error('None of this offer\'s items are currently available');
       }
-
-      // Graceful fallback: if offer uses only legacy items[] with no getItemId,
-      // warn in dev so the offer creator can update the offer document.
-      if (!freeItem && getItemId) {
-        console.warn(
-          `[BuyXGetY] Free item not found in menu. getItemId="${getItemId}". ` +
-          `Ensure the offer document has a valid getItemId and the item is available.`
-        );
-      }
-
-      toast.success(`${offer.title} added to cart ✓`);
       return;
     }
 
@@ -754,10 +843,13 @@ const CafeOrderingPremium = () => {
           addonTotal:   i.addonTotal   || 0,
           selectedSize: i.selectedSize || null,
           comboItems:   i.comboItems   || [],
-          // TASK 1 + TASK 5: pass offer fields to orders dashboard + kitchen
-          ...(i.isOffer   && { isOffer:   true        }),
-          ...(i.offerType && { offerType: i.offerType }),
-          ...(i.items     && { items:     i.items     }),
+          // Offer metadata — consumed by kitchen display, invoice, and dashboard
+          ...(i.isOffer      && { isOffer:      true          }),
+          ...(i.offerType    && { offerType:    i.offerType   }),
+          ...(i.items        && { items:        i.items       }),
+          // CHANGE: also forward isFree + linkedOffer for buy_x_get_y free rows
+          ...(i.isFree       && { isFree:       true          }),
+          ...(i.linkedOffer  && { linkedOffer:  i.linkedOffer }),
         })),
         subtotalAmount: subtotal,
         taxAmount,
@@ -1271,17 +1363,31 @@ const CafeOrderingPremium = () => {
                         )}
                       </div>
                       <div className="flex items-center gap-2 flex-shrink-0">
-                        <button onClick={() => removeFromCart(item.id)}
-                          className="w-7 h-7 rounded-full flex items-center justify-center transition-all"
-                          style={{ background: T.bgInput, color: T.text, border: `1px solid ${T.border}` }}>
-                          <Minus className="w-3 h-3" />
-                        </button>
-                        <span className="font-bold text-sm w-5 text-center" style={{ color: T.text }}>{item.quantity}</span>
-                        <button onClick={() => addToCart(item)}
-                          className="w-7 h-7 rounded-full flex items-center justify-center text-black transition-all"
-                          style={{ background: primary }}>
-                          <Plus className="w-3 h-3" />
-                        </button>
+                        {/* CHANGE 3/3: Free items are system-managed — show a
+                            locked "FREE" badge instead of +/- controls.
+                            All other items keep their existing controls unchanged. */}
+                        {item.isFree ? (
+                          <span
+                            className="px-2.5 py-1 rounded-full text-xs font-bold"
+                            style={{ background: `${primary}22`, color: primary, border: `1px solid ${primary}44` }}
+                          >
+                            FREE
+                          </span>
+                        ) : (
+                          <>
+                            <button onClick={() => removeFromCart(item.id)}
+                              className="w-7 h-7 rounded-full flex items-center justify-center transition-all"
+                              style={{ background: T.bgInput, color: T.text, border: `1px solid ${T.border}` }}>
+                              <Minus className="w-3 h-3" />
+                            </button>
+                            <span className="font-bold text-sm w-5 text-center" style={{ color: T.text }}>{item.quantity}</span>
+                            <button onClick={() => addToCart(item)}
+                              className="w-7 h-7 rounded-full flex items-center justify-center text-black transition-all"
+                              style={{ background: primary }}>
+                              <Plus className="w-3 h-3" />
+                            </button>
+                          </>
+                        )}
                       </div>
                     </motion.div>
                   ))}
