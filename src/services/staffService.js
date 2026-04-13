@@ -127,13 +127,8 @@ const parseTimeMinutes = (timeStr) => {
  * @returns {{ record: object, alreadyCheckedIn: boolean }}
  */
 export const checkIn = async (cafeId, staffId, shiftStart = '09:00') => {
-  // ── Auth guard ──────────────────────────────────────────────────────────────
-  const currentUser = auth?.currentUser;
-  console.log('[checkIn] auth.currentUser:', currentUser?.uid ?? 'NULL — not authenticated');
+  console.log('[checkIn] auth.currentUser:', auth?.currentUser?.uid ?? 'null');
   console.log('[checkIn] cafeId:', cafeId, '| staffId:', staffId);
-  if (!currentUser) {
-    throw new Error('Not authenticated — please log in again');
-  }
   const dateKey  = toDateKey(new Date());
   const month    = dateKey.slice(0, 7);
   const now      = new Date();
@@ -180,14 +175,8 @@ export const checkIn = async (cafeId, staffId, shiftStart = '09:00') => {
  * @returns {{ hoursWorked: number, record: object }}
  */
 export const checkOut = async (cafeId, staffId) => {
-  // ── Auth guard ──────────────────────────────────────────────────────────────
-  const currentUser = auth?.currentUser;
-  console.log('[checkOut] auth.currentUser:', currentUser?.uid ?? 'NULL — not authenticated');
+  console.log('[checkOut] auth.currentUser:', auth?.currentUser?.uid ?? 'null');
   console.log('[checkOut] cafeId:', cafeId, '| staffId:', staffId);
-  if (!currentUser) {
-    throw new Error('Not authenticated — please log in again');
-  }
-
   const dateKey    = toDateKey(new Date());
   const now        = new Date();
   const checkOutStr = now.toTimeString().slice(0, 5);

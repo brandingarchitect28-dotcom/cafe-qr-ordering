@@ -276,7 +276,7 @@ const MonthCalendar = ({ cafeId, staffList }) => {
           const day     = i + 1;
           const dateKey = `${yearMonth}-${String(day).padStart(2, '0')}`;
           const rec     = records[dateKey];
-          const isToday = dateKey === _dateKey();
+          const isToday = dateKey === toDateKey();
           const s       = rec ? STATUS[rec.status] : null;
           return (
             <div
@@ -312,22 +312,28 @@ const MonthCalendar = ({ cafeId, staffList }) => {
   );
 };
 
-// ── Main AttendanceDashboard ───────────────────────────────────────────────────
-const AttendanceDashboard = ({ cafeId, staffList = [] }) => {
+// ─── Main ─────────────────────────────────────────────────────────────────────
+const AttendanceDashboard = ({ cafeId }) => {
+  const [staffList,   setStaffList  ] = useState([]);
   const [todayRecs,   setTodayRecs  ] = useState([]);
   const [showScanner, setShowScanner] = useState(false);
   const [manualId,    setManualId   ] = useState('');
-  const today = _dateKey();
+  const today = toDateKey();
+
+  // Real-time staff — own listener so component is self-contained
+  useEffect(() => {
+    if (!cafeId) return;
+    return onSnapshot(
+      query(collection(db, 'staff'), where('cafeId', '==', cafeId), where('isActive', '==', true)),
+      snap => setStaffList(snap.docs.map(d => ({ id: d.id, ...d.data() })).sort((a, b) => a.name.localeCompare(b.name)))
+    );
+  }, [cafeId]);
 
   // Real-time today's attendance
   useEffect(() => {
     if (!cafeId) return;
     return onSnapshot(
-      query(
-        collection(db, 'attendance'),
-        where('cafeId', '==', cafeId),
-        where('date',   '==', today)
-      ),
+      query(collection(db, 'attendance'), where('cafeId', '==', cafeId), where('date', '==', today)),
       snap => setTodayRecs(snap.docs.map(d => ({ id: d.id, ...d.data() })))
     );
   }, [cafeId, today]);
