@@ -160,7 +160,28 @@ const OrderCard = ({ order, onAdvance, advancing }) => {
       <div className="px-4 py-3 space-y-1.5">
         {(order.items || []).map((item, idx) => (
           <div key={idx} className="flex items-baseline justify-between gap-2">
-            <span className="text-white text-sm font-medium leading-snug">{item.name}</span>
+            <div className="flex-1 min-w-0">
+              <span className="text-white text-sm font-medium leading-snug">{item.name}</span>
+
+              {/* Combo items */}
+              {item.comboItems?.length > 0 && (
+                <div style={{ fontSize: '12px', opacity: 0.8 }}>
+                  {item.comboItems.map((ci, cIdx) => (
+                    <div key={cIdx} style={{ color: '#A3A3A3', paddingLeft: '8px' }}>
+                      - {ci.name}{ci.quantity > 1 ? ` ×${ci.quantity}` : ''}
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {/* Addons */}
+              {item.addons?.length > 0 && (
+                <div style={{ fontSize: '12px', opacity: 0.8, color: '#A3A3A3', paddingLeft: '8px' }}>
+                  + {item.addons.map(a => a.name).join(', ')}
+                </div>
+              )}
+            </div>
+
             <span
               className="flex-shrink-0 text-sm font-bold px-2 py-0.5 rounded-full"
               style={{ backgroundColor: 'rgba(212,175,55,0.15)', color: '#D4AF37' }}
