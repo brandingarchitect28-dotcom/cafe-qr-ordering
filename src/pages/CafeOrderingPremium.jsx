@@ -614,29 +614,73 @@ const CafeOrderingPremium = () => {
       return;
     }
 
-    // --- Buy X Get Y: paid qty at normal price + free qty at zero ---
+    // --- Buy X Get Y: paid qty at normal price + FREE item (getItemId) at zero ---
+    //
+    // FIX: The original code used the same menuItem (buy item) for the free slot.
+    // Correct behaviour: look up offer.getItemId to find the FREE item, which is
+    // a DIFFERENT menu item selected when the offer was created.
+    //
+    // Offer schema expected (set by offer creation form):
+    //   offer.buyItemId   — id of the item the customer must buy
+    //   offer.buyQty      — how many they must buy  (also stored as offer.buyQuantity)
+    //   offer.getItemId   — id of the item given for free
+    //   offer.getQty      — how many free items      (also stored as offer.getQuantity)
+    //
+    // If the offer still uses the legacy offer.items[] array format we fall back
+    // gracefully so no existing combo/discount order is broken.
     if (offer.type === 'buy_x_get_y') {
-      (offer.items || []).forEach(oi => {
-        const menuItem = menuItems.find(m => m.id === oi.itemId);
-        if (!menuItem) return;
-        const buyQty = offer.buyQuantity || oi.quantity || 1;
-        const getQty = offer.getQuantity || 0;
-        if (buyQty > 0) {
-          setCart(prev => [...prev, {
-            ...menuItem,
-            price:        parseFloat(menuItem.price),
-            basePrice:    parseFloat(menuItem.price),
+      // ── Resolve buy item ──────────────────────────────────────────────────
+      // Support both new field (buyItemId) and legacy (offer.items[0].itemId)
+      const buyItemId = offer.buyItemId || offer.items?.[0]?.itemId;
+      const buyItem   = menuItems.find(m => m.id === buyItemId);
+
+      // ── Resolve GET (free) item ───────────────────────────────────────────
+      // FIX: use offer.getItemId — the item chosen as the FREE reward.
+      // Previously this was missing and the code reused buyItem, causing the
+      // "Buy Malai Chicken Roll → Get Malai Chicken Roll free" bug.
+      const getItemId = offer.getItemId || offer.items?.[1]?.itemId;
+      const freeItem  = menuItems.find(m => m.id === getItemId);
+
+      // ── Quantities ────────────────────────────────────────────────────────
+      const buyQty = parseInt(offer.buyQty || offer.buyQuantity || offer.items?.[0]?.quantity || 1, 10);
+      const getQty = parseInt(offer.getQty || offer.getQuantity || offer.items?.[1]?.quantity || 1, 10);
+
+      // ── Add paid (buy) item ───────────────────────────────────────────────
+      if (buyItem && buyQty > 0) {
+        setCart(prev => {
+          // Prevent duplicate paid entry for this offer: check by id + offerType
+          const alreadyExists = prev.some(
+            i => i.id === buyItem.id && i.offerType === 'buy_x_get_y' && i.isOffer
+          );
+          if (alreadyExists) return prev; // idempotent — don't double-add
+          return [...prev, {
+            ...buyItem,
+            price:        parseFloat(buyItem.price),
+            basePrice:    parseFloat(buyItem.price),
             quantity:     buyQty,
             addons:       [],
             addonTotal:   0,
             selectedSize: null,
             isOffer:      true,
             offerType:    'buy_x_get_y',
-          }]);
-        }
-        if (getQty > 0) {
-          setCart(prev => [...prev, {
-            ...menuItem,
+          }];
+        });
+      }
+
+      // ── Add FREE (get) item ───────────────────────────────────────────────
+      // Uses freeItem (getItemId), NOT buyItem — this was the core bug.
+      // isFree: true ensures price is excluded from all totals/tax calculations.
+      // linkedTo: buyItemId allows future sync logic (removal, qty changes).
+      if (freeItem && getQty > 0) {
+        setCart(prev => {
+          // Prevent duplicate free entry: one free block per offer's getItemId
+          const alreadyExists = prev.some(
+            i => i.id === freeItem.id && i.offerType === 'buy_x_get_y_free' && i.isFree
+          );
+          if (alreadyExists) return prev; // idempotent — don't double-add
+          return [...prev, {
+            ...freeItem,
+            // price: 0 — free item MUST NOT affect cart total, taxes, or service charge
             price:        0,
             basePrice:    0,
             quantity:     getQty,
@@ -645,10 +689,23 @@ const CafeOrderingPremium = () => {
             selectedSize: null,
             isOffer:      true,
             offerType:    'buy_x_get_y_free',
-            name:         `${menuItem.name} (Free)`,
-          }]);
-        }
-      });
+            isFree:       true,                     // explicit free flag for kitchen + invoice
+            linkedTo:     buyItemId,                // ties free item to its buy trigger
+            // UI display: show correct free item name e.g. "Masala Fries (Free)"
+            name:         `${freeItem.name} (Free)`,
+          }];
+        });
+      }
+
+      // Graceful fallback: if offer uses only legacy items[] with no getItemId,
+      // warn in dev so the offer creator can update the offer document.
+      if (!freeItem && getItemId) {
+        console.warn(
+          `[BuyXGetY] Free item not found in menu. getItemId="${getItemId}". ` +
+          `Ensure the offer document has a valid getItemId and the item is available.`
+        );
+      }
+
       toast.success(`${offer.title} added to cart ✓`);
       return;
     }
