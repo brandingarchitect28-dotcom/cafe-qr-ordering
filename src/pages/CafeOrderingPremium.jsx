@@ -1119,7 +1119,17 @@ const CafeOrderingPremium = () => {
                         </div>
                       )}
                       <div className="flex-1 min-w-0">
-                        <p className="text-sm font-medium truncate" style={{ color: T.text }}>{item.name}</p>
+                        <p className="text-sm font-medium truncate" style={{ color: T.text }}>
+                           {item.name}
+                        </p>
+
+                        {item.isOffer && item.items && (
+                          <div className="text-xs opacity-70 mt-1">
+                            {item.items.map((sub, i) => (
+                              <div key={i}>• {sub.name}</div>
+                            ))}
+                          </div>
+                        )}
                         <p className="text-xs" style={{ color: T.textMuted }}>{CUR}{fmt(item.basePrice ?? item.price)}</p>
                         {item.addons?.length > 0 && (
                           <p className="text-xs mt-0.5 truncate" style={{ color: T.textMuted }}>
