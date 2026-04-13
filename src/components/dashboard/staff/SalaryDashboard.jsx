@@ -75,15 +75,17 @@ const SalaryDashboard = ({ staffList = [] }) => {
     }
     setCalculating(true);
     try {
-      // Single query — all attendance for this cafe + month
+      // Query by cafeId only, then filter by month in JS
+      // (avoids requiring a cafeId+month composite index on 'attendance')
       const attSnap = await getDocs(
         query(
           collection(db, 'attendance'),
-          where('cafeId', '==', cafeId),
-          where('month',  '==', yearMonth)
+          where('cafeId', '==', cafeId)
         )
       );
-      const allAtt = attSnap.docs.map(d => d.data());
+      const allAtt = attSnap.docs
+        .map(d => d.data())
+        .filter(a => a.month === yearMonth);
 
       // Group by staffId
       const attByStaff = {};
@@ -98,17 +100,18 @@ const SalaryDashboard = ({ staffList = [] }) => {
       );
 
       // Merge paid status from existing Firestore salary docs
+      // Query by cafeId only, then filter by month in JS
+      // (avoids requiring a cafeId+month composite index on 'salary')
       const salarySnap = await getDocs(
         query(
           collection(db, 'salary'),
-          where('cafeId', '==', cafeId),
-          where('month',  '==', yearMonth)
+          where('cafeId', '==', cafeId)
         )
       );
       const paidMap = {};
       salarySnap.docs.forEach(d => {
         const data = d.data();
-        if (data.staffId) paidMap[data.staffId] = data.status;
+        if (data.staffId && data.month === yearMonth) paidMap[data.staffId] = data.status;
       });
 
       const merged = results.map(r => ({
