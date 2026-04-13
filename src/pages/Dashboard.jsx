@@ -119,21 +119,32 @@ const Dashboard = () => {
 
       {/* ── Sidebar ──────────────────────────────────────────────────────── */}
       {/*
-        FIX — ISSUE 2 (landscape sidebar not minimizable):
-        Root cause: the X close button had className="lg:hidden" so it was
-        invisible at ≥1024 px wide — which includes landscape tablets and some
-        phones. On those devices the sidebar had no dismiss control.
+        FIX — sidebar minimize in landscape / all screen sizes:
 
-        Fix: remove "lg:hidden" from the X button so it is ALWAYS visible.
-        The sidebar's own lg:translate-x-0 still pins it open on large desktops
-        via CSS, but the toggle now works at every width/orientation.
+        ROOT CAUSE of the landscape bug:
+          The aside had the Tailwind class "lg:translate-x-0" which forces
+          translateX(0) — fully visible — at ≥1024 px wide. This breakpoint
+          covers landscape tablets, landscape phones, laptops and desktops.
+          Because CSS specificity beats inline React state-driven classes,
+          the sidebar was ALWAYS visible at lg+ regardless of sidebarOpen,
+          and the X button appeared to do nothing.
 
-        Header hamburger also had "lg:hidden" — same problem, same fix.
-        Both changed to always-visible. The spacer div at the right of the
-        header is kept so the title stays centred.
+        FIX:
+          Removed "lg:translate-x-0" entirely.
+          Sidebar visibility is now controlled ONLY by sidebarOpen state:
+            open  → translate-x-0     (visible)
+            closed → -translate-x-full (hidden off-screen left)
+          This works identically on every screen width and orientation.
+
+        Also removed "lg:ml-64" from the main content wrapper below — that
+        class was a permanent 256px left margin at lg+ to compensate for the
+        always-visible sidebar. Since the sidebar is now overlay-only (toggle-
+        driven), the margin is not needed and would create a blank gap when
+        the sidebar is closed on large screens.
       */}
       <aside
-        className={`fixed top-0 left-0 h-screen w-64 ${sidebarBg} border-r border-white/5 flex flex-col p-4 z-50 transform transition-transform lg:translate-x-0 ${
+        className={`fixed top-0 left-0 h-screen w-64 ${sidebarBg} border-r border-white/5 flex flex-col p-4 z-50 transform transition-transform ${
+          // FIX: sidebar visibility controlled purely by state — no lg: override
           sidebarOpen ? 'translate-x-0' : '-translate-x-full'
         }`}
       >
@@ -202,7 +213,9 @@ const Dashboard = () => {
       </aside>
 
       {/* ── Main content ──────────────────────────────────────────────────── */}
-      <div className="lg:ml-64">
+      {/* FIX: removed lg:ml-64 — sidebar is now overlay-only (toggle-driven),
+          so a permanent left margin is not needed and would leave a blank gap */}
+      <div>
 
         {/* Sticky header */}
         <header
