@@ -17,7 +17,7 @@
  * - "Add More Items" button to append items to existing order
  */
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { doc, onSnapshot, getDoc, updateDoc, collection, query, where } from 'firebase/firestore';
 import { db } from '../lib/firebase';
@@ -165,14 +165,25 @@ const PaymentBadge = ({ status }) => {
 
 // ─── Add More Items Modal ─────────────────────────────────────────────────────
 
-const AddMoreItemsModal = ({ order, onClose, primary }) => {
+// FIX — ISSUE 1: AddOnModal used to be rendered INSIDE this component which has
+// z-[70]. Because a fixed element inside a z-indexed stacking context resolves
+// its own z relative to that context, AddOnModal's z-[60] was BELOW the z-[70]
+// backdrop, making it invisible and unresponsive to taps.
+//
+// Fix: addonModal state lives in the parent (OrderTracking). This modal accepts:
+//   setAddonModal   — parent setter; called when an addon item is tapped
+//   directAddRef    — a React ref the parent provides; we store directAddToNewCart
+//                     in it so the parent's AddOnModal onConfirm can call it
+// AddOnModal is rendered in OrderTracking, outside any stacking context.
+// All other logic in this component is UNCHANGED.
+const AddMoreItemsModal = ({ order, onClose, primary, setAddonModal, directAddRef }) => {
   const CUR = order?.currencySymbol || '₹';
   const fmt = (n) => (parseFloat(n) || 0).toFixed(2);
 
   const [menuItems,   setMenuItems  ] = useState([]);
   const [loadingMenu, setLoadingMenu] = useState(true);
   const [newCart,     setNewCart    ] = useState([]);
-  const [addonModal,  setAddonModal ] = useState(null);
+  // addonModal state removed — now lives in OrderTracking (see fix comment above)
   const [saving,      setSaving     ] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
 
@@ -217,8 +228,16 @@ const AddMoreItemsModal = ({ order, onClose, primary }) => {
     });
   }, []);
 
+  // FIX — expose directAddToNewCart to parent via ref so the root-level
+  // AddOnModal onConfirm can call it directly without re-inventing cart logic
+  useEffect(() => {
+    if (directAddRef) directAddRef.current = directAddToNewCart;
+  }, [directAddToNewCart, directAddRef]);
+
   const addToNewCart = useCallback((item) => {
     if (item.addons?.length > 0) {
+      // FIX — call parent setter instead of local state setter so the parent
+      // renders AddOnModal outside the z-[70] stacking context
       setAddonModal(item);
       return;
     }
@@ -232,7 +251,7 @@ const AddMoreItemsModal = ({ order, onClose, primary }) => {
       addonTotal:   0,
       comboItems:   [],
     });
-  }, [directAddToNewCart]);
+  }, [directAddToNewCart, setAddonModal]);
 
   const removeFromNewCart = useCallback((id) => {
     setNewCart(prev => {
@@ -441,17 +460,7 @@ const AddMoreItemsModal = ({ order, onClose, primary }) => {
         </motion.div>
       </motion.div>
 
-      {/* Addon modal for new cart items */}
-      {addonModal && (
-        <AddOnModal
-          item={addonModal}
-          onConfirm={(entry) => { directAddToNewCart(entry); setAddonModal(null); }}
-          onClose={() => setAddonModal(null)}
-          currencySymbol={CUR}
-          primaryColor={primary}
-          theme="dark"
-        />
-      )}
+      {/* AddOnModal is rendered at OrderTracking level — see FIX ISSUE 1 comment */}
     </AnimatePresence>
   );
 };
@@ -465,6 +474,12 @@ const OrderTracking = () => {
   const [loading,        setLoading       ] = useState(true);
   const [notFound,       setNotFound      ] = useState(false);
   const [showAddMore,    setShowAddMore   ] = useState(false);
+  // FIX — ISSUE 1: addonModal state lives here so AddOnModal renders outside
+  // AddMoreItemsModal's z-[70] stacking context (see component comment above)
+  const [addMoreAddonModal, setAddMoreAddonModal] = useState(null);
+  // directAddRef lets the root-level AddOnModal call directAddToNewCart which
+  // lives inside AddMoreItemsModal — avoids duplicating cart logic
+  const directAddRef = useRef(null);
 
   // ── Google Review link — fetched per café from cafes/{cafeId} ───────────────
   const [googleReviewLink, setGoogleReviewLink] = useState('');
@@ -861,6 +876,26 @@ const OrderTracking = () => {
           order={order}
           onClose={() => setShowAddMore(false)}
           primary={primary}
+          setAddonModal={setAddMoreAddonModal}
+          directAddRef={directAddRef}
+        />
+      )}
+
+      {/* FIX — ISSUE 1: AddOnModal rendered HERE at root level so its z-[60]
+          is evaluated against the document root, not AddMoreItemsModal's z-[70].
+          onConfirm calls directAddRef.current (= directAddToNewCart inside the
+          modal) so the cart entry is delivered without duplicating any logic. */}
+      {addMoreAddonModal && (
+        <AddOnModal
+          item={addMoreAddonModal}
+          onConfirm={(entry) => {
+            directAddRef.current?.(entry);
+            setAddMoreAddonModal(null);
+          }}
+          onClose={() => setAddMoreAddonModal(null)}
+          currencySymbol={order?.currencySymbol || '₹'}
+          primaryColor={primary}
+          theme="dark"
         />
       )}
     </div>

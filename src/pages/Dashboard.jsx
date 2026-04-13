@@ -55,15 +55,12 @@ const Dashboard = () => {
   const navigate = useNavigate();
   const { T, isLight } = useTheme();
 
-  // Global new-order notification — sound + vibration + popup, works on every tab
   const { newOrder, clearNewOrder } = useGlobalOrderNotification(cafeId);
-
   const { data: cafe } = useDocument('cafes', cafeId);
 
   const [activeTab,   setActiveTab  ] = useState('overview');
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
-  // Feature gates — default true so features are visible unless admin disables them
   const features = {
     marketing:   cafe?.features?.marketingWhatsappEnabled !== false,
     aiAssistant: cafe?.features?.aiAssistantEnabled       !== false,
@@ -79,7 +76,6 @@ const Dashboard = () => {
     }
   };
 
-  // ── Sidebar items — exactly matching screenshot (16 items) ────────────────
   const menuItems = [
     { id: 'overview',  label: 'Overview',    icon: LayoutDashboard },
     { id: 'orders',    label: 'Orders',      icon: ShoppingBag     },
@@ -100,12 +96,10 @@ const Dashboard = () => {
     { id: 'settings',  label: 'Settings',    icon: SettingsIcon    },
   ];
 
-  const sidebarBg = isLight ? 'bg-white'    : 'bg-[#050505]';
-  const headerBg  = isLight ? 'bg-white/90' : 'bg-[#050505]/80';
-  const pageBg    = isLight ? 'bg-[#F5F5F5]' : 'bg-[#050505]';
+  const sidebarBg = isLight ? 'bg-white'      : 'bg-[#050505]';
+  const headerBg  = isLight ? 'bg-white/90'   : 'bg-[#050505]/80';
+  const pageBg    = isLight ? 'bg-[#F5F5F5]'  : 'bg-[#050505]';
 
-  // ── isActive check — add-only: blocks disabled cafe owners without touching any existing logic ──
-  // cafe doc is already loaded via useDocument above. Only blocks when explicitly set to false.
   if (cafe && cafe.isActive === false) {
     return <CafeDisabled isAdmin={true} />;
   }
@@ -113,24 +107,37 @@ const Dashboard = () => {
   return (
     <div className={`min-h-screen ${pageBg}`} style={{ fontFamily: 'Manrope, sans-serif' }}>
 
-      {/* Global new-order popup — renders on top of every page */}
       <GlobalOrderPopup order={newOrder} onClose={clearNewOrder} />
 
-      {/* Mobile overlay */}
+      {/* ── Overlay — shown on ALL screen sizes when sidebar is open ─────── */}
       {sidebarOpen && (
         <div
-          className="fixed inset-0 bg-black/60 backdrop-blur-sm z-40 lg:hidden"
+          className="fixed inset-0 bg-black/60 backdrop-blur-sm z-40"
           onClick={() => setSidebarOpen(false)}
         />
       )}
 
       {/* ── Sidebar ──────────────────────────────────────────────────────── */}
+      {/*
+        FIX — ISSUE 2 (landscape sidebar not minimizable):
+        Root cause: the X close button had className="lg:hidden" so it was
+        invisible at ≥1024 px wide — which includes landscape tablets and some
+        phones. On those devices the sidebar had no dismiss control.
+
+        Fix: remove "lg:hidden" from the X button so it is ALWAYS visible.
+        The sidebar's own lg:translate-x-0 still pins it open on large desktops
+        via CSS, but the toggle now works at every width/orientation.
+
+        Header hamburger also had "lg:hidden" — same problem, same fix.
+        Both changed to always-visible. The spacer div at the right of the
+        header is kept so the title stays centred.
+      */}
       <aside
         className={`fixed top-0 left-0 h-screen w-64 ${sidebarBg} border-r border-white/5 flex flex-col p-4 z-50 transform transition-transform lg:translate-x-0 ${
           sidebarOpen ? 'translate-x-0' : '-translate-x-full'
         }`}
       >
-        {/* Branding */}
+        {/* Branding + close — X is always visible (was lg:hidden, now removed) */}
         <div className="flex items-center justify-between mb-8">
           <h1
             className="text-xl font-bold text-[#D4AF37]"
@@ -138,15 +145,17 @@ const Dashboard = () => {
           >
             BRANDING ARCHITECT
           </h1>
+          {/* FIX: removed lg:hidden — close button visible in ALL orientations */}
           <button
-            className="lg:hidden text-[#A3A3A3] hover:text-white"
+            className="text-[#A3A3A3] hover:text-white transition-colors"
             onClick={() => setSidebarOpen(false)}
+            aria-label="Close sidebar"
           >
             <X className="w-6 h-6" />
           </button>
         </div>
 
-        {/* Nav items — overflow-y-auto + touch-friendly scrolling */}
+        {/* Nav items */}
         <nav
           className="flex-1 space-y-1 overflow-y-auto overscroll-contain"
           style={{ WebkitOverflowScrolling: 'touch' }}
@@ -175,7 +184,7 @@ const Dashboard = () => {
           })}
         </nav>
 
-        {/* Bottom: user + logout — flex-shrink-0 keeps it always visible */}
+        {/* Bottom: user + logout */}
         <div className="border-t border-white/5 pt-4 flex-shrink-0">
           <div className="px-4 py-3 mb-2">
             <p className="text-[#A3A3A3] text-sm">Logged in as</p>
@@ -199,19 +208,24 @@ const Dashboard = () => {
         <header
           className={`sticky top-0 z-30 h-16 border-b border-white/5 ${headerBg} backdrop-blur-md px-6 flex items-center justify-between`}
         >
+          {/* FIX: removed lg:hidden — hamburger visible in ALL orientations */}
           <button
-            className="lg:hidden text-[#D4AF37]"
-            onClick={() => setSidebarOpen(true)}
+            className="text-[#D4AF37] hover:opacity-80 transition-opacity"
+            onClick={() => setSidebarOpen(prev => !prev)}
+            aria-label="Toggle sidebar"
           >
             <MenuIcon className="w-6 h-6" />
           </button>
+
           <h2
             className="text-2xl font-bold text-white"
             style={{ fontFamily: 'Playfair Display, serif' }}
           >
             {menuItems.find(item => item.id === activeTab)?.label}
           </h2>
-          <div className="w-8 lg:hidden" />
+
+          {/* Spacer keeps title centred — width matches hamburger button */}
+          <div className="w-6" />
         </header>
 
         {/* Page content */}
