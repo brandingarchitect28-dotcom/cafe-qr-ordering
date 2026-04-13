@@ -21,6 +21,18 @@ import {
 } from '../../../services/staffService';
 import { toast } from 'sonner';
 
+// FALLBACK FIX: guarantees toDateKey always works even if import fails at runtime
+const safeToDateKey = (date = new Date()) => {
+  try {
+    return new Date(date).toISOString().split('T')[0];
+  } catch (e) {
+    console.error('safeToDateKey error:', e);
+    return '';
+  }
+};
+const _dateKey = (date) =>
+  (typeof toDateKey === 'function' ? toDateKey : safeToDateKey)(date);
+
 // ── Status config ─────────────────────────────────────────────────────────────
 const STATUS = {
   present:    { label: 'Present',  color: '#10B981', bg: 'rgba(16,185,129,0.12)' },
@@ -98,7 +110,7 @@ const QRScannerModal = ({ cafeId, staffList, onClose }) => {
     }
 
     try {
-      const today    = await getDailyAttendance(cafeId, toDateKey());
+      const today    = await getDailyAttendance(cafeId, _dateKey());
       const existing = today.find(a => a.staffId === staffId);
 
       if (existing && !existing.checkOut) {
@@ -264,7 +276,7 @@ const MonthCalendar = ({ cafeId, staffList }) => {
           const day     = i + 1;
           const dateKey = `${yearMonth}-${String(day).padStart(2, '0')}`;
           const rec     = records[dateKey];
-          const isToday = dateKey === toDateKey();
+          const isToday = dateKey === _dateKey();
           const s       = rec ? STATUS[rec.status] : null;
           return (
             <div
@@ -305,7 +317,7 @@ const AttendanceDashboard = ({ cafeId, staffList = [] }) => {
   const [todayRecs,   setTodayRecs  ] = useState([]);
   const [showScanner, setShowScanner] = useState(false);
   const [manualId,    setManualId   ] = useState('');
-  const today = toDateKey();
+  const today = _dateKey();
 
   // Real-time today's attendance
   useEffect(() => {

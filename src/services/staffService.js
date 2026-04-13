@@ -19,7 +19,14 @@ import {
   serverTimestamp,
 } from 'firebase/firestore';
 import { db } from '../lib/firebase';
-export { toDateKey } from './salaryEngine';
+export const toDateKey = (date = new Date()) => {
+  try {
+    return new Date(date).toISOString().split('T')[0];
+  } catch (e) {
+    console.error('toDateKey error:', e);
+    return '';
+  }
+};
 
 // ── Constants ──────────────────────────────────────────────────────────────────
 
