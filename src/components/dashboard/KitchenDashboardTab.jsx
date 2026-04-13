@@ -182,7 +182,7 @@ const KitchenDashboardTab = () => {
                   {/* Status colour bar */}
                   <div className="w-1 flex-shrink-0" style={{ backgroundColor: colMeta.accent }} />
 
-                  <div className="flex-1 px-4 py-3 flex items-center gap-4 flex-wrap">
+                  <div className="flex-1 px-4 py-3 flex items-start gap-4 flex-wrap">
                     {/* Order # + table */}
                     <div className="flex items-center gap-2 min-w-[80px]">
                       <span className="text-[#D4AF37] font-bold text-lg" style={{ fontFamily: 'Playfair Display, serif' }}>
@@ -202,9 +202,29 @@ const KitchenDashboardTab = () => {
                       {colMeta.label}
                     </span>
 
-                    {/* Items summary */}
-                    <div className={`flex-1 text-sm ${T.muted} truncate`}>
-                      {order.items?.map(i => `${i.name} ×${i.quantity}`).join(' · ')}
+                    {/* Items summary — with comboItems and addons */}
+                    <div className={`flex-1 text-sm ${T.muted} min-w-0`}>
+                      {order.items?.map((item, idx) => (
+                        <div key={idx} className="mb-0.5">
+                          <span>{item.name} ×{item.quantity}</span>
+                          {/* comboItems under item */}
+                          {item.comboItems?.length > 0 && (
+                            <div className="ml-2 mt-0.5">
+                              {item.comboItems.map((ci, cIdx) => (
+                                <span key={cIdx} className="block text-xs opacity-70">
+                                  — {ci.name}{ci.quantity > 1 ? ` ×${ci.quantity}` : ''}
+                                </span>
+                              ))}
+                            </div>
+                          )}
+                          {/* addons under item */}
+                          {item.addons?.length > 0 && (
+                            <span className="block text-xs opacity-70 ml-2">
+                              + {item.addons.map(a => a.name).join(', ')}
+                            </span>
+                          )}
+                        </div>
+                      ))}
                     </div>
 
                     {/* Elapsed */}

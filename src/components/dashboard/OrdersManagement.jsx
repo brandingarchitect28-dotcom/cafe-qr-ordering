@@ -239,7 +239,6 @@ const OrdersManagement = () => {
   // ── Feature 2: Invoice handlers (with safety checks) ─────────────────────
   const handleViewInvoice = async (orderId, e) => {
     if (e) e.stopPropagation();
-    // Safety check
     if (!orderId) {
       console.error('Invalid order for invoice');
       toast.error('Invalid order');
@@ -247,7 +246,6 @@ const OrdersManagement = () => {
     }
     setInvoiceLoading(orderId);
     try {
-      // Step 1: try fetching existing Firestore invoice doc
       const { data, error } = await getInvoiceByOrderId(orderId);
       if (error) {
         console.error('Invoice fetch error:', error);
@@ -257,14 +255,11 @@ const OrdersManagement = () => {
       }
 
       if (data) {
-        // Invoice doc exists — open it directly
         setInvoiceLoading(null);
         setViewingInvoice(data);
         return;
       }
 
-      // Step 2: no invoice doc yet — generate from the order in memory
-      // Find the full order object from the already-loaded orders array
       const orderObj = orders?.find(o => o.id === orderId);
       if (!orderObj) {
         setInvoiceLoading(null);
@@ -272,11 +267,8 @@ const OrdersManagement = () => {
         return;
       }
 
-      // Ensure invoice is created in Firestore (idempotent — safe to call repeatedly)
       const { invoiceId, error: genError } = await ensureInvoiceForOrder(orderId, orderObj, cafe || {});
       if (genError || !invoiceId) {
-        // Even if Firestore write failed, build a synthetic invoice from order data
-        // so the owner can still see/print it
         console.warn('[Invoice] Firestore write failed — showing synthetic invoice:', genError);
         const synthetic = {
           orderId,
@@ -309,7 +301,6 @@ const OrdersManagement = () => {
         return;
       }
 
-      // Fetch the newly created invoice doc and open it
       const { data: fresh } = await getInvoiceByOrderId(orderId);
       setInvoiceLoading(null);
       setViewingInvoice(fresh || { orderId, orderNumber: orderObj.orderNumber });
@@ -322,7 +313,6 @@ const OrdersManagement = () => {
 
   const handleDownloadInvoice = async (orderId, e) => {
     if (e) e.stopPropagation();
-    // Safety check
     if (!orderId) {
       console.error('Invalid order for invoice');
       toast.error('Invalid order');
@@ -330,7 +320,6 @@ const OrdersManagement = () => {
     }
     setInvoiceLoading(orderId);
     try {
-      // Step 1: try fetching existing Firestore invoice doc
       const { data, error } = await getInvoiceByOrderId(orderId);
       if (error) {
         console.error('Invoice fetch error:', error);
@@ -340,13 +329,11 @@ const OrdersManagement = () => {
       }
 
       if (data) {
-        // Invoice doc exists — open with autoPrint to trigger PDF download
         setInvoiceLoading(null);
         setViewingInvoice({ ...data, _autoPrint: true });
         return;
       }
 
-      // Step 2: no invoice doc yet — generate from the order in memory
       const orderObj = orders?.find(o => o.id === orderId);
       if (!orderObj) {
         setInvoiceLoading(null);
@@ -356,7 +343,6 @@ const OrdersManagement = () => {
 
       const { invoiceId, error: genError } = await ensureInvoiceForOrder(orderId, orderObj, cafe || {});
       if (genError || !invoiceId) {
-        // Build synthetic invoice so download still works
         console.warn('[Invoice] Firestore write failed — using synthetic for PDF:', genError);
         const synthetic = {
           orderId,
@@ -390,7 +376,6 @@ const OrdersManagement = () => {
         return;
       }
 
-      // Fetch newly created invoice and open with autoPrint
       const { data: fresh } = await getInvoiceByOrderId(orderId);
       setInvoiceLoading(null);
       setViewingInvoice({ ...(fresh || { orderId }), _autoPrint: true });
@@ -402,7 +387,6 @@ const OrdersManagement = () => {
   };
 
   // ── WhatsApp Invoice Send ────────────────────────────────────────────────────
-  // Strips non-digits, adds India country code for 10-digit numbers
   const formatWhatsAppNumber = (raw) => {
     if (!raw) return '';
     const digits = String(raw).replace(/\D/g, '');
@@ -411,7 +395,6 @@ const OrdersManagement = () => {
     return digits;
   };
 
-  // Sends a formatted invoice message to the customer via WhatsApp
   const handleSendInvoiceWA = (order, e) => {
     if (e) e.stopPropagation();
     if (!order) return;
@@ -753,9 +736,27 @@ const OrdersManagement = () => {
                                 <h4 className="text-[#D4AF37] font-semibold mb-3">Order Items</h4>
                                 <div className="space-y-2">
                                   {order.items?.map((item, idx) => (
-                                    <div key={idx} className="flex justify-between text-sm">
-                                      <span className="text-white">{item.name} x{item.quantity}</span>
-                                      <span className="text-[#D4AF37]">{order.currencySymbol || cafeCurrency}{(item.price * item.quantity).toFixed(2)}</span>
+                                    <div key={idx} className="text-sm">
+                                      <div className="flex justify-between">
+                                        <span className="text-white">{item.name} x{item.quantity}</span>
+                                        <span className="text-[#D4AF37]">{order.currencySymbol || cafeCurrency}{(item.price * item.quantity).toFixed(2)}</span>
+                                      </div>
+                                      {/* comboItems display */}
+                                      {item.comboItems?.length > 0 && (
+                                        <div className="ml-3 mt-0.5 space-y-0.5">
+                                          {item.comboItems.map((ci, cIdx) => (
+                                            <p key={cIdx} className="text-xs text-[#A3A3A3]">
+                                              — {ci.name}{ci.quantity > 1 ? ` ×${ci.quantity}` : ''}
+                                            </p>
+                                          ))}
+                                        </div>
+                                      )}
+                                      {/* addons display */}
+                                      {item.addons?.length > 0 && (
+                                        <p className="text-xs text-[#A3A3A3] ml-3 mt-0.5">
+                                          + {item.addons.map(a => a.name).join(', ')}
+                                        </p>
+                                      )}
                                     </div>
                                   ))}
                                   <div className="border-t border-white/10 pt-2 mt-2 flex justify-between font-bold">
@@ -862,9 +863,27 @@ const OrdersManagement = () => {
                       <h4 className="text-[#D4AF37] font-semibold mb-2 text-sm">Items</h4>
                       <div className="space-y-1">
                         {order.items?.map((item, idx) => (
-                          <div key={idx} className="flex justify-between text-sm">
-                            <span className="text-white">{item.name} x{item.quantity}</span>
-                            <span className="text-[#D4AF37]">{order.currencySymbol || cafeCurrency}{(item.price * item.quantity).toFixed(2)}</span>
+                          <div key={idx} className="text-sm">
+                            <div className="flex justify-between">
+                              <span className="text-white">{item.name} x{item.quantity}</span>
+                              <span className="text-[#D4AF37]">{order.currencySymbol || cafeCurrency}{(item.price * item.quantity).toFixed(2)}</span>
+                            </div>
+                            {/* comboItems display (mobile) */}
+                            {item.comboItems?.length > 0 && (
+                              <div className="ml-3 mt-0.5 space-y-0.5">
+                                {item.comboItems.map((ci, cIdx) => (
+                                  <p key={cIdx} className="text-xs text-[#A3A3A3]">
+                                    — {ci.name}{ci.quantity > 1 ? ` ×${ci.quantity}` : ''}
+                                  </p>
+                                ))}
+                              </div>
+                            )}
+                            {/* addons display (mobile) */}
+                            {item.addons?.length > 0 && (
+                              <p className="text-xs text-[#A3A3A3] ml-3 mt-0.5">
+                                + {item.addons.map(a => a.name).join(', ')}
+                              </p>
+                            )}
                           </div>
                         ))}
                       </div>
