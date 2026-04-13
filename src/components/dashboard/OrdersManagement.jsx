@@ -1,18 +1,315 @@
 import React, { useState, useMemo, useEffect, useRef, useCallback } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
 import { useCollection, useDocument } from '../../hooks/useFirestore';
-import { where, doc, updateDoc, collection, addDoc, runTransaction, serverTimestamp } from 'firebase/firestore';
+import { where, doc, updateDoc, collection, addDoc, runTransaction, serverTimestamp, query, onSnapshot, getDoc } from 'firebase/firestore';
 import { db } from '../../lib/firebase';
-import { AlertCircle, Search, Download, Phone, MapPin, Clock, Bell, Volume2, X, FileText, Eye, Trash2, MessageSquare, PlusCircle } from 'lucide-react';
+import { AlertCircle, Search, Download, Phone, MapPin, Clock, Bell, Volume2, X, FileText, Eye, Trash2, MessageSquare, PlusCircle, Plus, Minus, ShoppingCart, RefreshCw } from 'lucide-react';
 import { toast } from 'sonner';
 import { CSVLink } from 'react-csv';
 import { motion, AnimatePresence } from 'framer-motion';
 import InvoiceModal from './InvoiceModal';
 import { getInvoiceByOrderId, ensureInvoiceForOrder, generateInvoiceMessage, createInvoiceForOrder } from '../../services/invoiceService';
 import ExternalOrderModal from './ExternalOrderModal';
+import AddOnModal from '../AddOnModal';
 
 // Notification sound (base64 encoded short beep)
 const NOTIFICATION_SOUND = 'data:audio/mp3;base64,SUQzBAAAAAAAI1RTU0UAAAAPAAADTGF2ZjU4Ljc2LjEwMAAAAAAAAAAAAAAA/+M4wAAAAAAAAAAAAEluZm8AAAAPAAAAAwAAAbAAqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV////////////////////////////////////////////AAAAAExhdmM1OC4xMwAAAAAAAAAAAAAAACQDgAAAAAAAAAGw3X+VkgAAAAAAAAAAAAAAAAD/4xjEAAJQAVAAAAAAvYCCB4P+UBn//+D4PoGH/ygM///KAHAY////4Pg+D7/8EMOD4f/6gYf///wfB9///5QGf/lAZ//+UAcH0GH////+oGH//6gYf5QBwfD4fygDg//+D5//ygMAAAAAAA/+MYxBYCwAFYAAAAAPHjx4sePHjx5OTk5FRUVFRU9PT09PT09PT0/////////////////////////////////+MYxCMAAADSAAAAAP///////////////////////////////////////////////+MYxDAAAADSAAAAAP///////////////////////////////////////////////+MYxD4AAADSAAAAAP//////////////////////////////////////////////'
+
+// ─── Add Items to Order Modal ─────────────────────────────────────────────────
+
+const AddItemsToOrderModal = ({ order, cafeCurrency, onClose }) => {
+  const CUR = order?.currencySymbol || cafeCurrency || '₹';
+  const fmt = (n) => (parseFloat(n) || 0).toFixed(2);
+  const primary = '#D4AF37';
+
+  const [menuItems,   setMenuItems  ] = useState([]);
+  const [loadingMenu, setLoadingMenu] = useState(true);
+  const [newCart,     setNewCart    ] = useState([]);
+  const [addonModal,  setAddonModal ] = useState(null);
+  const [saving,      setSaving     ] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+
+  useEffect(() => {
+    if (!order?.cafeId) return;
+    const q = query(
+      collection(db, 'menuItems'),
+      where('cafeId', '==', order.cafeId),
+      where('available', '==', true)
+    );
+    const unsub = onSnapshot(q, snap => {
+      setMenuItems(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+      setLoadingMenu(false);
+    }, () => setLoadingMenu(false));
+    return () => unsub();
+  }, [order?.cafeId]);
+
+  const filteredItems = menuItems.filter(item =>
+    !searchQuery || item.name.toLowerCase().includes(searchQuery.toLowerCase())
+  );
+
+  const newCartTotal = newCart.reduce((s, i) => s + i.price * i.quantity, 0);
+
+  const directAddToNewCart = useCallback((cartEntry) => {
+    setNewCart(prev => {
+      if (cartEntry.addons?.length > 0) return [...prev, cartEntry];
+      if (cartEntry.selectedSize) {
+        const ex = prev.find(i => i.id === cartEntry.id && i.selectedSize === cartEntry.selectedSize);
+        if (ex) return prev.map(i =>
+          i.id === cartEntry.id && i.selectedSize === cartEntry.selectedSize
+            ? { ...i, quantity: i.quantity + 1 } : i
+        );
+        return [...prev, cartEntry];
+      }
+      const ex = prev.find(i => i.id === cartEntry.id && !i.addons?.length && !i.selectedSize);
+      if (ex) return prev.map(i =>
+        i.id === cartEntry.id && !i.addons?.length && !i.selectedSize
+          ? { ...i, quantity: i.quantity + 1 } : i
+      );
+      return [...prev, cartEntry];
+    });
+  }, []);
+
+  const addToNewCart = useCallback((item) => {
+    if (item.addons?.length > 0) {
+      setAddonModal(item);
+      return;
+    }
+    directAddToNewCart({
+      ...item,
+      price:        parseFloat(item.price),
+      basePrice:    parseFloat(item.price),
+      selectedSize: null,
+      quantity:     1,
+      addons:       [],
+      addonTotal:   0,
+      comboItems:   [],
+    });
+  }, [directAddToNewCart]);
+
+  const removeFromNewCart = useCallback((id) => {
+    setNewCart(prev => {
+      const ex = prev.find(i => i.id === id);
+      if (!ex) return prev;
+      if (ex.quantity === 1) return prev.filter(i => i.id !== id);
+      return prev.map(i => i.id === id ? { ...i, quantity: i.quantity - 1 } : i);
+    });
+  }, []);
+
+  const newCartQtyFor = (id) => newCart.find(i => i.id === id)?.quantity || 0;
+
+  const handleSave = async () => {
+    if (newCart.length === 0) return;
+    setSaving(true);
+    try {
+      const safeNum = (v) => { const n = parseFloat(v); return isNaN(n) || !isFinite(n) ? 0 : n; };
+
+      const existingItems = order.items || [];
+      const newItems = newCart.map(i => ({
+        name:         i.name,
+        price:        i.basePrice ?? i.price,
+        quantity:     i.quantity,
+        addons:       i.addons       || [],
+        addonTotal:   i.addonTotal   || 0,
+        selectedSize: i.selectedSize || null,
+        comboItems:   i.comboItems   || [],
+      }));
+      const updatedItems = [...existingItems, ...newItems];
+
+      const newSubtotal = updatedItems.reduce((s, item) => {
+        const base = safeNum(item.price);
+        const addonAmt = (item.addons || []).reduce((as, a) => as + safeNum(a.price), 0);
+        return s + (base + addonAmt) * safeNum(item.quantity);
+      }, 0);
+
+      const cafeSnap = await getDoc(doc(db, 'cafes', order.cafeId));
+      const cafe = cafeSnap.exists() ? cafeSnap.data() : {};
+
+      const newTax = cafe?.taxEnabled ? newSubtotal * safeNum(cafe.taxRate) / 100 : 0;
+      const newSC  = cafe?.serviceChargeEnabled ? newSubtotal * safeNum(cafe.serviceChargeRate) / 100 : 0;
+      const newGST = cafe?.gstEnabled ? newSubtotal * safeNum(cafe.gstRate) / 100 : 0;
+      const newPlatform = cafe?.platformFeeEnabled ? safeNum(cafe.platformFeeAmount) : 0;
+      const newTotal = Math.round(newSubtotal + newTax + newSC + newGST + newPlatform);
+
+      await updateDoc(doc(db, 'orders', order.id), {
+        items:                updatedItems,
+        subtotalAmount:       newSubtotal,
+        taxAmount:            newTax,
+        serviceChargeAmount:  newSC,
+        gstAmount:            newGST,
+        totalAmount:          newTotal,
+      });
+
+      toast.success(`${newItems.length} item${newItems.length !== 1 ? 's' : ''} added to order`);
+      onClose();
+    } catch (err) {
+      console.error('[AddItemsToOrder] Failed:', err);
+      toast.error('Failed to add items to order');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <AnimatePresence>
+      <motion.div
+        className="fixed inset-0 z-[80] flex items-end sm:items-center justify-center"
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        exit={{ opacity: 0 }}
+      >
+        <motion.div className="absolute inset-0 bg-black/75 backdrop-blur-sm" onClick={onClose} />
+
+        <motion.div
+          className="relative w-full sm:max-w-lg rounded-t-3xl sm:rounded-2xl overflow-hidden flex flex-col"
+          style={{ background: '#0F0F0F', border: '1px solid rgba(255,255,255,0.08)', maxHeight: '90vh' }}
+          initial={{ y: '100%' }}
+          animate={{ y: 0 }}
+          exit={{ y: '100%' }}
+          transition={{ type: 'spring', damping: 26, stiffness: 300 }}
+          onClick={e => e.stopPropagation()}
+        >
+          {/* Header */}
+          <div className="flex items-center justify-between px-5 py-4 border-b border-white/5 flex-shrink-0">
+            <div>
+              <h3 className="text-white font-bold text-lg" style={{ fontFamily: 'Playfair Display, serif' }}>
+                Add Items to Order
+              </h3>
+              <p className="text-xs mt-0.5 text-[#A3A3A3]">
+                #{order.orderNumber ? String(order.orderNumber).padStart(3, '0') : order.id.slice(0, 6)}
+                {order.customerName ? ` · ${order.customerName}` : ''}
+              </p>
+            </div>
+            <button onClick={onClose} className="p-2 rounded-full hover:bg-white/10 transition-all">
+              <X className="w-5 h-5 text-[#A3A3A3]" />
+            </button>
+          </div>
+
+          {/* Search */}
+          <div className="px-4 py-3 flex-shrink-0 border-b border-white/5">
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[#A3A3A3]" />
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={e => setSearchQuery(e.target.value)}
+                placeholder="Search menu..."
+                className="w-full pl-9 pr-4 py-2 rounded-xl text-sm outline-none"
+                style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.08)', color: '#fff' }}
+              />
+            </div>
+          </div>
+
+          {/* Menu list */}
+          <div className="flex-1 overflow-y-auto px-4 py-3 space-y-2">
+            {loadingMenu ? (
+              <div className="flex items-center justify-center py-10">
+                <div className="w-6 h-6 rounded-full border-2 border-[#D4AF37] border-t-transparent animate-spin" />
+              </div>
+            ) : filteredItems.length === 0 ? (
+              <p className="text-center text-[#555] py-8 text-sm">No items found</p>
+            ) : (
+              filteredItems.map(item => {
+                const qty = newCartQtyFor(item.id);
+                return (
+                  <div
+                    key={item.id}
+                    className="flex items-center justify-between p-3 rounded-xl"
+                    style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.06)' }}
+                  >
+                    <div className="flex-1 min-w-0 mr-3">
+                      <p className="text-white text-sm font-medium truncate">{item.name}</p>
+                      {item.category && (
+                        <p className="text-xs mt-0.5 text-[#555]">{item.category}</p>
+                      )}
+                      <p className="text-sm font-bold mt-0.5" style={{ color: primary }}>
+                        {CUR}{fmt(item.price)}
+                      </p>
+                    </div>
+                    {qty > 0 ? (
+                      <div className="flex items-center gap-2 flex-shrink-0">
+                        <button
+                          onClick={() => removeFromNewCart(item.id)}
+                          className="w-7 h-7 rounded-full flex items-center justify-center"
+                          style={{ background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.10)' }}
+                        >
+                          <Minus className="w-3 h-3 text-white" />
+                        </button>
+                        <span className="text-white font-bold text-sm min-w-[16px] text-center">{qty}</span>
+                        <button
+                          onClick={() => addToNewCart(item)}
+                          className="w-7 h-7 rounded-full flex items-center justify-center text-black font-bold"
+                          style={{ background: primary }}
+                        >
+                          <Plus className="w-3 h-3" />
+                        </button>
+                      </div>
+                    ) : (
+                      <motion.button
+                        whileTap={{ scale: 0.94 }}
+                        onClick={() => addToNewCart(item)}
+                        className="flex-shrink-0 flex items-center gap-1 px-3 py-1.5 rounded-lg text-black font-bold text-xs"
+                        style={{ background: primary }}
+                      >
+                        <Plus className="w-3 h-3" />
+                        Add
+                      </motion.button>
+                    )}
+                  </div>
+                );
+              })
+            )}
+          </div>
+
+          {/* Footer */}
+          {newCart.length > 0 && (
+            <div className="px-4 py-4 flex-shrink-0 border-t border-white/5 space-y-3">
+              <div className="space-y-1">
+                {newCart.map((item, idx) => (
+                  <div key={idx} className="flex justify-between text-xs text-[#A3A3A3]">
+                    <span>{item.name} × {item.quantity}</span>
+                    <span>{CUR}{fmt(item.price * item.quantity)}</span>
+                  </div>
+                ))}
+                <div className="flex justify-between text-sm font-bold pt-1 border-t border-white/5">
+                  <span className="text-[#A3A3A3]">New items total</span>
+                  <span style={{ color: primary }}>{CUR}{fmt(newCartTotal)}</span>
+                </div>
+              </div>
+              <motion.button
+                whileHover={{ scale: 1.02 }}
+                whileTap={{ scale: 0.98 }}
+                onClick={handleSave}
+                disabled={saving}
+                className="w-full py-3.5 rounded-xl text-black font-bold text-sm flex items-center justify-center gap-2 disabled:opacity-60"
+                style={{ background: `linear-gradient(135deg, ${primary}, ${primary}cc)` }}
+              >
+                {saving ? (
+                  <><RefreshCw className="w-4 h-4 animate-spin" />Updating Order…</>
+                ) : (
+                  <><ShoppingCart className="w-4 h-4" />Add to Order · {CUR}{fmt(newCartTotal)}</>
+                )}
+              </motion.button>
+            </div>
+          )}
+        </motion.div>
+
+        {/* Addon modal */}
+        {addonModal && (
+          <AddOnModal
+            item={addonModal}
+            onConfirm={(entry) => { directAddToNewCart(entry); setAddonModal(null); }}
+            onClose={() => setAddonModal(null)}
+            currencySymbol={CUR}
+            primaryColor={primary}
+            theme="dark"
+          />
+        )}
+      </motion.div>
+    </AnimatePresence>
+  );
+};
+
+// ─── Main Component ───────────────────────────────────────────────────────────
 
 const OrdersManagement = () => {
   const { user } = useAuth();
@@ -39,6 +336,9 @@ const OrdersManagement = () => {
   // ── Fix 3: Soft-delete state ─────────────────────────────────────────────
   const [deleteConfirmId, setDeleteConfirmId] = useState(null);
   const [deleting, setDeleting]               = useState(false);
+
+  // ── Add Items to Order state ──────────────────────────────────────────────
+  const [addItemsOrder, setAddItemsOrder] = useState(null);  // order object to add items to
 
   useEffect(() => {
     console.log('[OrdersManagement] User cafeId:', cafeId);
@@ -435,6 +735,15 @@ const OrdersManagement = () => {
         />
       )}
 
+      {/* ── Add Items to Order Modal ──────────────────────────────────────── */}
+      {addItemsOrder && (
+        <AddItemsToOrderModal
+          order={addItemsOrder}
+          cafeCurrency={cafeCurrency}
+          onClose={() => setAddItemsOrder(null)}
+        />
+      )}
+
       {/* New Order Notification Popup */}
       <AnimatePresence>
         {newOrderNotification && (
@@ -663,7 +972,7 @@ const OrdersManagement = () => {
                               </select>
                             </div>
                             {/* ── Feature 2: Invoice Buttons (desktop) ── */}
-                            <div className="flex gap-1.5">
+                            <div className="flex gap-1.5 flex-wrap">
                               <button
                                 onClick={(e) => handleViewInvoice(order.id, e)}
                                 disabled={invoiceLoading === order.id}
@@ -694,6 +1003,18 @@ const OrdersManagement = () => {
                                 >
                                   <MessageSquare className="w-3 h-3" />
                                   WA
+                                </button>
+                              )}
+                              {/* ── Add Items button (desktop) ── */}
+                              {order.orderStatus !== 'completed' && order.orderStatus !== 'cancelled' && (
+                                <button
+                                  onClick={(e) => { e.stopPropagation(); setAddItemsOrder(order); }}
+                                  data-testid={`add-items-${order.id}`}
+                                  className="flex items-center gap-1 px-2.5 py-1.5 bg-blue-500/10 hover:bg-blue-500/20 border border-blue-500/20 text-blue-400 rounded text-xs font-medium transition-all"
+                                  title="Add Items to Order"
+                                >
+                                  <Plus className="w-3 h-3" />
+                                  Add Items
                                 </button>
                               )}
                               {/* Delete button */}
@@ -953,6 +1274,20 @@ const OrdersManagement = () => {
                         >
                           <MessageSquare className="w-4 h-4" />
                           Send Invoice via WhatsApp
+                        </button>
+                      </div>
+                    )}
+
+                    {/* ── Add Items button (mobile) ── */}
+                    {order.orderStatus !== 'completed' && order.orderStatus !== 'cancelled' && (
+                      <div onClick={(e) => e.stopPropagation()}>
+                        <button
+                          onClick={() => setAddItemsOrder(order)}
+                          data-testid={`add-items-mobile-${order.id}`}
+                          className="w-full flex items-center justify-center gap-2 py-2.5 bg-blue-500/10 hover:bg-blue-500/20 border border-blue-500/20 text-blue-400 rounded text-sm font-medium transition-all"
+                        >
+                          <Plus className="w-4 h-4" />
+                          Add Items to Order
                         </button>
                       </div>
                     )}
