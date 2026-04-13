@@ -1,3 +1,13 @@
+/**
+ * StaffList.jsx
+ *
+ * Displays all active staff for a cafe.
+ * Features: Add, Edit, Delete staff; view attendance QR code.
+ * Clicking a staff card opens their full profile (AttendanceCalendar).
+ *
+ * ADD: staff profile page
+ */
+
 import React, { useState, useEffect } from 'react';
 import { collection, query, where, onSnapshot } from 'firebase/firestore';
 import { db } from '../../../lib/firebase';
@@ -6,13 +16,22 @@ import { QRCodeSVG } from 'qrcode.react';
 import {
   UserPlus, Edit2, Trash2, X, Save, QrCode,
   Phone, CreditCard, Clock, RefreshCw, User,
+  CalendarDays,
 } from 'lucide-react';
-import { addStaff, updateStaff, deleteStaff, ROLES, SALARY_TYPES } from '../../../services/staffService';
+import {
+  addStaff, updateStaff, deleteStaff, ROLES, SALARY_TYPES,
+} from '../../../services/staffService';
 import { toast } from 'sonner';
+import { useTheme } from '../../../hooks/useTheme';
+import AttendanceCalendar from './AttendanceCalendar';
+import { useAuth } from '../../../contexts/AuthContext';
+
+// ── Constants ──────────────────────────────────────────────────────────────────
 
 const EMPTY = {
   name: '', role: 'Waiter', phone: '', upiId: '',
   salaryType: 'monthly', salaryAmount: '', shiftStart: '09:00',
+  latePenalty: '50',
 };
 
 const inputCls =
@@ -23,9 +42,16 @@ const labelCls =
   'block text-[#A3A3A3] text-xs font-semibold uppercase tracking-wide mb-1.5';
 
 const ROLE_COLORS = {
-  Manager: '#D4AF37', Chef: '#EF4444', Waiter: '#3B82F6',
-  Cashier: '#10B981', Cleaner: '#8B5CF6', Delivery: '#F97316', Other: '#A3A3A3',
+  Manager:  '#D4AF37',
+  Chef:     '#EF4444',
+  Waiter:   '#3B82F6',
+  Cashier:  '#10B981',
+  Cleaner:  '#8B5CF6',
+  Delivery: '#F97316',
+  Other:    '#A3A3A3',
 };
+
+// ── Staff Form Modal ───────────────────────────────────────────────────────────
 
 const StaffFormModal = ({ initial, onSave, onClose, saving }) => {
   const [form, setForm] = useState(initial || EMPTY);
@@ -33,7 +59,7 @@ const StaffFormModal = ({ initial, onSave, onClose, saving }) => {
 
   const handleSubmit = (e) => {
     e.preventDefault();
-    if (!form.name.trim()) { toast.error('Name is required'); return; }
+    if (!form.name.trim())                      { toast.error('Name is required');              return; }
     if (!form.salaryAmount || isNaN(form.salaryAmount)) { toast.error('Valid salary amount required'); return; }
     onSave(form);
   };
@@ -51,6 +77,7 @@ const StaffFormModal = ({ initial, onSave, onClose, saving }) => {
         initial={{ scale: 0.95, y: 20 }}
         animate={{ scale: 1, y: 0 }}
       >
+        {/* Header */}
         <div className="flex items-center justify-between">
           <h3 className="text-white font-bold text-lg" style={{ fontFamily: 'Playfair Display, serif' }}>
             {initial?.id ? 'Edit Staff' : 'Add Staff Member'}
@@ -62,6 +89,7 @@ const StaffFormModal = ({ initial, onSave, onClose, saving }) => {
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="grid grid-cols-2 gap-4">
+            {/* Full Name */}
             <div className="col-span-2">
               <label className={labelCls}>Full Name *</label>
               <input
@@ -71,6 +99,8 @@ const StaffFormModal = ({ initial, onSave, onClose, saving }) => {
                 placeholder="e.g. Rahul Kumar"
               />
             </div>
+
+            {/* Role */}
             <div>
               <label className={labelCls}>Role</label>
               <select
@@ -83,6 +113,8 @@ const StaffFormModal = ({ initial, onSave, onClose, saving }) => {
                 ))}
               </select>
             </div>
+
+            {/* Shift Start */}
             <div>
               <label className={labelCls}>Shift Start</label>
               <input
@@ -92,6 +124,8 @@ const StaffFormModal = ({ initial, onSave, onClose, saving }) => {
                 onChange={e => set('shiftStart', e.target.value)}
               />
             </div>
+
+            {/* Phone */}
             <div>
               <label className={labelCls}>Phone</label>
               <input
@@ -102,6 +136,8 @@ const StaffFormModal = ({ initial, onSave, onClose, saving }) => {
                 type="tel"
               />
             </div>
+
+            {/* UPI ID */}
             <div>
               <label className={labelCls}>UPI ID</label>
               <input
@@ -111,6 +147,8 @@ const StaffFormModal = ({ initial, onSave, onClose, saving }) => {
                 placeholder="name@upi"
               />
             </div>
+
+            {/* Salary Type */}
             <div>
               <label className={labelCls}>Salary Type</label>
               <select
@@ -125,6 +163,8 @@ const StaffFormModal = ({ initial, onSave, onClose, saving }) => {
                 ))}
               </select>
             </div>
+
+            {/* Salary Amount */}
             <div>
               <label className={labelCls}>Salary Amount (₹) *</label>
               <input
@@ -136,8 +176,22 @@ const StaffFormModal = ({ initial, onSave, onClose, saving }) => {
                 placeholder="e.g. 15000"
               />
             </div>
+
+            {/* Late Penalty */}
+            <div className="col-span-2">
+              <label className={labelCls}>Late Penalty per occurrence (₹)</label>
+              <input
+                className={inputCls}
+                type="number"
+                min="0"
+                value={form.latePenalty}
+                onChange={e => set('latePenalty', e.target.value)}
+                placeholder="e.g. 50"
+              />
+            </div>
           </div>
 
+          {/* Actions */}
           <div className="flex gap-3 pt-2">
             <button
               type="button"
@@ -162,6 +216,8 @@ const StaffFormModal = ({ initial, onSave, onClose, saving }) => {
     </motion.div>
   );
 };
+
+// ── QR Code Modal ──────────────────────────────────────────────────────────────
 
 const QRModal = ({ staff, cafeId, onClose }) => {
   const qrValue = `STAFF_ATTENDANCE|${cafeId}|${staff.id}`;
@@ -196,21 +252,27 @@ const QRModal = ({ staff, cafeId, onClose }) => {
   );
 };
 
-const StaffList = ({ cafeId }) => {
-  const [staff, setStaff] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [showForm, setShowForm] = useState(false);
-  const [editTarget, setEditTarget] = useState(null);
-  const [saving, setSaving] = useState(false);
-  const [qrTarget, setQrTarget] = useState(null);
-  const [deleteId, setDeleteId] = useState(null);
+// ── Main StaffList component ───────────────────────────────────────────────────
 
+const StaffList = ({ cafeId }) => {
+  const { T }              = useTheme();
+  const [staff,       setStaff      ] = useState([]);
+  const [loading,     setLoading    ] = useState(true);
+  const [showForm,    setShowForm   ] = useState(false);
+  const [editTarget,  setEditTarget ] = useState(null);
+  const [saving,      setSaving     ] = useState(false);
+  const [qrTarget,    setQrTarget   ] = useState(null);
+  const [deleteId,    setDeleteId   ] = useState(null);
+  // ADD: staff profile — holds staff object whose calendar is open
+  const [profileStaff, setProfileStaff] = useState(null);
+
+  // Real-time staff list
   useEffect(() => {
     if (!cafeId) return;
     const unsub = onSnapshot(
       query(
         collection(db, 'staff'),
-        where('cafeId', '==', cafeId),
+        where('cafeId',   '==', cafeId),
         where('isActive', '==', true)
       ),
       snap => {
@@ -260,6 +322,7 @@ const StaffList = ({ cafeId }) => {
 
   return (
     <>
+      {/* ── Modals ── */}
       <AnimatePresence>
         {(showForm || editTarget) && (
           <StaffFormModal
@@ -276,10 +339,20 @@ const StaffList = ({ cafeId }) => {
             onClose={() => setQrTarget(null)}
           />
         )}
+        {/* ADD: staff profile — attendance calendar overlay */}
+        {profileStaff && (
+          <AttendanceCalendar
+            staff={profileStaff}
+            cafeId={cafeId}
+            onClose={() => setProfileStaff(null)}
+            T={T}
+          />
+        )}
       </AnimatePresence>
 
+      {/* ── List header ── */}
       <div className="flex items-center justify-between mb-4">
-        <p className="text-[#555] text-sm">{staff.length} team members</p>
+        <p className="text-[#555] text-sm">{staff.length} team member{staff.length !== 1 ? 's' : ''}</p>
         <motion.button
           whileTap={{ scale: 0.97 }}
           onClick={() => setShowForm(true)}
@@ -289,6 +362,7 @@ const StaffList = ({ cafeId }) => {
         </motion.button>
       </div>
 
+      {/* ── Loading skeleton ── */}
       {loading ? (
         <div className="space-y-3">
           {[...Array(3)].map((_, i) => (
@@ -322,10 +396,16 @@ const StaffList = ({ cafeId }) => {
                 transition={{ delay: i * 0.04 }}
                 className="bg-[#0F0F0F] border border-white/5 rounded-2xl p-5 hover:border-white/10 transition-colors"
               >
+                {/* Card top: avatar + name + action buttons */}
                 <div className="flex items-start justify-between mb-3">
-                  <div className="flex items-center gap-3">
+                  {/* ADD: clicking avatar/name opens attendance calendar profile */}
+                  <button
+                    className="flex items-center gap-3 text-left flex-1 min-w-0 mr-2"
+                    onClick={() => setProfileStaff(s)}
+                    title="View attendance calendar"
+                  >
                     <div
-                      className="w-10 h-10 rounded-xl flex items-center justify-center font-black text-base"
+                      className="w-10 h-10 rounded-xl flex items-center justify-center font-black text-base flex-shrink-0"
                       style={{
                         background: `${ROLE_COLORS[s.role] || '#A3A3A3'}18`,
                         color: ROLE_COLORS[s.role] || '#A3A3A3',
@@ -333,8 +413,8 @@ const StaffList = ({ cafeId }) => {
                     >
                       {s.name.charAt(0).toUpperCase()}
                     </div>
-                    <div>
-                      <p className="text-white font-semibold text-sm">{s.name}</p>
+                    <div className="min-w-0">
+                      <p className="text-white font-semibold text-sm truncate">{s.name}</p>
                       <span
                         className="text-xs font-semibold px-2 py-0.5 rounded-full"
                         style={{
@@ -345,8 +425,18 @@ const StaffList = ({ cafeId }) => {
                         {s.role}
                       </span>
                     </div>
-                  </div>
-                  <div className="flex gap-1">
+                  </button>
+
+                  {/* Action buttons */}
+                  <div className="flex gap-1 flex-shrink-0">
+                    {/* ADD: calendar icon opens attendance profile */}
+                    <button
+                      onClick={() => setProfileStaff(s)}
+                      className="p-2 rounded-lg hover:bg-white/10 text-[#555] hover:text-[#D4AF37] transition-all"
+                      title="View attendance calendar"
+                    >
+                      <CalendarDays className="w-3.5 h-3.5" />
+                    </button>
                     <button
                       onClick={() => setQrTarget(s)}
                       className="p-2 rounded-lg hover:bg-white/10 text-[#555] hover:text-[#D4AF37] transition-all"
@@ -357,18 +447,21 @@ const StaffList = ({ cafeId }) => {
                     <button
                       onClick={() => setEditTarget(s)}
                       className="p-2 rounded-lg hover:bg-white/10 text-[#555] hover:text-white transition-all"
+                      title="Edit staff"
                     >
                       <Edit2 className="w-3.5 h-3.5" />
                     </button>
                     <button
                       onClick={() => setDeleteId(s.id)}
                       className="p-2 rounded-lg hover:bg-red-500/10 text-[#555] hover:text-red-400 transition-all"
+                      title="Remove staff"
                     >
                       <Trash2 className="w-3.5 h-3.5" />
                     </button>
                   </div>
                 </div>
 
+                {/* Staff details */}
                 <div className="space-y-1.5 text-xs text-[#555]">
                   {s.phone && (
                     <div className="flex items-center gap-1.5">
@@ -385,13 +478,15 @@ const StaffList = ({ cafeId }) => {
                   </div>
                 </div>
 
+                {/* Salary summary */}
                 <div className="mt-3 pt-3 border-t border-white/5 flex justify-between items-center">
                   <span className="text-[#555] text-xs capitalize">{s.salaryType} salary</span>
                   <span className="text-[#D4AF37] font-black text-sm">
-                    ₹{s.salaryAmount?.toLocaleString('en-IN')}
+                    ₹{(s.salaryAmount || 0).toLocaleString('en-IN')}
                   </span>
                 </div>
 
+                {/* Delete confirmation inline */}
                 <AnimatePresence>
                   {deleteId === s.id && (
                     <motion.div

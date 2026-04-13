@@ -4,7 +4,11 @@
  * Opens when owner clicks any staff member.
  * Shows a monthly calendar with colour-coded attendance status per day.
  * Clicking a day shows check-in time, late minutes, and note.
- * No redesign of existing UI — uses same dark card theme.
+ * Owner can override any day's status and add a note.
+ *
+ * No redesign — uses same dark card theme via T prop.
+ *
+ * ADD: staff profile page (attendance calendar view)
  */
 
 import React, { useState, useMemo, useEffect } from 'react';
@@ -36,9 +40,13 @@ const DAY_LABELS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 // ── Helpers ────────────────────────────────────────────────────────────────────
 const fmtTime = (iso) => {
   if (!iso) return '—';
-  return new Date(iso).toLocaleTimeString('en-IN', {
-    hour: '2-digit', minute: '2-digit', hour12: true,
-  });
+  // Handle both 'HH:MM' strings and ISO timestamps
+  if (typeof iso === 'string' && /^\d{2}:\d{2}$/.test(iso)) return iso;
+  try {
+    return new Date(iso).toLocaleTimeString('en-IN', {
+      hour: '2-digit', minute: '2-digit', hour12: true,
+    });
+  } catch { return iso; }
 };
 
 const monthLabel = (ym) =>
@@ -52,12 +60,14 @@ const prevMonth = (ym) => {
     ? `${y - 1}-12`
     : `${y}-${String(m - 1).padStart(2, '0')}`;
 };
+
 const nextMonth = (ym) => {
   const [y, m] = ym.split('-').map(Number);
   return m === 12
     ? `${y + 1}-01`
     : `${y}-${String(m + 1).padStart(2, '0')}`;
 };
+
 const todayYM = () => toDateKey(new Date()).slice(0, 7);
 
 // ── Main component ─────────────────────────────────────────────────────────────
@@ -107,15 +117,13 @@ const AttendanceCalendar = ({ staff, cafeId, onClose, T }) => {
   const getStatus = (date) => {
     const rec = records[date];
     if (!rec) {
-      // Future dates show nothing; past dates auto-absent
       const d   = new Date(date);
-      const now = new Date(); now.setHours(0,0,0,0);
+      const now = new Date(); now.setHours(0, 0, 0, 0);
       if (d > now) return null;
-      // Sunday = off
-      if (d.getDay() === 0) return 'off';
+      if (d.getDay() === 0) return 'off'; // Sunday
       return STATUS.ABSENT;
     }
-    return rec.status;
+    return rec.status || deriveStatus(rec);
   };
 
   // ── Summary counts ───────────────────────────────────────────────────────────
@@ -126,12 +134,13 @@ const AttendanceCalendar = ({ staff, cafeId, onClose, T }) => {
     all.forEach(date => {
       if (date > today || new Date(date).getDay() === 0) return;
       const s = getStatus(date);
-      if (s === STATUS.PRESENT)  present++;
+      if      (s === STATUS.PRESENT)  present++;
       else if (s === STATUS.ABSENT)   absent++;
       else if (s === STATUS.LATE)   { present++; late++; }
-      else if (s === STATUS.HALF_DAY)  half++;
+      else if (s === STATUS.HALF_DAY) half++;
     });
     return { present, absent, late, half };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [records, yearMonth]);
 
   // ── Save manual override ─────────────────────────────────────────────────────
@@ -139,26 +148,29 @@ const AttendanceCalendar = ({ staff, cafeId, onClose, T }) => {
     if (!selectedDate) return;
     setSaving(true);
     try {
-      const docId  = `${cafeId}_${staff.id}_${selectedDate}`;
-      const ref    = doc(db, 'attendance', docId);
+      const docId    = `${cafeId}_${staff.id}_${selectedDate}`;
+      const ref      = doc(db, 'attendance', docId);
       const existing = records[selectedDate] || {};
+      const newStatus = editStatus || existing.status || STATUS.ABSENT;
+
       await setDoc(ref, {
-        staffId:   staff.id,
+        staffId:     staff.id,
         cafeId,
-        date:      selectedDate,
-        month:     yearMonth,
-        status:    editStatus || existing.status || STATUS.ABSENT,
-        note:      editNote,
-        checkIn:   existing.checkIn   || null,
-        checkOut:  existing.checkOut  || null,
-        lateMinutes: existing.lateMinutes || 0,
-        updatedAt: serverTimestamp(),
+        date:        selectedDate,
+        month:       yearMonth,
+        status:      newStatus,
+        note:        editNote,
+        checkIn:     existing.checkIn      || null,
+        checkOut:    existing.checkOut     || null,
+        lateMinutes: existing.lateMinutes  || 0,
+        updatedAt:   serverTimestamp(),
       }, { merge: true });
+
       setRecords(prev => ({
         ...prev,
         [selectedDate]: {
           ...existing,
-          status: editStatus || existing.status || STATUS.ABSENT,
+          status: newStatus,
           note:   editNote,
         },
       }));
@@ -174,7 +186,7 @@ const AttendanceCalendar = ({ staff, cafeId, onClose, T }) => {
   const openDay = (date) => {
     setSelectedDate(date);
     const rec = records[date];
-    setEditNote(rec?.note   || '');
+    setEditNote(rec?.note    || '');
     setEditStatus(rec?.status || getStatus(date) || STATUS.ABSENT);
     setEditMode(false);
   };
@@ -189,24 +201,29 @@ const AttendanceCalendar = ({ staff, cafeId, onClose, T }) => {
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
       className="fixed inset-0 z-50 flex items-center justify-center p-4"
-      style={{ background: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(4px)' }}
+      style={{ background: 'rgba(0,0,0,0.75)', backdropFilter: 'blur(4px)' }}
       onClick={(e) => e.target === e.currentTarget && onClose()}
     >
       <motion.div
         initial={{ scale: 0.96, y: 20 }}
         animate={{ scale: 1, y: 0 }}
         exit={{ scale: 0.96, y: 20 }}
-        className={`${T.card} rounded-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto`}
-        style={{ border: '1px solid rgba(255,255,255,0.06)' }}
+        className={`${T?.card || 'bg-[#0F0F0F]'} rounded-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto`}
+        style={{ border: '1px solid rgba(255,255,255,0.08)' }}
+        onClick={e => e.stopPropagation()}
       >
         {/* ── Header ── */}
-        <div className={`flex items-center justify-between px-6 py-4 border-b ${T.border}`}>
+        <div className={`flex items-center justify-between px-6 py-4 border-b ${T?.border || 'border-white/5'}`}>
           <div>
-            <h2 className={`${T.heading} font-bold text-lg`}>{staff.name}</h2>
-            <p className={`${T.muted} text-xs mt-0.5`}>{staff.role} · Attendance Calendar</p>
+            <h2 className={`${T?.heading || 'text-white'} font-bold text-lg`}>{staff.name}</h2>
+            <p className={`${T?.muted || 'text-[#A3A3A3]'} text-xs mt-0.5`}>
+              {staff.role} · Attendance Calendar
+            </p>
           </div>
-          <button onClick={onClose}
-            className={`w-8 h-8 rounded-lg ${T.subCard} flex items-center justify-center ${T.muted} hover:text-white transition-colors`}>
+          <button
+            onClick={onClose}
+            className={`w-8 h-8 rounded-lg ${T?.subCard || 'bg-white/5'} flex items-center justify-center ${T?.muted || 'text-[#A3A3A3]'} hover:text-white transition-colors`}
+          >
             <X className="w-4 h-4" />
           </button>
         </div>
@@ -215,14 +232,20 @@ const AttendanceCalendar = ({ staff, cafeId, onClose, T }) => {
 
           {/* ── Month nav ── */}
           <div className="flex items-center justify-between">
-            <button onClick={() => setYearMonth(prevMonth(yearMonth))}
-              className={`w-8 h-8 rounded-lg ${T.subCard} flex items-center justify-center ${T.muted} hover:text-white transition-colors`}>
+            <button
+              onClick={() => { setYearMonth(prevMonth(yearMonth)); setSelectedDate(null); }}
+              className={`w-8 h-8 rounded-lg ${T?.subCard || 'bg-white/5'} flex items-center justify-center ${T?.muted || 'text-[#A3A3A3]'} hover:text-white transition-colors`}
+            >
               <ChevronLeft className="w-4 h-4" />
             </button>
-            <h3 className={`${T.heading} font-bold text-base`}>{monthLabel(yearMonth)}</h3>
-            <button onClick={() => setYearMonth(nextMonth(yearMonth))}
+            <h3 className={`${T?.heading || 'text-white'} font-bold text-base`}>
+              {monthLabel(yearMonth)}
+            </h3>
+            <button
+              onClick={() => { setYearMonth(nextMonth(yearMonth)); setSelectedDate(null); }}
               disabled={yearMonth >= todayYM()}
-              className={`w-8 h-8 rounded-lg ${T.subCard} flex items-center justify-center ${T.muted} hover:text-white transition-colors disabled:opacity-30`}>
+              className={`w-8 h-8 rounded-lg ${T?.subCard || 'bg-white/5'} flex items-center justify-center ${T?.muted || 'text-[#A3A3A3]'} hover:text-white transition-colors disabled:opacity-30`}
+            >
               <ChevronRight className="w-4 h-4" />
             </button>
           </div>
@@ -235,17 +258,19 @@ const AttendanceCalendar = ({ staff, cafeId, onClose, T }) => {
               { label: 'Late',    val: summary.late,    color: '#F59E0B' },
               { label: 'Half',    val: summary.half,    color: '#F97316' },
             ].map(s => (
-              <div key={s.label} className={`${T.subCard} rounded-xl p-3 text-center`}>
+              <div key={s.label} className={`${T?.subCard || 'bg-white/5'} rounded-xl p-3 text-center`}>
                 <p className="text-xl font-black" style={{ color: s.color }}>{s.val}</p>
-                <p className={`${T.faint} text-xs mt-0.5`}>{s.label}</p>
+                <p className={`${T?.faint || 'text-[#555]'} text-xs mt-0.5`}>{s.label}</p>
               </div>
             ))}
           </div>
 
-          {/* ── Day labels ── */}
+          {/* ── Day header labels ── */}
           <div className="grid grid-cols-7 gap-1">
             {DAY_LABELS.map(d => (
-              <div key={d} className={`text-center text-xs font-semibold py-1 ${T.faint}`}>{d}</div>
+              <div key={d} className={`text-center text-xs font-semibold py-1 ${T?.faint || 'text-[#555]'}`}>
+                {d}
+              </div>
             ))}
           </div>
 
@@ -253,30 +278,30 @@ const AttendanceCalendar = ({ staff, cafeId, onClose, T }) => {
           {loading ? (
             <div className="grid grid-cols-7 gap-1">
               {Array(35).fill(0).map((_, i) => (
-                <div key={i} className={`h-10 rounded-lg ${T.subCard} animate-pulse`} />
+                <div key={i} className={`h-10 rounded-lg ${T?.subCard || 'bg-white/5'} animate-pulse`} />
               ))}
             </div>
           ) : (
             <div className="grid grid-cols-7 gap-1">
               {calendarDays.map((date, i) => {
                 if (!date) return <div key={i} />;
-                const dow    = new Date(date).getDay();
-                const status = getStatus(date);
-                const day    = date.split('-')[2];
-                const isToday = date === toDateKey(new Date());
+                const dow      = new Date(date).getDay();
+                const status   = getStatus(date);
+                const day      = date.split('-')[2];
+                const isToday  = date === toDateKey(new Date());
                 const isFuture = date > toDateKey(new Date());
-                const isSel  = date === selectedDate;
-                const cfg    = status && status !== 'off' ? STATUS_CONFIG[status] : null;
+                const isSel    = date === selectedDate;
+                const cfg      = status && status !== 'off' ? STATUS_CONFIG[status] : null;
 
                 return (
                   <button
                     key={date}
                     onClick={() => !isFuture && dow !== 0 && openDay(date)}
                     disabled={isFuture || dow === 0}
-                    className="h-10 rounded-lg flex items-center justify-center text-sm font-semibold transition-all relative"
+                    className="h-10 rounded-lg flex items-center justify-center text-sm font-semibold transition-all"
                     style={{
                       background: isSel
-                        ? '#D4A843'
+                        ? '#D4AF37'
                         : cfg
                           ? cfg.bg
                           : dow === 0
@@ -289,8 +314,8 @@ const AttendanceCalendar = ({ staff, cafeId, onClose, T }) => {
                           : dow === 0
                             ? 'rgba(255,255,255,0.15)'
                             : 'rgba(255,255,255,0.3)',
-                      border: isToday ? '1.5px solid #D4A843' : '1px solid transparent',
-                      cursor: isFuture || dow === 0 ? 'default' : 'pointer',
+                      border:  isToday ? '1.5px solid #D4AF37' : '1px solid transparent',
+                      cursor:  isFuture || dow === 0 ? 'default' : 'pointer',
                     }}
                   >
                     {day}
@@ -305,12 +330,12 @@ const AttendanceCalendar = ({ staff, cafeId, onClose, T }) => {
             {Object.entries(STATUS_CONFIG).map(([k, v]) => (
               <div key={k} className="flex items-center gap-1.5">
                 <div className="w-3 h-3 rounded-full" style={{ background: v.color }} />
-                <span className={`${T.faint} text-xs`}>{v.label}</span>
+                <span className={`${T?.faint || 'text-[#555]'} text-xs`}>{v.label}</span>
               </div>
             ))}
             <div className="flex items-center gap-1.5">
               <div className="w-3 h-3 rounded-full" style={{ background: 'rgba(255,255,255,0.15)' }} />
-              <span className={`${T.faint} text-xs`}>Sunday (Off)</span>
+              <span className={`${T?.faint || 'text-[#555]'} text-xs`}>Sunday (Off)</span>
             </div>
           </div>
 
@@ -321,84 +346,94 @@ const AttendanceCalendar = ({ staff, cafeId, onClose, T }) => {
                 initial={{ opacity: 0, height: 0 }}
                 animate={{ opacity: 1, height: 'auto' }}
                 exit={{ opacity: 0, height: 0 }}
-                className={`${T.subCard} rounded-xl overflow-hidden`}
+                className={`${T?.subCard || 'bg-white/5'} rounded-xl overflow-hidden`}
               >
                 <div className="p-4 space-y-3">
-                  {/* Date + status */}
+
+                  {/* Date + status badge + Edit button */}
                   <div className="flex items-center justify-between">
                     <div>
-                      <p className={`${T.heading} font-bold text-sm`}>
+                      <p className={`${T?.heading || 'text-white'} font-bold text-sm`}>
                         {new Date(selectedDate).toLocaleDateString('en-IN', {
                           weekday: 'long', day: 'numeric', month: 'long',
                         })}
                       </p>
                       {SC && (
-                        <span className="text-xs font-bold px-2 py-0.5 rounded-full mt-1 inline-block"
-                          style={{ color: SC.color, background: SC.bg }}>
+                        <span
+                          className="text-xs font-bold px-2 py-0.5 rounded-full mt-1 inline-block"
+                          style={{ color: SC.color, background: SC.bg }}
+                        >
                           {SC.label}
                         </span>
                       )}
                     </div>
                     <button
                       onClick={() => setEditMode(e => !e)}
-                      className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${T.subCard}`}
-                      style={{ color: '#D4A843', border: '1px solid rgba(212,168,67,0.3)' }}
+                      className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${T?.subCard || 'bg-white/5'}`}
+                      style={{ color: '#D4AF37', border: '1px solid rgba(212,175,55,0.3)' }}
                     >
-                      <Edit3 className="w-3 h-3" /> Edit
+                      <Edit3 className="w-3 h-3" /> {editMode ? 'Cancel' : 'Edit'}
                     </button>
                   </div>
 
-                  {/* Check-in / late info */}
+                  {/* Check-in / check-out / late info */}
                   <div className="grid grid-cols-3 gap-3">
                     {[
-                      { label: 'Check In',  val: fmtTime(selectedRec?.checkIn) },
+                      { label: 'Check In',  val: fmtTime(selectedRec?.checkIn)  },
                       { label: 'Check Out', val: fmtTime(selectedRec?.checkOut) },
                       { label: 'Late By',   val: selectedRec?.lateMinutes ? `${selectedRec.lateMinutes} min` : '—' },
                     ].map(item => (
-                      <div key={item.label} className={`${T.innerCard} rounded-lg p-3`}>
-                        <p className={`${T.faint} text-xs mb-1`}>{item.label}</p>
-                        <p className={`${T.heading} text-sm font-bold`}>{item.val}</p>
+                      <div key={item.label} className="bg-black/20 rounded-lg p-3">
+                        <p className={`${T?.faint || 'text-[#555]'} text-xs mb-1`}>{item.label}</p>
+                        <p className={`${T?.heading || 'text-white'} text-sm font-bold`}>{item.val}</p>
                       </div>
                     ))}
                   </div>
 
-                  {/* Note */}
+                  {/* Note display (read mode) */}
                   {selectedRec?.note && !editMode && (
-                    <p className={`${T.muted} text-xs italic`}>📝 {selectedRec.note}</p>
+                    <p className={`${T?.muted || 'text-[#A3A3A3]'} text-xs italic`}>
+                      📝 {selectedRec.note}
+                    </p>
                   )}
 
-                  {/* Edit mode */}
+                  {/* Edit mode — status override + note */}
                   {editMode && (
                     <div className="space-y-3">
                       <div>
-                        <p className={`${T.muted} text-xs mb-2`}>Override status</p>
+                        <p className={`${T?.muted || 'text-[#A3A3A3]'} text-xs mb-2`}>Override status</p>
                         <div className="flex gap-2 flex-wrap">
                           {Object.entries(STATUS_CONFIG).map(([k, v]) => (
-                            <button key={k}
+                            <button
+                              key={k}
                               onClick={() => setEditStatus(k)}
                               className="px-3 py-1.5 rounded-lg text-xs font-bold transition-all"
-                              style={editStatus === k
-                                ? { background: v.color, color: '#fff' }
-                                : { background: v.bg, color: v.color }}>
+                              style={
+                                editStatus === k
+                                  ? { background: v.color, color: '#fff' }
+                                  : { background: v.bg,    color: v.color }
+                              }
+                            >
                               {v.label}
                             </button>
                           ))}
                         </div>
                       </div>
                       <div>
-                        <p className={`${T.muted} text-xs mb-1`}>Note / Reason</p>
+                        <p className={`${T?.muted || 'text-[#A3A3A3]'} text-xs mb-1`}>Note / Reason</p>
                         <input
                           value={editNote}
                           onChange={e => setEditNote(e.target.value)}
                           placeholder="e.g. Medical leave, Personal emergency..."
-                          className={`w-full ${T.input} rounded-lg px-3 py-2 text-sm`}
+                          className="w-full bg-black/20 border border-white/10 text-white rounded-lg px-3 py-2 text-sm outline-none focus:border-[#D4AF37]"
                         />
                       </div>
                       <button
                         onClick={saveOverride}
                         disabled={saving}
                         className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-bold text-black transition-all disabled:opacity-50"
-                        style={{ background: '#D4A843' }}>
+                        style={{ background: '#D4AF37' }}
+                      >
                         <Save className="w-3.5 h-3.5" />
                         {saving ? 'Saving…' : 'Save Changes'}
                       </button>

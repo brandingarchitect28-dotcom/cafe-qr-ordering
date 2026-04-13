@@ -1,249 +1,317 @@
 /**
  * salaryEngine.js
  *
- * Pure salary calculation functions.
- * No Firebase calls, no UI — just math.
- * Import anywhere: component, Cloud Function, test.
+ * Pure calculation engine for staff salary computation.
+ * No Firebase imports — takes plain data objects, returns plain data objects.
+ * Called by SalaryDashboard after fetching attendance from Firestore.
  *
- * Firestore data model used:
- *
- *   staff/{staffId}
- *     name, role, baseSalary, shiftStartTime ('09:00'),
- *     lateGraceMinutes (15), latePenaltyPerOccurrence (50),
- *     cafeId, phone, upiId, bankDetails, joiningDate
- *
- *   attendance/{cafeId}_{staffId}_{YYYY-MM-DD}
- *     staffId, cafeId, date ('YYYY-MM-DD'),
- *     checkIn (ISO string | null), checkOut (ISO string | null),
- *     status ('present'|'absent'|'late'|'half_day'),
- *     lateMinutes (number), note (string)
- *
- *   salary/{cafeId}_{staffId}_{YYYY-MM}
- *     staffId, cafeId, month ('YYYY-MM'),
- *     baseSalary, workingDays, presentDays, absentDays,
- *     lateDays, halfDays, absentDeduction, lateDeduction,
- *     bonus, advance, finalSalary, breakdown[], status,
- *     generatedAt, paidAt
+ * Exports:
+ *   STATUS           — attendance status constants
+ *   toDateKey        — Date → 'YYYY-MM-DD'
+ *   daysInMonth      — 'YYYY-MM' → ['YYYY-MM-DD', ...]
+ *   deriveStatus     — attendance record → STATUS value
+ *   calculateAllSalaries — main batch calculation
+ *   buildSalarySlip  — WhatsApp message string builder
  */
 
-// ─── Constants ────────────────────────────────────────────────────────────────
+// ADD: salary calculation logic
 
+// ── Status constants ───────────────────────────────────────────────────────────
 export const STATUS = {
-  PRESENT:   'present',
-  ABSENT:    'absent',
-  LATE:      'late',
-  HALF_DAY:  'half_day',
+  PRESENT:  'present',
+  ABSENT:   'absent',
+  LATE:     'late',
+  HALF_DAY: 'half-day',
 };
 
-// ─── Date helpers ─────────────────────────────────────────────────────────────
+// ── Date helpers ───────────────────────────────────────────────────────────────
 
-/** 'YYYY-MM-DD' for any Date */
-export const toDateKey = (d) =>
-  d.toISOString().split('T')[0];
+/**
+ * Convert a Date (or use today) to a 'YYYY-MM-DD' string.
+ * Safe for use as Firestore document key.
+ */
+export const toDateKey = (date = new Date()) => {
+  const d = date instanceof Date ? date : new Date(date);
+  return [
+    d.getFullYear(),
+    String(d.getMonth() + 1).padStart(2, '0'),
+    String(d.getDate()).padStart(2, '0'),
+  ].join('-');
+};
 
-/** Array of 'YYYY-MM-DD' strings for every day in a given month */
+/**
+ * Return an array of 'YYYY-MM-DD' strings for every calendar day in the month.
+ * @param {string} yearMonth  'YYYY-MM'
+ */
 export const daysInMonth = (yearMonth) => {
-  const [y, m] = yearMonth.split('-').map(Number);
-  const count = new Date(y, m, 0).getDate();
-  return Array.from({ length: count }, (_, i) => {
-    const day = String(i + 1).padStart(2, '0');
-    return `${yearMonth}-${day}`;
-  });
+  const [year, month] = yearMonth.split('-').map(Number);
+  const count = new Date(year, month, 0).getDate(); // last day of month
+  const days  = [];
+  for (let d = 1; d <= count; d++) {
+    days.push(`${yearMonth}-${String(d).padStart(2, '0')}`);
+  }
+  return days;
 };
 
-/** Number of working days (Mon–Sat) in a month */
-export const workingDaysInMonth = (yearMonth) =>
-  daysInMonth(yearMonth).filter(d => {
-    const dow = new Date(d).getDay(); // 0=Sun
-    return dow !== 0; // exclude Sunday
+// ── Status derivation ──────────────────────────────────────────────────────────
+
+/**
+ * Given an attendance record (or null), return the canonical STATUS value.
+ * Used by AttendanceCalendar to colour each calendar cell.
+ *
+ * @param {object|null} record  Firestore attendance doc data
+ * @returns {string}  one of STATUS.*
+ */
+export const deriveStatus = (record) => {
+  if (!record) return STATUS.ABSENT;
+  if (record.status) return record.status; // trust stored status
+  // Fallback derivation from raw check-in data
+  if (!record.checkIn) return STATUS.ABSENT;
+  if (record.lateMinutes > 30) return STATUS.LATE;
+  return STATUS.PRESENT;
+};
+
+// ── Salary calculation ─────────────────────────────────────────────────────────
+
+/**
+ * Calculate the salary sheet for a single staff member.
+ *
+ * @param {object}   staff        Staff document { id, name, role, salaryType, salaryAmount, shiftStart, ... }
+ * @param {object[]} attendance   Array of attendance records for this staff this month
+ * @param {string}   yearMonth    'YYYY-MM'
+ * @param {object}   overrides    { bonus?: number, advance?: number }
+ *
+ * @returns {object} salary sheet
+ */
+export const calculateSalary = (staff, attendance = [], yearMonth, overrides = {}) => {
+  const safeNum = (v, fallback = 0) => {
+    const n = parseFloat(v);
+    return isNaN(n) || !isFinite(n) ? fallback : n;
+  };
+
+  // ── Base salary params ──────────────────────────────────────────────────────
+  const baseSalary    = safeNum(staff.salaryAmount, 0);
+  const allDays       = daysInMonth(yearMonth);
+  const today         = toDateKey(new Date());
+
+  // Count working days (Mon–Sat, excluding Sundays, up to today or month end)
+  const workingDays = allDays.filter(date => {
+    if (date > today) return false;           // future days excluded
+    return new Date(date).getDay() !== 0;     // 0 = Sunday
   }).length;
 
-// ─── Attendance logic ─────────────────────────────────────────────────────────
+  // Per-day rate based on calendar working days (26-day month convention)
+  const workingDaysInMonth = allDays.filter(
+    date => new Date(date).getDay() !== 0
+  ).length;
+  const perDay = workingDaysInMonth > 0
+    ? Math.round(baseSalary / workingDaysInMonth)
+    : 0;
 
-/**
- * Derive attendance status from raw check-in time.
- * @param {string|null} checkInISO  ISO timestamp or null
- * @param {string}      shiftStart  '09:00'
- * @param {number}      graceMinutes  default 15
- * @returns {{ status, lateMinutes }}
- */
-export const deriveStatus = (checkInISO, shiftStart = '09:00', graceMinutes = 15) => {
-  if (!checkInISO) return { status: STATUS.ABSENT, lateMinutes: 0 };
-
-  const checkIn   = new Date(checkInISO);
-  const [sh, sm]  = shiftStart.split(':').map(Number);
-
-  // Build shift start as same date as checkIn
-  const shift = new Date(checkIn);
-  shift.setHours(sh, sm + graceMinutes, 0, 0); // grace window
-
-  if (checkIn <= shift) return { status: STATUS.PRESENT, lateMinutes: 0 };
-
-  const lateMinutes = Math.round((checkIn - shift) / 60000);
-  return { status: STATUS.LATE, lateMinutes };
-};
-
-// ─── Salary engine ────────────────────────────────────────────────────────────
-
-/**
- * Calculate full salary for one staff member for one month.
- *
- * @param {object} staff         — staff document data
- * @param {object[]} attendances — attendance docs for this staff this month
- * @param {string} yearMonth     — 'YYYY-MM'
- * @param {object} overrides     — { bonus: 0, advance: 0 } from owner input
- * @returns {object}             — complete salary sheet
- */
-export const calculateSalary = (staff, attendances, yearMonth, overrides = {}) => {
-  const {
-    baseSalary         = 0,
-    shiftStartTime     = '09:00',
-    lateGraceMinutes   = 15,
-    latePenaltyPerOccurrence = 50,
-  } = staff;
-
-  const bonus   = Number(overrides.bonus   ?? 0);
-  const advance = Number(overrides.advance ?? 0);
-
-  // Build a map of date → attendance record
+  // ── Build attendance map for O(1) lookup ────────────────────────────────────
   const attMap = {};
-  attendances.forEach(a => { attMap[a.date] = a; });
+  attendance.forEach(rec => { if (rec.date) attMap[rec.date] = rec; });
 
-  const allDays     = daysInMonth(yearMonth);
-  const workingDays = allDays.filter(d => new Date(d).getDay() !== 0); // no Sundays
-
+  // ── Count each status ────────────────────────────────────────────────────────
   let presentDays = 0;
   let absentDays  = 0;
   let lateDays    = 0;
   let halfDays    = 0;
 
-  workingDays.forEach(date => {
-    const rec    = attMap[date];
-    const status = rec?.status ?? STATUS.ABSENT;
+  allDays.forEach(date => {
+    if (date > today) return;                 // skip future
+    if (new Date(date).getDay() === 0) return; // skip Sundays
 
-    if (status === STATUS.PRESENT) presentDays++;
-    else if (status === STATUS.ABSENT)   absentDays++;
-    else if (status === STATUS.LATE)   { presentDays++; lateDays++; }
-    else if (status === STATUS.HALF_DAY){ halfDays++;   absentDays += 0.5; }
+    const rec    = attMap[date];
+    const status = rec ? deriveStatus(rec) : STATUS.ABSENT;
+
+    switch (status) {
+      case STATUS.PRESENT:  presentDays++; break;
+      case STATUS.LATE:     presentDays++; lateDays++; break;  // late = present + penalty
+      case STATUS.HALF_DAY: halfDays++;   break;
+      case STATUS.ABSENT:   absentDays++; break;
+      default: break;
+    }
   });
 
-  // Per-day salary
-  const perDay = workingDays.length > 0
-    ? baseSalary / workingDays.length
-    : 0;
+  // ── Salary deduction / addition breakdown ───────────────────────────────────
 
-  // Deductions
-  const absentDeduction = Math.round(perDay * absentDays);
-  const lateDeduction   = Math.round(latePenaltyPerOccurrence * lateDays);
-  const totalDeductions = absentDeduction + lateDeduction + advance;
+  // Absent deduction: absent days × per-day rate
+  const absentDeduction = absentDays * perDay;
 
-  const finalSalary = Math.max(0, baseSalary - totalDeductions + bonus);
+  // Half-day deduction: half days × half per-day rate
+  const halfDayDeduction = halfDays * Math.round(perDay / 2);
 
-  // Human-readable breakdown for "Why salary changed"
+  // Late penalty: configurable per-late-occurrence penalty
+  // Default: ₹50 per late occurrence; can be overridden from cafe settings
+  const latePenalty     = safeNum(staff.latePenalty, 50);
+  const lateDeduction   = lateDays * latePenalty;
+
+  // Bonus and advance from overrides
+  const bonus   = safeNum(overrides.bonus,   0);
+  const advance = safeNum(overrides.advance, 0);
+
+  // ── Build breakdown array (used by SalaryCard UI) ───────────────────────────
   const breakdown = [];
-  if (absentDays > 0)
+
+  if (absentDays > 0) {
     breakdown.push({
-      label:  `${absentDays} absent day${absentDays !== 1 ? 's' : ''}`,
+      label:  `${absentDays} absent day${absentDays !== 1 ? 's' : ''} × ₹${perDay}/day`,
       amount: -absentDeduction,
       type:   'deduction',
     });
-  if (lateDays > 0)
+  }
+  if (halfDays > 0) {
     breakdown.push({
-      label:  `${lateDays} late mark${lateDays !== 1 ? 's' : ''}`,
+      label:  `${halfDays} half-day${halfDays !== 1 ? 's' : ''} × ₹${Math.round(perDay / 2)}/day`,
+      amount: -halfDayDeduction,
+      type:   'deduction',
+    });
+  }
+  if (lateDays > 0) {
+    breakdown.push({
+      label:  `${lateDays} late arrival${lateDays !== 1 ? 's' : ''} × ₹${latePenalty} penalty`,
       amount: -lateDeduction,
       type:   'deduction',
     });
-  if (advance > 0)
+  }
+  if (bonus > 0) {
+    breakdown.push({
+      label:  'Bonus',
+      amount: bonus,
+      type:   'bonus',
+    });
+  }
+  if (advance > 0) {
     breakdown.push({
       label:  'Advance deduction',
       amount: -advance,
       type:   'deduction',
     });
-  if (bonus > 0)
-    breakdown.push({
-      label:  'Bonus',
-      amount: +bonus,
-      type:   'bonus',
-    });
+  }
+
+  // ── Final totals ─────────────────────────────────────────────────────────────
+  const totalDeductions = absentDeduction + halfDayDeduction + lateDeduction + advance;
+  const finalSalary     = Math.max(0, Math.round(baseSalary - totalDeductions + bonus));
 
   return {
-    staffId:          staff.id,
-    staffName:        staff.name,
-    role:             staff.role,
-    month:            yearMonth,
+    // Identity
+    staffId:    staff.id,
+    staffName:  staff.name || '',
+    role:       staff.role || '',
+    month:      yearMonth,
+
+    // Salary params
     baseSalary,
-    workingDays:      workingDays.length,
+    perDay,
+    workingDays,
+
+    // Attendance counts
     presentDays,
     absentDays,
     lateDays,
     halfDays,
-    perDay:           Math.round(perDay),
-    absentDeduction,
-    lateDeduction,
+
+    // Breakdown for UI
+    breakdown,
+    totalDeductions,
     bonus,
     advance,
-    totalDeductions,
     finalSalary,
-    breakdown,
-    status:           'pending',
-    generatedAt:      new Date().toISOString(),
+
+    // Payment status — updated by SalaryCard / Firestore
+    status: 'pending',
   };
 };
 
 /**
- * Calculate salaries for ALL staff in one call.
- * @param {object[]} staffList
- * @param {object}   attendanceByStaff  { [staffId]: attendanceDoc[] }
- * @param {string}   yearMonth
- * @param {object}   overridesByStaff   { [staffId]: { bonus, advance } }
+ * Batch-calculate salaries for all staff members.
+ *
+ * @param {object[]} staffList     Array of staff documents
+ * @param {object}   attByStaff   { [staffId]: attendanceRecord[] }
+ * @param {string}   yearMonth    'YYYY-MM'
+ * @param {object}   overrides    { [staffId]: { bonus, advance } }
+ *
+ * @returns {object[]} array of salary sheets
  */
 export const calculateAllSalaries = (
-  staffList, attendanceByStaff, yearMonth, overridesByStaff = {}
+  staffList  = [],
+  attByStaff = {},
+  yearMonth,
+  overrides  = {}
 ) =>
   staffList.map(staff =>
     calculateSalary(
       staff,
-      attendanceByStaff[staff.id] || [],
+      attByStaff[staff.id] || [],
       yearMonth,
-      overridesByStaff[staff.id] || {}
+      overrides[staff.id]  || {}
     )
   );
 
-// ─── WhatsApp salary slip ─────────────────────────────────────────────────────
+// ── WhatsApp salary slip builder ───────────────────────────────────────────────
 
-/** Generate the WhatsApp salary message string */
-export const buildSalarySlip = (sheet, cafeName = 'the café') => {
-  const monthLabel = new Date(sheet.month + '-01')
-    .toLocaleDateString('en-IN', { month: 'long', year: 'numeric' });
-
-  const deductionLines = [];
-  if (sheet.absentDeduction > 0)
-    deductionLines.push(`  • Absent (${sheet.absentDays} days): -₹${sheet.absentDeduction}`);
-  if (sheet.lateDeduction > 0)
-    deductionLines.push(`  • Late marks (${sheet.lateDays}): -₹${sheet.lateDeduction}`);
-  if (sheet.advance > 0)
-    deductionLines.push(`  • Advance: -₹${sheet.advance}`);
-
-  const deductionBlock = deductionLines.length
-    ? `\nDeductions:\n${deductionLines.join('\n')}`
+/**
+ * Build a formatted WhatsApp salary slip message string.
+ * Used by SalaryCard → "Send Slip" button.
+ *
+ * @param {object} sheet     Salary sheet (from calculateSalary)
+ * @param {string} cafeName  Cafe display name
+ * @returns {string}         Multi-line WhatsApp message
+ */
+export const buildSalarySlip = (sheet, cafeName = '') => {
+  const LINE = '─────────────────────────';
+  const cur  = '₹';
+  const mo   = sheet.month
+    ? new Date(sheet.month + '-01').toLocaleDateString('en-IN', { month: 'long', year: 'numeric' })
     : '';
 
-  const bonusLine = sheet.bonus > 0 ? `\nBonus: +₹${sheet.bonus}` : '';
+  const lines = [];
 
-  return (
-    `Hi ${sheet.staffName},\n\n` +
-    `Your salary for *${monthLabel}* from *${cafeName}* has been processed.\n\n` +
-    `📋 *Attendance Summary*\n` +
-    `  • Working days: ${sheet.workingDays}\n` +
-    `  • Present: ${sheet.presentDays}\n` +
-    `  • Absent: ${sheet.absentDays}\n` +
-    `  • Late: ${sheet.lateDays}\n` +
-    `\n💰 *Salary Details*\n` +
-    `  • Base Salary: ₹${sheet.baseSalary}` +
-    deductionBlock +
-    bonusLine +
-    `\n\n✅ *Final Salary: ₹${sheet.finalSalary}*\n\n` +
-    `Thank you for your hard work! 🙏\n` +
-    `— ${cafeName}`
-  );
+  lines.push(`💰 *Salary Slip — ${mo}*`);
+  if (cafeName) lines.push(`🏪 ${cafeName}`);
+  lines.push('');
+
+  lines.push(LINE);
+  lines.push(`👤 *${sheet.staffName}*`);
+  lines.push(`   Role: ${sheet.role}`);
+  lines.push('');
+
+  lines.push(LINE);
+  lines.push('📅 *Attendance Summary*');
+  lines.push('');
+  lines.push(`   Present Days:  ${sheet.presentDays}`);
+  lines.push(`   Absent Days:   ${sheet.absentDays}`);
+  lines.push(`   Late:          ${sheet.lateDays}`);
+  lines.push(`   Half Days:     ${sheet.halfDays}`);
+  lines.push('');
+
+  lines.push(LINE);
+  lines.push('💵 *Salary Calculation*');
+  lines.push('');
+  lines.push(`   Base Salary:   ${cur}${sheet.baseSalary.toLocaleString('en-IN')}`);
+  lines.push(`   Per Day Rate:  ${cur}${sheet.perDay}`);
+
+  if (sheet.breakdown.length > 0) {
+    lines.push('');
+    sheet.breakdown.forEach(b => {
+      const sign = b.type === 'bonus' ? '+' : '-';
+      lines.push(`   ${sign} ${b.label}: ${cur}${Math.abs(b.amount).toLocaleString('en-IN')}`);
+    });
+  }
+
+  lines.push('');
+  lines.push(LINE);
+  lines.push(`✅ *Final Salary: ${cur}${sheet.finalSalary.toLocaleString('en-IN')}*`);
+  lines.push(LINE);
+  lines.push('');
+
+  if (cafeName) {
+    lines.push(`Thank you for your service at *${cafeName}* 🙏`);
+  } else {
+    lines.push('Thank you for your service 🙏');
+  }
+  lines.push('_Powered by SmartCafé OS_');
+
+  return lines.join('\n');
 };

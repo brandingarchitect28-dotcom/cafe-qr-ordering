@@ -1,31 +1,42 @@
 /**
- * whatsapp.js — shared WhatsApp number formatter
+ * utils/whatsapp.js
  *
- * formatWhatsAppNumber(raw)
- *   • Strips all non-numeric characters (removes +, spaces, dashes, brackets)
- *   • If the cleaned number is exactly 10 digits → Indian mobile → prepends "91"
- *   • Otherwise keeps the number as-is (already has country code)
- *   • Returns empty string if input is falsy
+ * Shared WhatsApp utility helpers.
+ * Used by SalaryCard, OrdersManagement, and anywhere a WA link is generated.
  *
- * waLink(phone, message)
- *   • Returns a ready-to-use https://wa.me/{number}?text=... URL
- *   • If phone is empty/invalid → returns link without a number (open WA chat picker)
- *
- * No side-effects. Pure functions. Safe to import anywhere.
+ * ADD: WhatsApp integration utility
  */
 
-export const formatWhatsAppNumber = (raw) => {
-  if (!raw) return '';
-  const digits = String(raw).replace(/\D/g, '');   // strip everything except 0-9
+/**
+ * Normalise a raw phone number string into a format suitable for wa.me links.
+ *
+ * Rules:
+ *  - Strip all non-digit characters
+ *  - 10-digit Indian numbers → prefix '91'
+ *  - Numbers already starting with country code → use as-is
+ *  - Empty / invalid → return ''
+ *
+ * @param {string} raw  Raw phone number (e.g. '+91 98765 43210', '9876543210')
+ * @returns {string}    Digits-only string ready for https://wa.me/{result}
+ */
+export const formatWhatsAppNumber = (raw = '') => {
+  const digits = String(raw).replace(/\D/g, '');
   if (!digits) return '';
-  if (digits.length === 10) return `91${digits}`;  // 10-digit Indian mobile
-  return digits;                                    // already has country code
+  // 10-digit Indian mobile number — prepend country code
+  if (digits.length === 10) return `91${digits}`;
+  // Already has country code or non-standard length — use as-is
+  return digits;
 };
 
-export const waLink = (phone, message) => {
-  const number = formatWhatsAppNumber(phone);
-  const text   = message ? `?text=${encodeURIComponent(message)}` : '';
-  return number
-    ? `https://wa.me/${number}${text}`
-    : `https://wa.me/${text}`;
+/**
+ * Open WhatsApp with a pre-filled message.
+ * Uses window.location.href for iOS compatibility (deep-link redirect).
+ *
+ * @param {string} phone    Raw phone number (passed through formatWhatsAppNumber)
+ * @param {string} message  Plain text message (will be URI-encoded)
+ */
+export const openWhatsApp = (phone, message) => {
+  const formatted = formatWhatsAppNumber(phone);
+  if (!formatted) return;
+  window.location.href = `https://wa.me/${formatted}?text=${encodeURIComponent(message)}`;
 };
