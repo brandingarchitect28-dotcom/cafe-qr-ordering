@@ -499,10 +499,12 @@ const CafeOrderingPremium = () => {
     directAddToCart({
       ...item,
       price:        selectedPrice,
+      basePrice:    selectedPrice,
       selectedSize: size || null,
       quantity:     1,
       addons:       [],
       addonTotal:   0,
+      comboItems:   [],
     });
   }, [directAddToCart]);
 
@@ -560,11 +562,12 @@ const CafeOrderingPremium = () => {
           image:     menuItem?.image || '',
         };
       });
+      const selectedPrice = parseFloat(offer.comboPrice);
       const comboEntry = {
         id:           offer.id,
         name:         offer.title,
-        price:        parseFloat(offer.comboPrice),
-        basePrice:    parseFloat(offer.comboPrice),
+        price:        selectedPrice,
+        basePrice:    selectedPrice,
         quantity:     1,
         addons:       [],
         addonTotal:   0,
@@ -572,6 +575,11 @@ const CafeOrderingPremium = () => {
         isOffer:      true,
         offerType:    'combo',
         items:        enrichedItems,
+        comboItems:   enrichedItems.map(ei => ({
+          name:     ei.itemName,
+          price:    ei.itemPrice,
+          quantity: ei.quantity,
+        })),
       };
       setCart(prev => [...prev, comboEntry]);
       toast.success(`${offer.title} added to cart ✓`);
@@ -589,11 +597,11 @@ const CafeOrderingPremium = () => {
         } else {
           discountedPrice = Math.max(0, discountedPrice - parseFloat(offer.discountAmount));
         }
-        discountedPrice = parseFloat(discountedPrice.toFixed(2));
+        const selectedPrice = parseFloat(discountedPrice.toFixed(2));
         setCart(prev => [...prev, {
           ...menuItem,
-          price:        discountedPrice,
-          basePrice:    discountedPrice,
+          price:        selectedPrice,
+          basePrice:    selectedPrice,
           quantity:     oi.quantity || 1,
           addons:       [],
           addonTotal:   0,
@@ -688,6 +696,7 @@ const CafeOrderingPremium = () => {
           addons:       i.addons       || [],
           addonTotal:   i.addonTotal   || 0,
           selectedSize: i.selectedSize || null,
+          comboItems:   i.comboItems   || [],
           // TASK 1 + TASK 5: pass offer fields to orders dashboard + kitchen
           ...(i.isOffer   && { isOffer:   true        }),
           ...(i.offerType && { offerType: i.offerType }),
@@ -1189,6 +1198,15 @@ const CafeOrderingPremium = () => {
                       <div className="flex-1 min-w-0">
                         <p className="text-sm font-medium truncate" style={{ color: T.text }}>{item.name}</p>
                         <p className="text-xs" style={{ color: T.textMuted }}>{CUR}{fmt(item.basePrice ?? item.price)}</p>
+                        {item.comboItems?.length > 0 && (
+                          <div className="mt-0.5">
+                            {item.comboItems.map((ci, cIdx) => (
+                              <p key={cIdx} className="text-xs" style={{ color: T.textMuted }}>
+                                — {ci.name}{ci.quantity > 1 ? ` ×${ci.quantity}` : ''}
+                              </p>
+                            ))}
+                          </div>
+                        )}
                         {item.addons?.length > 0 && (
                           <p className="text-xs mt-0.5 truncate" style={{ color: T.textMuted }}>
                             + {item.addons.map(a => a.name).join(', ')}
@@ -1392,6 +1410,15 @@ const CafeOrderingPremium = () => {
                         <span style={{ color: T.textMuted }}>{item.name} × {item.quantity}</span>
                         <span style={{ color: T.text }}>{CUR}{fmt(item.price * item.quantity)}</span>
                       </div>
+                      {item.comboItems?.length > 0 && (
+                        <div className="ml-2 mt-0.5">
+                          {item.comboItems.map((ci, cIdx) => (
+                            <p key={cIdx} className="text-xs" style={{ color: T.textFaint || T.textMuted }}>
+                              — {ci.name}{ci.quantity > 1 ? ` ×${ci.quantity}` : ''}
+                            </p>
+                          ))}
+                        </div>
+                      )}
                       {item.addons?.length > 0 && (
                         <p className="text-xs ml-2 mt-0.5" style={{ color: T.textFaint || T.textMuted }}>
                           + {item.addons.map(a => a.name).join(', ')}
