@@ -872,31 +872,37 @@ const OrderTracking = () => {
 
       {/* ── Add More Items Modal ──────────────────────────────────────────── */}
       {showAddMore && order && (
-        <AddMoreItemsModal
-          order={order}
-          onClose={() => setShowAddMore(false)}
-          primary={primary}
-          setAddonModal={setAddMoreAddonModal}
-          directAddRef={directAddRef}
-        />
+        // FIX — ISSUE 1: hide (not unmount) AddMoreItemsModal while addon modal
+        // is open so there is no visible overlap. Cart state is preserved.
+        <div style={{ visibility: addMoreAddonModal ? 'hidden' : 'visible' }}>
+          <AddMoreItemsModal
+            order={order}
+            onClose={() => setShowAddMore(false)}
+            primary={primary}
+            setAddonModal={setAddMoreAddonModal}
+            directAddRef={directAddRef}
+          />
+        </div>
       )}
 
-      {/* FIX — ISSUE 1: AddOnModal rendered HERE at root level so its z-[60]
-          is evaluated against the document root, not AddMoreItemsModal's z-[70].
+      {/* FIX — ISSUE 1: AddOnModal rendered at root level with z-[200] so it
+          is guaranteed above AddMoreItemsModal's z-[70] stacking context.
           onConfirm calls directAddRef.current (= directAddToNewCart inside the
           modal) so the cart entry is delivered without duplicating any logic. */}
       {addMoreAddonModal && (
-        <AddOnModal
-          item={addMoreAddonModal}
-          onConfirm={(entry) => {
-            directAddRef.current?.(entry);
-            setAddMoreAddonModal(null);
-          }}
-          onClose={() => setAddMoreAddonModal(null)}
-          currencySymbol={order?.currencySymbol || '₹'}
-          primaryColor={primary}
-          theme="dark"
-        />
+        <div className="fixed inset-0 z-[200]">
+          <AddOnModal
+            item={addMoreAddonModal}
+            onConfirm={(entry) => {
+              directAddRef.current?.(entry);
+              setAddMoreAddonModal(null);
+            }}
+            onClose={() => setAddMoreAddonModal(null)}
+            currencySymbol={order?.currencySymbol || '₹'}
+            primaryColor={primary}
+            theme="dark"
+          />
+        </div>
       )}
     </div>
   );
