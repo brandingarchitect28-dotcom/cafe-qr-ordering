@@ -592,20 +592,25 @@ const OrdersManagement = () => {
     }
     setInvoiceLoading(orderId);
     try {
+      // FIX: invoice API call — attempt to fetch existing invoice from Firestore.
+      // If getInvoiceByOrderId returns an error (e.g. Firestore permission-denied,
+      // missing index, or network failure), we log it for debugging but DO NOT stop.
+      // We fall through to the synthetic invoice path which always succeeds using
+      // order data already loaded in local state. Previously this block did an early
+      // return on error, which prevented the working fallback from ever running.
       const { data, error } = await getInvoiceByOrderId(orderId);
       if (error) {
-        console.error('Invoice fetch error:', error);
-        setInvoiceLoading(null);
-        toast.error('Could not load invoice');
-        return;
+        // FIX: error handling — log real error, then fall through to fallback
+        console.warn('[Invoice] getInvoiceByOrderId error (will use fallback):', error);
       }
 
-      if (data) {
+      if (!error && data) {
         setInvoiceLoading(null);
         setViewingInvoice(data);
         return;
       }
 
+      // FIX: validate order data before use
       const orderObj = orders?.find(o => o.id === orderId);
       if (!orderObj) {
         setInvoiceLoading(null);
@@ -616,6 +621,7 @@ const OrdersManagement = () => {
       const { invoiceId, error: genError } = await ensureInvoiceForOrder(orderId, orderObj, cafe || {});
       if (genError || !invoiceId) {
         console.warn('[Invoice] Firestore write failed — showing synthetic invoice:', genError);
+        // FIX: build synthetic invoice from local order data as guaranteed fallback
         const synthetic = {
           orderId,
           orderNumber:         orderObj.orderNumber,
@@ -651,7 +657,8 @@ const OrdersManagement = () => {
       setInvoiceLoading(null);
       setViewingInvoice(fresh || { orderId, orderNumber: orderObj.orderNumber });
     } catch (err) {
-      console.error('Invoice error:', err);
+      // FIX: error handling — catch-all with real error logged for debugging
+      console.error('[Invoice] handleViewInvoice unexpected error:', err);
       setInvoiceLoading(null);
       toast.error('Failed to load invoice');
     }
@@ -666,20 +673,23 @@ const OrdersManagement = () => {
     }
     setInvoiceLoading(orderId);
     try {
+      // FIX: invoice API call — attempt to fetch existing invoice from Firestore.
+      // Same fix as handleViewInvoice: if getInvoiceByOrderId returns an error,
+      // log it and fall through to the synthetic fallback. Previously the early
+      // return here was preventing the PDF from ever generating.
       const { data, error } = await getInvoiceByOrderId(orderId);
       if (error) {
-        console.error('Invoice fetch error:', error);
-        setInvoiceLoading(null);
-        toast.error('Could not load invoice');
-        return;
+        // FIX: error handling — log real error, then fall through to fallback
+        console.warn('[Invoice] getInvoiceByOrderId error (will use fallback):', error);
       }
 
-      if (data) {
+      if (!error && data) {
         setInvoiceLoading(null);
         setViewingInvoice({ ...data, _autoPrint: true });
         return;
       }
 
+      // FIX: validate order data before use
       const orderObj = orders?.find(o => o.id === orderId);
       if (!orderObj) {
         setInvoiceLoading(null);
@@ -690,6 +700,7 @@ const OrdersManagement = () => {
       const { invoiceId, error: genError } = await ensureInvoiceForOrder(orderId, orderObj, cafe || {});
       if (genError || !invoiceId) {
         console.warn('[Invoice] Firestore write failed — using synthetic for PDF:', genError);
+        // FIX: build synthetic invoice from local order data as guaranteed fallback
         const synthetic = {
           orderId,
           orderNumber:         orderObj.orderNumber,
@@ -726,7 +737,8 @@ const OrdersManagement = () => {
       setInvoiceLoading(null);
       setViewingInvoice({ ...(fresh || { orderId }), _autoPrint: true });
     } catch (err) {
-      console.error('Invoice error:', err);
+      // FIX: error handling — catch-all with real error logged for debugging
+      console.error('[Invoice] handleDownloadInvoice unexpected error:', err);
       setInvoiceLoading(null);
       toast.error('Failed to download invoice');
     }
