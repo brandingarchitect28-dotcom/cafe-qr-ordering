@@ -117,10 +117,7 @@ const AddItemsToOrderModal = ({ order, cafeCurrency, onClose }) => {
 
       const newSubtotal = updatedItems.reduce((s, item) => {
         const base = safeNum(item.price);
-        // CHANGE 10 — Multiply addon price by quantity (previously ignored qty)
-        const addonAmt = (item.addons || []).reduce(
-          (as, a) => as + safeNum(a.price) * Math.max(1, safeNum(a.quantity || 1)), 0
-        );
+        const addonAmt = (item.addons || []).reduce((as, a) => as + safeNum(a.price), 0);
         return s + (base + addonAmt) * safeNum(item.quantity);
       }, 0);
 
@@ -328,6 +325,52 @@ const OrdersManagement = () => {
   const [soundEnabled, setSoundEnabled] = useState(true);
   const previousOrdersRef = useRef([]);
   const audioRef = useRef(null);
+
+  // ── FIX ISSUE 3: drag-to-scroll for the orders desktop table ─────────────
+  // mousedown → record start position
+  // mousemove → scroll the container proportionally
+  // mouseup / mouseleave → stop dragging
+  // cursor changes to 'grabbing' while dragging for clear visual feedback.
+  // Applied ONLY to the desktop table overflow-x-auto container via dragScrollRef.
+  const dragScrollRef  = useRef(null);
+  const dragState      = useRef({ active: false, startX: 0, startY: 0, scrollLeft: 0, scrollTop: 0 });
+
+  const onDragMouseDown = useCallback((e) => {
+    const el = dragScrollRef.current;
+    if (!el) return;
+    // Only respond to primary mouse button; ignore text-selection drags
+    if (e.button !== 0) return;
+    dragState.current = {
+      active:     true,
+      startX:     e.pageX - el.offsetLeft,
+      startY:     e.pageY - el.offsetTop,
+      scrollLeft: el.scrollLeft,
+      scrollTop:  el.scrollTop,
+    };
+    el.style.cursor = 'grabbing';
+    el.style.userSelect = 'none';
+  }, []);
+
+  const onDragMouseMove = useCallback((e) => {
+    if (!dragState.current.active) return;
+    const el = dragScrollRef.current;
+    if (!el) return;
+    e.preventDefault();
+    const x    = e.pageX - el.offsetLeft;
+    const y    = e.pageY - el.offsetTop;
+    const walkX = (x - dragState.current.startX) * 1.2; // slight multiplier for feel
+    const walkY = (y - dragState.current.startY) * 1.2;
+    el.scrollLeft = dragState.current.scrollLeft - walkX;
+    el.scrollTop  = dragState.current.scrollTop  - walkY;
+  }, []);
+
+  const onDragEnd = useCallback(() => {
+    dragState.current.active = false;
+    const el = dragScrollRef.current;
+    if (!el) return;
+    el.style.cursor    = 'grab';
+    el.style.userSelect = '';
+  }, []);
 
   // ── Feature 1: Invoice state ─────────────────────────────────────────────
   const [viewingInvoice, setViewingInvoice]   = useState(null);  // invoice object
@@ -894,7 +937,24 @@ const OrdersManagement = () => {
         <>
           {/* Desktop Table View */}
           <div className="hidden lg:block bg-[#0F0F0F] border border-white/5 rounded-sm overflow-hidden">
-            <div className="overflow-x-auto">
+            {/*
+              FIX — ISSUE 3: drag-to-scroll container.
+              ref={dragScrollRef}  — used by mouse handlers above
+              cursor: grab         — visual affordance for draggable area
+              scrollBehavior: smooth — smooth keyboard/programmatic scrolling
+              Mouse handlers: onMouseDown starts drag, onMouseMove scrolls,
+              onMouseUp/onMouseLeave stops drag. overflow: auto ensures both
+              axes scroll when content overflows.
+            */}
+            <div
+              ref={dragScrollRef}
+              className="overflow-x-auto overflow-y-auto"
+              style={{ scrollBehavior: 'smooth', cursor: 'grab' }}
+              onMouseDown={onDragMouseDown}
+              onMouseMove={onDragMouseMove}
+              onMouseUp={onDragEnd}
+              onMouseLeave={onDragEnd}
+            >
               <table className="w-full">
                 <thead>
                   <tr className="border-b border-white/10 bg-black/30">
@@ -1078,8 +1138,7 @@ const OrdersManagement = () => {
                                       {/* addons display */}
                                       {item.addons?.length > 0 && (
                                         <p className="text-xs text-[#A3A3A3] ml-3 mt-0.5">
-                                          {/* CHANGE 11 — Show addon qty when > 1 */}
-                                          + {item.addons.map(a => a.quantity > 1 ? `${a.name} ×${a.quantity}` : a.name).join(', ')}
+                                          + {item.addons.map(a => a.name).join(', ')}
                                         </p>
                                       )}
                                     </div>
@@ -1206,8 +1265,7 @@ const OrdersManagement = () => {
                             {/* addons display (mobile) */}
                             {item.addons?.length > 0 && (
                               <p className="text-xs text-[#A3A3A3] ml-3 mt-0.5">
-                                {/* CHANGE 12 — Show addon qty when > 1 */}
-                                + {item.addons.map(a => a.quantity > 1 ? `${a.name} ×${a.quantity}` : a.name).join(', ')}
+                                + {item.addons.map(a => a.name).join(', ')}
                               </p>
                             )}
                           </div>
