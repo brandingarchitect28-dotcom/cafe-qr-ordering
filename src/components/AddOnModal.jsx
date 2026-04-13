@@ -63,22 +63,7 @@ const AddOnModal = ({
 
   const selectedAddons = addons.filter(a => selected[a.id]);
   const addonTotal     = selectedAddons.reduce((sum, a) => sum + (a.price || 0), 0);
-  let basePrice = parseFloat(item.price);
-
-  // ✅ APPLY OFFER LOGIC (SAFE)
-  if (item.offer) {
-    const offer = item.offer;
-
-    if (offer.type === "discount" && offer.discountAmount) {
-      basePrice = basePrice - (basePrice * offer.discountAmount) / 100;
-    }
-
-    if (offer.type === "combo" && offer.comboPrice) {
-    basePrice = offer.comboPrice;
-    }
-  }
-
-const itemTotal = (basePrice + addonTotal) * quantity;
+  const itemTotal      = (parseFloat(item.price) + addonTotal) * quantity;
 
   const handleConfirm = () => {
     // Cart entry structure — fully backward compatible
@@ -90,8 +75,8 @@ const itemTotal = (basePrice + addonTotal) * quantity;
       addons:     selectedAddons.map(a => ({ id: a.id, name: a.name, price: a.price })),
       addonTotal, // extra amount from addons only
       // effectivePrice = base + addonTotal so pricing system works without changes
-      price: basePrice + addonTotal,
-      basePrice: basePrice,
+      price:      parseFloat(item.price) + addonTotal,
+      basePrice:  parseFloat(item.price), // keep original for display
     });
   };
 
