@@ -8,6 +8,7 @@
  *
  * Added:
  * - Add-ons shown under each item
+ * - comboItems shown under combo items
  * - Payment status badge
  * - "Send Invoice on WhatsApp" button (optional, no auto-redirect)
  * - Cancelled state
@@ -172,7 +173,6 @@ const OrderTracking = () => {
   const [googleReviewLink, setGoogleReviewLink] = useState('');
 
   useEffect(() => {
-    // Runs once order has loaded and cafeId is available
     if (!order?.cafeId) return;
     const fetchReviewLink = async () => {
       try {
@@ -185,11 +185,11 @@ const OrderTracking = () => {
       }
     };
     fetchReviewLink();
-  }, [order?.cafeId]); // re-runs only if cafeId changes (it won't — but safe
+  }, [order?.cafeId]);
+
   const [waSending, setWaSending] = useState(false);
 
   // ── Real-time listener — UNCHANGED from existing system ──────────────────────
-  // Uses the same onSnapshot pattern. Kitchen updates flow here automatically.
   useEffect(() => {
     if (!orderId) { setNotFound(true); setLoading(false); return; }
 
@@ -384,6 +384,7 @@ const OrderTracking = () => {
                 const basePrice  = parseFloat(item.basePrice ?? item.price) || 0;
                 const qty        = parseInt(item.quantity) || 1;
                 const addons     = Array.isArray(item.addons) ? item.addons : [];
+                const comboItems = Array.isArray(item.comboItems) ? item.comboItems : [];
                 const addonAmt   = addons.reduce((s, a) => s + (parseFloat(a.price) || 0), 0);
                 const lineTotal  = (basePrice + addonAmt) * qty;
 
@@ -395,6 +396,12 @@ const OrderTracking = () => {
                       </span>
                       <span className="text-white font-semibold">{CUR}{fmt(lineTotal)}</span>
                     </div>
+                    {/* comboItems indented */}
+                    {comboItems.map((ci, cIdx) => (
+                      <div key={cIdx} className="flex items-center text-xs pl-3">
+                        <span className="text-[#555]">— {ci.name}{ci.quantity > 1 ? ` ×${ci.quantity}` : ''}</span>
+                      </div>
+                    ))}
                     {/* Add-ons indented */}
                     {addons.map((a, ai) => (
                       <div key={ai} className="flex justify-between text-xs pl-3">
