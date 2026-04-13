@@ -488,68 +488,32 @@ const CafeOrderingPremium = () => {
   }, []);
 
   const addToCart = useCallback((item, size = null) => {
-    // CHANGE 1/5 — Resolve variant price FIRST so every downstream path uses it.
-    // If a size is explicitly passed OR the item already carries a selectedSize
-    // (e.g. when the cart drawer + button re-calls addToCart on an existing row),
-    // look up the variant price from sizePricing. Fall back to item.price only
-    // when no size is involved.
-    const effectiveSize  = size || item.selectedSize || null;
-    const selectedPrice  =
-      effectiveSize && item.sizePricing?.[effectiveSize]
-        ? parseFloat(item.sizePricing[effectiveSize])
-        : parseFloat(item.price);
-
-    // Build a selectedVariant descriptor used by cart display, Firestore, and
-    // the kitchen — { name: 'Small', price: 20 }
-    const selectedVariant = effectiveSize
-      ? { name: effectiveSize.charAt(0).toUpperCase() + effectiveSize.slice(1), price: selectedPrice }
-      : null;
-
     if (item.addons?.length > 0) {
-      // CHANGE 1/5 (cont.) — Pass variant-resolved price into the modal so
-      // AddOnModal.handleConfirm computes: finalPrice = selectedPrice + addonTotal
-      // instead of: finalPrice = item.price (base) + addonTotal.
-      setAddonModal({
-        ...item,
-        price:           selectedPrice,   // override: variant price is now the base for addon calc
-        basePrice:       selectedPrice,   // keep display consistent
-        selectedSize:    effectiveSize,
-        selectedVariant,
-      });
-      return;
-    }
-
+  setAddonModal({ ...item, selectedSize: size });
+  return;
+  }
+  
+  const selectedPrice = size && item.sizePricing?.[size]
+      ? parseFloat(item.sizePricing[size])
+      : item.price;
     directAddToCart({
       ...item,
-      price:           selectedPrice,
-      basePrice:       selectedPrice,
-      selectedSize:    effectiveSize,
-      selectedVariant,
-      quantity:        1,
-      addons:          [],
-      addonTotal:      0,
-      comboItems:      [],
+      price:        selectedPrice,
+      basePrice:    selectedPrice,
+      selectedSize: size || null,
+      quantity:     1,
+      addons:       [],
+      addonTotal:   0,
+      comboItems:   [],
     });
   }, [directAddToCart]);
 
-  const removeFromCart = useCallback((id, selectedSize = null) => {
-    // CHANGE 2/5 — Match by (id + selectedSize) so size variants are
-    // independently addressable. Without this, two rows for the same item at
-    // different sizes would share a single id match and the wrong row
-    // would be decremented or removed.
+  const removeFromCart = useCallback((id) => {
     setCart(prev => {
-      const ex = prev.find(i =>
-        i.id === id && (i.selectedSize || null) === (selectedSize || null)
-      );
+      const ex = prev.find(i => i.id === id);
       if (!ex) return prev;
-      if (ex.quantity === 1) return prev.filter(i =>
-        !(i.id === id && (i.selectedSize || null) === (selectedSize || null))
-      );
-      return prev.map(i =>
-        i.id === id && (i.selectedSize || null) === (selectedSize || null)
-          ? { ...i, quantity: i.quantity - 1 }
-          : i
-      );
+      if (ex.quantity === 1) return prev.filter(i => i.id !== id);
+      return prev.map(i => i.id === id ? { ...i, quantity: i.quantity - 1 } : i);
     });
   }, []);
 
@@ -726,18 +690,14 @@ const CafeOrderingPremium = () => {
         cafeId,
         orderNumber: oNum,
         items: cart.map(i => ({
-          name:            i.name,
-          // price is always the variant price — set correctly by addToCart
-          price:           i.basePrice ?? i.price,
-          quantity:        i.quantity,
-          addons:          i.addons       || [],
-          addonTotal:      i.addonTotal   || 0,
-          selectedSize:    i.selectedSize || null,
-          // CHANGE 5/5 — Include selectedVariant so kitchen, dashboard, and
-          // invoice receive { name: 'Medium', price: 40 } alongside selectedSize.
-          selectedVariant: i.selectedVariant || null,
-          comboItems:      i.comboItems   || [],
-          // Offer metadata
+          name:         i.name,
+          price:        i.basePrice ?? i.price,
+          quantity:     i.quantity,
+          addons:       i.addons       || [],
+          addonTotal:   i.addonTotal   || 0,
+          selectedSize: i.selectedSize || null,
+          comboItems:   i.comboItems   || [],
+          // TASK 1 + TASK 5: pass offer fields to orders dashboard + kitchen
           ...(i.isOffer   && { isOffer:   true        }),
           ...(i.offerType && { offerType: i.offerType }),
           ...(i.items     && { items:     i.items     }),
@@ -1237,13 +1197,6 @@ const CafeOrderingPremium = () => {
                       )}
                       <div className="flex-1 min-w-0">
                         <p className="text-sm font-medium truncate" style={{ color: T.text }}>{item.name}</p>
-                        {/* CHANGE 3/5 — Show selected variant name (Small/Medium/Large)
-                            so the user can distinguish multiple sizes of the same item. */}
-                        {item.selectedVariant && (
-                          <p className="text-xs font-semibold" style={{ color: primary }}>
-                            {item.selectedVariant.name}
-                          </p>
-                        )}
                         <p className="text-xs" style={{ color: T.textMuted }}>{CUR}{fmt(item.basePrice ?? item.price)}</p>
                         {item.comboItems?.length > 0 && (
                           <div className="mt-0.5">
@@ -1256,21 +1209,18 @@ const CafeOrderingPremium = () => {
                         )}
                         {item.addons?.length > 0 && (
                           <p className="text-xs mt-0.5 truncate" style={{ color: T.textMuted }}>
-                            + {item.addons.map(a => a.name).join(', ')}
+                            {/* CHANGE 7 — Show qty suffix for addons with qty > 1 */}
+                            + {item.addons.map(a => a.quantity > 1 ? `${a.name} ×${a.quantity}` : a.name).join(', ')}
                           </p>
                         )}
                       </div>
                       <div className="flex items-center gap-2 flex-shrink-0">
-                        {/* CHANGE 3/5 — Pass selectedSize so removeFromCart hits
-                            the correct variant row, not the first id match. */}
-                        <button onClick={() => removeFromCart(item.id, item.selectedSize)}
+                        <button onClick={() => removeFromCart(item.id)}
                           className="w-7 h-7 rounded-full flex items-center justify-center transition-all"
                           style={{ background: T.bgInput, color: T.text, border: `1px solid ${T.border}` }}>
                           <Minus className="w-3 h-3" />
                         </button>
                         <span className="font-bold text-sm w-5 text-center" style={{ color: T.text }}>{item.quantity}</span>
-                        {/* CHANGE 3/5 — Pass the full cart entry so addToCart
-                            picks up selectedSize and stacks on the right row. */}
                         <button onClick={() => addToCart(item)}
                           className="w-7 h-7 rounded-full flex items-center justify-center text-black transition-all"
                           style={{ background: primary }}>
@@ -1458,11 +1408,7 @@ const CafeOrderingPremium = () => {
                   {cart.map((item, idx) => (
                     <div key={`${item.id}-${idx}`} className="text-sm">
                       <div className="flex justify-between">
-                        {/* CHANGE 4/5 — Append variant name to item name in
-                            checkout summary so customer can verify their order. */}
-                        <span style={{ color: T.textMuted }}>
-                          {item.name}{item.selectedVariant ? ` (${item.selectedVariant.name})` : ''} × {item.quantity}
-                        </span>
+                        <span style={{ color: T.textMuted }}>{item.name} × {item.quantity}</span>
                         <span style={{ color: T.text }}>{CUR}{fmt(item.price * item.quantity)}</span>
                       </div>
                       {item.comboItems?.length > 0 && (
@@ -1476,7 +1422,8 @@ const CafeOrderingPremium = () => {
                       )}
                       {item.addons?.length > 0 && (
                         <p className="text-xs ml-2 mt-0.5" style={{ color: T.textFaint || T.textMuted }}>
-                          + {item.addons.map(a => a.name).join(', ')}
+                          {/* CHANGE 8 — Show qty suffix for addons with qty > 1 */}
+                          + {item.addons.map(a => a.quantity > 1 ? `${a.name} ×${a.quantity}` : a.name).join(', ')}
                         </p>
                       )}
                     </div>

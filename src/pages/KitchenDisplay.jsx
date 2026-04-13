@@ -177,7 +177,8 @@ const OrderCard = ({ order, onAdvance, advancing }) => {
               {/* Addons */}
               {item.addons?.length > 0 && (
                 <div style={{ fontSize: '12px', opacity: 0.8, color: '#A3A3A3', paddingLeft: '8px' }}>
-                  + {item.addons.map(a => a.name).join(', ')}
+                  {/* CHANGE 9 — Show addon qty when > 1 e.g. "Jam ×2, Butter" */}
+                  + {item.addons.map(a => a.quantity > 1 ? `${a.name} ×${a.quantity}` : a.name).join(', ')}
                 </div>
               )}
             </div>
