@@ -18,8 +18,15 @@ import {
   getDocs, query, where,
   serverTimestamp,
 } from 'firebase/firestore';
-import { db } from '../lib/firebase';
-export { toDateKey } from './salaryEngine';
+import { db, auth } from '../lib/firebase';
+export const toDateKey = (date = new Date()) => {
+  try {
+    return new Date(date).toISOString().split('T')[0];
+  } catch (e) {
+    console.error('toDateKey error:', e);
+    return '';
+  }
+};
 
 // ── Constants ──────────────────────────────────────────────────────────────────
 
@@ -120,6 +127,13 @@ const parseTimeMinutes = (timeStr) => {
  * @returns {{ record: object, alreadyCheckedIn: boolean }}
  */
 export const checkIn = async (cafeId, staffId, shiftStart = '09:00') => {
+  // ── Auth guard ──────────────────────────────────────────────────────────────
+  const currentUser = auth?.currentUser;
+  console.log('[checkIn] auth.currentUser:', currentUser?.uid ?? 'NULL — not authenticated');
+  console.log('[checkIn] cafeId:', cafeId, '| staffId:', staffId);
+  if (!currentUser) {
+    throw new Error('Not authenticated — please log in again');
+  }
   const dateKey  = toDateKey(new Date());
   const month    = dateKey.slice(0, 7);
   const now      = new Date();
@@ -166,6 +180,14 @@ export const checkIn = async (cafeId, staffId, shiftStart = '09:00') => {
  * @returns {{ hoursWorked: number, record: object }}
  */
 export const checkOut = async (cafeId, staffId) => {
+  // ── Auth guard ──────────────────────────────────────────────────────────────
+  const currentUser = auth?.currentUser;
+  console.log('[checkOut] auth.currentUser:', currentUser?.uid ?? 'NULL — not authenticated');
+  console.log('[checkOut] cafeId:', cafeId, '| staffId:', staffId);
+  if (!currentUser) {
+    throw new Error('Not authenticated — please log in again');
+  }
+
   const dateKey    = toDateKey(new Date());
   const now        = new Date();
   const checkOutStr = now.toTimeString().slice(0, 5);
