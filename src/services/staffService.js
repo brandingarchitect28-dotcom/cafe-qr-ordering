@@ -19,7 +19,7 @@ import {
   serverTimestamp,
 } from 'firebase/firestore';
 import { db } from '../lib/firebase';
-import { toDateKey } from './salaryEngine';
+export { toDateKey } from './salaryEngine';
 
 // ── Constants ──────────────────────────────────────────────────────────────────
 
