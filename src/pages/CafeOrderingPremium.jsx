@@ -630,7 +630,7 @@ const CafeOrderingPremium = () => {
           // 🔥 ADD THESE TWO LINES
           isOffer: i.isOffer || false,
           items: i.items || [],
-        }))
+        })),
         subtotalAmount: subtotal,
         taxAmount,
         serviceChargeAmount: scAmount,
