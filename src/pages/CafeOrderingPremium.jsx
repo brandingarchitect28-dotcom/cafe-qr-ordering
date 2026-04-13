@@ -169,10 +169,7 @@ const OfferDetailModal = ({ offer, menuItems, CUR, onAdd, onClose, primary = '#D
           <motion.button
             whileHover={{ scale: 1.02 }}
             whileTap={{ scale: 0.97 }}
-            onClick={() => {
-              onAdd(offer); // ✅ pass full offer
-              onClose();
-            }}
+            onClick={() => { onAdd(); onClose(); }}
             className="w-full py-4 rounded-xl text-black font-bold text-base flex items-center justify-center gap-2"
             style={{ background: `linear-gradient(135deg, ${primary}, ${primary}cc)`, boxShadow: `0 4px 20px ${primary}40` }}
           >
@@ -490,37 +487,15 @@ const CafeOrderingPremium = () => {
     });
   }, []);
 
-  const addToCart = useCallback((item, size = null, extra = {}) => {
+  const addToCart = useCallback((item, size = null) => {
     if (item.addons?.length > 0) {
-  setAddonModal({
-     ...item,
-     selectedSize: size,
-     offer: extra?.offer || item.offer || null,
-   });
+  setAddonModal({ ...item, selectedSize: size });
   return;
   }
   
-  let selectedPrice = size && item.sizePricing?.[size]
+  const selectedPrice = size && item.sizePricing?.[size]
       ? parseFloat(item.sizePricing[size])
       : item.price;
-
-  // ✅ APPLY OFFER LOGIC (SAFE ADDITION)
-  if (extra?.offer) {
-    const offer = extra.offer;
-
-    // 🔹 Percentage Discount
-    if (offer.type === "discount" && offer.discountAmount) {
-    selectedPrice =
-      selectedPrice - (selectedPrice * offer.discountAmount) / 100;
-    }
-
-    // 🔹 Combo Pricing
-    if (offer.type === "combo" && offer.comboPrice) {
-    selectedPrice = offer.comboPrice;
-    }
-
-    // 🔹 Buy X Get Y (price stays same, quantity logic handles it)
-  }
     directAddToCart({
       ...item,
       price:        selectedPrice,
@@ -570,26 +545,14 @@ const CafeOrderingPremium = () => {
 
   // ── Add offer to cart ──────────────────────────────────────────────────────
   const addOfferToCart = (offer) => {
-    const comboItems = (offer.items || []).map(oi => {
+    (offer.items || []).forEach(oi => {
       const menuItem = menuItems.find(m => m.id === oi.itemId);
-      return {
-        ...menuItem,
-        quantity: oi.quantity || 1,
-      };
+      if (!menuItem) return;
+      for (let i = 0; i < (oi.quantity || 1); i++) addToCart(menuItem);
     });
-
-    directAddToCart({
-      id: `offer-${offer.id}-${Date.now()}`,
-      name: offer.title,
-      price: offer.comboPrice || 0,
-      quantity: 1,
-      isOffer: true,
-      offerType: offer.type,
-      items: comboItems,
-    });
-
     toast.success(`${offer.title} added to cart ✓`);
-   };
+  };
+
   // ── Order placement ────────────────────────────────────────────────────────
   const handlePlaceOrder = async () => {
     if (!customerName.trim()) { toast.error('Enter your name'); return; }
@@ -618,18 +581,12 @@ const CafeOrderingPremium = () => {
         cafeId,
         orderNumber: oNum,
         items: cart.map(i => ({
-          name: i.name,
-          price: i.basePrice ?? i.price,
-          quantity: i.quantity,
-
-          // existing
-          addons: i.addons || [],
-          addonTotal: i.addonTotal || 0,
+          name:         i.name,
+          price:        i.basePrice ?? i.price,
+          quantity:     i.quantity,
+          addons:       i.addons       || [],
+          addonTotal:   i.addonTotal   || 0,
           selectedSize: i.selectedSize || null,
-
-          // 🔥 ADD THESE TWO LINES
-          isOffer: i.isOffer || false,
-          items: i.items || [],
         })),
         subtotalAmount: subtotal,
         taxAmount,
@@ -1125,17 +1082,7 @@ const CafeOrderingPremium = () => {
                         </div>
                       )}
                       <div className="flex-1 min-w-0">
-                        <p className="text-sm font-medium truncate" style={{ color: T.text }}>
-                           {item.name}
-                        </p>
-
-                        {item.isOffer && item.items && (
-                          <div className="text-xs opacity-70 mt-1">
-                            {item.items.map((sub, i) => (
-                              <div key={i}>• {sub.name}</div>
-                            ))}
-                          </div>
-                        )}
+                        <p className="text-sm font-medium truncate" style={{ color: T.text }}>{item.name}</p>
                         <p className="text-xs" style={{ color: T.textMuted }}>{CUR}{fmt(item.basePrice ?? item.price)}</p>
                         {item.addons?.length > 0 && (
                           <p className="text-xs mt-0.5 truncate" style={{ color: T.textMuted }}>
