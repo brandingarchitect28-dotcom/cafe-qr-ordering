@@ -345,12 +345,6 @@ const CafeOrderingPremium = () => {
   const [showCart,      setShowCart     ] = useState(false);
   const [showCheckout,  setShowCheckout ] = useState(false);
   const [selectedOffer, setSelectedOffer] = useState(null);
-  // CHANGE 1/5 — activeOffer: tracks the one buy_x_get_y offer the user explicitly
-  // clicked. The sync useEffect ONLY runs when this is non-null, which is the
-  // primary gate that prevents offers from auto-applying when menu items are added.
-  // null  = no offer active, sync engine is completely dormant.
-  // {id, type, ...offer} = offer is active, sync engine watches cart changes.
-  const [activeOffer,   setActiveOffer  ] = useState(null);
   const [flyingDots,    setFlyingDots   ] = useState([]);
   const [selectedFoodItem, setSelectedFoodItem] = useState(null); // Food detail overlay
   const cartBtnRef = useRef(null);
@@ -494,146 +488,70 @@ const CafeOrderingPremium = () => {
   }, []);
 
   const addToCart = useCallback((item, size = null) => {
+    // CHANGE 1/5 — Resolve variant price FIRST so every downstream path uses it.
+    // If a size is explicitly passed OR the item already carries a selectedSize
+    // (e.g. when the cart drawer + button re-calls addToCart on an existing row),
+    // look up the variant price from sizePricing. Fall back to item.price only
+    // when no size is involved.
+    const effectiveSize  = size || item.selectedSize || null;
+    const selectedPrice  =
+      effectiveSize && item.sizePricing?.[effectiveSize]
+        ? parseFloat(item.sizePricing[effectiveSize])
+        : parseFloat(item.price);
+
+    // Build a selectedVariant descriptor used by cart display, Firestore, and
+    // the kitchen — { name: 'Small', price: 20 }
+    const selectedVariant = effectiveSize
+      ? { name: effectiveSize.charAt(0).toUpperCase() + effectiveSize.slice(1), price: selectedPrice }
+      : null;
+
     if (item.addons?.length > 0) {
-  setAddonModal({ ...item, selectedSize: size });
-  return;
-  }
-  
-  const selectedPrice = size && item.sizePricing?.[size]
-      ? parseFloat(item.sizePricing[size])
-      : item.price;
+      // CHANGE 1/5 (cont.) — Pass variant-resolved price into the modal so
+      // AddOnModal.handleConfirm computes: finalPrice = selectedPrice + addonTotal
+      // instead of: finalPrice = item.price (base) + addonTotal.
+      setAddonModal({
+        ...item,
+        price:           selectedPrice,   // override: variant price is now the base for addon calc
+        basePrice:       selectedPrice,   // keep display consistent
+        selectedSize:    effectiveSize,
+        selectedVariant,
+      });
+      return;
+    }
+
     directAddToCart({
       ...item,
-      price:        selectedPrice,
-      basePrice:    selectedPrice,
-      selectedSize: size || null,
-      quantity:     1,
-      addons:       [],
-      addonTotal:   0,
-      comboItems:   [],
+      price:           selectedPrice,
+      basePrice:       selectedPrice,
+      selectedSize:    effectiveSize,
+      selectedVariant,
+      quantity:        1,
+      addons:          [],
+      addonTotal:      0,
+      comboItems:      [],
     });
   }, [directAddToCart]);
 
-  const removeFromCart = useCallback((id) => {
+  const removeFromCart = useCallback((id, selectedSize = null) => {
+    // CHANGE 2/5 — Match by (id + selectedSize) so size variants are
+    // independently addressable. Without this, two rows for the same item at
+    // different sizes would share a single id match and the wrong row
+    // would be decremented or removed.
     setCart(prev => {
-      const ex = prev.find(i => i.id === id);
+      const ex = prev.find(i =>
+        i.id === id && (i.selectedSize || null) === (selectedSize || null)
+      );
       if (!ex) return prev;
-      if (ex.quantity === 1) return prev.filter(i => i.id !== id);
-      return prev.map(i => i.id === id ? { ...i, quantity: i.quantity - 1 } : i);
+      if (ex.quantity === 1) return prev.filter(i =>
+        !(i.id === id && (i.selectedSize || null) === (selectedSize || null))
+      );
+      return prev.map(i =>
+        i.id === id && (i.selectedSize || null) === (selectedSize || null)
+          ? { ...i, quantity: i.quantity - 1 }
+          : i
+      );
     });
   }, []);
-
-  // ── Buy X Get Y — reactive free-item sync ─────────────────────────────────
-  // CHANGE 3/5 — NEW useEffect (does not exist in the original file).
-  //
-  // PURPOSE: Keep the free-item row in the cart in sync with how many eligible
-  // buy-side items the user has after they explicitly activate an offer.
-  //
-  // GATE: The very first line bails out immediately when activeOffer is null.
-  // This means adding items from the normal menu NEVER triggers this logic —
-  // the sync engine is completely dormant until the user clicks an offer card.
-  //
-  // Per-render algorithm:
-  //   1. Bail if no offer is active.
-  //   2. Count total qty of paid (non-free) cart items whose id ∈ buyItems.
-  //   3. deservedFreeQty = floor(eligibleQty / buyQty) * getQty
-  //   4. Find existing free-item row: { offerType:'buy_x_get_y_free', linkedOffer:id }
-  //   5a. deservedFreeQty > 0, no row  → INSERT
-  //   5b. deservedFreeQty > 0, row exists, qty wrong → UPDATE
-  //   5c. deservedFreeQty === 0, row exists → REMOVE
-  //   5d. Nothing changed → return prev (same ref, avoids extra render)
-  useEffect(() => {
-    // ── PRIMARY GATE — do absolutely nothing if no offer is active ───────────
-    // This is the core fix: normal menu additions never trigger this path
-    // because activeOffer is null until the user explicitly clicks an offer.
-    if (!activeOffer || activeOffer.type !== 'buy_x_get_y') return;
-
-    const offer = activeOffer;
-
-    // Resolve eligible buy-item id set (same fallback chain as addOfferToCart)
-    let eligibleIds = [];
-    if (Array.isArray(offer.buyItems) && offer.buyItems.length > 0) {
-      eligibleIds = offer.buyItems;
-    } else if (offer.buyItemId) {
-      eligibleIds = [offer.buyItemId];
-    } else if (Array.isArray(offer.items) && offer.items.length > 0) {
-      eligibleIds = offer.items.map(oi => oi.itemId).filter(Boolean);
-    }
-    if (eligibleIds.length === 0) return;
-
-    // Resolve the free (get) item from menuItems
-    const getItemId = offer.getItemId
-      || (Array.isArray(offer.items) && offer.items.length > 0
-          ? offer.items[offer.items.length - 1]?.itemId
-          : null);
-    const freeMenuItem = getItemId ? menuItems.find(m => m.id === getItemId) : null;
-    if (!freeMenuItem) return; // can't add a free item we can't resolve
-
-    const buyQty = parseInt(offer.buyQty || offer.buyQuantity || 1, 10);
-    const getQty = parseInt(offer.getQty || offer.getQuantity || 1, 10);
-
-    setCart(prev => {
-      // Count total qty of PAID eligible items in cart (skip free rows to
-      // prevent circular quantity inflation)
-      const eligibleSet = new Set(eligibleIds);
-      const totalEligibleQty = prev.reduce((sum, item) => {
-        if (item.isFree || item.offerType === 'buy_x_get_y_free') return sum;
-        if (!eligibleSet.has(item.id)) return sum;
-        return sum + (item.quantity || 0);
-      }, 0);
-
-      const deservedFreeQty = Math.floor(totalEligibleQty / buyQty) * getQty;
-
-      // Find existing free-item row for this specific offer
-      const freeRowIdx = prev.findIndex(
-        i => i.offerType === 'buy_x_get_y_free' && i.linkedOffer === offer.id
-      );
-
-      if (deservedFreeQty > 0) {
-        if (freeRowIdx === -1) {
-          // INSERT — threshold just reached for the first time
-          return [
-            ...prev,
-            {
-              ...freeMenuItem,
-              price:        0,        // price: 0 keeps all total/tax memos correct
-              basePrice:    0,
-              quantity:     deservedFreeQty,
-              addons:       [],
-              addonTotal:   0,
-              selectedSize: null,
-              comboItems:   [],
-              isOffer:      true,
-              offerType:    'buy_x_get_y_free',
-              isFree:       true,       // consumed by kitchen display & invoice
-              linkedOffer:  offer.id,   // stable identity key for this sync loop
-              name:         `${freeMenuItem.name} (Free)`,
-            },
-          ];
-        }
-        if (prev[freeRowIdx].quantity !== deservedFreeQty) {
-          // UPDATE — user added/removed buy items, qty must re-sync
-          return prev.map((item, idx) =>
-            idx === freeRowIdx ? { ...item, quantity: deservedFreeQty } : item
-          );
-        }
-        // Correct qty already — no-op, return same ref to avoid re-render
-        return prev;
-      }
-
-      if (freeRowIdx !== -1) {
-        // REMOVE — eligible qty dropped below threshold
-        return prev.filter((_, idx) => idx !== freeRowIdx);
-      }
-
-      // Nothing to change
-      return prev;
-    });
-  // `setCart` from useState is stable — safe to omit from deps.
-  // activeOffer is intentionally in deps: if the user activates a new offer
-  // the effect must re-run with the new offer's parameters.
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [cart, activeOffer, menuItems]);
 
   // ── Flying dot animation ───────────────────────────────────────────────────
   const addWithAnim = useCallback((e, item, size = null) => {
@@ -732,71 +650,42 @@ const CafeOrderingPremium = () => {
       return;
     }
 
-    // ── Buy X Get Y ────────────────────────────────────────────────────────
-    // CHANGE 2/5 — Complete rewrite of this branch.
-    //
-    // This function is ONLY called when the user explicitly clicks "Add to Cart"
-    // inside the OfferDetailModal — it is NEVER called by normal menu additions.
-    //
-    // Flow:
-    //   1. Resolve eligible buy-item ids from offer (supports new buyItems[],
-    //      legacy buyItemId, and older offer.items[] format).
-    //   2. Set activeOffer state — this is the gate that activates the sync
-    //      useEffect. Without this, the sync engine stays completely dormant.
-    //   3. Add each buy-side item to cart at its normal price via directAddToCart.
-    //      The sync useEffect will immediately fire and add the free item.
-    //
-    // Offer document fields (written by offer-creation form):
-    //   offer.buyItems  — string[]  — itemIds eligible to count toward buyQty
-    //   offer.buyQty    — number    — total eligible qty needed to earn free item
-    //   offer.getItemId — string    — itemId of the FREE reward
-    //   offer.getQty    — number    — how many free items to grant
+    // --- Buy X Get Y: paid qty at normal price + free qty at zero ---
     if (offer.type === 'buy_x_get_y') {
-      // Resolve eligible buy-item ids — new format first, then legacy fallbacks
-      let eligibleIds = [];
-      if (Array.isArray(offer.buyItems) && offer.buyItems.length > 0) {
-        eligibleIds = offer.buyItems;
-      } else if (offer.buyItemId) {
-        eligibleIds = [offer.buyItemId];
-      } else if (Array.isArray(offer.items) && offer.items.length > 0) {
-        eligibleIds = offer.items.map(oi => oi.itemId).filter(Boolean);
-      }
-
-      if (eligibleIds.length === 0) {
-        toast.error('Offer configuration error — no buy items defined');
-        return;
-      }
-
-      // ACTIVATE the offer — this is what gates the sync useEffect.
-      // Must be set BEFORE directAddToCart so the effect fires with a non-null
-      // activeOffer on the very first cart change.
-      setActiveOffer({ id: offer.id, type: offer.type, ...offer });
-
-      // Add each eligible buy item at its normal price (qty 1 each).
-      // directAddToCart stacks qty if the item is already in the cart.
-      let addedCount = 0;
-      eligibleIds.forEach(itemId => {
-        const menuItem = menuItems.find(m => m.id === itemId);
+      (offer.items || []).forEach(oi => {
+        const menuItem = menuItems.find(m => m.id === oi.itemId);
         if (!menuItem) return;
-        directAddToCart({
-          ...menuItem,
-          price:        parseFloat(menuItem.price),
-          basePrice:    parseFloat(menuItem.price),
-          quantity:     1,
-          addons:       [],
-          addonTotal:   0,
-          selectedSize: null,
-          comboItems:   [],
-        });
-        addedCount++;
+        const buyQty = offer.buyQuantity || oi.quantity || 1;
+        const getQty = offer.getQuantity || 0;
+        if (buyQty > 0) {
+          setCart(prev => [...prev, {
+            ...menuItem,
+            price:        parseFloat(menuItem.price),
+            basePrice:    parseFloat(menuItem.price),
+            quantity:     buyQty,
+            addons:       [],
+            addonTotal:   0,
+            selectedSize: null,
+            isOffer:      true,
+            offerType:    'buy_x_get_y',
+          }]);
+        }
+        if (getQty > 0) {
+          setCart(prev => [...prev, {
+            ...menuItem,
+            price:        0,
+            basePrice:    0,
+            quantity:     getQty,
+            addons:       [],
+            addonTotal:   0,
+            selectedSize: null,
+            isOffer:      true,
+            offerType:    'buy_x_get_y_free',
+            name:         `${menuItem.name} (Free)`,
+          }]);
+        }
       });
-
-      if (addedCount > 0) {
-        toast.success(`${offer.title} added! Keep adding eligible items to earn more free rewards.`);
-      } else {
-        toast.error('None of this offer\'s items are currently available');
-        setActiveOffer(null); // roll back activation if nothing was added
-      }
+      toast.success(`${offer.title} added to cart ✓`);
       return;
     }
 
@@ -837,20 +726,21 @@ const CafeOrderingPremium = () => {
         cafeId,
         orderNumber: oNum,
         items: cart.map(i => ({
-          name:         i.name,
-          price:        i.basePrice ?? i.price,
-          quantity:     i.quantity,
-          addons:       i.addons       || [],
-          addonTotal:   i.addonTotal   || 0,
-          selectedSize: i.selectedSize || null,
-          comboItems:   i.comboItems   || [],
-          // Offer metadata — consumed by kitchen display, invoice, and dashboard
-          ...(i.isOffer      && { isOffer:      true          }),
-          ...(i.offerType    && { offerType:    i.offerType   }),
-          ...(i.items        && { items:        i.items       }),
-          // Free-item flags for buy_x_get_y — kitchen and invoice use these
-          ...(i.isFree       && { isFree:       true          }),
-          ...(i.linkedOffer  && { linkedOffer:  i.linkedOffer }),
+          name:            i.name,
+          // price is always the variant price — set correctly by addToCart
+          price:           i.basePrice ?? i.price,
+          quantity:        i.quantity,
+          addons:          i.addons       || [],
+          addonTotal:      i.addonTotal   || 0,
+          selectedSize:    i.selectedSize || null,
+          // CHANGE 5/5 — Include selectedVariant so kitchen, dashboard, and
+          // invoice receive { name: 'Medium', price: 40 } alongside selectedSize.
+          selectedVariant: i.selectedVariant || null,
+          comboItems:      i.comboItems   || [],
+          // Offer metadata
+          ...(i.isOffer   && { isOffer:   true        }),
+          ...(i.offerType && { offerType: i.offerType }),
+          ...(i.items     && { items:     i.items     }),
         })),
         subtotalAmount: subtotal,
         taxAmount,
@@ -996,7 +886,6 @@ const CafeOrderingPremium = () => {
 
       setOrderNumber(formattedNum);
       setCart([]);
-      setActiveOffer(null); // CHANGE 4/5 — clear active offer on order completion
       setCustomerName('');
       setCustomerPhone('');
       setTableNumber('');
@@ -1348,6 +1237,13 @@ const CafeOrderingPremium = () => {
                       )}
                       <div className="flex-1 min-w-0">
                         <p className="text-sm font-medium truncate" style={{ color: T.text }}>{item.name}</p>
+                        {/* CHANGE 3/5 — Show selected variant name (Small/Medium/Large)
+                            so the user can distinguish multiple sizes of the same item. */}
+                        {item.selectedVariant && (
+                          <p className="text-xs font-semibold" style={{ color: primary }}>
+                            {item.selectedVariant.name}
+                          </p>
+                        )}
                         <p className="text-xs" style={{ color: T.textMuted }}>{CUR}{fmt(item.basePrice ?? item.price)}</p>
                         {item.comboItems?.length > 0 && (
                           <div className="mt-0.5">
@@ -1365,36 +1261,21 @@ const CafeOrderingPremium = () => {
                         )}
                       </div>
                       <div className="flex items-center gap-2 flex-shrink-0">
-                        {/* CHANGE 5/5 — Free items are system-managed by the sync
-                            useEffect. Show a locked FREE badge instead of +/- so
-                            the user cannot manually edit a qty that will be
-                            immediately overwritten on the next render. */}
-                        {item.isFree ? (
-                          <span
-                            className="px-2.5 py-1 rounded-full text-xs font-bold"
-                            style={{
-                              background: `${primary}22`,
-                              color:       primary,
-                              border:      `1px solid ${primary}44`,
-                            }}
-                          >
-                            FREE
-                          </span>
-                        ) : (
-                          <>
-                            <button onClick={() => removeFromCart(item.id)}
-                              className="w-7 h-7 rounded-full flex items-center justify-center transition-all"
-                              style={{ background: T.bgInput, color: T.text, border: `1px solid ${T.border}` }}>
-                              <Minus className="w-3 h-3" />
-                            </button>
-                            <span className="font-bold text-sm w-5 text-center" style={{ color: T.text }}>{item.quantity}</span>
-                            <button onClick={() => addToCart(item)}
-                              className="w-7 h-7 rounded-full flex items-center justify-center text-black transition-all"
-                              style={{ background: primary }}>
-                              <Plus className="w-3 h-3" />
-                            </button>
-                          </>
-                        )}
+                        {/* CHANGE 3/5 — Pass selectedSize so removeFromCart hits
+                            the correct variant row, not the first id match. */}
+                        <button onClick={() => removeFromCart(item.id, item.selectedSize)}
+                          className="w-7 h-7 rounded-full flex items-center justify-center transition-all"
+                          style={{ background: T.bgInput, color: T.text, border: `1px solid ${T.border}` }}>
+                          <Minus className="w-3 h-3" />
+                        </button>
+                        <span className="font-bold text-sm w-5 text-center" style={{ color: T.text }}>{item.quantity}</span>
+                        {/* CHANGE 3/5 — Pass the full cart entry so addToCart
+                            picks up selectedSize and stacks on the right row. */}
+                        <button onClick={() => addToCart(item)}
+                          className="w-7 h-7 rounded-full flex items-center justify-center text-black transition-all"
+                          style={{ background: primary }}>
+                          <Plus className="w-3 h-3" />
+                        </button>
                       </div>
                     </motion.div>
                   ))}
@@ -1577,7 +1458,11 @@ const CafeOrderingPremium = () => {
                   {cart.map((item, idx) => (
                     <div key={`${item.id}-${idx}`} className="text-sm">
                       <div className="flex justify-between">
-                        <span style={{ color: T.textMuted }}>{item.name} × {item.quantity}</span>
+                        {/* CHANGE 4/5 — Append variant name to item name in
+                            checkout summary so customer can verify their order. */}
+                        <span style={{ color: T.textMuted }}>
+                          {item.name}{item.selectedVariant ? ` (${item.selectedVariant.name})` : ''} × {item.quantity}
+                        </span>
                         <span style={{ color: T.text }}>{CUR}{fmt(item.price * item.quantity)}</span>
                       </div>
                       {item.comboItems?.length > 0 && (
