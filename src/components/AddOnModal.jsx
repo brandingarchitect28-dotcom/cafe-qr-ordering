@@ -66,17 +66,21 @@ const AddOnModal = ({
   const itemTotal      = (parseFloat(item.price) + addonTotal) * quantity;
 
   const handleConfirm = () => {
-    // Cart entry structure — fully backward compatible
-    // Items without addons use the same fields, addons/addonTotal just default to []
+    // item.price is already variant-resolved — CafeOrderingPremium.addToCart
+    // overwrites item.price with the selected variant price before calling
+    // setAddonModal(), so this calculation is always correct:
+    //   finalPrice = variantPrice (or basePrice if no variant) + addonTotal
     onConfirm({
       ...item,
-      selectedSize: item.selectedSize || null, // 
+      selectedSize:    item.selectedSize    || null,
+      // CHANGE — forward selectedVariant so the cart entry carries the full
+      // variant descriptor { name, price } for display and Firestore
+      selectedVariant: item.selectedVariant || null,
       quantity,
       addons:     selectedAddons.map(a => ({ id: a.id, name: a.name, price: a.price })),
-      addonTotal, // extra amount from addons only
-      // effectivePrice = base + addonTotal so pricing system works without changes
+      addonTotal,
       price:      parseFloat(item.price) + addonTotal,
-      basePrice:  parseFloat(item.price), // keep original for display
+      basePrice:  parseFloat(item.price), // variant price (already resolved upstream)
     });
   };
 
@@ -117,7 +121,11 @@ const AddOnModal = ({
                 {item.name}
               </h3>
               <p className="text-sm mt-0.5" style={{ color: primary }}>
-                {CUR}{fmt(item.price)} base price
+                {/* Show variant name if present, otherwise "base price" */}
+                {item.selectedVariant
+                  ? `${item.selectedVariant.name} — ${CUR}${fmt(item.price)}`
+                  : `${CUR}${fmt(item.price)} base price`
+                }
               </p>
             </div>
             <button onClick={onClose}
