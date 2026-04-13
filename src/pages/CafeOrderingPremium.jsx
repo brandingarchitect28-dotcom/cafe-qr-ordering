@@ -618,13 +618,19 @@ const CafeOrderingPremium = () => {
         cafeId,
         orderNumber: oNum,
         items: cart.map(i => ({
-          name:         i.name,
-          price:        i.basePrice ?? i.price,
-          quantity:     i.quantity,
-          addons:       i.addons       || [],
-          addonTotal:   i.addonTotal   || 0,
+          name: i.name,
+          price: i.basePrice ?? i.price,
+          quantity: i.quantity,
+
+          // existing
+          addons: i.addons || [],
+          addonTotal: i.addonTotal || 0,
           selectedSize: i.selectedSize || null,
-        })),
+
+          // 🔥 ADD THESE TWO LINES
+          isOffer: i.isOffer || false,
+          items: i.items || [],
+        }))
         subtotalAmount: subtotal,
         taxAmount,
         serviceChargeAmount: scAmount,
