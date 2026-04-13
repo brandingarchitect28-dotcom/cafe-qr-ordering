@@ -17,11 +17,7 @@ const NOTIFICATION_SOUND = 'data:audio/mp3;base64,SUQzBAAAAAAAI1RTU0UAAAAPAAADTG
 
 // ─── Add Items to Order Modal ─────────────────────────────────────────────────
 
-// FIX — ISSUE 1 (modal z-index layering):
-// addonModal state and AddOnModal rendering have been lifted to OrdersManagement
-// so AddOnModal is rendered outside this modal's z-[80] stacking context.
-// This component now receives setAddonModal and directAddRef from the parent.
-const AddItemsToOrderModal = ({ order, cafeCurrency, onClose, setAddonModal, directAddRef }) => {
+const AddItemsToOrderModal = ({ order, cafeCurrency, onClose }) => {
   const CUR = order?.currencySymbol || cafeCurrency || '₹';
   const fmt = (n) => (parseFloat(n) || 0).toFixed(2);
   const primary = '#D4AF37';
@@ -29,8 +25,7 @@ const AddItemsToOrderModal = ({ order, cafeCurrency, onClose, setAddonModal, dir
   const [menuItems,   setMenuItems  ] = useState([]);
   const [loadingMenu, setLoadingMenu] = useState(true);
   const [newCart,     setNewCart    ] = useState([]);
-  // FIX: addonModal state lifted to parent (OrdersManagement) so AddOnModal
-  // renders outside this modal's z-[80] stacking context — see parent render
+  const [addonModal,  setAddonModal ] = useState(null);
   const [saving,      setSaving     ] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
 
@@ -74,15 +69,8 @@ const AddItemsToOrderModal = ({ order, cafeCurrency, onClose, setAddonModal, dir
     });
   }, []);
 
-  // FIX: expose directAddToNewCart via ref so the parent-level AddOnModal
-  // onConfirm can call it without duplicating cart logic
-  useEffect(() => {
-    if (directAddRef) directAddRef.current = directAddToNewCart;
-  }, [directAddToNewCart, directAddRef]);
-
   const addToNewCart = useCallback((item) => {
     if (item.addons?.length > 0) {
-      // FIX: call parent setter so AddOnModal renders outside z-[80] context
       setAddonModal(item);
       return;
     }
@@ -305,9 +293,17 @@ const AddItemsToOrderModal = ({ order, cafeCurrency, onClose, setAddonModal, dir
           )}
         </motion.div>
 
-        {/* FIX — ISSUE 1: AddOnModal removed from here. It is now rendered in
-            OrdersManagement at root level with z-[200], outside this modal's
-            z-[80] stacking context. See parent render below. */}
+        {/* Addon modal */}
+        {addonModal && (
+          <AddOnModal
+            item={addonModal}
+            onConfirm={(entry) => { directAddToNewCart(entry); setAddonModal(null); }}
+            onClose={() => setAddonModal(null)}
+            currencySymbol={CUR}
+            primaryColor={primary}
+            theme="dark"
+          />
+        )}
       </motion.div>
     </AnimatePresence>
   );
@@ -389,10 +385,6 @@ const OrdersManagement = () => {
 
   // ── Add Items to Order state ──────────────────────────────────────────────
   const [addItemsOrder, setAddItemsOrder] = useState(null);  // order object to add items to
-  // FIX — ISSUE 1: addonModal state lives here so AddOnModal renders outside
-  // AddItemsToOrderModal's z-[80] stacking context (z-index layering fix)
-  const [addItemsAddonModal, setAddItemsAddonModal] = useState(null);
-  const addItemsDirectAddRef = useRef(null);
 
   useEffect(() => {
     console.log('[OrdersManagement] User cafeId:', cafeId);
@@ -795,27 +787,6 @@ const OrdersManagement = () => {
           order={addItemsOrder}
           cafeCurrency={cafeCurrency}
           onClose={() => setAddItemsOrder(null)}
-          setAddonModal={setAddItemsAddonModal}
-          directAddRef={addItemsDirectAddRef}
-        />
-      )}
-
-      {/* FIX — ISSUE 1: AddOnModal rendered at root level with z-[200] so it
-          always appears above AddItemsToOrderModal (z-[80]). onConfirm calls
-          addItemsDirectAddRef.current which points to directAddToNewCart inside
-          AddItemsToOrderModal — no cart logic is duplicated. */}
-      {addItemsAddonModal && (
-        <AddOnModal
-          item={addItemsAddonModal}
-          onConfirm={(entry) => {
-            addItemsDirectAddRef.current?.(entry);
-            setAddItemsAddonModal(null);
-          }}
-          onClose={() => setAddItemsAddonModal(null)}
-          currencySymbol={cafeCurrency}
-          primaryColor="#D4AF37"
-          theme="dark"
-          style={{ zIndex: 200 }}
         />
       )}
 
