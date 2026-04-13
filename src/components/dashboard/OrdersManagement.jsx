@@ -117,7 +117,10 @@ const AddItemsToOrderModal = ({ order, cafeCurrency, onClose }) => {
 
       const newSubtotal = updatedItems.reduce((s, item) => {
         const base = safeNum(item.price);
-        const addonAmt = (item.addons || []).reduce((as, a) => as + safeNum(a.price), 0);
+        // CHANGE 10 — Multiply addon price by quantity (previously ignored qty)
+        const addonAmt = (item.addons || []).reduce(
+          (as, a) => as + safeNum(a.price) * Math.max(1, safeNum(a.quantity || 1)), 0
+        );
         return s + (base + addonAmt) * safeNum(item.quantity);
       }, 0);
 
@@ -1075,7 +1078,8 @@ const OrdersManagement = () => {
                                       {/* addons display */}
                                       {item.addons?.length > 0 && (
                                         <p className="text-xs text-[#A3A3A3] ml-3 mt-0.5">
-                                          + {item.addons.map(a => a.name).join(', ')}
+                                          {/* CHANGE 11 — Show addon qty when > 1 */}
+                                          + {item.addons.map(a => a.quantity > 1 ? `${a.name} ×${a.quantity}` : a.name).join(', ')}
                                         </p>
                                       )}
                                     </div>
@@ -1202,7 +1206,8 @@ const OrdersManagement = () => {
                             {/* addons display (mobile) */}
                             {item.addons?.length > 0 && (
                               <p className="text-xs text-[#A3A3A3] ml-3 mt-0.5">
-                                + {item.addons.map(a => a.name).join(', ')}
+                                {/* CHANGE 12 — Show addon qty when > 1 */}
+                                + {item.addons.map(a => a.quantity > 1 ? `${a.name} ×${a.quantity}` : a.name).join(', ')}
                               </p>
                             )}
                           </div>
