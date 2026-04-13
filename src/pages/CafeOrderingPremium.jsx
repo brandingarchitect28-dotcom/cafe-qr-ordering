@@ -549,6 +549,17 @@ const CafeOrderingPremium = () => {
 
     // --- Combo: single cart entry at comboPrice ---
     if (offer.type === 'combo' && offer.comboPrice) {
+      // BUG FIX: enrich combo items from menuItems so kitchen/dashboard has full details
+      const enrichedItems = (offer.items || []).map(oi => {
+        const menuItem = menuItems.find(m => m.id === oi.itemId);
+        return {
+          itemId:    oi.itemId,
+          itemName:  oi.itemName  || menuItem?.name      || '',
+          quantity:  oi.quantity  || 1,
+          itemPrice: oi.itemPrice || menuItem?.price      || 0,
+          image:     menuItem?.image || '',
+        };
+      });
       const comboEntry = {
         id:           offer.id,
         name:         offer.title,
@@ -560,12 +571,7 @@ const CafeOrderingPremium = () => {
         selectedSize: null,
         isOffer:      true,
         offerType:    'combo',
-        items:        (offer.items || []).map(oi => ({
-          itemId:    oi.itemId,
-          itemName:  oi.itemName,
-          quantity:  oi.quantity || 1,
-          itemPrice: oi.itemPrice,
-        })),
+        items:        enrichedItems,
       };
       setCart(prev => [...prev, comboEntry]);
       toast.success(`${offer.title} added to cart ✓`);
