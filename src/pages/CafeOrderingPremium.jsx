@@ -545,6 +545,101 @@ const CafeOrderingPremium = () => {
 
   // ── Add offer to cart ──────────────────────────────────────────────────────
   const addOfferToCart = (offer) => {
+    // TASK 2 + TASK 3: Apply correct offer pricing per type
+
+    // --- Combo: single cart entry at comboPrice ---
+    if (offer.type === 'combo' && offer.comboPrice) {
+      const comboEntry = {
+        id:           offer.id,
+        name:         offer.title,
+        price:        parseFloat(offer.comboPrice),
+        basePrice:    parseFloat(offer.comboPrice),
+        quantity:     1,
+        addons:       [],
+        addonTotal:   0,
+        selectedSize: null,
+        isOffer:      true,
+        offerType:    'combo',
+        items:        (offer.items || []).map(oi => ({
+          itemId:    oi.itemId,
+          itemName:  oi.itemName,
+          quantity:  oi.quantity || 1,
+          itemPrice: oi.itemPrice,
+        })),
+      };
+      setCart(prev => [...prev, comboEntry]);
+      toast.success(`${offer.title} added to cart ✓`);
+      return;
+    }
+
+    // --- % or flat discount: apply reduced price per item ---
+    if (offer.type === 'discount') {
+      (offer.items || []).forEach(oi => {
+        const menuItem = menuItems.find(m => m.id === oi.itemId);
+        if (!menuItem) return;
+        let discountedPrice = parseFloat(menuItem.price);
+        if (offer.discountType === 'percentage') {
+          discountedPrice = discountedPrice * (1 - parseFloat(offer.discountAmount) / 100);
+        } else {
+          discountedPrice = Math.max(0, discountedPrice - parseFloat(offer.discountAmount));
+        }
+        discountedPrice = parseFloat(discountedPrice.toFixed(2));
+        setCart(prev => [...prev, {
+          ...menuItem,
+          price:        discountedPrice,
+          basePrice:    discountedPrice,
+          quantity:     oi.quantity || 1,
+          addons:       [],
+          addonTotal:   0,
+          selectedSize: null,
+          isOffer:      true,
+          offerType:    'discount',
+        }]);
+      });
+      toast.success(`${offer.title} added to cart ✓`);
+      return;
+    }
+
+    // --- Buy X Get Y: paid qty at normal price + free qty at zero ---
+    if (offer.type === 'buy_x_get_y') {
+      (offer.items || []).forEach(oi => {
+        const menuItem = menuItems.find(m => m.id === oi.itemId);
+        if (!menuItem) return;
+        const buyQty = offer.buyQuantity || oi.quantity || 1;
+        const getQty = offer.getQuantity || 0;
+        if (buyQty > 0) {
+          setCart(prev => [...prev, {
+            ...menuItem,
+            price:        parseFloat(menuItem.price),
+            basePrice:    parseFloat(menuItem.price),
+            quantity:     buyQty,
+            addons:       [],
+            addonTotal:   0,
+            selectedSize: null,
+            isOffer:      true,
+            offerType:    'buy_x_get_y',
+          }]);
+        }
+        if (getQty > 0) {
+          setCart(prev => [...prev, {
+            ...menuItem,
+            price:        0,
+            basePrice:    0,
+            quantity:     getQty,
+            addons:       [],
+            addonTotal:   0,
+            selectedSize: null,
+            isOffer:      true,
+            offerType:    'buy_x_get_y_free',
+            name:         `${menuItem.name} (Free)`,
+          }]);
+        }
+      });
+      toast.success(`${offer.title} added to cart ✓`);
+      return;
+    }
+
+    // --- Fallback: original behaviour — no breakage ---
     (offer.items || []).forEach(oi => {
       const menuItem = menuItems.find(m => m.id === oi.itemId);
       if (!menuItem) return;
@@ -587,6 +682,10 @@ const CafeOrderingPremium = () => {
           addons:       i.addons       || [],
           addonTotal:   i.addonTotal   || 0,
           selectedSize: i.selectedSize || null,
+          // TASK 1 + TASK 5: pass offer fields to orders dashboard + kitchen
+          ...(i.isOffer   && { isOffer:   true        }),
+          ...(i.offerType && { offerType: i.offerType }),
+          ...(i.items     && { items:     i.items     }),
         })),
         subtotalAmount: subtotal,
         taxAmount,
