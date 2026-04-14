@@ -221,8 +221,8 @@ const AIMenuUpload = ({ onClose }) => {
       toast.error('Please upload a JPG, PNG, WebP, or PDF file');
       return;
     }
-    if (selectedFile.size > 10 * 1024 * 1024) {
-      toast.error('File must be under 10MB');
+    if (selectedFile.size > 5 * 1024 * 1024) {
+      toast.error('File must be under 5MB');
       return;
     }
 
