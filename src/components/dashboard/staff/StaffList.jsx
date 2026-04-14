@@ -31,7 +31,7 @@ import { useAuth } from '../../../contexts/AuthContext';
 const EMPTY = {
   name: '', role: 'Waiter', phone: '', upiId: '',
   salaryType: 'monthly', salaryAmount: '', shiftStart: '09:00',
-  latePenalty: '50',
+  shiftEnd: '', latePenalty: '50',
 };
 
 const inputCls =
@@ -122,6 +122,17 @@ const StaffFormModal = ({ initial, onSave, onClose, saving }) => {
                 className={inputCls}
                 value={form.shiftStart}
                 onChange={e => set('shiftStart', e.target.value)}
+              />
+            </div>
+
+            {/* Shift End */}
+            <div>
+              <label className={labelCls}>Shift End</label>
+              <input
+                type="time"
+                className={inputCls}
+                value={form.shiftEnd || ''}
+                onChange={e => set('shiftEnd', e.target.value)}
               />
             </div>
 
@@ -474,7 +485,7 @@ const StaffList = ({ cafeId }) => {
                     </div>
                   )}
                   <div className="flex items-center gap-1.5">
-                    <Clock className="w-3 h-3" />Shift: {s.shiftStart}
+                    <Clock className="w-3 h-3" />Shift: {s.shiftStart}{s.shiftEnd ? ` – ${s.shiftEnd}` : ''}
                   </div>
                 </div>
 
