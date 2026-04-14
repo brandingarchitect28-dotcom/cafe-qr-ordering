@@ -21,29 +21,34 @@ const PEXELS_BASE = 'https://api.pexels.com';
  */
 export const fetchPexelsVideo = async (query, apiKey) => {
   if (!apiKey) return null;
-  try {
-    const res = await fetch(
-      `${PEXELS_BASE}/videos/search?query=${encodeURIComponent(query + ' food')}&per_page=5&orientation=landscape`,
-      { headers: { Authorization: apiKey } }
-    );
-    if (!res.ok) return null;
-    const data = await res.json();
-    const video = data.videos?.[0];
-    if (!video) return null;
 
-    // Pick lowest-resolution video file to minimise size
-    const files = video.video_files || [];
-    const sorted = files
-      .filter(f => f.link && (f.file_type === 'video/mp4' || f.link.includes('.mp4')))
-      .sort((a, b) => (a.width || 9999) - (b.width || 9999));
+  // Try bare name first, then with " food" — better for regional dish names
+  const queries = [query.trim(), `${query.trim()} food`];
 
-    const chosen = sorted[0];
-    if (!chosen) return null;
+  for (const q of queries) {
+    try {
+      const res = await fetch(
+        `${PEXELS_BASE}/videos/search?query=${encodeURIComponent(q)}&per_page=3&orientation=landscape`,
+        { headers: { Authorization: apiKey } }
+      );
+      if (!res.ok) continue;
+      const data = await res.json();
+      const video = data.videos?.[0];
+      if (!video) continue;
 
-    return { url: chosen.link, type: 'video', thumb: video.image };
-  } catch {
-    return null;
+      // Pick lowest-resolution video file to minimise size
+      const files = video.video_files || [];
+      const sorted = files
+        .filter(f => f.link && (f.file_type === 'video/mp4' || f.link.includes('.mp4')))
+        .sort((a, b) => (a.width || 9999) - (b.width || 9999));
+
+      const chosen = sorted[0];
+      if (chosen) return { url: chosen.link, type: 'video', thumb: video.image };
+    } catch {
+      continue;
+    }
   }
+  return null;
 };
 
 /**
@@ -52,58 +57,59 @@ export const fetchPexelsVideo = async (query, apiKey) => {
  */
 export const fetchPexelsImage = async (query, apiKey) => {
   if (!apiKey) return null;
-  try {
-    const res = await fetch(
-      `${PEXELS_BASE}/v1/search?query=${encodeURIComponent(query + ' food dish')}&per_page=5&orientation=square`,
-      { headers: { Authorization: apiKey } }
-    );
-    if (!res.ok) return null;
-    const data = await res.json();
-    const photo = data.photos?.[0];
-    if (!photo) return null;
 
-    // Use medium size to keep payload reasonable
-    const url = photo.src?.medium || photo.src?.original;
-    if (!url) return null;
+  // Try two queries: bare name first (better for regional foods), then with " food dish"
+  const queries = [query.trim(), `${query.trim()} food dish`];
 
-    return { url, type: 'image' };
-  } catch {
-    return null;
+  for (const q of queries) {
+    try {
+      const res = await fetch(
+        `${PEXELS_BASE}/v1/search?query=${encodeURIComponent(q)}&per_page=3&orientation=square`,
+        { headers: { Authorization: apiKey } }
+      );
+      if (!res.ok) continue;
+      const data = await res.json();
+      const photo = data.photos?.[0];
+      if (!photo) continue;
+
+      // Use medium size to keep payload reasonable
+      const url = photo.src?.medium || photo.src?.original;
+      if (url) return { url, type: 'image' };
+    } catch {
+      continue;
+    }
   }
+  return null;
 };
 
 /**
- * Generate an AI image via the Anthropic messages API (tool_use → image).
- * Returns { url: string (data URI), type: 'image' } or null.
+ * Fallback image when Pexels returns nothing.
+ * Uses Unsplash Source API — no key required, always returns a food photo.
+ * Returns { url: string, type: 'image' } — never null.
  */
 export const generateAIImage = async (itemName) => {
   try {
-    const res = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        model: 'claude-sonnet-4-20250514',
-        max_tokens: 1024,
-        messages: [{
-          role: 'user',
-          content: `Generate a realistic, appetising top-down food photo of "${itemName}". 
-                    Respond ONLY with a base64-encoded JPEG image, nothing else.`,
-        }],
-      }),
-    });
-    if (!res.ok) return null;
-    const data = await res.json();
-    // Claude may return image content block
-    const imageBlock = data.content?.find(b => b.type === 'image');
-    if (imageBlock?.source?.data) {
-      return {
-        url: `data:${imageBlock.source.media_type || 'image/jpeg'};base64,${imageBlock.source.data}`,
-        type: 'image',
-      };
+    // Unsplash Source: free, no API key, CORS-safe, returns relevant food photo
+    const query = encodeURIComponent(itemName.trim() + ' food');
+    // Use a fixed size (400x400) — fast to load, good quality for menu cards
+    const url = `https://source.unsplash.com/400x400/?${query}`;
+
+    // Verify the URL is reachable (HEAD request, no body)
+    const check = await fetch(url, { method: 'HEAD' });
+    if (check.ok) {
+      return { url, type: 'image' };
     }
-    return null;
+    // If Unsplash is down, use a static food placeholder
+    return {
+      url: `https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=400&h=400&fit=crop`,
+      type: 'image',
+    };
   } catch {
-    return null;
+    // Absolute last resort — always return something
+    return {
+      url: `https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=400&h=400&fit=crop`,
+      type: 'image',
+    };
   }
 };
 
