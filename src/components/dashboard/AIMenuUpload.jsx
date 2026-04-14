@@ -270,24 +270,34 @@ const AIMenuUpload = ({ onClose }) => {
       const result = await response.json();
 
       if (!response.ok) {
-        throw new Error(result.error || 'Extraction failed');
+        const errMsg = result?.error || result?.detail || `Server error (${response.status})`;
+        throw new Error(errMsg);
       }
 
-      // FIX 3: Server returns { preview: [...] } not { success, items }.
-      if (result.preview?.length > 0) {
-        // PART 3 — Category inference: apply inferCategory() to every item
-        // that has no category assigned by the AI response.
-        // Items that already have a category are left untouched.
-        const itemsWithCategory = result.preview.map(item => ({
-          ...item,
-          category: item.category && item.category !== 'Other' && item.category !== ''
+      // Handle both response shapes: { preview } and { items } for full compatibility
+      const rawItems = result.preview || result.items || [];
+
+      if (rawItems.length > 0) {
+        // Apply category inference + safe field defaults for every item
+        const itemsWithCategory = rawItems.map(item => ({
+          name:        String(item.name        || '').trim(),
+          price:       parseFloat(item.price)  || 0,
+          description: String(item.description || '').trim(),
+          available:   item.available !== false,
+          // Category: use server value if valid, else infer from name
+          category: (item.category && item.category !== '' && item.category !== 'Other')
             ? item.category
             : inferCategory(item.name),
-        }));
+        })).filter(item => item.name.length > 0); // drop blank names
+
+        if (itemsWithCategory.length === 0) {
+          toast.error('No valid items found. Try a clearer image.');
+          return;
+        }
 
         setItems(itemsWithCategory);
         setStep('preview');
-        toast.success(`${result.preview.length} items extracted ✨`);
+        toast.success(`${itemsWithCategory.length} items extracted ✨`);
       } else {
         toast.error('No menu items found. Try a clearer image.');
       }
