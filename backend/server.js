@@ -38,8 +38,7 @@ app.use(cors({
   methods: ['GET', 'POST'],
   allowedHeaders: ['Content-Type'],
 }));
-app.use(express.json({ limit: '15mb' }));
-app.use(express.urlencoded({ limit: '15mb', extended: true }));
+app.use(express.json());
 
 // ─── Request logger ───────────────────────────────────────────────────────────
 app.use((req, res, next) => {
@@ -47,7 +46,7 @@ app.use((req, res, next) => {
   next();
 });
 
-// ─── GET / ────────────────────────────────────────────────────────────────────
+// ─── GET / ───────────────────────────────────────────────────────────────────
 app.get('/', (req, res) => {
   res.json({
     status:      'ok',
@@ -59,174 +58,164 @@ app.get('/', (req, res) => {
 });
 
 // ─── POST /create-order ───────────────────────────────────────────────────────
-// Creates a Cashfree payment order. Called by the frontend to initiate payment.
-// Returns { payment_session_id, order_id, checkout_url } on success.
 app.post('/create-order', async (req, res) => {
   const { orderId, amount, phone, cafeId, currency, customerName, returnUrl } = req.body;
 
+  // ── Task 7: Log full incoming request ──────────────────────────────────────
   console.log('[create-order] ─── Incoming request ───────────────────────────');
-  console.log('[create-order] body:', JSON.stringify(req.body));
+  console.log('[create-order] orderId:     ', orderId);
+  console.log('[create-order] amount:      ', amount, '(raw)');
+  console.log('[create-order] phone:       ', phone);
+  console.log('[create-order] cafeId:      ', cafeId);
+  console.log('[create-order] customerName:', customerName);
+  console.log('[create-order] returnUrl:   ', returnUrl);
+  console.log('[create-order] ─────────────────────────────────────────────────');
 
-  // ── Validate required fields ───────────────────────────────────────────────
+  // ── Input validation ────────────────────────────────────────────────────────
+  // Guard: keys must be set or return clear error (server still runs without them)
+  if (!process.env.APP_ID || !process.env.SECRET_KEY) {
+    console.error('[create-order] APP_ID or SECRET_KEY not set — add them in Render environment');
+    return res.status(503).json({ error: 'Payment gateway not configured. Add APP_ID and SECRET_KEY in Render environment.' });
+  }
+
   if (!orderId || !amount || !phone) {
     console.warn('[create-order] FAIL — missing required fields');
     return res.status(400).json({ error: 'orderId, amount and phone are required.' });
   }
-
-  // ── Check API keys are configured ─────────────────────────────────────────
-  // MULTI-TENANT: try to fetch THIS café's own Cashfree keys from Firestore.
-  // If the café has its own keys saved in paymentSettings, use those.
-  // Otherwise fall back to the global Render environment variables so that
-  // existing cafés with no per-café keys configured continue working exactly
-  // as before — zero breaking change.
-  let selectedAppId  = process.env.APP_ID;
-  let selectedSecret = process.env.SECRET_KEY;
-
-  if (cafeId && firestoreDb) {
-    try {
-      const cafeSnap = await firestoreDb.collection('cafes').doc(cafeId).get();
-      if (cafeSnap.exists) {
-        const cafeData = cafeSnap.data();
-        const ps = cafeData?.paymentSettings;
-        // Accept either cashfree_app_id / cashfree_secret_key (new dedicated fields)
-        // or the generic keyId / keySecret already stored by the Settings page.
-        const cafeAppId  = ps?.cashfree_app_id  || ps?.keyId;
-        const cafeSecret = ps?.cashfree_secret_key || ps?.keySecret;
-        if (cafeAppId && cafeSecret) {
-          selectedAppId  = cafeAppId;
-          selectedSecret = cafeSecret;
-          console.log('[create-order] Using per-café Cashfree keys for cafeId:', cafeId);
-        } else {
-          console.log('[create-order] No per-café keys found — using global env keys for cafeId:', cafeId);
-        }
-      } else {
-        console.warn('[create-order] Café doc not found in Firestore for cafeId:', cafeId);
-      }
-    } catch (lookupErr) {
-      // Non-fatal: if Firestore lookup fails, fall back to global keys so payment still works
-      console.error('[create-order] Firestore key lookup failed (using global env fallback):', lookupErr.message);
-    }
+  if (isNaN(amount) || Number(amount) <= 0) {
+    console.warn('[create-order] FAIL — invalid amount:', amount);
+    return res.status(400).json({ error: 'amount must be a positive number.' });
   }
 
-  // Verification log (required by spec)
-  console.log('Using Cashfree App ID:', selectedAppId);
-
-  if (!selectedAppId || !selectedSecret) {
-    console.error('[create-order] FAIL — no Cashfree keys available (env or per-café)');
-    return res.status(503).json({
-      error: 'Payment service not configured. Contact the café owner.',
-    });
+  const cleanPhone = String(phone).replace(/\D/g, '');
+  if (cleanPhone.length < 10) {
+    console.warn('[create-order] FAIL — invalid phone:', phone, 'cleaned:', cleanPhone);
+    return res.status(400).json({ error: 'Phone number must be at least 10 digits.' });
   }
 
-  // ── Build Cashfree order payload ───────────────────────────────────────────
-  // uniqueOrderId format: {cafeId}_{firestoreDocId}_{timestamp}
-  // Using cafeId prefix ensures order IDs are unique per café account
-  // and the webhook can still extract the Firestore doc ID later.
-  const uniqueOrderId = cafeId ? `${cafeId}_${orderId}_${Date.now()}` : `${orderId}_${Date.now()}`;
+  // ── FIX 2: Integer amount — no decimals, no precision errors ───────────────
+  // Math.round eliminates 1.1500000000000001, 115.999999 etc.
+  const formattedAmount = Math.round(Number(amount));
+  console.log('[create-order] Amount:', amount, '->', formattedAmount, '(rounded integer)');
 
-  const orderPayload = {
+  if (formattedAmount <= 0) {
+    return res.status(400).json({ error: 'Order amount must be greater than zero.' });
+  }
+
+  // ── FIX 1: Always unique orderId — Cashfree rejects reused IDs ─────────────
+  // Reusing an orderId returns the OLD session which may be expired/invalid
+  // causing "client session is invalid" on the payment page
+  const uniqueOrderId = `${orderId}_${Date.now()}`;
+  console.log('[create-order] uniqueOrderId:', uniqueOrderId);
+
+  // ── Build Cashfree payload ──────────────────────────────────────────────────
+  const cfPayloadObj = {
     order_id:       uniqueOrderId,
-    order_amount:   parseFloat(amount),
+    order_amount:   formattedAmount,
     order_currency: currency || 'INR',
     customer_details: {
-      customer_id:    phone,
-      customer_phone: phone,
+      customer_id:    cleanPhone,
       customer_name:  customerName || 'Customer',
+      customer_phone: cleanPhone,
     },
     order_meta: {
-      return_url: returnUrl || `${req.headers.origin || ''}/track/${orderId}?order_id={order_id}`,
-      notify_url: `https://${req.headers.host}/webhook/cashfree`,
+      return_url: returnUrl || `https://your-frontend.netlify.app/track/${orderId}`,
     },
   };
 
-  console.log('[create-order] Cashfree payload:', JSON.stringify(orderPayload));
+  // Task 7: Log exact payload sent to Cashfree (no keys)
+  console.log('[create-order] Payload to Cashfree:', JSON.stringify(cfPayloadObj, null, 2));
 
+  // ── Call Cashfree server-side ───────────────────────────────────────────────
   try {
-    // ── Call Cashfree API via https.request (no browser CORS issue) ──────────
-    const cfResponse = await new Promise((resolve, reject) => {
-      const body = JSON.stringify(orderPayload);
-      const options = {
-        hostname: CF_HOST,
-        path:     '/pg/orders',
-        method:   'POST',
-        headers: {
-          'Content-Type':    'application/json',
-          'x-client-id':     selectedAppId,
-          'x-client-secret': selectedSecret,
-          'x-api-version':   '2023-08-01',
-          'Content-Length':  Buffer.byteLength(body),
-        },
-      };
+    const cfData = await cashfreeRequest(JSON.stringify(cfPayloadObj));
 
-      const request = https.request(options, (cfRes) => {
-        let data = '';
-        cfRes.on('data', chunk => { data += chunk; });
-        cfRes.on('end', () => {
-          try {
-            resolve({ status: cfRes.statusCode, body: JSON.parse(data) });
-          } catch (e) {
-            reject(new Error(`Cashfree response parse failed: ${data.slice(0, 200)}`));
-          }
-        });
+    // FIX 6: Log FULL response — essential for diagnosing any Cashfree error
+    console.log('[create-order] ─── Cashfree full response ───────────────────');
+    console.log(JSON.stringify(cfData, null, 2));
+    console.log('[create-order] ─────────────────────────────────────────────');
+
+    // FIX 3: Strict session validation — empty string or null are both invalid
+    const session = cfData.payment_session_id;
+    if (session && typeof session === 'string' && session.trim() !== '') {
+
+      // FIX 4+5: Build correct URL for the right environment
+      // Mixing sandbox session with production URL → "client session is invalid"
+      const payment_link = IS_SANDBOX
+        ? `${CF_CHECKOUT_BASE}/${session}`
+        : `${CF_CHECKOUT_BASE}/#${session}`;
+
+      console.log('[create-order] SUCCESS');
+      console.log('[create-order]   uniqueOrderId      :', uniqueOrderId);
+      console.log('[create-order]   payment_session_id :', session);
+      console.log('[create-order]   payment_link       :', payment_link);
+      console.log('[create-order]   environment        :', IS_SANDBOX ? 'SANDBOX' : 'PRODUCTION');
+
+      // FIX 4: Return fresh session — frontend must use it immediately
+      return res.json({
+        success:            true,
+        payment_link,
+        payment_session_id: session,
+        order_id:           uniqueOrderId,
+        environment:        IS_SANDBOX ? 'sandbox' : 'production',
       });
-
-      request.on('error', reject);
-      request.write(body);
-      request.end();
-    });
-
-    console.log('[create-order] Cashfree response status:', cfResponse.status);
-    console.log('[create-order] Cashfree response body:', JSON.stringify(cfResponse.body));
-
-    if (cfResponse.status !== 200) {
-      const errMsg = cfResponse.body?.message || cfResponse.body?.error || 'Cashfree error';
-      console.error('[create-order] Cashfree error:', errMsg);
-      return res.status(cfResponse.status).json({ error: errMsg });
     }
 
-    // ── Return payment session to frontend ───────────────────────────────────
-    const { payment_session_id, order_id, order_status } = cfResponse.body;
+    // ── Cashfree returned an error ────────────────────────────────────────────
+    const errMsg  = cfData.message || cfData.error || cfData.type || 'Unknown Cashfree error';
+    const errCode = cfData.code    || cfData.status || 'UNKNOWN';
+    console.error('[create-order] Cashfree error — message:', errMsg, '| code:', errCode);
 
-    return res.json({
-      payment_session_id,
-      order_id,
-      order_status,
-      checkout_url: `${CF_CHECKOUT_BASE}/${payment_session_id}`,
-    });
+    // Targeted diagnosis for common errors
+    if (errMsg.includes('order already exists')) {
+      console.error('[create-order] CAUSE: Duplicate order_id — this should be fixed by uniqueOrderId suffix');
+    }
+    if (errMsg.includes('session') || errMsg.includes('client')) {
+      console.error('[create-order] CAUSE: Session/auth issue — verify APP_ID + SECRET_KEY are',
+        IS_SANDBOX ? 'SANDBOX (TEST_...)' : 'PRODUCTION (CF_...)');
+    }
+    if (errMsg.includes('amount')) {
+      console.error('[create-order] CAUSE: Amount issue — sent:', formattedAmount);
+    }
+
+    return res.status(502).json({ error: errMsg, code: errCode });
 
   } catch (err) {
-    console.error('[create-order] Unexpected error:', err.message);
-    return res.status(500).json({ error: 'Payment order creation failed. Please try again.' });
+    console.error('[create-order] API call failed:', err.message);
+    return res.status(500).json({ error: 'Payment gateway unreachable. Please try again.' });
   }
 });
 
-// ─── Firebase Admin SDK ───────────────────────────────────────────────────────
+// ─── Firebase Admin — initialised once, used by webhook ─────────────────────
 // Set FIREBASE_SERVICE_ACCOUNT in Render env vars (JSON string of service account)
 let firestoreDb = null;
+
 try {
   const admin = require('firebase-admin');
+
   if (!admin.apps.length) {
     const serviceAccountRaw = process.env.FIREBASE_SERVICE_ACCOUNT;
+
     if (!serviceAccountRaw) {
       console.warn('[Firebase] FIREBASE_SERVICE_ACCOUNT env var not set.');
+      console.warn('[Firebase] Webhook will log only — no Firestore updates until configured.');
     } else {
       const serviceAccount = JSON.parse(serviceAccountRaw);
       admin.initializeApp({
         credential: admin.credential.cert(serviceAccount),
       });
       firestoreDb = admin.firestore();
-      console.log('[Firebase] Admin SDK initialised ✓');
+      console.log('[Firebase] Admin SDK initialised successfully.');
     }
   } else {
     firestoreDb = admin.firestore();
-    console.log('[Firebase] Admin SDK already initialised ✓');
   }
-} catch (e) {
+} catch (err) {
+  console.error('[Firebase] Admin SDK init failed:', err.message);
   console.error('[Firebase] Check FIREBASE_SERVICE_ACCOUNT format (must be valid JSON string).');
-  console.error('[Firebase] Error:', e.message);
 }
 
-// ─── uniqueOrderId helper ─────────────────────────────────────────────────────
+// ─── Helper: strip timestamp suffix to get Firestore doc ID ──────────────────
 // uniqueOrderId format: {firestoreDocId}_{timestamp}
 // Example: XyZ1AbcDef9_1742803200000 → XyZ1AbcDef9
 // Firebase auto-IDs are alphanumeric (no underscores), so last segment is always the timestamp.
@@ -237,7 +226,7 @@ function getFirestoreDocId(cashfreeOrderId) {
   return parts.slice(0, -1).join('_');
 }
 
-// ─── POST /webhook/cashfree ───────────────────────────────────────────────────
+// ─── POST /webhook/cashfree ────────────────────────────────────────────────────
 // Register this URL in Cashfree Dashboard → Developers → Webhooks:
 //   https://your-app.onrender.com/webhook/cashfree
 //
@@ -253,50 +242,50 @@ function getFirestoreDocId(cashfreeOrderId) {
 //   type: "PAYMENT_SUCCESS_WEBHOOK" | "PAYMENT_FAILED_WEBHOOK"
 // }
 async function handleCashfreeWebhook(req, res) {
-  // Always respond 200 immediately — Cashfree retries on non-200
+  // Send 200 FIRST — before any processing.
+  // Cashfree marks the test as failed if 200 does not arrive immediately.
   res.status(200).send('OK');
 
-  const body = req.body;
-  console.log('[webhook] Webhook received');
-  console.log('[webhook] Full payload:', JSON.stringify(body, null, 2));
-
-  // ── Extract fields — support both v2 and v1 payload shapes ────────────────
-  const cashfreeOrderId = body?.data?.order?.order_id    || body?.order_id    || null;
-  const paymentStatus   = body?.data?.payment?.payment_status || body?.payment_status || null;
-  const orderStatus     = body?.data?.order?.order_status     || body?.order_status   || null;
-  const eventType       = body?.type || null;
-
-  console.log('[webhook] cashfreeOrderId:', cashfreeOrderId);
-  console.log('[webhook] paymentStatus  :', paymentStatus);
-  console.log('[webhook] orderStatus    :', orderStatus);
-  console.log('[webhook] eventType      :', eventType);
-
-  // ── Determine outcome ─────────────────────────────────────────────────────
-  const isSuccess = paymentStatus === 'SUCCESS'
-    || orderStatus  === 'PAID'
-    || eventType    === 'PAYMENT_SUCCESS_WEBHOOK';
-
-  const isFailed  = paymentStatus === 'FAILED'
-    || paymentStatus === 'USER_DROPPED'
-    || eventType    === 'PAYMENT_FAILED_WEBHOOK';
-
-  if (!cashfreeOrderId) {
-    console.error('[webhook] No order_id in payload — cannot update Firestore');
-    return;
-  }
-
-  // ── Derive Firestore document ID ──────────────────────────────────────────
-  const firestoreDocId = getFirestoreDocId(cashfreeOrderId);
-  console.log('[webhook] firestoreDocId:', firestoreDocId);
-
-  // ── Skip if Firebase Admin not configured ─────────────────────────────────
-  if (!firestoreDb) {
-    console.warn('[webhook] Firestore not initialised — skipping DB update.');
-    console.warn('[webhook] Add FIREBASE_SERVICE_ACCOUNT to Render env vars to enable.');
-    return;
-  }
-
+  // All remaining work is best-effort — wrapped in try/catch so no exception
+  // can ever surface after the response has already been sent.
   try {
+    const body = req.body || {};
+    console.log('[webhook] Webhook received');
+    console.log('[webhook] Full payload:', JSON.stringify(body, null, 2));
+
+    // Extract fields — support both Cashfree v2 and v1 payload shapes
+    const cashfreeOrderId = body?.data?.order?.order_id         || body?.order_id    || null;
+    const paymentStatus   = body?.data?.payment?.payment_status || body?.payment_status || null;
+    const orderStatus     = body?.data?.order?.order_status     || body?.order_status   || null;
+    const eventType       = body?.type || null;
+
+    console.log('[webhook] cashfreeOrderId:', cashfreeOrderId);
+    console.log('[webhook] paymentStatus  :', paymentStatus);
+    console.log('[webhook] orderStatus    :', orderStatus);
+    console.log('[webhook] eventType      :', eventType);
+
+    const isSuccess = paymentStatus === 'SUCCESS'
+      || orderStatus === 'PAID'
+      || eventType   === 'PAYMENT_SUCCESS_WEBHOOK';
+
+    const isFailed  = paymentStatus === 'FAILED'
+      || paymentStatus === 'USER_DROPPED'
+      || eventType   === 'PAYMENT_FAILED_WEBHOOK';
+
+    if (!cashfreeOrderId) {
+      console.warn('[webhook] No order_id in payload — logging only, no DB update');
+      return;
+    }
+
+    const firestoreDocId = getFirestoreDocId(cashfreeOrderId);
+    console.log('[webhook] firestoreDocId:', firestoreDocId);
+
+    if (!firestoreDb) {
+      console.warn('[webhook] Firestore not initialised — skipping DB update.');
+      console.warn('[webhook] Add FIREBASE_SERVICE_ACCOUNT to Render env vars to enable.');
+      return;
+    }
+
     const orderRef  = firestoreDb.collection('orders').doc(firestoreDocId);
     const orderSnap = await orderRef.get();
 
@@ -305,30 +294,36 @@ async function handleCashfreeWebhook(req, res) {
       return;
     }
 
+    const existingOrder = orderSnap.data();
     console.log('[webhook] Order found:', firestoreDocId,
-      '| current paymentStatus:', orderSnap.data()?.paymentStatus);
+      '| currentPaymentStatus:', existingOrder.paymentStatus);
 
+    // Idempotency: skip if already in final state
+    if (isSuccess && existingOrder.paymentStatus === 'paid') {
+      console.log('[webhook] Order already marked paid — skipping duplicate webhook');
+      return;
+    }
+    if (isFailed && existingOrder.paymentStatus === 'failed') {
+      console.log('[webhook] Order already marked failed — skipping duplicate webhook');
+      return;
+    }
+
+    // Update Firestore — triggers existing onSnapshot listeners on frontend
+    // (dashboard, kitchen display, order tracking) automatically
     if (isSuccess) {
-      await orderRef.update({
-        paymentStatus:    'paid',
-        paidAt:           new Date(),
-        cashfreeOrderId,
-        webhookEventType: eventType,
-      });
+      await orderRef.update({ paymentStatus: 'paid', updatedAt: new Date() });
       console.log('[webhook] Order updated to PAID:', firestoreDocId);
     } else if (isFailed) {
-      await orderRef.update({
-        paymentStatus:    'failed',
-        failedAt:         new Date(),
-        cashfreeOrderId,
-        webhookEventType: eventType,
-      });
+      await orderRef.update({ paymentStatus: 'failed', updatedAt: new Date() });
       console.log('[webhook] Order updated to FAILED:', firestoreDocId);
     } else {
-      console.log('[webhook] Unrecognised status — no DB update. paymentStatus:', paymentStatus);
+      console.log('[webhook] Unhandled status — no DB update.',
+        '| paymentStatus:', paymentStatus, '| orderStatus:', orderStatus);
     }
+
   } catch (err) {
-    console.error('[webhook] Firestore update error:', err.message);
+    // Log but never re-throw — 200 was already sent
+    console.error('[webhook] Processing error (200 already sent):', err.message);
   }
 }
 
@@ -345,263 +340,191 @@ app.post('/webhook/cashfree', handleCashfreeWebhook);
 app.post('/webhook',          handleCashfreeWebhook);
 
 // ─── POST /api/ai-menu-upload ─────────────────────────────────────────────────
-// FIXED: Now uses OpenAI Vision (gpt-4o-mini) instead of Gemini.
-//        Returns { preview: [...] } — DOES NOT write to Firebase.
-//        Owner reviews preview and confirms before saving.
-//
-// Accepts: { cafeId, imageBase64, mimeType }
-// Returns: { preview: [{ name, price, category, description, available }] }
+// Accepts an image/PDF as base64 JSON, sends to Gemini, returns parsed menu items.
+// No multer needed — frontend sends base64 string to keep it simple.
+// OPENAI_API_KEY must be set in Render → Environment Variables.
+
 app.post('/api/ai-menu-upload', async (req, res) => {
   try {
     const { cafeId, imageBase64, mimeType } = req.body;
 
-    if (!cafeId)      return res.status(400).json({ error: 'cafeId is required' });
-    if (!imageBase64) return res.status(400).json({ error: 'imageBase64 is required' });
-    if (!mimeType)    return res.status(400).json({ error: 'mimeType is required' });
+    if (!cafeId)       return res.status(400).json({ error: 'cafeId is required' });
+    if (!imageBase64)  return res.status(400).json({ error: 'imageBase64 is required' });
+    if (!mimeType)     return res.status(400).json({ error: 'mimeType is required' });
 
-    const allowed = ['image/jpeg', 'image/png', 'image/webp', 'application/pdf'];
-    if (!allowed.includes(mimeType)) {
-      return res.status(400).json({ error: 'Invalid file type. Use JPG, PNG, WebP, or PDF.' });
+    const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
+    if (!OPENAI_API_KEY) {
+      console.error('[AI Menu] OPENAI_API_KEY not set in environment');
+      return res.status(500).json({ error: 'AI service not configured. Add OPENAI_API_KEY in Render environment.' });
     }
 
+    // Validate file size — base64 is ~33% larger than binary, so 7MB base64 ≈ 5MB file
     const approxBytes = (imageBase64.length * 3) / 4;
     if (approxBytes > 7 * 1024 * 1024) {
       return res.status(400).json({ error: 'File too large. Maximum 5MB.' });
     }
 
-    // ── Use OpenAI Vision (OPENAI_API_KEY from Render env) ───────────────────
-    const OPENAI_KEY = process.env.OPENAI_API_KEY;
-    if (OPENAI_KEY) {
-      console.log(`[AI-Menu-Upload] Using OpenAI Vision for cafeId=${cafeId}`);
+    // Validate mime type
+    const allowed = ['image/jpeg', 'image/png', 'image/webp', 'application/pdf'];
+    if (!allowed.includes(mimeType)) {
+      return res.status(400).json({ error: 'Invalid file type. Use JPG, PNG, WebP, or PDF.' });
+    }
 
-      const messages = [
-        {
-          role: 'system',
-          content:
-            'You are a restaurant menu extraction AI. ' +
-            'Extract all menu items from the image. ' +
-            'Return ONLY valid JSON array — no markdown, no explanation. ' +
-            'Each item must have: name (string), price (number, strip ₹/Rs symbols), ' +
-            'category (one of: Beverages, Food, Snacks, Desserts, Main Course, Starters, Other), ' +
-            'description (string, may be empty), available (true). ' +
-            'If price is unclear, use 0. ' +
-            'Example: [{"name":"Burger","price":120,"category":"Food","description":"","available":true}]',
-        },
-        {
+    console.log(`[AI Menu] Processing for cafeId=${cafeId}, type=${mimeType}, size≈${Math.round(approxBytes/1024)}KB`);
+
+    // ── Prompt — was missing after OpenAI migration (root cause of 500) ──────
+    const prompt = `You are a restaurant menu extraction AI.
+
+Convert the uploaded menu image into structured JSON.
+
+Return ONLY a JSON array with no extra text, no markdown fences, nothing else.
+
+Format:
+[
+  {
+    "name": "Item Name",
+    "price": 0,
+    "category": "Beverages | Food | Snacks | Desserts | Main Course | Starters | Other",
+    "description": "Short description",
+    "available": true
+  }
+]
+
+Rules:
+- Remove currency symbols from prices (price must be a plain number)
+- Auto-detect category from context
+- Clean item names (remove numbering, bullets, extra symbols)
+- If price is missing, use 0
+- Return ONLY the JSON array — no explanation, no markdown`;
+
+    // ── Call OpenAI vision API (gpt-4o-mini) ─────────────────────────────────
+    const openaiRes = await fetch('https://api.openai.com/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${OPENAI_API_KEY}`,
+      },
+      body: JSON.stringify({
+        model: 'gpt-4o-mini',
+        max_tokens: 4096,
+        temperature: 0.1,
+        messages: [{
           role: 'user',
           content: [
+            { type: 'text', text: prompt },
             {
               type: 'image_url',
-              image_url: { url: `data:${mimeType};base64,${imageBase64}` },
+              image_url: {
+                url: `data:${mimeType};base64,${imageBase64}`,
+                detail: 'high',
+              },
             },
-            { type: 'text', text: 'Extract all menu items and return the JSON array.' },
           ],
-        },
-      ];
+        }],
+      }),
+    });
 
-      const oaiPayload = JSON.stringify({
-        model:       'gpt-4o-mini',
-        messages,
-        max_tokens:  2000,
-        temperature: 0.1,
-      });
-
-      const rawText = await new Promise((resolve, reject) => {
-        const request = https.request(
-          {
-            hostname: 'api.openai.com',
-            path:     '/v1/chat/completions',
-            method:   'POST',
-            headers: {
-              'Content-Type':   'application/json',
-              'Authorization':  `Bearer ${OPENAI_KEY}`,
-              'Content-Length': Buffer.byteLength(oaiPayload),
-            },
-          },
-          (response) => {
-            let body = '';
-            response.on('data', chunk => { body += chunk; });
-            response.on('end', () => {
-              try {
-                const parsed = JSON.parse(body);
-                if (parsed.error) return reject(new Error(parsed.error.message));
-                resolve((parsed.choices?.[0]?.message?.content || '').trim());
-              } catch (e) {
-                reject(new Error('Failed to parse OpenAI response'));
-              }
-            });
-          }
-        );
-        request.on('error', reject);
-        request.write(oaiPayload);
-        request.end();
-      });
-
-      if (!rawText) {
-        return res.status(502).json({ error: 'No response from AI. Try a clearer image.' });
-      }
-
-      let items;
-      try {
-        const cleaned = rawText
-          .replace(/^```json\s*/i, '').replace(/^```\s*/i, '').replace(/\s*```$/i, '').trim();
-        items = JSON.parse(cleaned);
-      } catch {
-        console.error('[AI-Menu-Upload] JSON parse failed. Raw:', rawText.slice(0, 300));
-        return res.status(422).json({ error: 'AI returned invalid format. Try a clearer image.' });
-      }
-
-      if (!Array.isArray(items) || items.length === 0) {
-        return res.status(422).json({ error: 'No menu items found in the image.' });
-      }
-
-      const VALID_CATS = ['Beverages','Food','Snacks','Desserts','Main Course','Starters','Other'];
-      const preview = items
-        .filter(i => i && typeof i === 'object')
-        .map(i => ({
-          name:        String(i.name        || '').trim().slice(0, 100),
-          price:       Math.max(0, parseFloat(i.price) || 0),
-          category:    VALID_CATS.includes(i.category) ? i.category : 'Other',
-          description: String(i.description || '').trim().slice(0, 300),
-          available:   true,
-        }))
-        .filter(i => i.name.length > 0);
-
-      if (preview.length === 0) {
-        return res.status(422).json({ error: 'Could not extract valid items. Try a clearer image.' });
-      }
-
-      console.log(`[AI-Menu-Upload] Preview: ${preview.length} items for cafeId=${cafeId}`);
-      // IMPORTANT: Returns preview only — does NOT write to Firebase
-      return res.json({ preview });
+    if (!openaiRes.ok) {
+      const errText = await openaiRes.text();
+      console.error('[AI Menu] OpenAI API error:', openaiRes.status, errText.slice(0, 300));
+      return res.status(502).json({ error: `AI service error (${openaiRes.status}). Check your OPENAI_API_KEY in Render.` });
     }
 
-    // ── Fallback: Gemini (GEMINI_API_KEY from Render env) ────────────────────
-    const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
-    if (!GEMINI_API_KEY) {
-      console.error('[AI-Menu-Upload] Neither OPENAI_API_KEY nor GEMINI_API_KEY set.');
-      return res.status(503).json({
-        error: 'AI service not configured. Add OPENAI_API_KEY in Render → Environment.',
-      });
-    }
+    const openaiData = await openaiRes.json();
+    const rawText = openaiData?.choices?.[0]?.message?.content || '';
 
-    console.log(`[AI-Menu-Upload] Using Gemini for cafeId=${cafeId}, type=${mimeType}, size≈${Math.round(approxBytes/1024)}KB`);
-
-    const prompt = `You are a restaurant menu extraction AI.
-Convert the uploaded menu into structured JSON.
-Return ONLY JSON in this format:
-[{ "name": "", "price": 0, "category": "", "description": "", "available": true }]
-Rules:
-- Remove currency symbols from prices. Price must be a number only.
-- Auto detect category: Beverages, Food, Snacks, Desserts, Main Course, Starters, Other
-- If price is missing or unclear, use 0
-- No extra text outside the JSON array`;
-
-    const geminiRes = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${GEMINI_API_KEY}`,
-      {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          contents: [{
-            parts: [
-              { text: prompt },
-              { inline_data: { mime_type: mimeType, data: imageBase64 } },
-            ],
-          }],
-          generationConfig: { temperature: 0.1, maxOutputTokens: 4096 },
-        }),
-      }
-    );
-
-    if (!geminiRes.ok) {
-      const errText = await geminiRes.text();
-      console.error('[AI-Menu-Upload] Gemini API error:', geminiRes.status, errText.slice(0, 300));
-      return res.status(502).json({ error: 'AI service error. Check your Gemini API key.' });
-    }
-
-    const geminiData = await geminiRes.json();
-    const rawText2   = geminiData?.candidates?.[0]?.content?.parts?.[0]?.text || '';
-
-    if (!rawText2) {
+    if (!rawText) {
+      console.error('[AI Menu] Empty response from OpenAI');
       return res.status(502).json({ error: 'No response from AI. Try a clearer image.' });
     }
 
-    let items2;
+    // ── Safe JSON parsing — strip markdown fences if present ──────────────────
+    let items;
     try {
-      const cleaned2 = rawText2
-        .replace(/^```json\s*/i, '').replace(/^```\s*/i, '').replace(/\s*```$/i, '').trim();
-      items2 = JSON.parse(cleaned2);
-    } catch {
-      console.error('[AI-Menu-Upload] JSON parse failed. Raw:', rawText2.slice(0, 300));
+      // Gemini sometimes wraps in ```json ... ``` — strip it
+      const cleaned = rawText
+        .replace(/^```json\s*/i, '')
+        .replace(/^```\s*/i, '')
+        .replace(/\s*```$/i, '')
+        .trim();
+      items = JSON.parse(cleaned);
+    } catch (parseErr) {
+      console.error('[AI Menu] JSON parse failed. Raw text:', rawText.slice(0, 500));
       return res.status(422).json({ error: 'AI returned invalid format. Try a clearer menu image.' });
     }
 
-    if (!Array.isArray(items2) || items2.length === 0) {
+    if (!Array.isArray(items) || items.length === 0) {
       return res.status(422).json({ error: 'No menu items found in the image.' });
     }
 
-    const VALID_CATS2 = ['Beverages','Food','Snacks','Desserts','Main Course','Starters','Other'];
-    const preview2 = items2
-      .filter(i => i && typeof i === 'object')
-      .map(i => ({
-        name:        String(i.name        || '').trim().slice(0, 100),
-        price:       Math.max(0, parseFloat(i.price) || 0),
-        category:    VALID_CATS2.includes(i.category) ? i.category : 'Other',
-        description: String(i.description || '').trim().slice(0, 300),
+    // ── Sanitise each item ─────────────────────────────────────────────────────
+    const sanitised = items
+      .filter(item => item && typeof item === 'object')
+      .map(item => ({
+        name:        String(item.name        || '').trim().slice(0, 100),
+        price:       Math.max(0, parseFloat(item.price) || 0),
+        category:    String(item.category    || 'Other').trim().slice(0, 50),
+        description: String(item.description || '').trim().slice(0, 300),
         available:   true,
       }))
-      .filter(i => i.name.length > 0);
+      .filter(item => item.name.length > 0);   // drop blank-name items
 
-    if (preview2.length === 0) {
+    if (sanitised.length === 0) {
       return res.status(422).json({ error: 'Could not extract valid items. Try a clearer image.' });
     }
 
-    console.log(`[AI-Menu-Upload] Gemini preview: ${preview2.length} items for cafeId=${cafeId}`);
-    // Returns preview only — does NOT write to Firebase
-    return res.json({ preview: preview2 });
+    console.log(`[AI Menu] Extracted ${sanitised.length} items for cafeId=${cafeId}`);
+    // Return both `preview` (what frontend reads) and `items` (backward compat)
+    return res.json({ success: true, preview: sanitised, items: sanitised, count: sanitised.length });
 
   } catch (err) {
-    console.error('[AI-Menu-Upload] Unexpected error:', err.message);
-    return res.status(500).json({ error: 'Internal server error. Please try again.' });
+    console.error('[AI Menu] Unexpected error:', err.message);
+    console.error('[AI Menu] Stack:', err.stack);
+    return res.status(500).json({ error: 'Internal server error. Please try again.', detail: err.message });
   }
 });
 
 // ─── GET /test-gemini ─────────────────────────────────────────────────────────
-// Verifies GEMINI_API_KEY is set and the Gemini API responds.
+// Verifies the OPENAI_API_KEY env var is set and the OpenAI API responds.
+// Uses the same native fetch pattern as /api/ai-menu-upload — no extra SDK needed.
+// Zero impact on existing routes or payment logic.
+
 app.get('/test-gemini', async (req, res) => {
   try {
-    const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
-    if (!GEMINI_API_KEY) {
+    const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
+    if (!OPENAI_API_KEY) {
       return res.status(500).json({
         success: false,
-        error: 'GEMINI_API_KEY not set. Add it in Render → Environment Variables.',
+        error: 'OPENAI_API_KEY not set. Add it in Render → Environment Variables.',
       });
     }
 
-    const geminiRes = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${GEMINI_API_KEY}`,
-      {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          contents: [{ parts: [{ text: 'Say hello from SmartCafe AI' }] }],
-          generationConfig: { maxOutputTokens: 64 },
-        }),
-      }
-    );
+    const openaiRes = await fetch('https://api.openai.com/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${OPENAI_API_KEY}`,
+      },
+      body: JSON.stringify({
+        model: 'gpt-4o-mini',
+        max_tokens: 64,
+        messages: [{ role: 'user', content: 'Say hello from SmartCafe AI' }],
+      }),
+    });
 
-    if (!geminiRes.ok) {
-      const errText = await geminiRes.text();
-      console.error('[test-gemini] Gemini API error:', geminiRes.status, errText.slice(0, 200));
+    if (!openaiRes.ok) {
+      const errText = await openaiRes.text();
+      console.error('[test-gemini] OpenAI API error:', openaiRes.status, errText);
       return res.status(502).json({
         success: false,
-        error: `Gemini API returned ${geminiRes.status}. Check your API key is valid.`,
+        status: openaiRes.status,
+        error: `OpenAI API returned ${openaiRes.status}`,
+        detail: errText,
       });
     }
 
-    const data = await geminiRes.json();
-    const text = data?.candidates?.[0]?.content?.parts?.[0]?.text || '(no text)';
+    const data = await openaiRes.json();
+    const text = data?.choices?.[0]?.message?.content || '(no text)';
 
     console.log('[test-gemini] Success:', text.slice(0, 80));
     return res.json({ success: true, message: text });
@@ -613,8 +536,11 @@ app.get('/test-gemini', async (req, res) => {
 });
 
 // ─── POST /api/save-api-keys ──────────────────────────────────────────────────
-// Accepts API keys from the admin panel and returns instructions.
-// Keys are NOT stored here — they must be set manually in Render → Environment.
+// Receives API keys from AdminApiSettings frontend.
+// Keys are NOT stored in code or DB — this route validates them and instructs
+// the owner to set them in Render environment variables, which is the secure path.
+// The response guides the owner on exactly what to set where.
+
 app.post('/api/save-api-keys', (req, res) => {
   const { openaiKey, geminiKey, whatsappKey } = req.body || {};
 
@@ -631,6 +557,7 @@ app.post('/api/save-api-keys', (req, res) => {
 
   console.log('[save-api-keys] Keys received for:', received.join(', '));
 
+  // Build instructions for each key that was submitted
   const instructions = [];
   if (openaiKey)   instructions.push(`OPENAI_API_KEY = ${openaiKey.slice(0, 8)}...`);
   if (geminiKey)   instructions.push(`GEMINI_API_KEY = ${geminiKey.slice(0, 8)}...`);
@@ -643,283 +570,12 @@ app.post('/api/save-api-keys', (req, res) => {
   });
 });
 
-// ─── POST /api/ai-assistant ───────────────────────────────────────────────────
-// FIXED: Proper try/catch, accepts both { question } and { query },
-//        uses https.request (not fetch) with already-declared https module.
-//        Never crashes the server — always returns a JSON response.
-//
-// Accepts: { cafeId, question } OR { cafeId, query }
-// Returns: { reply: "..." }
-app.post('/api/ai-assistant', async (req, res) => {
-  try {
-    // Accept both field names — frontend may send either
-    const cafeId   = req.body?.cafeId;
-    const question = (req.body?.question || req.body?.query || '').trim();
-
-    // ── 1. Input validation ────────────────────────────────────────────────
-    if (!cafeId) {
-      console.warn('[AI-Assistant] Missing cafeId. Body:', JSON.stringify(req.body));
-      return res.status(400).json({ error: 'cafeId is required.' });
-    }
-    if (!question) {
-      console.warn('[AI-Assistant] Missing question. Body:', JSON.stringify(req.body));
-      return res.status(400).json({ error: 'question is required.' });
-    }
-
-    // ── 2. API key guard ───────────────────────────────────────────────────
-    const OPENAI_KEY = process.env.OPENAI_API_KEY;
-    if (!OPENAI_KEY) {
-      console.error('[AI-Assistant] OPENAI_API_KEY not set in Render environment.');
-      return res.status(503).json({
-        error: 'AI service not configured. Add OPENAI_API_KEY in Render → Environment.',
-      });
-    }
-
-    console.log(`[AI-Assistant] cafeId=${cafeId} question="${question.slice(0, 80)}"`);
-
-    // ── 3. Build OpenAI request ────────────────────────────────────────────
-    // FIX: read the context snapshot sent by the frontend (AskAI.jsx → buildSystemContext).
-    // This makes the AI aware of real revenue, inventory, staff, and order data
-    // without requiring any extra Firestore reads on the backend.
-    const ctx = req.body?.context || null;
-
-    // Build a human-readable data block from the context snapshot if present
-    let contextBlock = '';
-    if (ctx && typeof ctx === 'object') {
-      const r = ctx.revenue || {};
-      const inv = ctx.inventory || {};
-      const st = ctx.staff || {};
-      const lines = [
-        '=== LIVE CAFÉ DATA (use this to answer the question accurately) ===',
-        '',
-        '--- REVENUE ---',
-        `Today: ₹${(r.today || 0).toFixed(2)} from ${r.ordersToday || 0} paid orders`,
-        `This week: ₹${(r.thisWeek || 0).toFixed(2)} from ${r.ordersWeek || 0} orders`,
-        `This month: ₹${(r.thisMonth || 0).toFixed(2)} from ${r.ordersMonth || 0} orders`,
-        `Avg order value: ₹${r.avgOrderValue || 0}`,
-        `Cancelled today: ${r.cancelledToday || 0}`,
-        `Peak hour: ${ctx.peakHour || 'N/A'}`,
-        '',
-        '--- TOP SELLING ITEMS ---',
-        ...(ctx.topItems || []).slice(0, 5).map((i, n) => `${n+1}. ${i.name} — ${i.qty} sold, ₹${(i.revenue||0).toFixed(0)} revenue`),
-        '',
-        '--- INVENTORY ---',
-        `Total items: ${inv.total || 0}`,
-        `Low stock: ${(inv.lowStock || []).map(i => `${i.name} (${i.qty} ${i.unit})`).join(', ') || 'none'}`,
-        `Out of stock: ${(inv.outOfStock || []).map(i => i.name).join(', ') || 'none'}`,
-        '',
-        '--- STAFF ---',
-        `Total staff: ${st.total || 0}`,
-        `Present today: ${st.presentToday || 0}`,
-        `Absent: ${(st.absentToday || []).map(s => s.name).join(', ') || 'none'}`,
-        '',
-        '--- PAYMENT MODES ---',
-        ...Object.entries(ctx.paymentModes || {}).map(([m, v]) => `${m}: ₹${(v||0).toFixed(2)}`),
-        '',
-        '=== END OF DATA ===',
-      ];
-      contextBlock = '\n\n' + lines.join('\n');
-    }
-
-    const systemPrompt =
-      'You are an expert café business analyst and assistant for SmartCafé OS. ' +
-      'You have access to real-time data about this café — revenue, orders, inventory, staff, and menu. ' +
-      'Use the provided data to give accurate, specific, and actionable insights. ' +
-      'When data is available, always quote the exact numbers. ' +
-      'If asked for suggestions, give concrete and practical ones. ' +
-      'Keep answers under 150 words unless a detailed breakdown is requested. ' +
-      'Respond in the same language as the question.';
-
-    const userMessage = `Café ID: ${cafeId}${contextBlock}\n\nQuestion: ${question}`;
-
-    const safeQuestionLength = question ? question.length : 0;
-    console.log(
-      '[AI-Assistant] context attached:',
-      ctx ? 'yes' : 'no',
-      'question length:',
-      safeQuestionLength
-    );
-
-    const payload = JSON.stringify({
-      model: 'gpt-4o-mini',
-      messages: [
-        { role: 'system', content: systemPrompt },
-        { role: 'user',   content: userMessage  },
-      ],
-      max_tokens: 500,
-      temperature: 0.4,
-    });
-
-    // ── 4. Call OpenAI via https (already required at top of file) ─────────
-    const answer = await new Promise((resolve, reject) => {
-      const request = https.request(
-        {
-          hostname: 'api.openai.com',
-          path:     '/v1/chat/completions',
-          method:   'POST',
-          headers: {
-            'Content-Type':   'application/json',
-            'Authorization':  `Bearer ${OPENAI_KEY}`,
-            'Content-Length': Buffer.byteLength(payload),
-          },
-        },
-        (response) => {
-          let body = '';
-          response.on('data', chunk => { body += chunk; });
-          response.on('end', () => {
-            try {
-              const parsed = JSON.parse(body);
-              if (parsed.error) {
-                console.error('[AI-Assistant] OpenAI error:', parsed.error.message);
-                return reject(new Error(parsed.error.message || 'OpenAI returned an error'));
-              }
-              const text = (parsed.choices?.[0]?.message?.content || '').trim();
-              resolve(text || 'No response from AI.');
-            } catch (e) {
-              reject(new Error('Failed to parse OpenAI response'));
-            }
-          });
-        }
-      );
-
-      request.on('error', (e) => {
-        console.error('[AI-Assistant] HTTPS error:', e.message);
-        reject(e);
-      });
-
-      request.write(payload);
-      request.end();
-    });
-
-    console.log(`[AI-Assistant] Answered (${answer.length} chars)`);
-    return res.json({ reply: answer });
-
-  } catch (err) {
-    // Outer catch: nothing can crash the server or leave the request hanging
-    console.error('[AI-Assistant] Error:', err.message);
-    return res.status(500).json({ error: 'AI request failed. Please try again.' });
-  }
-});
-
-// ─── POST /api/send-whatsapp-campaign ─────────────────────────────────────────
-// Queue-based WhatsApp marketing campaign.
-// Validates, deduplicates, creates a campaign doc in Firestore,
-// then processes each customer sequentially with a 400ms delay.
-// Uses placeholder logic — ready to swap for Meta/Twilio later.
-//
-// Request body: { cafeId, customers: [{ name, phone }], message }
-
-function formatWANumber(raw) {
-  if (!raw) return '';
-  const digits = String(raw).replace(/\D/g, '');
-  if (!digits) return '';
-  if (digits.length === 10) return `91${digits}`;
-  return digits;
-}
-
-async function sendWhatsAppMessage(phone, message) {
-  const formatted = formatWANumber(phone);
-  if (!formatted || formatted.length < 10) {
-    throw new Error(`Invalid phone number: ${phone}`);
-  }
-  // PLACEHOLDER — swap with Meta or Twilio SDK call here:
-  // await twilioClient.messages.create({ from: 'whatsapp:+14155238886', to: `whatsapp:+${formatted}`, body: message });
-  console.log(`[WA-Campaign] Sent to +${formatted} (${message.slice(0, 40)}...)`);
-  return { phone: formatted, status: 'sent' };
-}
-
-const activeCampaigns = new Set();
-
-app.post('/api/send-whatsapp-campaign', async (req, res) => {
-  const { cafeId, customers, message } = req.body || {};
-
-  if (!cafeId)                                    return res.status(400).json({ error: 'cafeId is required.' });
-  if (!message?.trim())                           return res.status(400).json({ error: 'message is required.' });
-  if (!Array.isArray(customers) || customers.length === 0)
-    return res.status(400).json({ error: 'customers array is required and must not be empty.' });
-
-  if (activeCampaigns.has(cafeId)) {
-    return res.status(429).json({ error: 'A campaign is already running for this café. Please wait.' });
-  }
-
-  // Deduplicate and validate phone numbers
-  const seen  = new Set();
-  const valid = customers
-    .map(c => ({ ...c, phone: formatWANumber(c.phone) }))
-    .filter(c => {
-      if (!c.phone || c.phone.length < 10) return false;
-      if (seen.has(c.phone)) return false;
-      seen.add(c.phone);
-      return true;
-    })
-    .slice(0, 200);
-
-  if (valid.length === 0) {
-    return res.status(400).json({ error: 'No valid phone numbers found after validation.' });
-  }
-
-  // Create campaign record in Firestore (if available)
-  let campaignRef = null;
-  if (firestoreDb) {
-    try {
-      campaignRef = await firestoreDb.collection('whatsapp_campaigns').add({
-        cafeId,
-        total:     valid.length,
-        sent:      0,
-        failed:    0,
-        status:    'running',
-        message:   message.slice(0, 500),
-        createdAt: new Date(),
-      });
-    } catch (e) {
-      console.error('[WA-Campaign] Firestore campaign create error:', e.message);
-    }
-  }
-
-  // Respond immediately — processing continues in background
-  res.json({
-    success:    true,
-    campaignId: campaignRef?.id || null,
-    total:      valid.length,
-    message:    `Campaign started for ${valid.length} customers.`,
-  });
-
-  // ── Background processing ─────────────────────────────────────────────────
-  activeCampaigns.add(cafeId);
-  let sent = 0; let failed = 0;
-
-  for (const customer of valid) {
-    try {
-      await sendWhatsAppMessage(customer.phone, message);
-      sent++;
-    } catch (err) {
-      console.error(`[WA-Campaign] Failed for ${customer.phone}:`, err.message);
-      failed++;
-    }
-
-    // Update progress in Firestore
-    if (campaignRef) {
-      campaignRef.update({ sent, failed }).catch(() => {});
-    }
-
-    // 400ms delay between messages
-    await new Promise(r => setTimeout(r, 400));
-  }
-
-  if (campaignRef) {
-    campaignRef.update({ status: 'completed', completedAt: new Date() }).catch(() => {});
-  }
-
-  activeCampaigns.delete(cafeId);
-  console.log(`[WA-Campaign] Completed for cafeId=${cafeId}: ${sent} sent, ${failed} failed`);
-});
-
-// ─── 404 — must be AFTER all routes ──────────────────────────────────────────
+// ─── 404 — must be AFTER all routes ─────────────────────────────────────────
 app.use((req, res) => {
   res.status(404).json({ error: `Route ${req.method} ${req.path} not found.` });
 });
 
-// ─── Global error handler — must be AFTER all routes ─────────────────────────
+// ─── Global error handler — must be AFTER all routes ────────────────────────
 app.use((err, req, res, next) => {
   console.error('[Error]', err.message);
   res.status(500).json({ error: 'Internal server error.' });
@@ -928,13 +584,57 @@ app.use((err, req, res, next) => {
 // ─── Start ────────────────────────────────────────────────────────────────────
 app.listen(PORT, () => {
   console.log(`[Server] Running on port ${PORT}`);
-  console.log(`[Server]   GET  /                           → health check`);
-  console.log(`[Server]   POST /create-order               → Cashfree order creation`);
-  console.log(`[Server]   POST /webhook/cashfree           → payment status callback`);
-  console.log(`[Server]   POST /webhook                    → payment status callback (compat)`);
-  console.log(`[Server]   POST /api/ai-menu-upload         → AI menu extraction (preview)`);
-  console.log(`[Server]   GET  /test-gemini                → Gemini API key verification`);
-  console.log(`[Server]   POST /api/save-api-keys          → API key instructions`);
-  console.log(`[Server]   POST /api/ai-assistant           → AI business assistant`);
-  console.log(`[Server]   POST /api/send-whatsapp-campaign → WhatsApp bulk campaign`);
+  console.log(`[Server]   GET  /             → health check`);
+  console.log(`[Server]   POST /create-order → Cashfree order creation`);
+  console.log(`[Server]   POST /webhook      → payment status callback`);
+  console.log(`[Server]   POST /api/ai-menu-upload → AI menu extraction`);
+  console.log(`[Server]   GET  /test-gemini  → Gemini API key verification`);
 });
+
+// ─── Cashfree HTTPS helper ────────────────────────────────────────────────────
+// FIX 5: Uses CF_HOST — sandbox.cashfree.com OR api.cashfree.com
+function cashfreeRequest(payload) {
+  return new Promise((resolve, reject) => {
+    const options = {
+      hostname: CF_HOST,
+      path:     '/pg/orders',
+      method:   'POST',
+      headers: {
+        'Content-Type':    'application/json',
+        'x-api-version':   '2023-08-01',
+        'x-client-id':     process.env.APP_ID,
+        'x-client-secret': process.env.SECRET_KEY,
+        'Content-Length':  Buffer.byteLength(payload),
+      },
+    };
+
+    console.log('[cashfreeRequest] Host:', options.hostname, '| Path:', options.path);
+
+    const req = https.request(options, (cfRes) => {
+      console.log('[cashfreeRequest] HTTP status from Cashfree:', cfRes.statusCode);
+      let data = '';
+      cfRes.on('data', chunk => { data += chunk; });
+      cfRes.on('end', () => {
+        try {
+          resolve(JSON.parse(data));
+        } catch (e) {
+          console.error('[cashfreeRequest] Non-JSON response:', data.slice(0, 300));
+          reject(new Error(`Non-JSON from Cashfree: ${data.slice(0, 200)}`));
+        }
+      });
+    });
+
+    req.on('error', (err) => {
+      console.error('[cashfreeRequest] Network error:', err.message);
+      reject(err);
+    });
+
+    req.setTimeout(15000, () => {
+      req.destroy();
+      reject(new Error('Cashfree API timed out after 15s'));
+    });
+
+    req.write(payload);
+    req.end();
+  });
+}
