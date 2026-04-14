@@ -19,6 +19,12 @@ import {
   serverTimestamp,
 } from 'firebase/firestore';
 import { db, auth } from '../lib/firebase';
+
+// Strips undefined values so Firestore never receives them.
+// Fields that are genuinely absent are simply omitted from the update.
+const cleanData = (obj) =>
+  Object.fromEntries(Object.entries(obj).filter(([, v]) => v !== undefined));
+
 export const toDateKey = (date = new Date()) => {
   try {
     return new Date(date).toISOString().split('T')[0];
@@ -71,7 +77,7 @@ export const addStaff = async (cafeId, formData) => {
  * @param {object} formData Partial update data
  */
 export const updateStaff = async (staffId, formData) => {
-  await updateDoc(doc(db, 'staff', staffId), {
+  await updateDoc(doc(db, 'staff', staffId), cleanData({
     name:         formData.name?.trim()             ?? undefined,
     role:         formData.role                     ?? undefined,
     phone:        formData.phone                    ?? undefined,
@@ -87,7 +93,7 @@ export const updateStaff = async (staffId, formData) => {
                     : undefined,
     bankDetails:  formData.bankDetails              ?? undefined,
     updatedAt:    serverTimestamp(),
-  });
+  }));
 };
 
 /**
