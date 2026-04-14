@@ -30,7 +30,13 @@ import { toast } from 'sonner';
 import {
   Upload, Sparkles, Check, X, Pencil, RefreshCw,
   FileImage, Plus, Trash2, Save, Lock, ChevronRight,
+  Video, Image as ImageIcon, Wand2, Zap,
 } from 'lucide-react';
+
+// ── NEW: enrichment + media services (add-only, never affect existing flow) ───
+import { enrichItems }          from '../../services/aiEnrichmentService';
+import { resolveMedia }         from '../../services/mediaService';
+import { processMediaForStorage } from '../../services/compressionService';
 
 const CATEGORIES = ['Beverages', 'Food', 'Snacks', 'Desserts', 'Main Course', 'Starters', 'Other'];
 
@@ -175,13 +181,19 @@ const AIMenuUpload = ({ onClose }) => {
 
   const fileInputRef = useRef(null);
 
-  const [step,      setStep     ] = useState('upload'); // upload | preview | saving | done
+  const [step,      setStep     ] = useState('upload'); // upload | preview | options | saving | done
   const [file,      setFile     ] = useState(null);
   const [preview,   setPreview  ] = useState(null);
   const [items,     setItems    ] = useState([]);
   const [loading,   setLoading  ] = useState(false);
   const [saving,    setSaving   ] = useState(false);
   const [dragOver,  setDragOver ] = useState(false);
+
+  // ── NEW: user preference state (add-only) ────────────────────────────────────
+  const [mediaPreference,  setMediaPreference ] = useState('auto');    // 'auto'|'image'|'none'
+  const [wantAIDetails,    setWantAIDetails   ] = useState(true);
+  const [enrichProgress,   setEnrichProgress  ] = useState(0);         // 0-100
+  const [enrichTotal,      setEnrichTotal     ] = useState(0);
 
   const isEnabled = cafe?.features?.aiMenu;
 
@@ -297,8 +309,50 @@ const AIMenuUpload = ({ onClose }) => {
     if (valid.length === 0) { toast.error('Add at least one item'); return; }
 
     setSaving(true);
+    setEnrichTotal(valid.length);
+    setEnrichProgress(0);
+
     try {
-      const batch = valid.map(item =>
+      // ── ENRICHMENT PHASE (add-only new fields) ──────────────────────────────
+      // Step A: AI food details + smart addons (if user opted in)
+      let enriched = valid;
+      if (wantAIDetails) {
+        try {
+          enriched = await enrichItems(
+            valid,
+            { generateDetails: true, generateAddons: true },
+            (done, total) => setEnrichProgress(Math.round((done / total) * 50)) // 0-50%
+          );
+        } catch (enrichErr) {
+          console.warn('[AIMenuUpload] Enrichment error (non-fatal):', enrichErr.message);
+          enriched = valid; // Failsafe — continue with original items
+        }
+      }
+
+      // Step B: Media resolution per item (if user wants media)
+      const pexelsKey = cafe?.pexelsApiKey || '';
+      const withMedia = await Promise.all(
+        enriched.map(async (item, idx) => {
+          if (mediaPreference === 'none') return item;
+          try {
+            const raw = await resolveMedia(item.name, pexelsKey, mediaPreference);
+            if (!raw) return item;
+            const processed = await processMediaForStorage(raw);
+            if (!processed) return item;
+            return { ...item, mediaUrl: processed.url, mediaType: processed.type };
+          } catch {
+            return item; // Failsafe — never block
+          } finally {
+            setEnrichProgress(50 + Math.round(((idx + 1) / enriched.length) * 50)); // 50-100%
+          }
+        })
+      );
+
+      // ── SAVE PHASE — SAME as before + new optional fields ──────────────────
+      // Existing fields: name, price, category, description, image, available, createdAt, source
+      // New optional fields added only if present on the item: mediaUrl, mediaType,
+      //   ingredients, calories, protein, carbs, fat, addons
+      const batch = withMedia.map(item =>
         addDoc(collection(db, 'menuItems'), {
           cafeId,
           name:        item.name.trim(),
@@ -309,6 +363,15 @@ const AIMenuUpload = ({ onClose }) => {
           available:   true,
           createdAt:   serverTimestamp(),
           source:      'ai_upload',
+          // ── New optional fields (undefined = not stored, backward compatible) ──
+          ...(item.mediaUrl  && { mediaUrl:  item.mediaUrl  }),
+          ...(item.mediaType && { mediaType: item.mediaType }),
+          ...(item.ingredients && { ingredients: item.ingredients }),
+          ...(item.calories    && { calories:    item.calories    }),
+          ...(item.protein     && { protein:     item.protein     }),
+          ...(item.carbs       && { carbs:       item.carbs       }),
+          ...(item.fat         && { fat:         item.fat         }),
+          ...(item.addons      && { addons:      item.addons      }),
         })
       );
       await Promise.all(batch);
@@ -318,6 +381,7 @@ const AIMenuUpload = ({ onClose }) => {
       toast.error('Failed to save menu items');
     } finally {
       setSaving(false);
+      setEnrichProgress(0);
     }
   };
 
@@ -354,16 +418,17 @@ const AIMenuUpload = ({ onClose }) => {
         </div>
         {/* Step indicator */}
         <div className="hidden sm:flex items-center gap-1 text-xs text-[#A3A3A3]">
-          {['Upload', 'Preview', 'Done'].map((s, i) => (
+          {['Upload', 'Preview', 'Options', 'Done'].map((s, i) => (
             <React.Fragment key={s}>
               <span className={
-                (step === 'upload' && i === 0) ||
+                (step === 'upload'  && i === 0) ||
                 (step === 'preview' && i === 1) ||
-                (step === 'done' && i === 2)
+                (step === 'options' && i === 2) ||
+                (step === 'done'    && i === 3)
                   ? 'text-[#D4AF37] font-semibold'
                   : 'text-[#555]'
               }>{s}</span>
-              {i < 2 && <ChevronRight className="w-3 h-3 text-[#333]" />}
+              {i < 3 && <ChevronRight className="w-3 h-3 text-[#333]" />}
             </React.Fragment>
           ))}
         </div>
@@ -485,12 +550,130 @@ const AIMenuUpload = ({ onClose }) => {
               <motion.button
                 whileHover={{ scale: 1.02 }}
                 whileTap={{ scale: 0.98 }}
+                onClick={() => setStep('options')}
+                disabled={items.length === 0}
+                className="flex-1 flex items-center justify-center gap-2 py-2.5 bg-[#D4AF37] hover:bg-[#C5A059] text-black font-bold rounded-sm text-sm transition-all disabled:opacity-50"
+              >
+                <Wand2 className="w-4 h-4" />
+                Continue → {items.length} Items
+              </motion.button>
+            </div>
+          </motion.div>
+        )}
+
+        {/* ── Options step — new interactive workflow ────────────────────── */}
+        {step === 'options' && (
+          <motion.div
+            key="options"
+            initial={{ opacity: 0, x: 10 }}
+            animate={{ opacity: 1, x: 0 }}
+            exit={{ opacity: 0, x: -10 }}
+            className="space-y-6"
+          >
+            <p className="text-[#A3A3A3] text-sm">
+              Customise how your <span className="text-white font-semibold">{items.length} items</span> are enriched before saving.
+            </p>
+
+            {/* Media preference */}
+            <div className="bg-[#0A0A0A] border border-white/5 rounded-xl p-5 space-y-3">
+              <p className="text-white font-semibold text-sm flex items-center gap-2">
+                <Video className="w-4 h-4 text-[#D4AF37]" />
+                Media (Pexels photos &amp; videos)
+              </p>
+              <p className="text-[#555] text-xs">
+                Auto-fetch food photos or videos for each item.
+                {!cafe?.pexelsApiKey && (
+                  <span className="text-amber-400"> Add your Pexels API key in Settings to enable this.</span>
+                )}
+              </p>
+              <div className="grid grid-cols-3 gap-2">
+                {[
+                  { val: 'auto',  label: 'Auto Best',    icon: Zap       },
+                  { val: 'image', label: 'Images Only',  icon: ImageIcon  },
+                  { val: 'none',  label: 'Skip Media',   icon: X          },
+                ].map(({ val, label, icon: Icon }) => (
+                  <button
+                    key={val}
+                    onClick={() => setMediaPreference(val)}
+                    className={`flex flex-col items-center gap-1.5 py-3 rounded-lg border text-xs font-semibold transition-all ${
+                      mediaPreference === val
+                        ? 'border-[#D4AF37] bg-[#D4AF37]/10 text-[#D4AF37]'
+                        : 'border-white/10 text-[#A3A3A3] hover:border-white/20'
+                    }`}
+                  >
+                    <Icon className="w-4 h-4" />
+                    {label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* AI food details */}
+            <div className="bg-[#0A0A0A] border border-white/5 rounded-xl p-5 space-y-3">
+              <p className="text-white font-semibold text-sm flex items-center gap-2">
+                <Sparkles className="w-4 h-4 text-[#D4AF37]" />
+                AI Food Details (ingredients + nutrition + addons)
+              </p>
+              <p className="text-[#555] text-xs">
+                Generates calories, protein, carbs, fat and auto-suggests addons per item.
+                Adds ~5s per item.
+              </p>
+              <div className="grid grid-cols-2 gap-2">
+                {[
+                  { val: true,  label: 'Yes, enrich items' },
+                  { val: false, label: 'Skip, save as-is'  },
+                ].map(({ val, label }) => (
+                  <button
+                    key={String(val)}
+                    onClick={() => setWantAIDetails(val)}
+                    className={`py-3 rounded-lg border text-xs font-semibold transition-all ${
+                      wantAIDetails === val
+                        ? 'border-[#D4AF37] bg-[#D4AF37]/10 text-[#D4AF37]'
+                        : 'border-white/10 text-[#A3A3A3] hover:border-white/20'
+                    }`}
+                  >
+                    {val ? '✦ ' : ''}{label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Progress bar — shown during save */}
+            {saving && (
+              <div className="space-y-2">
+                <div className="flex items-center justify-between text-xs text-[#A3A3A3]">
+                  <span>
+                    {enrichProgress < 50 ? 'Generating food details…' : 'Fetching media…'}
+                  </span>
+                  <span>{enrichProgress}%</span>
+                </div>
+                <div className="h-1.5 bg-white/5 rounded-full overflow-hidden">
+                  <motion.div
+                    className="h-full bg-[#D4AF37] rounded-full"
+                    animate={{ width: `${enrichProgress}%` }}
+                    transition={{ duration: 0.3 }}
+                  />
+                </div>
+              </div>
+            )}
+
+            <div className="flex gap-3 pt-1">
+              <button
+                onClick={() => setStep('preview')}
+                disabled={saving}
+                className="flex-1 py-2.5 border border-white/10 text-[#A3A3A3] hover:text-white rounded-sm text-sm transition-all disabled:opacity-40"
+              >
+                ← Back
+              </button>
+              <motion.button
+                whileHover={{ scale: 1.02 }}
+                whileTap={{ scale: 0.98 }}
                 onClick={handleSave}
-                disabled={saving || items.length === 0}
+                disabled={saving}
                 className="flex-1 flex items-center justify-center gap-2 py-2.5 bg-[#D4AF37] hover:bg-[#C5A059] text-black font-bold rounded-sm text-sm transition-all disabled:opacity-50"
               >
                 {saving
-                  ? <><RefreshCw className="w-4 h-4 animate-spin" /> Saving…</>
+                  ? <><RefreshCw className="w-4 h-4 animate-spin" /> Processing…</>
                   : <><Save className="w-4 h-4" /> Save {items.length} Items to Menu</>
                 }
               </motion.button>
