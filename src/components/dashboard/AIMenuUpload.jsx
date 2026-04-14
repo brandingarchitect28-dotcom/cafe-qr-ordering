@@ -20,7 +20,7 @@
  *     Does NOT touch items that already have a category from the AI response.
  */
 
-import React, { useState, useRef, useCallback } from 'react';
+import React, { useState, useRef, useCallback, useEffect } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
 import { useDocument } from '../../hooks/useFirestore';
 import { db } from '../../lib/firebase';
