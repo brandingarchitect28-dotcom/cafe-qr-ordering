@@ -55,6 +55,7 @@ export const addStaff = async (cafeId, formData) => {
     salaryType:   formData.salaryType   || 'monthly',
     salaryAmount: parseFloat(formData.salaryAmount) || 0,
     shiftStart:   formData.shiftStart   || '09:00',
+    shiftEnd:     formData.shiftEnd     || '',
     latePenalty:  parseFloat(formData.latePenalty)  || 50,
     bankDetails:  formData.bankDetails  || null,
     isActive:     true,
@@ -80,6 +81,7 @@ export const updateStaff = async (staffId, formData) => {
                     ? parseFloat(formData.salaryAmount) || 0
                     : undefined,
     shiftStart:   formData.shiftStart               ?? undefined,
+    shiftEnd:     formData.shiftEnd                  ?? undefined,
     latePenalty:  formData.latePenalty !== undefined
                     ? parseFloat(formData.latePenalty) || 50
                     : undefined,
