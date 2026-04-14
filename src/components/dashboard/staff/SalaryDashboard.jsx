@@ -15,7 +15,7 @@ import React, { useState, useCallback } from 'react';
 import { motion } from 'framer-motion';
 import {
   Calculator, RefreshCw, Save, TrendingDown,
-  IndianRupee, CheckCircle2,
+  IndianRupee, CheckCircle2, FileDown, Search,
 } from 'lucide-react';
 import {
   collection, query, where, getDocs,
@@ -51,6 +51,38 @@ const SalaryDashboard = ({ staffList = [] }) => {
   const [calculating, setCalculating] = useState(false);
   const [saving,      setSaving     ] = useState(false);
   const [overrides,   setOverrides  ] = useState({}); // { [staffId]: { bonus, advance } }
+
+  // ── Search ───────────────────────────────────────────────────────────────────
+  const [searchQuery, setSearchQuery] = useState('');
+  const filteredSheets = sheets.filter(s =>
+    s.staffName.toLowerCase().includes(searchQuery.toLowerCase())
+  );
+
+  // ── Export CSV ───────────────────────────────────────────────────────────────
+  const exportCSV = () => {
+    if (!sheets.length) { toast.error('Calculate salaries first.'); return; }
+    const rows = [
+      ['Name', 'Role', 'Base Salary', 'Final Salary', 'Deductions', 'Status'],
+      ...sheets.map(s => [
+        s.staffName,
+        s.role,
+        s.baseSalary,
+        s.finalSalary,
+        s.totalDeductions,
+        s.status === 'paid' ? 'Paid' : 'Pending',
+      ]),
+    ];
+    const csv  = rows.map(r => r.map(v => `"${String(v ?? '').replace(/"/g, '""')}"`).join(',')).join('\n');
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const url  = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.setAttribute('download', `salary-${yearMonth}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  };
 
   // ── Summary totals for strip ─────────────────────────────────────────────────
   const totals = sheets.reduce(
@@ -186,6 +218,20 @@ const SalaryDashboard = ({ staffList = [] }) => {
         />
       </div>
 
+      {/* ── Search bar ── */}
+      {sheets.length > 0 && (
+        <div className="relative">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[#555] pointer-events-none" />
+          <input
+            type="text"
+            value={searchQuery}
+            onChange={e => setSearchQuery(e.target.value)}
+            placeholder="Search employee..."
+            className="w-full bg-black/20 border border-white/10 text-white placeholder:text-[#555] rounded-xl pl-9 pr-4 py-2.5 text-sm outline-none focus:border-[#D4AF37] transition-all"
+          />
+        </div>
+      )}
+
       {/* ── Summary strip (after calculation) ── */}
       {sheets.length > 0 && (
         <motion.div
@@ -260,6 +306,13 @@ const SalaryDashboard = ({ staffList = [] }) => {
               <Save className="w-3.5 h-3.5" />
               {saving ? 'Saving…' : 'Save All Sheets'}
             </button>
+            <button
+              onClick={exportCSV}
+              className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold bg-blue-600 hover:bg-blue-700 text-white transition-all"
+            >
+              <FileDown className="w-3.5 h-3.5" />
+              Export CSV
+            </button>
           </>
         )}
       </div>
@@ -288,7 +341,11 @@ const SalaryDashboard = ({ staffList = [] }) => {
       {/* ── Salary cards ── */}
       {sheets.length > 0 && (
         <div className="space-y-3">
-          {sheets.map(sheet => {
+          {filteredSheets.length === 0 ? (
+            <p className={`${T?.muted || 'text-[#A3A3A3]'} text-sm text-center py-6`}>
+              No staff match "{searchQuery}"
+            </p>
+          ) : filteredSheets.map(sheet => {
             const staff = staffList.find(s => s.id === sheet.staffId) || {};
             return (
               <SalaryCard
