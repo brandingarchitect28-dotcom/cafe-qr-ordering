@@ -24,7 +24,7 @@ import React, { useState, useRef, useCallback } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
 import { useDocument } from '../../hooks/useFirestore';
 import { db } from '../../lib/firebase';
-import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
+import { collection, addDoc, serverTimestamp, getDoc, doc } from 'firebase/firestore';
 import { motion, AnimatePresence } from 'framer-motion';
 import { toast } from 'sonner';
 import {
@@ -195,6 +195,21 @@ const AIMenuUpload = ({ onClose }) => {
   const [enrichProgress,   setEnrichProgress  ] = useState(0);         // 0-100
   const [enrichTotal,      setEnrichTotal     ] = useState(0);
 
+  // ── Platform-wide Pexels key — fetched from appSettings/global ───────────────
+  // Stored once by platform owner, used by ALL café owners automatically.
+  // Falls back to '' gracefully — media step just skips Pexels if missing.
+  const [pexelsKey, setPexelsKey] = useState('');
+
+  useEffect(() => {
+    getDoc(doc(db, 'appSettings', 'global'))
+      .then(snap => {
+        if (snap.exists()) {
+          setPexelsKey(snap.data()?.pexelsApiKey || '');
+        }
+      })
+      .catch(() => {}); // silent fail — Pexels simply won't be used
+  }, []);
+
   const isEnabled = cafe?.features?.aiMenu;
 
   // FIX 2: Add `cafe` and `cafeLoading` to dependency array so processFile
@@ -330,7 +345,7 @@ const AIMenuUpload = ({ onClose }) => {
       }
 
       // Step B: Media resolution per item (if user wants media)
-      const pexelsKey = cafe?.pexelsApiKey || '';
+      // pexelsKey is fetched from appSettings/global — platform-wide, works for all cafés
       const withMedia = await Promise.all(
         enriched.map(async (item, idx) => {
           if (mediaPreference === 'none') return item;
@@ -582,8 +597,11 @@ const AIMenuUpload = ({ onClose }) => {
               </p>
               <p className="text-[#555] text-xs">
                 Auto-fetch food photos or videos for each item.
-                {!cafe?.pexelsApiKey && (
-                  <span className="text-amber-400"> Add your Pexels API key in Settings to enable this.</span>
+                {!pexelsKey && (
+                  <span className="text-amber-400"> Pexels key not configured — will use AI image fallback.</span>
+                )}
+                {pexelsKey && (
+                  <span className="text-emerald-400"> ✓ Pexels connected — photos &amp; videos ready.</span>
                 )}
               </p>
               <div className="grid grid-cols-3 gap-2">
