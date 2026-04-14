@@ -392,6 +392,7 @@ const AIMenuUpload = ({ onClose }) => {
           ...(item.carbs       && { carbs:       item.carbs       }),
           ...(item.fat         && { fat:         item.fat         }),
           ...(item.addons      && { addons:      item.addons      }),
+          ...(item.sizePricing && { sizePricing: item.sizePricing }),
         })
       );
       await Promise.all(batch);
