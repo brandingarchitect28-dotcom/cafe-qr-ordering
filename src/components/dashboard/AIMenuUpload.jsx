@@ -355,7 +355,8 @@ const AIMenuUpload = ({ onClose }) => {
             const processed = await processMediaForStorage(raw);
             if (!processed) return item;
             return { ...item, mediaUrl: processed.url, mediaType: processed.type };
-          } catch {
+          } catch (mediaErr) {
+            console.warn('[AIMenuUpload] Media fetch failed for', item.name, ':', mediaErr?.message || mediaErr);
             return item; // Failsafe — never block
           } finally {
             setEnrichProgress(50 + Math.round(((idx + 1) / enriched.length) * 50)); // 50-100%
@@ -374,11 +375,15 @@ const AIMenuUpload = ({ onClose }) => {
           price:       parseFloat(item.price) || 0,
           category:    item.category || 'Other',
           description: item.description || '',
-          image:       '',
           available:   true,
           createdAt:   serverTimestamp(),
           source:      'ai_upload',
-          // ── New optional fields (undefined = not stored, backward compatible) ──
+          // ── BUG FIX: image field now populated from resolved media ──────────
+          // All ordering pages (CafeOrdering, CafeOrderingPremium, etc.) read
+          // the `image` field. Previously hardcoded to '' so media never showed.
+          image:       item.mediaUrl && item.mediaType === 'image' ? item.mediaUrl : '',
+          video:       item.mediaUrl && item.mediaType === 'video' ? item.mediaUrl : '',
+          // ── New optional fields (backward compatible) ───────────────────────
           ...(item.mediaUrl  && { mediaUrl:  item.mediaUrl  }),
           ...(item.mediaType && { mediaType: item.mediaType }),
           ...(item.ingredients && { ingredients: item.ingredients }),
