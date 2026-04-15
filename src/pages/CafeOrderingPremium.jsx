@@ -576,24 +576,40 @@ const CafeOrderingPremium = () => {
     });
   }, []);
 
+  // ─── FIX: size key → human label helper ───────────────────────────────────
+  // Maps sizePricing keys ('small','medium','large') to display labels.
+  // Used so selectedVariant is always the human-readable label, not the raw key.
+  const sizeKeyToLabel = (key) => {
+    if (!key) return null;
+    const map = { small: 'Small', medium: 'Medium', large: 'Large' };
+    return map[key] || key;
+  };
+
   const addToCart = useCallback((item, size = null) => {
     if (item.addons?.length > 0) {
-  setAddonModal({ ...item, selectedSize: size });
-  return;
-  }
-  
-  const selectedPrice = size && item.sizePricing?.[size]
+      // FIX: pass sizeLabel into addonModal so AddOnModal can forward selectedVariant
+      const sizeLabel = sizeKeyToLabel(size);
+      setAddonModal({ ...item, selectedSize: sizeLabel, selectedVariant: sizeLabel });
+      return;
+    }
+
+    const selectedPrice = size && item.sizePricing?.[size]
       ? parseFloat(item.sizePricing[size])
       : item.price;
+
+    // FIX: convert raw size key to human label for selectedVariant
+    const sizeLabel = sizeKeyToLabel(size);
+
     directAddToCart({
       ...item,
-      price:        selectedPrice,
-      basePrice:    selectedPrice,
-      selectedSize: size || null,
-      quantity:     1,
-      addons:       [],
-      addonTotal:   0,
-      comboItems:   [],
+      price:           selectedPrice,
+      basePrice:       selectedPrice,
+      selectedSize:    sizeLabel,
+      selectedVariant: sizeLabel,   // ← FIX: always set selectedVariant
+      quantity:        1,
+      addons:          [],
+      addonTotal:      0,
+      comboItems:      [],
     });
   }, [directAddToCart]);
 
@@ -663,13 +679,14 @@ const CafeOrderingPremium = () => {
 
     directAddToCart({
       ...item,
-      price:        getFinalPrice(item),
-      basePrice:    size?.price ?? parseFloat(item.price),
-      selectedSize: size?.label || null,
-      quantity:     1,
-      addons:       activeAddons,
-      addonTotal:   activeAddons.reduce((s, a) => s + a.price * a.quantity, 0),
-      comboItems:   [],
+      price:           getFinalPrice(item),
+      basePrice:       size?.price ?? parseFloat(item.price),
+      selectedSize:    size?.label || null,
+      selectedVariant: size?.label || null,   // ← FIX: always set selectedVariant
+      quantity:        1,
+      addons:          activeAddons,
+      addonTotal:      activeAddons.reduce((s, a) => s + a.price * a.quantity, 0),
+      comboItems:      [],
     });
 
     // Reset per-item UI state after add
@@ -718,6 +735,7 @@ const CafeOrderingPremium = () => {
         addons:       [],
         addonTotal:   0,
         selectedSize: null,
+        selectedVariant: null,
         isOffer:      true,
         offerType:    'combo',
         items:        enrichedItems,
@@ -746,14 +764,15 @@ const CafeOrderingPremium = () => {
         const selectedPrice = parseFloat(discountedPrice.toFixed(2));
         setCart(prev => [...prev, {
           ...menuItem,
-          price:        selectedPrice,
-          basePrice:    selectedPrice,
-          quantity:     oi.quantity || 1,
-          addons:       [],
-          addonTotal:   0,
-          selectedSize: null,
-          isOffer:      true,
-          offerType:    'discount',
+          price:           selectedPrice,
+          basePrice:       selectedPrice,
+          quantity:        oi.quantity || 1,
+          addons:          [],
+          addonTotal:      0,
+          selectedSize:    null,
+          selectedVariant: null,
+          isOffer:         true,
+          offerType:       'discount',
         }]);
       });
       toast.success(`${offer.title} added to cart ✓`);
@@ -770,28 +789,30 @@ const CafeOrderingPremium = () => {
         if (buyQty > 0) {
           setCart(prev => [...prev, {
             ...menuItem,
-            price:        parseFloat(menuItem.price),
-            basePrice:    parseFloat(menuItem.price),
-            quantity:     buyQty,
-            addons:       [],
-            addonTotal:   0,
-            selectedSize: null,
-            isOffer:      true,
-            offerType:    'buy_x_get_y',
+            price:           parseFloat(menuItem.price),
+            basePrice:       parseFloat(menuItem.price),
+            quantity:        buyQty,
+            addons:          [],
+            addonTotal:      0,
+            selectedSize:    null,
+            selectedVariant: null,
+            isOffer:         true,
+            offerType:       'buy_x_get_y',
           }]);
         }
         if (getQty > 0) {
           setCart(prev => [...prev, {
             ...menuItem,
-            price:        0,
-            basePrice:    0,
-            quantity:     getQty,
-            addons:       [],
-            addonTotal:   0,
-            selectedSize: null,
-            isOffer:      true,
-            offerType:    'buy_x_get_y_free',
-            name:         `${menuItem.name} (Free)`,
+            price:           0,
+            basePrice:       0,
+            quantity:        getQty,
+            addons:          [],
+            addonTotal:      0,
+            selectedSize:    null,
+            selectedVariant: null,
+            isOffer:         true,
+            offerType:       'buy_x_get_y_free',
+            name:            `${menuItem.name} (Free)`,
           }]);
         }
       });
@@ -836,13 +857,15 @@ const CafeOrderingPremium = () => {
         cafeId,
         orderNumber: oNum,
         items: cart.map(i => ({
-          name:         i.name,
-          price:        i.basePrice ?? i.price,
-          quantity:     i.quantity,
-          addons:       i.addons       || [],
-          addonTotal:   i.addonTotal   || 0,
-          selectedSize: i.selectedSize || null,
-          comboItems:   i.comboItems   || [],
+          name:            i.name,
+          price:           i.basePrice ?? i.price,
+          basePrice:       i.basePrice ?? i.price,
+          quantity:        i.quantity,
+          addons:          i.addons          || [],
+          addonTotal:      i.addonTotal      || 0,
+          selectedSize:    i.selectedSize    || null,
+          selectedVariant: i.selectedVariant || null,  // ← FIX: always persisted
+          comboItems:      i.comboItems      || [],
           // TASK 1 + TASK 5: pass offer fields to orders dashboard + kitchen
           ...(i.isOffer   && { isOffer:   true        }),
           ...(i.offerType && { offerType: i.offerType }),
@@ -1348,7 +1371,9 @@ const CafeOrderingPremium = () => {
                         </div>
                       )}
                       <div className="flex-1 min-w-0">
-                        <p className="text-sm font-medium truncate" style={{ color: T.text }}>{item.name}</p>
+                        <p className="text-sm font-medium truncate" style={{ color: T.text }}>
+                          {item.name}{item.selectedVariant ? ` (${item.selectedVariant})` : ''}
+                        </p>
                         <p className="text-xs" style={{ color: T.textMuted }}>{CUR}{fmt(item.basePrice ?? item.price)}</p>
                         {item.comboItems?.length > 0 && (
                           <div className="mt-0.5">
@@ -1560,7 +1585,9 @@ const CafeOrderingPremium = () => {
                   {cart.map((item, idx) => (
                     <div key={`${item.id}-${idx}`} className="text-sm">
                       <div className="flex justify-between">
-                        <span style={{ color: T.textMuted }}>{item.name} × {item.quantity}</span>
+                        <span style={{ color: T.textMuted }}>
+                          {item.name}{item.selectedVariant ? ` (${item.selectedVariant})` : ''} × {item.quantity}
+                        </span>
                         <span style={{ color: T.text }}>{CUR}{fmt(item.price * item.quantity)}</span>
                       </div>
                       {item.comboItems?.length > 0 && (
