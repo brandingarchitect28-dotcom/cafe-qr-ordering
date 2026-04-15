@@ -564,6 +564,19 @@ const CafeOrderingPremium = () => {
     if (!customerPhone.trim()) { toast.error('Enter your phone number'); return; }
     setOrderPlacing(true);
     try {
+      // ── Utility: remove undefined values — Firestore rejects any undefined field ──
+      const removeUndefined = (obj) => {
+        if (Array.isArray(obj)) return obj.map(removeUndefined);
+        if (obj && typeof obj === 'object') {
+          return Object.fromEntries(
+            Object.entries(obj)
+              .filter(([, v]) => v !== undefined)
+              .map(([k, v]) => [k, removeUndefined(v)])
+          );
+        }
+        return obj;
+      };
+
       const counterRef = doc(db, 'system', 'counters');
       let oNum;
       await runTransaction(db, async (tx) => {
@@ -585,41 +598,53 @@ const CafeOrderingPremium = () => {
       const orderData = {
         cafeId,
         orderNumber: oNum,
-        items: cart.map(i => ({
-          name:         i.name,
-          price:        i.basePrice ?? i.price,
-          quantity:     i.quantity,
+        items: cart.map(i => removeUndefined({
+          name:         i.name         || '',
+          price:        parseFloat(i.basePrice ?? i.price) || 0,
+          quantity:     i.quantity     || 1,
           addons:       i.addons       || [],
           addonTotal:   i.addonTotal   || 0,
           selectedSize: i.selectedSize || null,
+          comboItems:   i.comboItems   || [],
+          ...(i.isOffer   && { isOffer:   true         }),
+          ...(i.offerType && { offerType: i.offerType  }),
+          ...(i.items     && { items:     i.items       }),
         })),
-        subtotalAmount: subtotal,
+        subtotalAmount:      subtotal,
         taxAmount,
         serviceChargeAmount: scAmount,
         gstAmount,
-        platformFeeAmount:   platformFeeCharge,
-        totalAmount: total,
-        currencyCode:   cafe?.currencyCode   || 'INR',
-        currencySymbol: cafe?.currencySymbol || '₹',
-        // TASK 1 FIX: Always 'pending' at creation. Never optimistically paid.
-        paymentStatus: 'pending',
+        platformFeeAmount:   platformFeeCharge || 0,
+        totalAmount:         total,
+        currencyCode:        cafe?.currencyCode   || 'INR',
+        currencySymbol:      cafe?.currencySymbol || '₹',
+        paymentStatus:       'pending',
         paymentMode,
-        orderStatus: 'new',
+        orderStatus:         'new',
         orderType,
         customerName,
         customerPhone,
-        ...(orderType === 'dine-in'  && { tableNumber }),
-        ...(orderType === 'delivery' && { deliveryAddress }),
+        ...(orderType === 'dine-in'  && tableNumber    && { tableNumber }),
+        ...(orderType === 'delivery' && deliveryAddress && { deliveryAddress }),
         ...(specialInstructions && { specialInstructions }),
         createdAt: serverTimestamp(),
       };
 
-      const orderRef = await addDoc(collection(db, 'orders'), orderData);
+      // Strip any remaining undefined values before Firestore write
+      const safeOrderData = removeUndefined(orderData);
+      console.log('[Order] Writing to Firestore:', {
+        cafeId,
+        itemCount: safeOrderData.items?.length,
+        totalAmount: safeOrderData.totalAmount,
+        orderType: safeOrderData.orderType,
+      });
 
-      createInvoiceForOrder({ ...orderData, orderNumber: oNum }, orderRef.id, cafe)
+      const orderRef = await addDoc(collection(db, 'orders'), safeOrderData);
+
+      createInvoiceForOrder({ ...safeOrderData, orderNumber: oNum }, orderRef.id, cafe)
         .catch(console.error);
-      deductStockForOrder(cafeId, orderData.items, menuItems).catch(console.error);
-      deductStockByRecipe(cafeId, orderData.items, menuItems).catch(console.error);
+      deductStockForOrder(cafeId, safeOrderData.items, menuItems).catch(console.error);
+      deductStockByRecipe(cafeId, safeOrderData.items, menuItems).catch(console.error);
 
       // TASK 7: Log order creation (no sensitive data)
       console.log('[Order] Created successfully:', {
@@ -748,8 +773,15 @@ const CafeOrderingPremium = () => {
       // Navigate customer to in-app order tracking
       navigate(`/track/${orderRef.id}`);
     } catch (err) {
-      toast.error('Failed to place order. Please try again.');
-      console.error(err);
+      // Verbose logging so the exact failure is visible in browser DevTools
+      console.error('[Order] PLACEMENT FAILED:', err.code || 'no-code', err.message);
+      if (err.code === 'permission-denied') {
+        console.error('[Order] FIRESTORE RULE ISSUE — check rules for orders collection');
+        toast.error('Order failed: permission denied. Contact support.');
+      } else {
+        toast.error('Failed to place order. Please try again.');
+      }
+      console.error('[Order] Full error:', err);
     } finally {
       setOrderPlacing(false);
     }

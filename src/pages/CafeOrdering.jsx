@@ -542,10 +542,33 @@ const CafeOrdering = () => {
       const gstAmount = calculateGST(); // legacy
       const total = calculateTotal();
 
-      const orderData = {
+      // ── Utility: remove undefined values — Firestore rejects any undefined field ──
+      const removeUndefined = (obj) => {
+        if (Array.isArray(obj)) return obj.map(removeUndefined);
+        if (obj && typeof obj === 'object') {
+          return Object.fromEntries(
+            Object.entries(obj)
+              .filter(([, v]) => v !== undefined)
+              .map(([k, v]) => [k, removeUndefined(v)])
+          );
+        }
+        return obj;
+      };
+
+      const orderData = removeUndefined({
         cafeId,
         orderNumber,
-        items: cart.map(item => ({ name: item.name, price: item.price, quantity: item.quantity, selectedSize: item.selectedSize || null })),
+        items: cart.map(item => removeUndefined({
+          name:         item.name         || '',
+          price:        parseFloat(item.price) || 0,
+          quantity:     item.quantity     || 1,
+          addons:       item.addons       || [],
+          addonTotal:   item.addonTotal   || 0,
+          selectedSize: item.selectedSize || null,
+          comboItems:   item.comboItems   || [],
+          ...(item.isOffer   && { isOffer:   true           }),
+          ...(item.offerType && { offerType: item.offerType }),
+        })),
         subtotalAmount: subtotal,
         taxAmount: taxAmount,
         serviceChargeAmount: serviceChargeAmount,
@@ -559,11 +582,18 @@ const CafeOrdering = () => {
         orderType,
         customerName,
         customerPhone,
-        ...(orderType === 'dine-in' && { tableNumber }),
-        ...(orderType === 'delivery' && { deliveryAddress }),
+        ...(orderType === 'dine-in' && tableNumber && { tableNumber }),
+        ...(orderType === 'delivery' && deliveryAddress && { deliveryAddress }),
         ...(specialInstructions && { specialInstructions }),
         createdAt: serverTimestamp()
-      };
+      });
+
+      console.log('[Order] Writing to Firestore:', {
+        cafeId,
+        itemCount: orderData.items?.length,
+        totalAmount: orderData.totalAmount,
+        orderType: orderData.orderType,
+      });
 
       const orderDocRef = await addDoc(collection(db, 'orders'), orderData);
 
@@ -644,8 +674,14 @@ const CafeOrdering = () => {
       window.location.href = whatsappUrl;
       
     } catch (error) {
-      console.error('Error placing order:', error);
-      toast.error('Failed to place order');
+      console.error('[Order] PLACEMENT FAILED:', error.code || 'no-code', error.message);
+      if (error.code === 'permission-denied') {
+        console.error('[Order] FIRESTORE RULE ISSUE — check rules for orders collection');
+        toast.error('Order failed: permission denied. Contact support.');
+      } else {
+        toast.error('Failed to place order. Please try again.');
+      }
+      console.error('[Order] Full error:', error);
     } finally {
       setOrderPlacing(false);
     }
