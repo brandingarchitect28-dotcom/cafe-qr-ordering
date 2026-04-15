@@ -14,7 +14,7 @@
 
 import React, { useState, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, ShoppingCart, Plus, Minus } from 'lucide-react';
+import { X, ShoppingCart, Plus, Minus, Check } from 'lucide-react';
 
 const fmt = (n) => (parseFloat(n) || 0).toFixed(2);
 
@@ -30,15 +30,24 @@ const AddOnModal = ({
   const primary = primaryColor   || '#D4AF37';
   const isDark  = theme !== 'light';
 
-  // CHANGE 1 — Replace bool-map `selected` with qty-map `addonQtys`.
-  // addonQtys[addonId] = 0 means not selected; > 0 means selected with that qty.
-  // This is the only state needed — the bool selected state is removed entirely.
-  const [addonQtys, setAddonQtys] = useState({});  // addonId → number (0 = off)
+  const [selected,  setSelected ] = useState({});  // addonId → true/false
   const [quantity,  setQuantity ] = useState(1);
 
-  const addons = item?.addons || [];
+  // normalizeAddons — guarantees every addon has an id before any state operations.
+  // Fixes: "clicking one addon updates ALL" (undefined key collision in addonQtys)
+  // and "manual addons disappearing" (React key=undefined de-duplication).
+  // Add-only — zero changes to addon rendering or confirmation logic.
+  const normalizeAddons = (list = []) =>
+    list.map((a, idx) => ({
+      ...a,
+      id:    a.id || `${a.name || 'addon'}-${idx}`,
+      name:  a.name  || '',
+      price: parseFloat(a.price) || 0,
+    }));
 
-  // Group add-ons by their group label — unchanged
+  const addons = normalizeAddons(item?.addons || []);
+
+  // Group add-ons by their group label
   const grouped = useMemo(() => {
     const map = {};
     addons.forEach(a => {
@@ -49,65 +58,36 @@ const AddOnModal = ({
     return map;
   }, [addons]);
 
-  // CHANGE 2 — increment / decrement helpers replace toggleAddon.
-  // incrementAddon: for single-type groups, zero all siblings first (radio
-  // behaviour preserved — only one option in the group can be > 0 at a time).
-  const incrementAddon = (addon) => {
-    setAddonQtys(prev => {
-      const next = { ...prev };
-      if (addon.type === 'single') {
-        // Zero every sibling in this radio group before setting this one to 1
-        addons
-          .filter(a => a.group === addon.group && a.type === 'single')
-          .forEach(a => { next[a.id] = 0; });
-        next[addon.id] = 1; // radio: max 1
-      } else {
-        next[addon.id] = (prev[addon.id] || 0) + 1;
-      }
-      return next;
-    });
-  };
-
-  const decrementAddon = (addon) => {
-    setAddonQtys(prev => {
-      const current = prev[addon.id] || 0;
-      if (current <= 1) {
+  const toggleAddon = (addon) => {
+    if (addon.type === 'single') {
+      // For single-select groups: deselect others in same group
+      const sameGroup = addons.filter(a => a.group === addon.group && a.type === 'single');
+      setSelected(prev => {
         const next = { ...prev };
-        next[addon.id] = 0; // drop to 0 = deselected
+        sameGroup.forEach(a => { next[a.id] = false; });
+        next[addon.id] = !prev[addon.id];
         return next;
-      }
-      return { ...prev, [addon.id]: current - 1 };
-    });
+      });
+    } else {
+      setSelected(prev => ({ ...prev, [addon.id]: !prev[addon.id] }));
+    }
   };
 
-  // CHANGE 3 — selectedAddons and addonTotal now use qty.
-  // selectedAddons: only addons whose qty > 0.
-  // addonTotal: sum(price × qty) instead of sum(price × 1).
-  const selectedAddons = addons.filter(a => (addonQtys[a.id] || 0) > 0);
-  const addonTotal     = addons.reduce(
-    (sum, a) => sum + (a.price || 0) * (addonQtys[a.id] || 0), 0
-  );
-  const itemTotal = (parseFloat(item.price) + addonTotal) * quantity;
+  const selectedAddons = addons.filter(a => selected[a.id]);
+  const addonTotal     = selectedAddons.reduce((sum, a) => sum + (a.price || 0), 0);
+  const itemTotal      = (parseFloat(item.price) + addonTotal) * quantity;
 
-  // CHANGE 4 — handleConfirm now includes quantity on each addon entry.
-  // Structure: { id, name, price, quantity }
-  // addonTotal is sum(price × qty) — already computed correctly above.
   const handleConfirm = () => {
+    // Cart entry structure — fully backward compatible
+    // Items without addons use the same fields, addons/addonTotal just default to []
     onConfirm({
       ...item,
-      selectedSize:    item.selectedSize    || null,
-      selectedVariant: item.selectedVariant || null,
       quantity,
-      addons: selectedAddons.map(a => ({
-        id:       a.id,
-        name:     a.name,
-        price:    a.price,
-        quantity: addonQtys[a.id] || 1,  // always ≥ 1 since selectedAddons filters qty > 0
-      })),
-      addonTotal,
-      // finalPrice = variantPrice (or basePrice) + addonTotal
-      price:     parseFloat(item.price) + addonTotal,
-      basePrice: parseFloat(item.price),
+      addons:     selectedAddons.map(a => ({ id: a.id, name: a.name, price: a.price })),
+      addonTotal, // extra amount from addons only
+      // effectivePrice = base + addonTotal so pricing system works without changes
+      price:      parseFloat(item.price) + addonTotal,
+      basePrice:  parseFloat(item.price), // keep original for display
     });
   };
 
@@ -179,66 +159,35 @@ const AddOnModal = ({
                   )}
                   <div className="space-y-2">
                     {groupAddons.map(addon => {
-                      const qty  = addonQtys[addon.id] || 0;
-                      const isOn = qty > 0;
-                      // CHANGE 5 — Row is now a plain div, not a button.
-                      // Interaction via [-] / [+] buttons inside the row.
-                      // Active state (isOn) styling is identical to the old
-                      // checked state — no visual design changes.
+                      const isOn = !!selected[addon.id];
                       return (
-                        <motion.div
+                        <motion.button
                           key={addon.id}
-                          layout
-                          className="w-full flex items-center justify-between p-3 rounded-xl"
+                          type="button"
+                          whileTap={{ scale: 0.98 }}
+                          onClick={() => toggleAddon(addon)}
+                          className="w-full flex items-center justify-between p-3 rounded-xl text-left transition-all"
                           style={{
                             background: isOn ? `${primary}14` : surface,
                             border: `1.5px solid ${isOn ? primary : border}`,
-                            transition: 'background 0.15s, border-color 0.15s',
                           }}
                         >
-                          {/* Left — addon name + per-unit price */}
-                          <div className="flex-1 min-w-0 pr-3">
-                            <span className="text-sm font-medium" style={{ color: text }}>
-                              {addon.name}
-                            </span>
-                            <span className="text-xs ml-2" style={{ color: addon.price > 0 ? primary : muted }}>
-                              {addon.price > 0 ? `+${CUR}${fmt(addon.price)} each` : 'Free'}
-                            </span>
-                          </div>
-
-                          {/* Right — [-] qty [+] controls */}
-                          <div className="flex items-center gap-2 flex-shrink-0">
-                            <button
-                              type="button"
-                              onClick={() => decrementAddon(addon)}
-                              // Visually disabled at qty=0 but still tappable (no-op via decrement logic)
-                              className="w-7 h-7 rounded-full flex items-center justify-center transition-all"
+                          <div className="flex items-center gap-3">
+                            {/* Checkbox / Radio indicator */}
+                            <div className="w-5 h-5 flex-shrink-0 rounded-full flex items-center justify-center transition-all"
                               style={{
-                                background: isOn ? `${primary}22` : surface,
-                                border: `1px solid ${isOn ? primary : border}`,
-                                opacity: isOn ? 1 : 0.45,
-                              }}
-                            >
-                              <Minus className="w-3 h-3" style={{ color: isOn ? primary : muted }} />
-                            </button>
-
-                            <span
-                              className="text-sm font-bold min-w-[18px] text-center"
-                              style={{ color: isOn ? primary : muted }}
-                            >
-                              {qty}
-                            </span>
-
-                            <button
-                              type="button"
-                              onClick={() => incrementAddon(addon)}
-                              className="w-7 h-7 rounded-full flex items-center justify-center transition-all text-black"
-                              style={{ background: primary }}
-                            >
-                              <Plus className="w-3 h-3" />
-                            </button>
+                                background: isOn ? primary : 'transparent',
+                                border: `2px solid ${isOn ? primary : border}`,
+                                borderRadius: addon.type === 'single' ? '50%' : '4px',
+                              }}>
+                              {isOn && <Check className="w-3 h-3 text-black" strokeWidth={3} />}
+                            </div>
+                            <span className="text-sm font-medium" style={{ color: text }}>{addon.name}</span>
                           </div>
-                        </motion.div>
+                          <span className="text-sm font-bold flex-shrink-0" style={{ color: addon.price > 0 ? primary : muted }}>
+                            {addon.price > 0 ? `+${CUR}${fmt(addon.price)}` : 'Free'}
+                          </span>
+                        </motion.button>
                       );
                     })}
                   </div>
@@ -249,21 +198,15 @@ const AddOnModal = ({
 
           {/* Footer */}
           <div className="p-5 pt-3 space-y-3" style={{ borderTop: `1px solid ${border}` }}>
-            {/* CHANGE 6 — Addon summary shows qty and total per addon */}
+            {/* Add-on summary */}
             {selectedAddons.length > 0 && (
               <div className="text-xs space-y-0.5" style={{ color: muted }}>
-                {selectedAddons.map(a => {
-                  const qty      = addonQtys[a.id] || 1;
-                  const lineAmt  = (a.price || 0) * qty;
-                  return (
-                    <div key={a.id} className="flex justify-between">
-                      <span>{a.name}{qty > 1 ? ` ×${qty}` : ''}</span>
-                      <span style={{ color: primary }}>
-                        {lineAmt > 0 ? `+${CUR}${fmt(lineAmt)}` : 'Free'}
-                      </span>
-                    </div>
-                  );
-                })}
+                {selectedAddons.map(a => (
+                  <div key={a.id} className="flex justify-between">
+                    <span>{a.name}</span>
+                    <span style={{ color: primary }}>+{CUR}{fmt(a.price)}</span>
+                  </div>
+                ))}
               </div>
             )}
 
