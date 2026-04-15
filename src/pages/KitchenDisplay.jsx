@@ -7,6 +7,8 @@
  * - All order mutations go through the same `orders/{orderId}.orderStatus`
  *   field used by Dashboard / Analytics / OrdersManagement — fully compatible.
  * - Statuses: new → preparing → ready → completed
+ *
+ * PATCH: Added selectedVariant size label display next to item names.
  */
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
@@ -161,7 +163,10 @@ const OrderCard = ({ order, onAdvance, advancing }) => {
         {(order.items || []).map((item, idx) => (
           <div key={idx} className="flex items-baseline justify-between gap-2">
             <div className="flex-1 min-w-0">
-              <span className="text-white text-sm font-medium leading-snug">{item.name}</span>
+              {/* PATCH: append (Size) if selectedVariant exists */}
+              <span className="text-white text-sm font-medium leading-snug">
+                {item.name}{item.selectedVariant ? ` (${item.selectedVariant})` : ''}
+              </span>
 
               {/* Combo items */}
               {item.comboItems?.length > 0 && (
@@ -177,7 +182,6 @@ const OrderCard = ({ order, onAdvance, advancing }) => {
               {/* Addons */}
               {item.addons?.length > 0 && (
                 <div style={{ fontSize: '12px', opacity: 0.8, color: '#A3A3A3', paddingLeft: '8px' }}>
-                  {/* CHANGE 9 — Show addon qty when > 1 e.g. "Jam ×2, Butter" */}
                   + {item.addons.map(a => a.quantity > 1 ? `${a.name} ×${a.quantity}` : a.name).join(', ')}
                 </div>
               )}
@@ -283,8 +287,6 @@ const KitchenDisplay = () => {
   useEffect(() => {
     if (!cafeId) return;
 
-    // Fetch only non-completed orders for the kitchen board.
-    // Completed orders move off the board automatically.
     const q = query(
       collection(db, 'orders'),
       where('cafeId', '==', cafeId),
@@ -306,7 +308,6 @@ const KitchenDisplay = () => {
               { duration: 6000, icon: '🍽️' }
             );
           });
-          // Jump to page 0 so new orders are visible at the top
           setColPages({ new: 0, preparing: 0, ready: 0 });
         }
       }
@@ -326,7 +327,6 @@ const KitchenDisplay = () => {
   const playNotify = useCallback(() => {
     try {
       const ctx = new (window.AudioContext || window.webkitAudioContext)();
-      // Simple two-tone chime — no external file needed
       [0, 200].forEach((delay, i) => {
         const osc  = ctx.createOscillator();
         const gain = ctx.createGain();
@@ -348,9 +348,8 @@ const KitchenDisplay = () => {
     try {
       await updateDoc(doc(db, 'orders', orderId), {
         orderStatus: nextStatus,
-        [`${nextStatus}At`]: serverTimestamp(),  // audit trail field
+        [`${nextStatus}At`]: serverTimestamp(),
       });
-      // If completed → remove from kitchen board (listener filters it out automatically)
     } catch (err) {
       console.error('[KDS] Failed to update order:', err);
       toast.error('Failed to update order status');
@@ -364,7 +363,6 @@ const KitchenDisplay = () => {
     const allColOrders = orders
       .filter(o => o.orderStatus === col.id)
       .sort((a, b) => {
-        // Newest orders on top (descending)
         const ta = a.createdAt?.toDate?.() || new Date(0);
         const tb = b.createdAt?.toDate?.() || new Date(0);
         return tb - ta;
@@ -427,7 +425,6 @@ const KitchenDisplay = () => {
         className="flex-shrink-0 flex items-center justify-between px-5 py-3 border-b"
         style={{ borderColor: 'rgba(255,255,255,0.06)', backgroundColor: '#0A0A0A' }}
       >
-        {/* Left: cafe name + KDS badge */}
         <div className="flex items-center gap-3">
           <div
             className="w-9 h-9 rounded-lg flex items-center justify-center"
@@ -446,7 +443,6 @@ const KitchenDisplay = () => {
           </div>
         </div>
 
-        {/* Centre: active order count */}
         <div className="flex items-center gap-5">
           <div className="text-center hidden sm:block">
             <p className="text-[28px] font-bold leading-none" style={{ color: '#D4AF37' }}>
@@ -466,7 +462,6 @@ const KitchenDisplay = () => {
           ))}
         </div>
 
-        {/* Right: time + date + network */}
         <div className="flex items-center gap-4">
           <div className="text-right hidden sm:block">
             <p className="text-sm font-bold text-white">{timeStr}</p>
@@ -483,7 +478,7 @@ const KitchenDisplay = () => {
         </div>
       </header>
 
-      {/* ── Column headers (tablet pill row) ─────────────────────────────── */}
+      {/* ── Column headers ────────────────────────────────────────────────── */}
       <div
         className="flex-shrink-0 flex items-stretch gap-px border-b"
         style={{ borderColor: 'rgba(255,255,255,0.05)', backgroundColor: '#080808' }}
@@ -519,7 +514,6 @@ const KitchenDisplay = () => {
             className="flex-1 flex flex-col overflow-hidden"
             style={{ backgroundColor: col.bg }}
           >
-            {/* Scrollable card list */}
             <div className="flex-1 overflow-y-auto p-3 space-y-3">
               <AnimatePresence mode="popLayout">
                 {col.orders.length === 0 ? (
@@ -553,7 +547,7 @@ const KitchenDisplay = () => {
               </AnimatePresence>
             </div>
 
-            {/* Pagination controls — only shown when column has >PAGE_SIZE orders */}
+            {/* Pagination controls */}
             {col.totalCount > PAGE_SIZE && (
               <div className="flex items-center justify-between px-3 py-2 border-t"
                 style={{ borderColor: col.border, background: col.bg }}>
@@ -582,7 +576,7 @@ const KitchenDisplay = () => {
         ))}
       </div>
 
-      {/* ── Loading overlay (first data fetch) ────────────────────────────── */}
+      {/* ── Loading overlay ────────────────────────────────────────────────── */}
       <AnimatePresence>
         {!ordersReady && (
           <motion.div
