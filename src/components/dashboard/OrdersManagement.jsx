@@ -19,36 +19,24 @@ const NOTIFICATION_SOUND = 'data:audio/mp3;base64,SUQzBAAAAAAAI1RTU0UAAAAPAAADTG
 // Used by every write path (handleSave, handleRemoveItem) AND every display
 // path (footer totals, Grand Total). Guarantees both screens always match.
 //
-// Addon quantity rule:
-//   Each addon entry has its own quantity (a.quantity, defaults 1).
-//   The item itself has item.quantity.
-//   addonLineTotal = a.price × a.quantity   (per-addon amount for 1 item)
-//   itemAddonTotal = SUM(addonLineTotals)   (all addons for 1 item)
-//   fullAddonTotal = itemAddonTotal × item.quantity  (scaled by item qty)
-//
-// Example: 2× Noodles, addon Sauce ×1 @ ₹10, addon Cheese ×2 @ ₹15
-//   itemAddonTotal = (10×1) + (15×2) = 40
-//   fullAddonTotal = 40 × 2 = 80
-//   itemBaseTotal  = 150 × 2 = 300
-//   itemTotal      = 300 + 80 = 380
+// NULL-SAFE: all fields guarded — never crashes on missing/null data.
 const calculateOrderTotals = (items = []) => {
+  if (!Array.isArray(items)) return { itemsTotal: 0, addonsTotal: 0, grandTotal: 0 };
   const safeN = v => { const n = parseFloat(v); return isNaN(n) || !isFinite(n) ? 0 : n; };
-  let itemsTotal  = 0;
-  let addonsTotal = 0;
+  let itemsTotal = 0, addonsTotal = 0;
 
   for (const item of items) {
-    const basePrice = safeN(item.basePrice ?? item.price);
-    const qty       = safeN(item.quantity) || 1;
+    if (!item) continue;
+    const base = safeN(item.basePrice ?? item.price);
+    const qty  = safeN(item.quantity) || 1;
+    // Each addon has its own quantity (a.quantity, default 1)
     const addons    = Array.isArray(item.addons) ? item.addons : [];
-
-    // per-addon qty is stored in a.quantity (from AddOnModal); default 1
-    const itemAddonAmt = addons.reduce(
-      (s, a) => s + safeN(a.price) * (parseInt(a.quantity) || 1),
-      0
-    );
-
-    itemsTotal  += basePrice    * qty;
-    addonsTotal += itemAddonAmt * qty;
+    const addonAmt  = addons.reduce((s, a) => {
+      if (!a) return s;
+      return s + safeN(a.price) * (parseInt(a.quantity) || 1);
+    }, 0);
+    itemsTotal  += base    * qty;
+    addonsTotal += addonAmt * qty;
   }
 
   return { itemsTotal, addonsTotal, grandTotal: itemsTotal + addonsTotal };
@@ -1418,11 +1406,10 @@ const OrdersManagement = () => {
                                   })}
                                   {/* Order total breakdown */}
                                   {(() => {
-                                    const CUR_D   = order.currencySymbol || cafeCurrency;
-                                    const safeN   = v => { const n = parseFloat(v); return isNaN(n) ? 0 : n; };
-                                    const { itemsTotal, addonsTotal, grandTotal: itemsPlusAddons } = calculateOrderTotals(order.items || []);
-                                    // Apply fees on top of the computed subtotal
-                                    const fees = safeN(order.gstAmount) + safeN(order.taxAmount) + safeN(order.serviceChargeAmount) + safeN(order.platformFeeAmount);
+                                    const CUR_D = order.currencySymbol || cafeCurrency;
+                                    const sN    = v => { const n = parseFloat(v); return isNaN(n) ? 0 : n; };
+                                    const { itemsTotal, addonsTotal, grandTotal: itemsPlusAddons } = calculateOrderTotals(order?.items || []);
+                                    const fees = sN(order?.gstAmount) + sN(order?.taxAmount) + sN(order?.serviceChargeAmount) + sN(order?.platformFeeAmount);
                                     const computedGrand = itemsPlusAddons + fees;
                                     return (
                                       <div className="border-t border-white/10 pt-2 mt-2 space-y-1">
@@ -1436,10 +1423,10 @@ const OrdersManagement = () => {
                                             <span>+{CUR_D}{addonsTotal.toFixed(2)}</span>
                                           </div>
                                         )}
-                                        {safeN(order.gstAmount) > 0 && <div className="flex justify-between text-xs" style={{ color: '#555' }}><span>GST</span><span>+{CUR_D}{safeN(order.gstAmount).toFixed(2)}</span></div>}
-                                        {safeN(order.taxAmount) > 0 && <div className="flex justify-between text-xs" style={{ color: '#555' }}><span>Tax</span><span>+{CUR_D}{safeN(order.taxAmount).toFixed(2)}</span></div>}
-                                        {safeN(order.serviceChargeAmount) > 0 && <div className="flex justify-between text-xs" style={{ color: '#555' }}><span>Service Charge</span><span>+{CUR_D}{safeN(order.serviceChargeAmount).toFixed(2)}</span></div>}
-                                        {safeN(order.platformFeeAmount) > 0 && <div className="flex justify-between text-xs" style={{ color: '#555' }}><span>Platform Fee</span><span>+{CUR_D}{safeN(order.platformFeeAmount).toFixed(2)}</span></div>}
+                                        {sN(order?.gstAmount) > 0 && <div className="flex justify-between text-xs" style={{ color: '#555' }}><span>GST</span><span>+{CUR_D}{sN(order.gstAmount).toFixed(2)}</span></div>}
+                                        {sN(order?.taxAmount) > 0 && <div className="flex justify-between text-xs" style={{ color: '#555' }}><span>Tax</span><span>+{CUR_D}{sN(order.taxAmount).toFixed(2)}</span></div>}
+                                        {sN(order?.serviceChargeAmount) > 0 && <div className="flex justify-between text-xs" style={{ color: '#555' }}><span>Service Charge</span><span>+{CUR_D}{sN(order.serviceChargeAmount).toFixed(2)}</span></div>}
+                                        {sN(order?.platformFeeAmount) > 0 && <div className="flex justify-between text-xs" style={{ color: '#555' }}><span>Platform Fee</span><span>+{CUR_D}{sN(order.platformFeeAmount).toFixed(2)}</span></div>}
                                         <div className="flex justify-between font-bold text-sm pt-1 border-t border-white/10">
                                           <span className="text-white">Grand Total</span>
                                           <span className="text-[#D4AF37]">{CUR_D}{computedGrand.toFixed(2)}</span>
@@ -1633,10 +1620,10 @@ const OrdersManagement = () => {
                         })}
                         {/* Order total breakdown (mobile) */}
                         {(() => {
-                          const CUR_M   = order.currencySymbol || cafeCurrency;
-                          const safeN   = v => { const n = parseFloat(v); return isNaN(n) ? 0 : n; };
-                          const { itemsTotal, addonsTotal, grandTotal: itemsPlusAddons } = calculateOrderTotals(order.items || []);
-                          const fees = safeN(order.gstAmount) + safeN(order.taxAmount) + safeN(order.serviceChargeAmount) + safeN(order.platformFeeAmount);
+                          const CUR_M = order.currencySymbol || cafeCurrency;
+                          const sN    = v => { const n = parseFloat(v); return isNaN(n) ? 0 : n; };
+                          const { itemsTotal, addonsTotal, grandTotal: itemsPlusAddons } = calculateOrderTotals(order?.items || []);
+                          const fees = sN(order?.gstAmount) + sN(order?.taxAmount) + sN(order?.serviceChargeAmount) + sN(order?.platformFeeAmount);
                           const computedGrand = itemsPlusAddons + fees;
                           return (
                             <div className="border-t border-white/10 pt-2 mt-1 space-y-1">
@@ -1650,10 +1637,10 @@ const OrdersManagement = () => {
                                   <span>+{CUR_M}{addonsTotal.toFixed(2)}</span>
                                 </div>
                               )}
-                              {safeN(order.gstAmount) > 0 && <div className="flex justify-between text-xs" style={{ color: '#555' }}><span>GST</span><span>+{CUR_M}{safeN(order.gstAmount).toFixed(2)}</span></div>}
-                              {safeN(order.taxAmount) > 0 && <div className="flex justify-between text-xs" style={{ color: '#555' }}><span>Tax</span><span>+{CUR_M}{safeN(order.taxAmount).toFixed(2)}</span></div>}
-                              {safeN(order.serviceChargeAmount) > 0 && <div className="flex justify-between text-xs" style={{ color: '#555' }}><span>Service Charge</span><span>+{CUR_M}{safeN(order.serviceChargeAmount).toFixed(2)}</span></div>}
-                              {safeN(order.platformFeeAmount) > 0 && <div className="flex justify-between text-xs" style={{ color: '#555' }}><span>Platform Fee</span><span>+{CUR_M}{safeN(order.platformFeeAmount).toFixed(2)}</span></div>}
+                              {sN(order?.gstAmount) > 0 && <div className="flex justify-between text-xs" style={{ color: '#555' }}><span>GST</span><span>+{CUR_M}{sN(order.gstAmount).toFixed(2)}</span></div>}
+                              {sN(order?.taxAmount) > 0 && <div className="flex justify-between text-xs" style={{ color: '#555' }}><span>Tax</span><span>+{CUR_M}{sN(order.taxAmount).toFixed(2)}</span></div>}
+                              {sN(order?.serviceChargeAmount) > 0 && <div className="flex justify-between text-xs" style={{ color: '#555' }}><span>Service Charge</span><span>+{CUR_M}{sN(order.serviceChargeAmount).toFixed(2)}</span></div>}
+                              {sN(order?.platformFeeAmount) > 0 && <div className="flex justify-between text-xs" style={{ color: '#555' }}><span>Platform Fee</span><span>+{CUR_M}{sN(order.platformFeeAmount).toFixed(2)}</span></div>}
                               <div className="flex justify-between font-bold text-sm pt-1 border-t border-white/10">
                                 <span className="text-white">Grand Total</span>
                                 <span className="text-[#D4AF37]">{CUR_M}{computedGrand.toFixed(2)}</span>
