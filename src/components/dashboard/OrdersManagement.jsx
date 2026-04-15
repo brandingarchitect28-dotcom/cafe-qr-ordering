@@ -100,6 +100,19 @@ const AddItemsToOrderModal = ({ order, cafeCurrency, onClose }) => {
   }, []);
 
   const addToNewCart = useCallback((item, forcedVariant) => {
+    if (!item) return;
+
+    // If item already exists in cart, increment it directly (skip variant picker)
+    const existing = newCart.find(i =>
+      i.id === item.id && !i.addons?.length
+        ? !i.selectedSize || i.selectedSize === (forcedVariant?.name || null)
+        : false
+    );
+    if (existing && !forcedVariant) {
+      directAddToNewCart({ ...existing });
+      return;
+    }
+
     // VARIANT FIX: if item has variants and no variant has been forced, show picker
     const variants = Array.isArray(item.variants) ? item.variants
       : Array.isArray(item.sizes) ? item.sizes
@@ -112,9 +125,7 @@ const AddItemsToOrderModal = ({ order, cafeCurrency, onClose }) => {
     }
 
     // Build the resolved price: forced variant overrides base price
-    const resolvedPrice = forcedVariant
-      ? parseFloat(forcedVariant.price) || parseFloat(item.price)
-      : parseFloat(item.price);
+    const resolvedPrice       = forcedVariant ? (parseFloat(forcedVariant.price) || parseFloat(item.price) || 0) : (parseFloat(item.price) || 0);
     const resolvedVariantName = forcedVariant?.name || null;
 
     // ADDON FIX: item.addons here is the *available* addons config list
@@ -138,9 +149,9 @@ const AddItemsToOrderModal = ({ order, cafeCurrency, onClose }) => {
       quantity:        1,
       addons:          [],
       addonTotal:      0,
-      comboItems:      [],
+      comboItems:      Array.isArray(item.comboItems) ? item.comboItems : [],
     });
-  }, [directAddToNewCart]);
+  }, [directAddToNewCart, newCart]);
 
   const removeFromNewCart = useCallback((id) => {
     setNewCart(prev => {
