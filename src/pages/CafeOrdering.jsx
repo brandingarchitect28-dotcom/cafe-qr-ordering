@@ -357,11 +357,11 @@ const CafeOrdering = () => {
 
   // Cart functions
   const addToCart = (item, size = null) => {
-    // ── Show addon modal if item has addons and no size is pre-selected ──────
-    // This matches CafeOrderingPremium behaviour — items with addons show
-    // the selection modal before being added to cart.
-    if (!size && item.addons?.length > 0) {
-      setAddonModal(item);
+    // ── Show addon modal if item has addons ───────────────────────────────────
+    // Applies whether or not a size is selected — the modal receives the
+    // chosen size so it can price correctly.
+    if (item.addons?.length > 0) {
+      setAddonModal({ item, size });
       return;
     }
     const selectedPrice = size && item.sizePricing?.[size]
@@ -1041,8 +1041,8 @@ const CafeOrdering = () => {
                 initial="rest"
                 whileHover="hover"
                 animate={addingItemId === item.id ? { scale: [1, 0.95, 1] } : "rest"}
-                className="rounded-2xl overflow-hidden shadow-md group" style={{ backgroundColor: COLORS.cardBg }}
-                style={{ boxShadow: `0 4px 20px ${COLORS.shadow}` }}
+                className="rounded-2xl overflow-hidden shadow-md group"
+                style={{ backgroundColor: COLORS.cardBg, boxShadow: `0 4px 20px ${COLORS.shadow}` }}
               >
                 {/* Item Image */}
                 <div className="aspect-square overflow-hidden relative">
@@ -1449,26 +1449,39 @@ const CafeOrdering = () => {
       </AnimatePresence>
 
       {/* ── AddOnModal — shows addon selection for items with addons ───────── */}
-      {addonModal && (
-        <AddOnModal
-          item={addonModal}
-          onConfirm={(entry) => {
-            // Add the confirmed cart entry (with selected addons) to cart
-            setCart(prev => [...prev, {
-              ...entry,
-              quantity:   entry.quantity   || 1,
-              addons:     entry.addons     || [],
-              addonTotal: entry.addonTotal || 0,
-            }]);
-            setAddonModal(null);
-            toast.success(`${entry.name} added to cart`, { duration: 2000 });
-          }}
-          onClose={() => setAddonModal(null)}
-          currencySymbol={cafe?.currencySymbol || '₹'}
-          primaryColor={cafe?.primaryColor   || '#D4AF37'}
-          theme={cafe?.mode}
-        />
-      )}
+      {addonModal && (() => {
+        // addonModal shape: { item, size } — size may be null
+        const modalItem = addonModal.item || addonModal; // backward-compat
+        const modalSize = addonModal.size || null;
+        // Resolve the correct base price for the chosen size
+        const sizePrice = modalSize && modalItem.sizePricing?.[modalSize]
+          ? parseFloat(modalItem.sizePricing[modalSize])
+          : null;
+        const pricedItem = sizePrice != null
+          ? { ...modalItem, price: sizePrice, selectedSize: modalSize }
+          : { ...modalItem, selectedSize: null };
+        return (
+          <AddOnModal
+            item={pricedItem}
+            onConfirm={(entry) => {
+              // Add confirmed cart entry (with selected addons) to cart
+              setCart(prev => [...prev, {
+                ...entry,
+                quantity:   entry.quantity   || 1,
+                addons:     entry.addons     || [],
+                addonTotal: entry.addonTotal || 0,
+              }]);
+              setAddonModal(null);
+              const sizeLabel = modalSize ? ` (${modalSize.charAt(0).toUpperCase() + modalSize.slice(1)})` : '';
+              toast.success(`${entry.name}${sizeLabel} added to cart`, { duration: 2000 });
+            }}
+            onClose={() => setAddonModal(null)}
+            currencySymbol={cafe?.currencySymbol || '₹'}
+            primaryColor={cafe?.primaryColor   || '#D4AF37'}
+            theme={cafe?.mode}
+          />
+        );
+      })()}
     </div>
   );
 };

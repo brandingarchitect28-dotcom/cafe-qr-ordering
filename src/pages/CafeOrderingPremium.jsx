@@ -504,8 +504,9 @@ const CafeOrderingPremium = () => {
   }, []);
 
   const addToCart = useCallback((item, size = null) => {
-    if (!size && item.addons?.length > 0) {
-      setAddonModal(item);
+    if (item.addons?.length > 0) {
+      // Pass both item and selected size so the modal can price correctly
+      setAddonModal({ item, size });
       return;
     }
     const selectedPrice = size && item.sizePricing?.[size]
@@ -1440,16 +1441,26 @@ const CafeOrderingPremium = () => {
       </AnimatePresence>
 
       {/* Add-on selection modal */}
-      {addonModal && (
-        <AddOnModal
-          item={addonModal}
-          onConfirm={(entry) => { directAddToCart(entry); setAddonModal(null); }}
-          onClose={() => setAddonModal(null)}
-          currencySymbol={CUR}
-          primaryColor={primary}
-          theme={cafe?.mode}
-        />
-      )}
+      {addonModal && (() => {
+        const modalItem = addonModal.item || addonModal; // backward-compat
+        const modalSize = addonModal.size || null;
+        const sizePrice = modalSize && modalItem.sizePricing?.[modalSize]
+          ? parseFloat(modalItem.sizePricing[modalSize])
+          : null;
+        const pricedItem = sizePrice != null
+          ? { ...modalItem, price: sizePrice, selectedSize: modalSize }
+          : { ...modalItem, selectedSize: null };
+        return (
+          <AddOnModal
+            item={pricedItem}
+            onConfirm={(entry) => { directAddToCart(entry); setAddonModal(null); }}
+            onClose={() => setAddonModal(null)}
+            currencySymbol={CUR}
+            primaryColor={primary}
+            theme={cafe?.mode}
+          />
+        );
+      })()}
     </div>
   );
 };
