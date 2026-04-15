@@ -301,6 +301,17 @@ const AddMoreItemsModal = ({ order, onClose, primary, setAddonModal, directAddRe
   // VARIANT + ADDON aware addToNewCart
   const addToNewCart = useCallback((item, forcedVariant) => {
     if (!item) return;
+
+    // If item already exists in cart without addons, increment it directly
+    // (avoids re-opening variant picker on the + increment button)
+    const existing = newCart.find(i =>
+      i.id === item.id && !(i.addons?.length > 0)
+    );
+    if (existing && !forcedVariant) {
+      directAddToNewCart({ ...existing });
+      return;
+    }
+
     // Check for variants — intercept before anything else
     const variants = Array.isArray(item.variants) ? item.variants
       : Array.isArray(item.sizes)   ? item.sizes
@@ -338,7 +349,7 @@ const AddMoreItemsModal = ({ order, onClose, primary, setAddonModal, directAddRe
       addonTotal:      0,
       comboItems:      Array.isArray(item.comboItems) ? item.comboItems : [],
     });
-  }, [directAddToNewCart, setAddonModal]);
+  }, [directAddToNewCart, newCart, setAddonModal]);
 
   const handleSave = async () => {
     if (newCart.length === 0) return;
