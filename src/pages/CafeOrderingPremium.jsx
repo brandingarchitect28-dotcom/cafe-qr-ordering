@@ -184,7 +184,12 @@ const OfferDetailModal = ({ offer, menuItems, CUR, onAdd, onClose, primary = '#D
 
 // ─── Menu Item Card (premium) ─────────────────────────────────────────────────
 
-const MenuCard = React.memo(({ item, CUR, cartQty, onAdd, onAddWithAnim, onShowDetails, primary = '#D4AF37', theme }) => {
+const MenuCard = React.memo(({
+  item, CUR, cartQty, onAdd, onAddWithAnim, onShowDetails,
+  primary = '#D4AF37', theme,
+  // inline size/addon props
+  selectedSize, selectedAddons, onSizeSelect, onUpdateAddon, onInlineAddToCart, getFinalPrice,
+}) => {
   const mediaType = getMediaType(item.image);
   const T = theme || {
     bgCard: 'rgba(255,255,255,0.04)',
@@ -192,6 +197,24 @@ const MenuCard = React.memo(({ item, CUR, cartQty, onAdd, onAddWithAnim, onShowD
     text: '#ffffff',
     textMuted: '#A3A3A3',
   };
+
+  const hasSizes   = item?.sizePricing != null && item.sizePricing.enabled === true;
+  const hasAddons  = Array.isArray(item.addons) && item.addons.length > 0;
+  // Whether inline flow is active for this card (size+addon items handled inline)
+  const useInline  = hasSizes || hasAddons;
+
+  const pickedSize  = selectedSize?.[item.id];
+  const pickedAddons = selectedAddons?.[item.id] || {};
+  const finalPrice   = getFinalPrice ? getFinalPrice(item) : parseFloat(item.price);
+
+  // Build size options from sizePricing
+  const sizeOptions = hasSizes
+    ? [
+        item.sizePricing.small  && { label: 'Small',  key: 'small',  price: parseFloat(item.sizePricing.small)  },
+        item.sizePricing.medium && { label: 'Medium', key: 'medium', price: parseFloat(item.sizePricing.medium) },
+        item.sizePricing.large  && { label: 'Large',  key: 'large',  price: parseFloat(item.sizePricing.large)  },
+      ].filter(Boolean)
+    : [];
 
   return (
     <motion.div
@@ -234,7 +257,7 @@ const MenuCard = React.memo(({ item, CUR, cartQty, onAdd, onAddWithAnim, onShowD
           </div>
         )}
 
-        {/* Gradient overlay — stronger on hover */}
+        {/* Gradient overlay */}
         <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/5 to-transparent transition-opacity duration-300 group-hover:opacity-80" />
 
         {/* Glow on hover */}
@@ -268,48 +291,111 @@ const MenuCard = React.memo(({ item, CUR, cartQty, onAdd, onAddWithAnim, onShowD
       <div className="p-4">
         <div className="flex items-start justify-between gap-2 mb-3">
           <h3 className="font-semibold text-base leading-tight" style={{ color: T.text }}>{item.name}</h3>
-          <span className="font-black text-base flex-shrink-0" style={{ color: primary }}>{CUR}{fmt(item.price)}</span>
+          {/* Dynamic price: shows final price once size is picked */}
+          <span className="font-black text-base flex-shrink-0" style={{ color: primary }}>
+            {pickedSize ? `${CUR}${fmt(finalPrice)}` : `${CUR}${fmt(item.price)}`}
+          </span>
         </div>
 
-        {/* Add button — size-aware or single */}
-        {(() => {
-          const hasSizes = item?.sizePricing != null && item.sizePricing.enabled === true;
-          return hasSizes ? (
-            <div className="space-y-1.5">
-              {item.sizePricing.small && (
-                <motion.button whileTap={{ scale: 0.97 }}
-                  onClick={(e) => onAddWithAnim(e, item, 'small')}
-                  className="w-full py-2 rounded-xl text-black font-bold text-sm flex justify-between items-center px-3"
-                  style={{ background: `linear-gradient(135deg, ${primary}, ${primary}dd)` }}
-                  data-testid={`add-small-${item.id}`}
-                ><span>Small</span><span>{CUR}{parseFloat(item.sizePricing.small).toFixed(2)}</span></motion.button>
-              )}
-              {item.sizePricing.medium && (
-                <motion.button whileTap={{ scale: 0.97 }}
-                  onClick={(e) => onAddWithAnim(e, item, 'medium')}
-                  className="w-full py-2 rounded-xl text-black font-bold text-sm flex justify-between items-center px-3"
-                  style={{ background: `linear-gradient(135deg, ${primary}, ${primary}dd)` }}
-                  data-testid={`add-medium-${item.id}`}
-                ><span>Medium</span><span>{CUR}{parseFloat(item.sizePricing.medium).toFixed(2)}</span></motion.button>
-              )}
-              {item.sizePricing.large && (
-                <motion.button whileTap={{ scale: 0.97 }}
-                  onClick={(e) => onAddWithAnim(e, item, 'large')}
-                  className="w-full py-2 rounded-xl text-black font-bold text-sm flex justify-between items-center px-3"
-                  style={{ background: `linear-gradient(135deg, ${primary}, ${primary}dd)` }}
-                  data-testid={`add-large-${item.id}`}
-                ><span>Large</span><span>{CUR}{parseFloat(item.sizePricing.large).toFixed(2)}</span></motion.button>
-              )}
-            </div>
-          ) : (
-            <motion.button
-              whileTap={{ scale: 0.94 }} whileHover={{ scale: 1.02 }}
-              onClick={(e) => onAddWithAnim(e, item)}
-              className="w-full py-2.5 rounded-xl text-black font-bold text-sm flex items-center justify-center gap-2 transition-all"
-              style={{ background: `linear-gradient(135deg, ${primary}, ${primary}dd)`, boxShadow: `0 4px 16px ${primary}30` }}
-            ><Plus className="w-4 h-4" />Add to Cart</motion.button>
-          );
-        })()}
+        {/* ── INLINE SIZE → ADDON → ADD FLOW ── */}
+        {useInline ? (
+          <div className="space-y-2">
+
+            {/* STEP 1: Size buttons (always shown if item has sizes) */}
+            {hasSizes && (
+              <div className="space-y-1.5">
+                {sizeOptions.map(sz => (
+                  <motion.button
+                    key={sz.key}
+                    whileTap={{ scale: 0.97 }}
+                    onClick={() => onSizeSelect(item.id, { label: sz.label, price: sz.price })}
+                    className="w-full py-2 rounded-xl font-bold text-sm flex justify-between items-center px-3 transition-all"
+                    style={pickedSize?.label === sz.label
+                      ? { background: `linear-gradient(135deg, ${primary}, ${primary}dd)`, color: '#000', boxShadow: `0 2px 10px ${primary}50` }
+                      : { background: `${primary}18`, color: primary, border: `1px solid ${primary}40` }
+                    }
+                    data-testid={`add-${sz.key}-${item.id}`}
+                  >
+                    <span>{sz.label}</span>
+                    <span>{CUR}{sz.price.toFixed(2)}</span>
+                  </motion.button>
+                ))}
+              </div>
+            )}
+
+            {/* STEP 2: Addons — only shown AFTER a size is selected (or if no sizes) */}
+            {hasAddons && (!hasSizes || pickedSize) && (
+              <AnimatePresence>
+                <motion.div
+                  key="addons"
+                  initial={{ opacity: 0, height: 0 }}
+                  animate={{ opacity: 1, height: 'auto' }}
+                  exit={{ opacity: 0, height: 0 }}
+                  transition={{ duration: 0.2 }}
+                  className="space-y-1.5 overflow-hidden"
+                >
+                  <p className="text-xs font-semibold uppercase tracking-wide pt-1" style={{ color: primary, opacity: 0.7 }}>
+                    Add-ons
+                  </p>
+                  {item.addons.map(addon => {
+                    const qty = pickedAddons[addon.name]?.qty || 0;
+                    return (
+                      <div key={addon.name}
+                        className="flex items-center justify-between gap-2 px-2 py-1.5 rounded-lg"
+                        style={{ background: `${primary}0C` }}
+                      >
+                        <div className="flex-1 min-w-0">
+                          <p className="text-xs font-medium truncate" style={{ color: T.text }}>{addon.name}</p>
+                          <p className="text-xs" style={{ color: T.textMuted }}>+{CUR}{fmt(addon.price)}</p>
+                        </div>
+                        <div className="flex items-center gap-1.5 flex-shrink-0">
+                          <button
+                            onClick={() => onUpdateAddon(item.id, addon, 'dec')}
+                            className="w-6 h-6 rounded-full flex items-center justify-center transition-all"
+                            style={{ background: qty > 0 ? primary : `${primary}30`, color: qty > 0 ? '#000' : T.textMuted }}
+                          >
+                            <Minus className="w-3 h-3" />
+                          </button>
+                          <span className="text-xs font-bold w-4 text-center" style={{ color: T.text }}>{qty}</span>
+                          <button
+                            onClick={() => onUpdateAddon(item.id, addon, 'inc')}
+                            className="w-6 h-6 rounded-full flex items-center justify-center text-black transition-all"
+                            style={{ background: primary }}
+                          >
+                            <Plus className="w-3 h-3" />
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </motion.div>
+              </AnimatePresence>
+            )}
+
+            {/* STEP 3: Add to Cart — shown when size is selected (or no sizes required) */}
+            {(!hasSizes || pickedSize) && (
+              <motion.button
+                whileTap={{ scale: 0.94 }} whileHover={{ scale: 1.02 }}
+                onClick={() => onInlineAddToCart(item)}
+                className="w-full py-2.5 rounded-xl text-black font-bold text-sm flex items-center justify-center gap-2 transition-all"
+                style={{ background: `linear-gradient(135deg, ${primary}, ${primary}dd)`, boxShadow: `0 4px 16px ${primary}30` }}
+              >
+                <Plus className="w-4 h-4" />
+                Add to Cart · {CUR}{fmt(finalPrice)}
+              </motion.button>
+            )}
+          </div>
+        ) : (
+          /* ── SIMPLE ITEM: no sizes, no addons — original single button ── */
+          <motion.button
+            whileTap={{ scale: 0.94 }} whileHover={{ scale: 1.02 }}
+            onClick={(e) => onAddWithAnim(e, item)}
+            className="w-full py-2.5 rounded-xl text-black font-bold text-sm flex items-center justify-center gap-2 transition-all"
+            style={{ background: `linear-gradient(135deg, ${primary}, ${primary}dd)`, boxShadow: `0 4px 16px ${primary}30` }}
+          >
+            <Plus className="w-4 h-4" />Add to Cart
+          </motion.button>
+        )}
 
         {/* Show Food Details — only when nutrition data exists */}
         {(item.ingredients || item.calories || item.protein || item.carbs || item.fats) && (
@@ -347,6 +433,9 @@ const CafeOrderingPremium = () => {
   const [selectedOffer, setSelectedOffer] = useState(null);
   const [flyingDots,    setFlyingDots   ] = useState([]);
   const [selectedFoodItem, setSelectedFoodItem] = useState(null); // Food detail overlay
+  // ── Size + Addon inline-selection state ───────────────────────────────────
+  const [selectedSize,   setSelectedSize  ] = useState({});   // { [itemId]: { label, price } }
+  const [selectedAddons, setSelectedAddons] = useState({});   // { [itemId]: { [addonName]: { ...addon, qty } } }
   const cartBtnRef = useRef(null);
   const unsubRef   = useRef([]);
 
@@ -530,6 +619,63 @@ const CafeOrderingPremium = () => {
       to:   { x: cartRect.left + cartRect.width / 2 - 10, y: cartRect.top + cartRect.height / 2 - 10 },
     }]);
   }, [addToCart]);
+
+  // ── Size → Addon inline flow handlers ─────────────────────────────────────
+
+  const handleSizeSelect = useCallback((itemId, sizeObj) => {
+    setSelectedSize(prev => ({ ...prev, [itemId]: sizeObj }));
+    // Reset addons whenever size changes
+    setSelectedAddons(prev => ({ ...prev, [itemId]: {} }));
+  }, []);
+
+  const updateAddon = useCallback((itemId, addon, type) => {
+    setSelectedAddons(prev => {
+      const itemAddons  = prev[itemId] || {};
+      const currentQty  = itemAddons[addon.name]?.qty || 0;
+      const newQty      = type === 'inc' ? currentQty + 1 : Math.max(0, currentQty - 1);
+      return {
+        ...prev,
+        [itemId]: {
+          ...itemAddons,
+          [addon.name]: { ...addon, qty: newQty },
+        },
+      };
+    });
+  }, []);
+
+  const getFinalPrice = useCallback((item) => {
+    const size      = selectedSize[item.id];
+    const basePrice = size?.price ?? parseFloat(item.price) ?? 0;
+    const addons    = selectedAddons[item.id] || {};
+    const addonTotal = Object.values(addons).reduce(
+      (sum, a) => sum + (parseFloat(a.price) || 0) * (a.qty || 0),
+      0,
+    );
+    return basePrice + addonTotal;
+  }, [selectedSize, selectedAddons]);
+
+  const handleInlineAddToCart = useCallback((item) => {
+    const size      = selectedSize[item.id];
+    const addons    = selectedAddons[item.id] || {};
+    const activeAddons = Object.values(addons)
+      .filter(a => a.qty > 0)
+      .map(a => ({ name: a.name, price: parseFloat(a.price) || 0, quantity: a.qty }));
+
+    directAddToCart({
+      ...item,
+      price:        getFinalPrice(item),
+      basePrice:    size?.price ?? parseFloat(item.price),
+      selectedSize: size?.label || null,
+      quantity:     1,
+      addons:       activeAddons,
+      addonTotal:   activeAddons.reduce((s, a) => s + a.price * a.quantity, 0),
+      comboItems:   [],
+    });
+
+    // Reset per-item UI state after add
+    setSelectedSize(prev  => { const n = { ...prev  }; delete n[item.id]; return n; });
+    setSelectedAddons(prev => { const n = { ...prev }; delete n[item.id]; return n; });
+  }, [selectedSize, selectedAddons, getFinalPrice, directAddToCart]);
 
   // ── Categories ─────────────────────────────────────────────────────────────
   const categories = useMemo(() => {
@@ -1134,6 +1280,12 @@ const CafeOrderingPremium = () => {
                     onShowDetails={(i) => setSelectedFoodItem(i)}
                     primary={primary}
                     theme={T}
+                    selectedSize={selectedSize}
+                    selectedAddons={selectedAddons}
+                    onSizeSelect={handleSizeSelect}
+                    onUpdateAddon={updateAddon}
+                    onInlineAddToCart={handleInlineAddToCart}
+                    getFinalPrice={getFinalPrice}
                   />
                 ))}
               </div>
