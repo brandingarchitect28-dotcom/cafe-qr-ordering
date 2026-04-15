@@ -1,6 +1,4 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
-import AddOnModal from '../components/AddOnModal';
-import { normalizeAddons } from '../services/aiEnrichmentService';
 import { useParams } from 'react-router-dom';
 import { collection, query, where, doc, addDoc, serverTimestamp, runTransaction, onSnapshot } from 'firebase/firestore';
 import { db } from '../lib/firebase';
@@ -126,7 +124,6 @@ const CafeOrdering = () => {
   const [menuItems, setMenuItems] = useState([]);
   const [offers, setOffers] = useState([]);
   const [cart, setCart] = useState([]);
-  const [addonModal, setAddonModal] = useState(null); // item awaiting addon selection
   const [loading, setLoading] = useState(true);
   const [menuLoading, setMenuLoading] = useState(true);
   const [offersLoading, setOffersLoading] = useState(true);
@@ -248,16 +245,7 @@ const CafeOrdering = () => {
     const unsubscribeMenu = onSnapshot(
       menuQuery,
       (snapshot) => {
-        const items = snapshot.docs.map(doc => {
-          const data = doc.data();
-          return {
-            id: doc.id,
-            ...data,
-            // normalizeAddons: guarantees every addon has a stable id
-            // Fixes all-addon-sync bug when AI addons have no id field
-            addons: normalizeAddons(data.addons || []),
-          };
-        });
+        const items = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
         setMenuItems(items);
         setMenuLoading(false);
         setLoading(false);
@@ -274,14 +262,7 @@ const CafeOrdering = () => {
           fallbackQuery,
           (fallbackSnapshot) => {
             const items = fallbackSnapshot.docs
-              .map(doc => {
-                const data = doc.data();
-                return {
-                  id: doc.id,
-                  ...data,
-                  addons: normalizeAddons(data.addons || []),
-                };
-              })
+              .map(doc => ({ id: doc.id, ...doc.data() }))
               .filter(item => item.available !== false);
             setMenuItems(items);
             setMenuLoading(false);
@@ -357,13 +338,6 @@ const CafeOrdering = () => {
 
   // Cart functions
   const addToCart = (item, size = null) => {
-    // ── Show addon modal if item has addons ───────────────────────────────────
-    // Applies whether or not a size is selected — the modal receives the
-    // chosen size so it can price correctly.
-    if (item.addons?.length > 0) {
-      setAddonModal({ item, size });
-      return;
-    }
     const selectedPrice = size && item.sizePricing?.[size]
       ? parseFloat(item.sizePricing[size])
       : item.price;
@@ -568,70 +542,28 @@ const CafeOrdering = () => {
       const gstAmount = calculateGST(); // legacy
       const total = calculateTotal();
 
-      // ── Utility: remove undefined values — Firestore rejects any undefined field ──
-      // ── Utility: remove undefined values — Firestore rejects any undefined field ──
-      // IMPORTANT: must skip Firestore FieldValue sentinels (serverTimestamp etc.)
-      // They are objects internally — recursing into them destroys them.
-      const isFieldValue = (v) =>
-        v != null && typeof v === 'object' && typeof v.isEqual === 'function';
-
-      const removeUndefined = (obj) => {
-        if (Array.isArray(obj)) return obj.map(removeUndefined);
-        // Never recurse into Firestore sentinels (serverTimestamp, increment, etc.)
-        if (isFieldValue(obj)) return obj;
-        if (obj && typeof obj === 'object') {
-          return Object.fromEntries(
-            Object.entries(obj)
-              .filter(([, v]) => v !== undefined)
-              .map(([k, v]) => [k, removeUndefined(v)])
-          );
-        }
-        return obj;
-      };
-
-      // createdAt added AFTER removeUndefined so the serverTimestamp sentinel
-      // is never touched by the recursive cleaner.
       const orderData = {
-        ...removeUndefined({
-          cafeId,
-          orderNumber,
-          items: cart.map(item => removeUndefined({
-            name:         item.name         || '',
-            price:        parseFloat(item.price) || 0,
-            quantity:     item.quantity     || 1,
-            addons:       item.addons       || [],
-            addonTotal:   item.addonTotal   || 0,
-            selectedSize: item.selectedSize || null,
-            comboItems:   item.comboItems   || [],
-            ...(item.isOffer   && { isOffer:   true           }),
-            ...(item.offerType && { offerType: item.offerType }),
-          })),
-          subtotalAmount: subtotal,
-          taxAmount: taxAmount,
-          serviceChargeAmount: serviceChargeAmount,
-          gstAmount: gstAmount,
-          totalAmount: total,
-          currencyCode: cafe?.currencyCode || 'INR',
-          currencySymbol: cafe?.currencySymbol || '₹',
-          paymentStatus: (paymentMode === 'prepaid' || paymentMode === 'online') ? 'paid' : 'pending',
-          paymentMode,
-          orderStatus: 'new',
-          orderType,
-          customerName,
-          customerPhone,
-          ...(orderType === 'dine-in' && tableNumber && { tableNumber }),
-          ...(orderType === 'delivery' && deliveryAddress && { deliveryAddress }),
-          ...(specialInstructions && { specialInstructions }),
-        }),
-        createdAt: serverTimestamp(),
-      };
-
-      console.log('[Order] Writing to Firestore:', {
         cafeId,
-        itemCount: orderData.items?.length,
-        totalAmount: orderData.totalAmount,
-        orderType: orderData.orderType,
-      });
+        orderNumber,
+        items: cart.map(item => ({ name: item.name, price: item.price, quantity: item.quantity, selectedSize: item.selectedSize || null })),
+        subtotalAmount: subtotal,
+        taxAmount: taxAmount,
+        serviceChargeAmount: serviceChargeAmount,
+        gstAmount: gstAmount,
+        totalAmount: total,
+        currencyCode: cafe?.currencyCode || 'INR',
+        currencySymbol: cafe?.currencySymbol || '₹',
+        paymentStatus: (paymentMode === 'prepaid' || paymentMode === 'online') ? 'paid' : 'pending',
+        paymentMode,
+        orderStatus: 'new',
+        orderType,
+        customerName,
+        customerPhone,
+        ...(orderType === 'dine-in' && { tableNumber }),
+        ...(orderType === 'delivery' && { deliveryAddress }),
+        ...(specialInstructions && { specialInstructions }),
+        createdAt: serverTimestamp()
+      };
 
       const orderDocRef = await addDoc(collection(db, 'orders'), orderData);
 
@@ -712,14 +644,8 @@ const CafeOrdering = () => {
       window.location.href = whatsappUrl;
       
     } catch (error) {
-      console.error('[Order] PLACEMENT FAILED:', error.code || 'no-code', error.message);
-      if (error.code === 'permission-denied') {
-        console.error('[Order] FIRESTORE RULE ISSUE — check rules for orders collection');
-        toast.error('Order failed: permission denied. Contact support.');
-      } else {
-        toast.error('Failed to place order. Please try again.');
-      }
-      console.error('[Order] Full error:', error);
+      console.error('Error placing order:', error);
+      toast.error('Failed to place order');
     } finally {
       setOrderPlacing(false);
     }
@@ -1041,39 +967,27 @@ const CafeOrdering = () => {
                 initial="rest"
                 whileHover="hover"
                 animate={addingItemId === item.id ? { scale: [1, 0.95, 1] } : "rest"}
-                className="rounded-2xl overflow-hidden shadow-md group"
-                style={{ backgroundColor: COLORS.cardBg, boxShadow: `0 4px 20px ${COLORS.shadow}` }}
+                className="rounded-2xl overflow-hidden shadow-md group" style={{ backgroundColor: COLORS.cardBg }}
+                style={{ boxShadow: `0 4px 20px ${COLORS.shadow}` }}
               >
                 {/* Item Image */}
                 <div className="aspect-square overflow-hidden relative">
-                  {(() => {
-                    const mediaUrl = item.image || item.video || item.mediaUrl || '';
-                    const isVideo  = mediaUrl.toLowerCase().includes('.mp4');
-                    return mediaUrl ? (
-                      isVideo ? (
-                        <video
-                          src={mediaUrl}
-                          autoPlay muted loop playsInline
-                          className="w-full h-full object-cover"
-                        />
-                      ) : (
-                        <motion.img
-                          src={mediaUrl}
-                          alt={item.name}
-                          className="w-full h-full object-cover"
-                          whileHover={{ scale: 1.1 }}
-                          transition={{ duration: 0.3 }}
-                        />
-                      )
-                    ) : (
+                  {item.image ? (
+                    <motion.img
+                      src={item.image}
+                      alt={item.name}
+                      className="w-full h-full object-cover"
+                      whileHover={{ scale: 1.1 }}
+                      transition={{ duration: 0.3 }}
+                    />
+                  ) : (
                     <div 
                       className="w-full h-full flex items-center justify-center"
                       style={{ backgroundColor: COLORS.backgroundSecondary }}
                     >
                       <Coffee className="w-12 h-12" style={{ color: COLORS.textMuted }} />
                     </div>
-                  );
-                  })()}
+                  )}
                   
                   {/* Quick Add Button */}
                   <motion.button
@@ -1447,41 +1361,6 @@ const CafeOrdering = () => {
           </motion.div>
         )}
       </AnimatePresence>
-
-      {/* ── AddOnModal — shows addon selection for items with addons ───────── */}
-      {addonModal && (() => {
-        // addonModal shape: { item, size } — size may be null
-        const modalItem = addonModal.item || addonModal; // backward-compat
-        const modalSize = addonModal.size || null;
-        // Resolve the correct base price for the chosen size
-        const sizePrice = modalSize && modalItem.sizePricing?.[modalSize]
-          ? parseFloat(modalItem.sizePricing[modalSize])
-          : null;
-        const pricedItem = sizePrice != null
-          ? { ...modalItem, price: sizePrice, selectedSize: modalSize }
-          : { ...modalItem, selectedSize: null };
-        return (
-          <AddOnModal
-            item={pricedItem}
-            onConfirm={(entry) => {
-              // Add confirmed cart entry (with selected addons) to cart
-              setCart(prev => [...prev, {
-                ...entry,
-                quantity:   entry.quantity   || 1,
-                addons:     entry.addons     || [],
-                addonTotal: entry.addonTotal || 0,
-              }]);
-              setAddonModal(null);
-              const sizeLabel = modalSize ? ` (${modalSize.charAt(0).toUpperCase() + modalSize.slice(1)})` : '';
-              toast.success(`${entry.name}${sizeLabel} added to cart`, { duration: 2000 });
-            }}
-            onClose={() => setAddonModal(null)}
-            currencySymbol={cafe?.currencySymbol || '₹'}
-            primaryColor={cafe?.primaryColor   || '#D4AF37'}
-            theme={cafe?.mode}
-          />
-        );
-      })()}
     </div>
   );
 };

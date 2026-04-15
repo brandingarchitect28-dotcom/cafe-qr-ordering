@@ -32,7 +32,6 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 import AddOnModal from '../components/AddOnModal';
-import { normalizeAddons } from '../services/aiEnrichmentService';
 import { QRCodeSVG } from 'qrcode.react';
 import { MediaPreview, getMediaType } from '../components/MediaUpload';
 import FoodDetailPremium from '../components/dashboard/FoodDetailPremium';
@@ -186,13 +185,7 @@ const OfferDetailModal = ({ offer, menuItems, CUR, onAdd, onClose, primary = '#D
 // ─── Menu Item Card (premium) ─────────────────────────────────────────────────
 
 const MenuCard = React.memo(({ item, CUR, cartQty, onAdd, onAddWithAnim, onShowDetails, primary = '#D4AF37', theme }) => {
-  // ── Media field resolution — add-only, zero removal ───────────────────────
-  // item.image  — manually uploaded via MediaUpload (existing path)
-  // item.video  — Pexels video URL saved by AIMenuUpload (new path)
-  // item.mediaUrl — canonical URL saved by AIMenuUpload (fallback)
-  // Priority: image → video → mediaUrl → '' (empty = show placeholder)
-  const mediaUrl  = item.image || item.video || item.mediaUrl || '';
-  const mediaType = getMediaType(mediaUrl);
+  const mediaType = getMediaType(item.image);
   const T = theme || {
     bgCard: 'rgba(255,255,255,0.04)',
     border: 'rgba(255,255,255,0.08)',
@@ -217,17 +210,17 @@ const MenuCard = React.memo(({ item, CUR, cartQty, onAdd, onAddWithAnim, onShowD
     >
       {/* Media */}
       <div className="relative overflow-hidden aspect-[4/3]">
-        {mediaUrl ? (
+        {item.image ? (
           <>
             {mediaType === 'video' ? (
               <video
-                src={mediaUrl}
+                src={item.image}
                 autoPlay muted loop playsInline
                 className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
               />
             ) : (
               <img
-                src={mediaUrl}
+                src={item.image}
                 alt={item.name}
                 loading="lazy"
                 className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
@@ -414,16 +407,7 @@ const CafeOrderingPremium = () => {
     if (!cafeId) return;
     const q = query(collection(db, 'menuItems'), where('cafeId', '==', cafeId), where('available', '==', true));
     const unsub = onSnapshot(q, snap => {
-      setMenuItems(snap.docs.map(d => {
-        const data = d.data();
-        return {
-          id: d.id,
-          ...data,
-          // normalizeAddons: guarantees every addon has a stable id
-          // Fixes all-addon-sync bug when AI addons have no id field
-          addons: normalizeAddons(data.addons || []),
-        };
-      }));
+      setMenuItems(snap.docs.map(d => ({ id: d.id, ...d.data() })));
     });
     unsubRef.current.push(unsub);
   }, [cafeId]);
@@ -505,20 +489,22 @@ const CafeOrderingPremium = () => {
 
   const addToCart = useCallback((item, size = null) => {
     if (item.addons?.length > 0) {
-      // Pass both item and selected size so the modal can price correctly
-      setAddonModal({ item, size });
-      return;
-    }
-    const selectedPrice = size && item.sizePricing?.[size]
+  setAddonModal({ ...item, selectedSize: size });
+  return;
+  }
+  
+  const selectedPrice = size && item.sizePricing?.[size]
       ? parseFloat(item.sizePricing[size])
       : item.price;
     directAddToCart({
       ...item,
       price:        selectedPrice,
+      basePrice:    selectedPrice,
       selectedSize: size || null,
       quantity:     1,
       addons:       [],
       addonTotal:   0,
+      comboItems:   [],
     });
   }, [directAddToCart]);
 
@@ -561,6 +547,113 @@ const CafeOrderingPremium = () => {
 
   // ── Add offer to cart ──────────────────────────────────────────────────────
   const addOfferToCart = (offer) => {
+    // TASK 2 + TASK 3: Apply correct offer pricing per type
+
+    // --- Combo: single cart entry at comboPrice ---
+    if (offer.type === 'combo' && offer.comboPrice) {
+      // BUG FIX: enrich combo items from menuItems so kitchen/dashboard has full details
+      const enrichedItems = (offer.items || []).map(oi => {
+        const menuItem = menuItems.find(m => m.id === oi.itemId);
+        return {
+          itemId:    oi.itemId,
+          itemName:  oi.itemName  || menuItem?.name      || '',
+          quantity:  oi.quantity  || 1,
+          itemPrice: oi.itemPrice || menuItem?.price      || 0,
+          image:     menuItem?.image || '',
+        };
+      });
+      const selectedPrice = parseFloat(offer.comboPrice);
+      const comboEntry = {
+        id:           offer.id,
+        name:         offer.title,
+        price:        selectedPrice,
+        basePrice:    selectedPrice,
+        quantity:     1,
+        addons:       [],
+        addonTotal:   0,
+        selectedSize: null,
+        isOffer:      true,
+        offerType:    'combo',
+        items:        enrichedItems,
+        comboItems:   enrichedItems.map(ei => ({
+          name:     ei.itemName,
+          price:    ei.itemPrice,
+          quantity: ei.quantity,
+        })),
+      };
+      setCart(prev => [...prev, comboEntry]);
+      toast.success(`${offer.title} added to cart ✓`);
+      return;
+    }
+
+    // --- % or flat discount: apply reduced price per item ---
+    if (offer.type === 'discount') {
+      (offer.items || []).forEach(oi => {
+        const menuItem = menuItems.find(m => m.id === oi.itemId);
+        if (!menuItem) return;
+        let discountedPrice = parseFloat(menuItem.price);
+        if (offer.discountType === 'percentage') {
+          discountedPrice = discountedPrice * (1 - parseFloat(offer.discountAmount) / 100);
+        } else {
+          discountedPrice = Math.max(0, discountedPrice - parseFloat(offer.discountAmount));
+        }
+        const selectedPrice = parseFloat(discountedPrice.toFixed(2));
+        setCart(prev => [...prev, {
+          ...menuItem,
+          price:        selectedPrice,
+          basePrice:    selectedPrice,
+          quantity:     oi.quantity || 1,
+          addons:       [],
+          addonTotal:   0,
+          selectedSize: null,
+          isOffer:      true,
+          offerType:    'discount',
+        }]);
+      });
+      toast.success(`${offer.title} added to cart ✓`);
+      return;
+    }
+
+    // --- Buy X Get Y: paid qty at normal price + free qty at zero ---
+    if (offer.type === 'buy_x_get_y') {
+      (offer.items || []).forEach(oi => {
+        const menuItem = menuItems.find(m => m.id === oi.itemId);
+        if (!menuItem) return;
+        const buyQty = offer.buyQuantity || oi.quantity || 1;
+        const getQty = offer.getQuantity || 0;
+        if (buyQty > 0) {
+          setCart(prev => [...prev, {
+            ...menuItem,
+            price:        parseFloat(menuItem.price),
+            basePrice:    parseFloat(menuItem.price),
+            quantity:     buyQty,
+            addons:       [],
+            addonTotal:   0,
+            selectedSize: null,
+            isOffer:      true,
+            offerType:    'buy_x_get_y',
+          }]);
+        }
+        if (getQty > 0) {
+          setCart(prev => [...prev, {
+            ...menuItem,
+            price:        0,
+            basePrice:    0,
+            quantity:     getQty,
+            addons:       [],
+            addonTotal:   0,
+            selectedSize: null,
+            isOffer:      true,
+            offerType:    'buy_x_get_y_free',
+            name:         `${menuItem.name} (Free)`,
+          }]);
+        }
+      });
+      toast.success(`${offer.title} added to cart ✓`);
+      return;
+    }
+
+    // --- Fallback: original behaviour — no breakage ---
     (offer.items || []).forEach(oi => {
       const menuItem = menuItems.find(m => m.id === oi.itemId);
       if (!menuItem) return;
@@ -575,26 +668,6 @@ const CafeOrderingPremium = () => {
     if (!customerPhone.trim()) { toast.error('Enter your phone number'); return; }
     setOrderPlacing(true);
     try {
-      // ── Utility: remove undefined values — Firestore rejects any undefined field ──
-      // IMPORTANT: must skip Firestore FieldValue sentinels (serverTimestamp etc.)
-      // They are objects internally — recursing into them destroys them.
-      const isFieldValue = (v) =>
-        v != null && typeof v === 'object' && typeof v.isEqual === 'function';
-
-      const removeUndefined = (obj) => {
-        if (Array.isArray(obj)) return obj.map(removeUndefined);
-        // Never recurse into Firestore sentinels (serverTimestamp, increment, etc.)
-        if (isFieldValue(obj)) return obj;
-        if (obj && typeof obj === 'object') {
-          return Object.fromEntries(
-            Object.entries(obj)
-              .filter(([, v]) => v !== undefined)
-              .map(([k, v]) => [k, removeUndefined(v)])
-          );
-        }
-        return obj;
-      };
-
       const counterRef = doc(db, 'system', 'counters');
       let oNum;
       await runTransaction(db, async (tx) => {
@@ -616,57 +689,46 @@ const CafeOrderingPremium = () => {
       const orderData = {
         cafeId,
         orderNumber: oNum,
-        items: cart.map(i => removeUndefined({
-          name:         i.name         || '',
-          price:        parseFloat(i.basePrice ?? i.price) || 0,
-          quantity:     i.quantity     || 1,
+        items: cart.map(i => ({
+          name:         i.name,
+          price:        i.basePrice ?? i.price,
+          quantity:     i.quantity,
           addons:       i.addons       || [],
           addonTotal:   i.addonTotal   || 0,
           selectedSize: i.selectedSize || null,
           comboItems:   i.comboItems   || [],
-          ...(i.isOffer   && { isOffer:   true         }),
-          ...(i.offerType && { offerType: i.offerType  }),
-          ...(i.items     && { items:     i.items       }),
+          // TASK 1 + TASK 5: pass offer fields to orders dashboard + kitchen
+          ...(i.isOffer   && { isOffer:   true        }),
+          ...(i.offerType && { offerType: i.offerType }),
+          ...(i.items     && { items:     i.items     }),
         })),
-        subtotalAmount:      subtotal,
+        subtotalAmount: subtotal,
         taxAmount,
         serviceChargeAmount: scAmount,
         gstAmount,
-        platformFeeAmount:   platformFeeCharge || 0,
-        totalAmount:         total,
-        currencyCode:        cafe?.currencyCode   || 'INR',
-        currencySymbol:      cafe?.currencySymbol || '₹',
-        paymentStatus:       'pending',
+        platformFeeAmount:   platformFeeCharge,
+        totalAmount: total,
+        currencyCode:   cafe?.currencyCode   || 'INR',
+        currencySymbol: cafe?.currencySymbol || '₹',
+        // TASK 1 FIX: Always 'pending' at creation. Never optimistically paid.
+        paymentStatus: 'pending',
         paymentMode,
-        orderStatus:         'new',
+        orderStatus: 'new',
         orderType,
         customerName,
         customerPhone,
-        ...(orderType === 'dine-in'  && tableNumber    && { tableNumber }),
-        ...(orderType === 'delivery' && deliveryAddress && { deliveryAddress }),
+        ...(orderType === 'dine-in'  && { tableNumber }),
+        ...(orderType === 'delivery' && { deliveryAddress }),
         ...(specialInstructions && { specialInstructions }),
-      };
-
-      // Strip any remaining undefined values before Firestore write.
-      // createdAt is added AFTER removeUndefined so the serverTimestamp
-      // sentinel is never touched by the recursive cleaner.
-      const safeOrderData = {
-        ...removeUndefined(orderData),
         createdAt: serverTimestamp(),
       };
-      console.log('[Order] Writing to Firestore:', {
-        cafeId,
-        itemCount: safeOrderData.items?.length,
-        totalAmount: safeOrderData.totalAmount,
-        orderType: safeOrderData.orderType,
-      });
 
-      const orderRef = await addDoc(collection(db, 'orders'), safeOrderData);
+      const orderRef = await addDoc(collection(db, 'orders'), orderData);
 
-      createInvoiceForOrder({ ...safeOrderData, orderNumber: oNum }, orderRef.id, cafe)
+      createInvoiceForOrder({ ...orderData, orderNumber: oNum }, orderRef.id, cafe)
         .catch(console.error);
-      deductStockForOrder(cafeId, safeOrderData.items, menuItems).catch(console.error);
-      deductStockByRecipe(cafeId, safeOrderData.items, menuItems).catch(console.error);
+      deductStockForOrder(cafeId, orderData.items, menuItems).catch(console.error);
+      deductStockByRecipe(cafeId, orderData.items, menuItems).catch(console.error);
 
       // TASK 7: Log order creation (no sensitive data)
       console.log('[Order] Created successfully:', {
@@ -795,15 +857,8 @@ const CafeOrderingPremium = () => {
       // Navigate customer to in-app order tracking
       navigate(`/track/${orderRef.id}`);
     } catch (err) {
-      // Verbose logging so the exact failure is visible in browser DevTools
-      console.error('[Order] PLACEMENT FAILED:', err.code || 'no-code', err.message);
-      if (err.code === 'permission-denied') {
-        console.error('[Order] FIRESTORE RULE ISSUE — check rules for orders collection');
-        toast.error('Order failed: permission denied. Contact support.');
-      } else {
-        toast.error('Failed to place order. Please try again.');
-      }
-      console.error('[Order] Full error:', err);
+      toast.error('Failed to place order. Please try again.');
+      console.error(err);
     } finally {
       setOrderPlacing(false);
     }
@@ -1143,9 +1198,19 @@ const CafeOrderingPremium = () => {
                       <div className="flex-1 min-w-0">
                         <p className="text-sm font-medium truncate" style={{ color: T.text }}>{item.name}</p>
                         <p className="text-xs" style={{ color: T.textMuted }}>{CUR}{fmt(item.basePrice ?? item.price)}</p>
+                        {item.comboItems?.length > 0 && (
+                          <div className="mt-0.5">
+                            {item.comboItems.map((ci, cIdx) => (
+                              <p key={cIdx} className="text-xs" style={{ color: T.textMuted }}>
+                                — {ci.name}{ci.quantity > 1 ? ` ×${ci.quantity}` : ''}
+                              </p>
+                            ))}
+                          </div>
+                        )}
                         {item.addons?.length > 0 && (
                           <p className="text-xs mt-0.5 truncate" style={{ color: T.textMuted }}>
-                            + {item.addons.map(a => a.name).join(', ')}
+                            {/* CHANGE 7 — Show qty suffix for addons with qty > 1 */}
+                            + {item.addons.map(a => a.quantity > 1 ? `${a.name} ×${a.quantity}` : a.name).join(', ')}
                           </p>
                         )}
                       </div>
@@ -1346,9 +1411,19 @@ const CafeOrderingPremium = () => {
                         <span style={{ color: T.textMuted }}>{item.name} × {item.quantity}</span>
                         <span style={{ color: T.text }}>{CUR}{fmt(item.price * item.quantity)}</span>
                       </div>
+                      {item.comboItems?.length > 0 && (
+                        <div className="ml-2 mt-0.5">
+                          {item.comboItems.map((ci, cIdx) => (
+                            <p key={cIdx} className="text-xs" style={{ color: T.textFaint || T.textMuted }}>
+                              — {ci.name}{ci.quantity > 1 ? ` ×${ci.quantity}` : ''}
+                            </p>
+                          ))}
+                        </div>
+                      )}
                       {item.addons?.length > 0 && (
                         <p className="text-xs ml-2 mt-0.5" style={{ color: T.textFaint || T.textMuted }}>
-                          + {item.addons.map(a => a.name).join(', ')}
+                          {/* CHANGE 8 — Show qty suffix for addons with qty > 1 */}
+                          + {item.addons.map(a => a.quantity > 1 ? `${a.name} ×${a.quantity}` : a.name).join(', ')}
                         </p>
                       )}
                     </div>
@@ -1441,26 +1516,16 @@ const CafeOrderingPremium = () => {
       </AnimatePresence>
 
       {/* Add-on selection modal */}
-      {addonModal && (() => {
-        const modalItem = addonModal.item || addonModal; // backward-compat
-        const modalSize = addonModal.size || null;
-        const sizePrice = modalSize && modalItem.sizePricing?.[modalSize]
-          ? parseFloat(modalItem.sizePricing[modalSize])
-          : null;
-        const pricedItem = sizePrice != null
-          ? { ...modalItem, price: sizePrice, selectedSize: modalSize }
-          : { ...modalItem, selectedSize: null };
-        return (
-          <AddOnModal
-            item={pricedItem}
-            onConfirm={(entry) => { directAddToCart(entry); setAddonModal(null); }}
-            onClose={() => setAddonModal(null)}
-            currencySymbol={CUR}
-            primaryColor={primary}
-            theme={cafe?.mode}
-          />
-        );
-      })()}
+      {addonModal && (
+        <AddOnModal
+          item={addonModal}
+          onConfirm={(entry) => { directAddToCart(entry); setAddonModal(null); }}
+          onClose={() => setAddonModal(null)}
+          currencySymbol={CUR}
+          primaryColor={primary}
+          theme={cafe?.mode}
+        />
+      )}
     </div>
   );
 };
