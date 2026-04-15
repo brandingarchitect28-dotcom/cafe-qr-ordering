@@ -6,6 +6,8 @@
  *   1. A live summary of active orders by status (mirrors the KDS).
  *   2. A button to open the full Kitchen Display in a new tab.
  *   3. Quick status update capability (same as OrdersManagement).
+ *
+ * PATCH: Added selectedVariant size label display next to item names.
  */
 
 import React, { useMemo } from 'react';
@@ -202,11 +204,14 @@ const KitchenDashboardTab = () => {
                       {colMeta.label}
                     </span>
 
-                    {/* Items summary — with comboItems and addons */}
+                    {/* Items summary — with size label, comboItems and addons */}
                     <div className={`flex-1 text-sm ${T.muted} min-w-0`}>
                       {order.items?.map((item, idx) => (
                         <div key={idx} className="mb-0.5">
-                          <span>{item.name} ×{item.quantity}</span>
+                          {/* PATCH: append (Size) if selectedVariant exists */}
+                          <span>
+                            {item.name}{item.selectedVariant ? ` (${item.selectedVariant})` : ''} ×{item.quantity}
+                          </span>
                           {/* comboItems under item */}
                           {item.comboItems?.length > 0 && (
                             <div className="ml-2 mt-0.5">
