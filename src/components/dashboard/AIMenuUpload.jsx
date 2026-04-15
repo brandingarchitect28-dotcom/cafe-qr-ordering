@@ -20,23 +20,17 @@
  *     Does NOT touch items that already have a category from the AI response.
  */
 
-import React, { useState, useRef, useCallback, useEffect } from 'react';
+import React, { useState, useRef, useCallback } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
 import { useDocument } from '../../hooks/useFirestore';
 import { db } from '../../lib/firebase';
-import { collection, addDoc, serverTimestamp, getDoc, doc } from 'firebase/firestore';
+import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
 import { motion, AnimatePresence } from 'framer-motion';
 import { toast } from 'sonner';
 import {
   Upload, Sparkles, Check, X, Pencil, RefreshCw,
   FileImage, Plus, Trash2, Save, Lock, ChevronRight,
-  Video, Image as ImageIcon, Wand2, Zap,
 } from 'lucide-react';
-
-// ── NEW: enrichment + media services (add-only, never affect existing flow) ───
-import { enrichItems, normalizeAddons } from '../../services/aiEnrichmentService';
-import { resolveMedia }         from '../../services/mediaService';
-import { processMediaForStorage } from '../../services/compressionService';
 
 const CATEGORIES = ['Beverages', 'Food', 'Snacks', 'Desserts', 'Main Course', 'Starters', 'Other'];
 
@@ -181,34 +175,13 @@ const AIMenuUpload = ({ onClose }) => {
 
   const fileInputRef = useRef(null);
 
-  const [step,      setStep     ] = useState('upload'); // upload | preview | options | saving | done
+  const [step,      setStep     ] = useState('upload'); // upload | preview | saving | done
   const [file,      setFile     ] = useState(null);
   const [preview,   setPreview  ] = useState(null);
   const [items,     setItems    ] = useState([]);
   const [loading,   setLoading  ] = useState(false);
   const [saving,    setSaving   ] = useState(false);
   const [dragOver,  setDragOver ] = useState(false);
-
-  // ── NEW: user preference state (add-only) ────────────────────────────────────
-  const [mediaPreference,  setMediaPreference ] = useState('auto');    // 'auto'|'image'|'none'
-  const [wantAIDetails,    setWantAIDetails   ] = useState(true);
-  const [enrichProgress,   setEnrichProgress  ] = useState(0);         // 0-100
-  const [enrichTotal,      setEnrichTotal     ] = useState(0);
-
-  // ── Platform-wide Pexels key — fetched from appSettings/global ───────────────
-  // Stored once by platform owner, used by ALL café owners automatically.
-  // Falls back to '' gracefully — media step just skips Pexels if missing.
-  const [pexelsKey, setPexelsKey] = useState('');
-
-  useEffect(() => {
-    getDoc(doc(db, 'appSettings', 'global'))
-      .then(snap => {
-        if (snap.exists()) {
-          setPexelsKey(snap.data()?.pexelsApiKey || '');
-        }
-      })
-      .catch(() => {}); // silent fail — Pexels simply won't be used
-  }, []);
 
   const isEnabled = cafe?.features?.aiMenu;
 
@@ -221,8 +194,8 @@ const AIMenuUpload = ({ onClose }) => {
       toast.error('Please upload a JPG, PNG, WebP, or PDF file');
       return;
     }
-    if (selectedFile.size > 5 * 1024 * 1024) {
-      toast.error('File must be under 5MB');
+    if (selectedFile.size > 10 * 1024 * 1024) {
+      toast.error('File must be under 10MB');
       return;
     }
 
@@ -270,34 +243,24 @@ const AIMenuUpload = ({ onClose }) => {
       const result = await response.json();
 
       if (!response.ok) {
-        const errMsg = result?.error || result?.detail || `Server error (${response.status})`;
-        throw new Error(errMsg);
+        throw new Error(result.error || 'Extraction failed');
       }
 
-      // Handle both response shapes: { preview } and { items } for full compatibility
-      const rawItems = result.preview || result.items || [];
-
-      if (rawItems.length > 0) {
-        // Apply category inference + safe field defaults for every item
-        const itemsWithCategory = rawItems.map(item => ({
-          name:        String(item.name        || '').trim(),
-          price:       parseFloat(item.price)  || 0,
-          description: String(item.description || '').trim(),
-          available:   item.available !== false,
-          // Category: use server value if valid, else infer from name
-          category: (item.category && item.category !== '' && item.category !== 'Other')
+      // FIX 3: Server returns { preview: [...] } not { success, items }.
+      if (result.preview?.length > 0) {
+        // PART 3 — Category inference: apply inferCategory() to every item
+        // that has no category assigned by the AI response.
+        // Items that already have a category are left untouched.
+        const itemsWithCategory = result.preview.map(item => ({
+          ...item,
+          category: item.category && item.category !== 'Other' && item.category !== ''
             ? item.category
             : inferCategory(item.name),
-        })).filter(item => item.name.length > 0); // drop blank names
-
-        if (itemsWithCategory.length === 0) {
-          toast.error('No valid items found. Try a clearer image.');
-          return;
-        }
+        }));
 
         setItems(itemsWithCategory);
         setStep('preview');
-        toast.success(`${itemsWithCategory.length} items extracted ✨`);
+        toast.success(`${result.preview.length} items extracted ✨`);
       } else {
         toast.error('No menu items found. Try a clearer image.');
       }
@@ -334,77 +297,18 @@ const AIMenuUpload = ({ onClose }) => {
     if (valid.length === 0) { toast.error('Add at least one item'); return; }
 
     setSaving(true);
-    setEnrichTotal(valid.length);
-    setEnrichProgress(0);
-
     try {
-      // ── ENRICHMENT PHASE (add-only new fields) ──────────────────────────────
-      // Step A: AI food details + smart addons (if user opted in)
-      let enriched = valid;
-      if (wantAIDetails) {
-        try {
-          enriched = await enrichItems(
-            valid,
-            { generateDetails: true, generateAddons: true },
-            (done, total) => setEnrichProgress(Math.round((done / total) * 50)) // 0-50%
-          );
-        } catch (enrichErr) {
-          console.warn('[AIMenuUpload] Enrichment error (non-fatal):', enrichErr.message);
-          enriched = valid; // Failsafe — continue with original items
-        }
-      }
-
-      // Step B: Media resolution per item (if user wants media)
-      // pexelsKey is fetched from appSettings/global — platform-wide, works for all cafés
-      const withMedia = await Promise.all(
-        enriched.map(async (item, idx) => {
-          if (mediaPreference === 'none') return item;
-          try {
-            const raw = await resolveMedia(item.name, pexelsKey, mediaPreference);
-            if (!raw) return item;
-            const processed = await processMediaForStorage(raw);
-            if (!processed) return item;
-            return { ...item, mediaUrl: processed.url, mediaType: processed.type };
-          } catch (mediaErr) {
-            console.warn('[AIMenuUpload] Media fetch failed for', item.name, ':', mediaErr?.message || mediaErr);
-            return item; // Failsafe — never block
-          } finally {
-            setEnrichProgress(50 + Math.round(((idx + 1) / enriched.length) * 50)); // 50-100%
-          }
-        })
-      );
-
-      // ── SAVE PHASE — SAME as before + new optional fields ──────────────────
-      // Existing fields: name, price, category, description, image, available, createdAt, source
-      // New optional fields added only if present on the item: mediaUrl, mediaType,
-      //   ingredients, calories, protein, carbs, fat, addons
-      const batch = withMedia.map(item =>
+      const batch = valid.map(item =>
         addDoc(collection(db, 'menuItems'), {
           cafeId,
           name:        item.name.trim(),
           price:       parseFloat(item.price) || 0,
           category:    item.category || 'Other',
           description: item.description || '',
+          image:       '',
           available:   true,
           createdAt:   serverTimestamp(),
           source:      'ai_upload',
-          // ── BUG FIX: image field now populated from resolved media ──────────
-          // All ordering pages (CafeOrdering, CafeOrderingPremium, etc.) read
-          // the `image` field. Previously hardcoded to '' so media never showed.
-          image:       item.mediaUrl && item.mediaType === 'image' ? item.mediaUrl : '',
-          video:       item.mediaUrl && item.mediaType === 'video' ? item.mediaUrl : '',
-          // ── New optional fields (backward compatible) ───────────────────────
-          ...(item.mediaUrl  && { mediaUrl:  item.mediaUrl  }),
-          ...(item.mediaType && { mediaType: item.mediaType }),
-          ...(item.ingredients && { ingredients: item.ingredients }),
-          ...(item.calories    && { calories:    item.calories    }),
-          ...(item.protein     && { protein:     item.protein     }),
-          ...(item.carbs       && { carbs:       item.carbs       }),
-          ...(item.fat         && { fat:         item.fat         }),
-          // normalizeAddons ensures every addon has a stable id in Firestore
-          // Fixes: manual addons disappearing + all-addon-qty-sync bug
-          ...(item.addons && item.addons.length > 0 && { addons: normalizeAddons(item.addons) }),
-          ...(item.sizePricing && { sizePricing: item.sizePricing }),
         })
       );
       await Promise.all(batch);
@@ -414,7 +318,6 @@ const AIMenuUpload = ({ onClose }) => {
       toast.error('Failed to save menu items');
     } finally {
       setSaving(false);
-      setEnrichProgress(0);
     }
   };
 
@@ -451,17 +354,16 @@ const AIMenuUpload = ({ onClose }) => {
         </div>
         {/* Step indicator */}
         <div className="hidden sm:flex items-center gap-1 text-xs text-[#A3A3A3]">
-          {['Upload', 'Preview', 'Options', 'Done'].map((s, i) => (
+          {['Upload', 'Preview', 'Done'].map((s, i) => (
             <React.Fragment key={s}>
               <span className={
-                (step === 'upload'  && i === 0) ||
+                (step === 'upload' && i === 0) ||
                 (step === 'preview' && i === 1) ||
-                (step === 'options' && i === 2) ||
-                (step === 'done'    && i === 3)
+                (step === 'done' && i === 2)
                   ? 'text-[#D4AF37] font-semibold'
                   : 'text-[#555]'
               }>{s}</span>
-              {i < 3 && <ChevronRight className="w-3 h-3 text-[#333]" />}
+              {i < 2 && <ChevronRight className="w-3 h-3 text-[#333]" />}
             </React.Fragment>
           ))}
         </div>
@@ -583,133 +485,12 @@ const AIMenuUpload = ({ onClose }) => {
               <motion.button
                 whileHover={{ scale: 1.02 }}
                 whileTap={{ scale: 0.98 }}
-                onClick={() => setStep('options')}
-                disabled={items.length === 0}
-                className="flex-1 flex items-center justify-center gap-2 py-2.5 bg-[#D4AF37] hover:bg-[#C5A059] text-black font-bold rounded-sm text-sm transition-all disabled:opacity-50"
-              >
-                <Wand2 className="w-4 h-4" />
-                Continue → {items.length} Items
-              </motion.button>
-            </div>
-          </motion.div>
-        )}
-
-        {/* ── Options step — new interactive workflow ────────────────────── */}
-        {step === 'options' && (
-          <motion.div
-            key="options"
-            initial={{ opacity: 0, x: 10 }}
-            animate={{ opacity: 1, x: 0 }}
-            exit={{ opacity: 0, x: -10 }}
-            className="space-y-6"
-          >
-            <p className="text-[#A3A3A3] text-sm">
-              Customise how your <span className="text-white font-semibold">{items.length} items</span> are enriched before saving.
-            </p>
-
-            {/* Media preference */}
-            <div className="bg-[#0A0A0A] border border-white/5 rounded-xl p-5 space-y-3">
-              <p className="text-white font-semibold text-sm flex items-center gap-2">
-                <Video className="w-4 h-4 text-[#D4AF37]" />
-                Media (Pexels photos &amp; videos)
-              </p>
-              <p className="text-[#555] text-xs">
-                Auto-fetch food photos or videos for each item.
-                {!pexelsKey && (
-                  <span className="text-amber-400"> Pexels key not configured — will use AI image fallback.</span>
-                )}
-                {pexelsKey && (
-                  <span className="text-emerald-400"> ✓ Pexels connected — photos &amp; videos ready.</span>
-                )}
-              </p>
-              <div className="grid grid-cols-3 gap-2">
-                {[
-                  { val: 'auto',  label: 'Auto Best',    icon: Zap       },
-                  { val: 'image', label: 'Images Only',  icon: ImageIcon  },
-                  { val: 'none',  label: 'Skip Media',   icon: X          },
-                ].map(({ val, label, icon: Icon }) => (
-                  <button
-                    key={val}
-                    onClick={() => setMediaPreference(val)}
-                    className={`flex flex-col items-center gap-1.5 py-3 rounded-lg border text-xs font-semibold transition-all ${
-                      mediaPreference === val
-                        ? 'border-[#D4AF37] bg-[#D4AF37]/10 text-[#D4AF37]'
-                        : 'border-white/10 text-[#A3A3A3] hover:border-white/20'
-                    }`}
-                  >
-                    <Icon className="w-4 h-4" />
-                    {label}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {/* AI food details */}
-            <div className="bg-[#0A0A0A] border border-white/5 rounded-xl p-5 space-y-3">
-              <p className="text-white font-semibold text-sm flex items-center gap-2">
-                <Sparkles className="w-4 h-4 text-[#D4AF37]" />
-                AI Food Details (ingredients + nutrition + addons)
-              </p>
-              <p className="text-[#555] text-xs">
-                Generates calories, protein, carbs, fat and auto-suggests addons per item.
-                Adds ~5s per item.
-              </p>
-              <div className="grid grid-cols-2 gap-2">
-                {[
-                  { val: true,  label: 'Yes, enrich items' },
-                  { val: false, label: 'Skip, save as-is'  },
-                ].map(({ val, label }) => (
-                  <button
-                    key={String(val)}
-                    onClick={() => setWantAIDetails(val)}
-                    className={`py-3 rounded-lg border text-xs font-semibold transition-all ${
-                      wantAIDetails === val
-                        ? 'border-[#D4AF37] bg-[#D4AF37]/10 text-[#D4AF37]'
-                        : 'border-white/10 text-[#A3A3A3] hover:border-white/20'
-                    }`}
-                  >
-                    {val ? '✦ ' : ''}{label}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {/* Progress bar — shown during save */}
-            {saving && (
-              <div className="space-y-2">
-                <div className="flex items-center justify-between text-xs text-[#A3A3A3]">
-                  <span>
-                    {enrichProgress < 50 ? 'Generating food details…' : 'Fetching media…'}
-                  </span>
-                  <span>{enrichProgress}%</span>
-                </div>
-                <div className="h-1.5 bg-white/5 rounded-full overflow-hidden">
-                  <motion.div
-                    className="h-full bg-[#D4AF37] rounded-full"
-                    animate={{ width: `${enrichProgress}%` }}
-                    transition={{ duration: 0.3 }}
-                  />
-                </div>
-              </div>
-            )}
-
-            <div className="flex gap-3 pt-1">
-              <button
-                onClick={() => setStep('preview')}
-                disabled={saving}
-                className="flex-1 py-2.5 border border-white/10 text-[#A3A3A3] hover:text-white rounded-sm text-sm transition-all disabled:opacity-40"
-              >
-                ← Back
-              </button>
-              <motion.button
-                whileHover={{ scale: 1.02 }}
-                whileTap={{ scale: 0.98 }}
                 onClick={handleSave}
-                disabled={saving}
+                disabled={saving || items.length === 0}
                 className="flex-1 flex items-center justify-center gap-2 py-2.5 bg-[#D4AF37] hover:bg-[#C5A059] text-black font-bold rounded-sm text-sm transition-all disabled:opacity-50"
               >
                 {saving
-                  ? <><RefreshCw className="w-4 h-4 animate-spin" /> Processing…</>
+                  ? <><RefreshCw className="w-4 h-4 animate-spin" /> Saving…</>
                   : <><Save className="w-4 h-4" /> Save {items.length} Items to Menu</>
                 }
               </motion.button>
