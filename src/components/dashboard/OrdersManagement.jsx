@@ -327,18 +327,12 @@ const OrdersManagement = () => {
   const audioRef = useRef(null);
 
   // ── FIX ISSUE 3: drag-to-scroll for the orders desktop table ─────────────
-  // mousedown → record start position
-  // mousemove → scroll the container proportionally
-  // mouseup / mouseleave → stop dragging
-  // cursor changes to 'grabbing' while dragging for clear visual feedback.
-  // Applied ONLY to the desktop table overflow-x-auto container via dragScrollRef.
   const dragScrollRef  = useRef(null);
   const dragState      = useRef({ active: false, startX: 0, startY: 0, scrollLeft: 0, scrollTop: 0 });
 
   const onDragMouseDown = useCallback((e) => {
     const el = dragScrollRef.current;
     if (!el) return;
-    // Only respond to primary mouse button; ignore text-selection drags
     if (e.button !== 0) return;
     dragState.current = {
       active:     true,
@@ -358,7 +352,7 @@ const OrdersManagement = () => {
     e.preventDefault();
     const x    = e.pageX - el.offsetLeft;
     const y    = e.pageY - el.offsetTop;
-    const walkX = (x - dragState.current.startX) * 1.2; // slight multiplier for feel
+    const walkX = (x - dragState.current.startX) * 1.2;
     const walkY = (y - dragState.current.startY) * 1.2;
     el.scrollLeft = dragState.current.scrollLeft - walkX;
     el.scrollTop  = dragState.current.scrollTop  - walkY;
@@ -373,18 +367,22 @@ const OrdersManagement = () => {
   }, []);
 
   // ── Feature 1: Invoice state ─────────────────────────────────────────────
-  const [viewingInvoice, setViewingInvoice]   = useState(null);  // invoice object
-  const [invoiceLoading, setInvoiceLoading]   = useState(null);  // orderId being loaded
+  const [viewingInvoice, setViewingInvoice]   = useState(null);
+  const [invoiceLoading, setInvoiceLoading]   = useState(null);
 
   // ── External Orders: modal state ─────────────────────────────────────────
   const [showExternalModal, setShowExternalModal] = useState(false);
 
-  // ── Fix 3: Soft-delete state ─────────────────────────────────────────────
+  // ── Soft-delete state ────────────────────────────────────────────────────
   const [deleteConfirmId, setDeleteConfirmId] = useState(null);
   const [deleting, setDeleting]               = useState(false);
 
   // ── Add Items to Order state ──────────────────────────────────────────────
-  const [addItemsOrder, setAddItemsOrder] = useState(null);  // order object to add items to
+  const [addItemsOrder, setAddItemsOrder] = useState(null);
+
+  // ── NEW: Remove Item state — tracks which (orderId, itemIndex) is pending confirm ──
+  // removingItem: { orderId: string, itemIndex: number } | null
+  const [removingItem, setRemovingItem] = useState(null);
 
   useEffect(() => {
     console.log('[OrdersManagement] User cafeId:', cafeId);
@@ -476,7 +474,7 @@ const OrdersManagement = () => {
     }
   };
 
-  // ── Fix 3: Soft-delete handler ───────────────────────────────────────────
+  // ── Soft-delete handler ───────────────────────────────────────────────────
   const handleSoftDelete = async (orderId) => {
     setDeleting(true);
     try {
@@ -495,8 +493,101 @@ const OrdersManagement = () => {
     }
   };
 
+  // ── NEW: Remove a single item from an existing order ─────────────────────
+  //
+  // Design:
+  //  1. Fetch fresh order data from Firestore to avoid stale-closure issues.
+  //  2. Splice the item at itemIndex from the items array.
+  //  3. If the resulting array is empty → mark order as 'cancelled' (no ghost orders).
+  //  4. Otherwise recalculate subtotal, then re-apply cafe fee rates (tax, GST,
+  //     service charge, platform fee) fetched fresh from cafes/{cafeId}.
+  //  5. Clamp total to 0 to guard against negative values.
+  //  6. Write everything back with serverTimestamp() on updatedAt.
+  //  7. onSnapshot listeners in both OrderTracking and this component pick up
+  //     the change instantly — no extra wiring needed.
+  const handleRemoveItem = useCallback(async (orderId, itemIndex) => {
+    // Clear the pending confirm state immediately so UI resets
+    setRemovingItem(null);
+
+    try {
+      const safeNum = (v) => { const n = parseFloat(v); return isNaN(n) || !isFinite(n) ? 0 : n; };
+
+      // 1. Fetch fresh order data
+      const orderRef  = doc(db, 'orders', orderId);
+      const orderSnap = await getDoc(orderRef);
+      if (!orderSnap.exists()) {
+        toast.error('Order not found');
+        return;
+      }
+      const orderData = orderSnap.data();
+
+      // 2. Build updated items array
+      const items = Array.isArray(orderData.items) ? [...orderData.items] : [];
+      if (itemIndex < 0 || itemIndex >= items.length) {
+        toast.error('Item index out of range');
+        return;
+      }
+      const removedItem = items[itemIndex];
+      items.splice(itemIndex, 1);
+
+      // 3. Empty order → cancel
+      if (items.length === 0) {
+        await updateDoc(orderRef, {
+          items:        [],
+          subtotalAmount: 0,
+          taxAmount:      0,
+          serviceChargeAmount: 0,
+          gstAmount:      0,
+          totalAmount:    0,
+          orderStatus:  'cancelled',
+          updatedAt:    serverTimestamp(),
+        });
+        toast.success(`Last item removed — order #${String(orderData.orderNumber || '').padStart(3, '0')} cancelled`);
+        return;
+      }
+
+      // 4. Recalculate subtotal from remaining items
+      const newSubtotal = items.reduce((s, item) => {
+        const base     = safeNum(item.price);
+        const addonAmt = (item.addons || []).reduce((as, a) => as + safeNum(a.price), 0);
+        return s + (base + addonAmt) * safeNum(item.quantity);
+      }, 0);
+
+      // 5. Re-fetch cafe rates for accurate fee recalculation
+      const cid = orderData.cafeId;
+      let cafe = {};
+      if (cid) {
+        const cafeSnap = await getDoc(doc(db, 'cafes', cid));
+        if (cafeSnap.exists()) cafe = cafeSnap.data();
+      }
+
+      const newTax      = cafe?.taxEnabled            ? newSubtotal * safeNum(cafe.taxRate)            / 100 : 0;
+      const newSC       = cafe?.serviceChargeEnabled  ? newSubtotal * safeNum(cafe.serviceChargeRate)  / 100 : 0;
+      const newGST      = cafe?.gstEnabled            ? newSubtotal * safeNum(cafe.gstRate)            / 100 : 0;
+      const newPlatform = cafe?.platformFeeEnabled     ? safeNum(cafe.platformFeeAmount)                     : 0;
+
+      // 6. Clamp total to 0 (safety: never negative)
+      const newTotal = Math.max(0, Math.round(newSubtotal + newTax + newSC + newGST + newPlatform));
+
+      // 7. Write back to Firestore — onSnapshot in OrderTracking & here picks up instantly
+      await updateDoc(orderRef, {
+        items,
+        subtotalAmount:      newSubtotal,
+        taxAmount:           newTax,
+        serviceChargeAmount: newSC,
+        gstAmount:           newGST,
+        totalAmount:         newTotal,
+        updatedAt:           serverTimestamp(),
+      });
+
+      toast.success(`"${removedItem?.name || 'Item'}" removed from order`);
+    } catch (err) {
+      console.error('[RemoveItem] Failed:', err);
+      toast.error('Failed to remove item from order');
+    }
+  }, []);
+
   const filteredOrders = useMemo(() => {
-    // Hide soft-deleted orders from the list
     let filtered = (sortedOrders || []).filter(o => !o.isDeleted);
 
     if (statusFilter !== 'all') {
@@ -582,7 +673,7 @@ const OrdersManagement = () => {
     setNewOrderNotification(null);
   };
 
-  // ── Feature 2: Invoice handlers (with safety checks) ─────────────────────
+  // ── Invoice handlers ─────────────────────────────────────────────────────
   const handleViewInvoice = async (orderId, e) => {
     if (e) e.stopPropagation();
     if (!orderId) {
@@ -592,15 +683,8 @@ const OrdersManagement = () => {
     }
     setInvoiceLoading(orderId);
     try {
-      // FIX: invoice API call — attempt to fetch existing invoice from Firestore.
-      // If getInvoiceByOrderId returns an error (e.g. Firestore permission-denied,
-      // missing index, or network failure), we log it for debugging but DO NOT stop.
-      // We fall through to the synthetic invoice path which always succeeds using
-      // order data already loaded in local state. Previously this block did an early
-      // return on error, which prevented the working fallback from ever running.
       const { data, error } = await getInvoiceByOrderId(orderId);
       if (error) {
-        // FIX: error handling — log real error, then fall through to fallback
         console.warn('[Invoice] getInvoiceByOrderId error (will use fallback):', error);
       }
 
@@ -610,7 +694,6 @@ const OrdersManagement = () => {
         return;
       }
 
-      // FIX: validate order data before use
       const orderObj = orders?.find(o => o.id === orderId);
       if (!orderObj) {
         setInvoiceLoading(null);
@@ -621,7 +704,6 @@ const OrdersManagement = () => {
       const { invoiceId, error: genError } = await ensureInvoiceForOrder(orderId, orderObj, cafe || {});
       if (genError || !invoiceId) {
         console.warn('[Invoice] Firestore write failed — showing synthetic invoice:', genError);
-        // FIX: build synthetic invoice from local order data as guaranteed fallback
         const synthetic = {
           orderId,
           orderNumber:         orderObj.orderNumber,
@@ -657,7 +739,6 @@ const OrdersManagement = () => {
       setInvoiceLoading(null);
       setViewingInvoice(fresh || { orderId, orderNumber: orderObj.orderNumber });
     } catch (err) {
-      // FIX: error handling — catch-all with real error logged for debugging
       console.error('[Invoice] handleViewInvoice unexpected error:', err);
       setInvoiceLoading(null);
       toast.error('Failed to load invoice');
@@ -673,13 +754,8 @@ const OrdersManagement = () => {
     }
     setInvoiceLoading(orderId);
     try {
-      // FIX: invoice API call — attempt to fetch existing invoice from Firestore.
-      // Same fix as handleViewInvoice: if getInvoiceByOrderId returns an error,
-      // log it and fall through to the synthetic fallback. Previously the early
-      // return here was preventing the PDF from ever generating.
       const { data, error } = await getInvoiceByOrderId(orderId);
       if (error) {
-        // FIX: error handling — log real error, then fall through to fallback
         console.warn('[Invoice] getInvoiceByOrderId error (will use fallback):', error);
       }
 
@@ -689,7 +765,6 @@ const OrdersManagement = () => {
         return;
       }
 
-      // FIX: validate order data before use
       const orderObj = orders?.find(o => o.id === orderId);
       if (!orderObj) {
         setInvoiceLoading(null);
@@ -700,7 +775,6 @@ const OrdersManagement = () => {
       const { invoiceId, error: genError } = await ensureInvoiceForOrder(orderId, orderObj, cafe || {});
       if (genError || !invoiceId) {
         console.warn('[Invoice] Firestore write failed — using synthetic for PDF:', genError);
-        // FIX: build synthetic invoice from local order data as guaranteed fallback
         const synthetic = {
           orderId,
           orderNumber:         orderObj.orderNumber,
@@ -737,7 +811,6 @@ const OrdersManagement = () => {
       setInvoiceLoading(null);
       setViewingInvoice({ ...(fresh || { orderId }), _autoPrint: true });
     } catch (err) {
-      // FIX: error handling — catch-all with real error logged for debugging
       console.error('[Invoice] handleDownloadInvoice unexpected error:', err);
       setInvoiceLoading(null);
       toast.error('Failed to download invoice');
@@ -773,9 +846,16 @@ const OrdersManagement = () => {
     }
   };
 
+  // ── NEW: Inline confirmation check helpers ────────────────────────────────
+  // We use an inline per-item confirm instead of window.confirm() so it works
+  // cleanly on mobile (iOS blocks window.confirm in some contexts).
+  // removingItem = { orderId, itemIndex } | null
+  const isConfirmingRemove = (orderId, itemIndex) =>
+    removingItem?.orderId === orderId && removingItem?.itemIndex === itemIndex;
+
   return (
     <div className="space-y-6 relative">
-      {/* ── Feature 1: Invoice Modal ─────────────────────────────────────── */}
+      {/* ── Invoice Modal ─────────────────────────────────────────────────── */}
       {viewingInvoice && (
         <InvoiceModal
           invoice={viewingInvoice}
@@ -846,7 +926,6 @@ const OrdersManagement = () => {
           Orders Management
         </h2>
         <div className="flex items-center gap-2">
-          {/* ── Add External Order Button ── */}
           <button
             onClick={() => setShowExternalModal(true)}
             data-testid="add-external-order-btn"
@@ -949,15 +1028,6 @@ const OrdersManagement = () => {
         <>
           {/* Desktop Table View */}
           <div className="hidden lg:block bg-[#0F0F0F] border border-white/5 rounded-sm overflow-hidden">
-            {/*
-              FIX — ISSUE 3: drag-to-scroll container.
-              ref={dragScrollRef}  — used by mouse handlers above
-              cursor: grab         — visual affordance for draggable area
-              scrollBehavior: smooth — smooth keyboard/programmatic scrolling
-              Mouse handlers: onMouseDown starts drag, onMouseMove scrolls,
-              onMouseUp/onMouseLeave stops drag. overflow: auto ensures both
-              axes scroll when content overflows.
-            */}
             <div
               ref={dragScrollRef}
               className="overflow-x-auto overflow-y-auto"
@@ -1046,7 +1116,6 @@ const OrdersManagement = () => {
                                 <option value="paid">Paid</option>
                               </select>
                             </div>
-                            {/* ── Feature 2: Invoice Buttons (desktop) ── */}
                             <div className="flex gap-1.5 flex-wrap">
                               <button
                                 onClick={(e) => handleViewInvoice(order.id, e)}
@@ -1068,7 +1137,6 @@ const OrdersManagement = () => {
                                 <FileText className="w-3 h-3" />
                                 PDF
                               </button>
-                              {/* WhatsApp Send Invoice — shown when customer phone exists */}
                               {order.customerPhone && (
                                 <button
                                   onClick={(e) => handleSendInvoiceWA(order, e)}
@@ -1080,7 +1148,6 @@ const OrdersManagement = () => {
                                   WA
                                 </button>
                               )}
-                              {/* ── Add Items button (desktop) ── */}
                               {order.orderStatus !== 'completed' && order.orderStatus !== 'cancelled' && (
                                 <button
                                   onClick={(e) => { e.stopPropagation(); setAddItemsOrder(order); }}
@@ -1092,7 +1159,6 @@ const OrdersManagement = () => {
                                   Add Items
                                 </button>
                               )}
-                              {/* Delete button */}
                               {deleteConfirmId === order.id ? (
                                 <div className="flex gap-1">
                                   <button
@@ -1133,9 +1199,43 @@ const OrdersManagement = () => {
                                 <div className="space-y-2">
                                   {order.items?.map((item, idx) => (
                                     <div key={idx} className="text-sm">
-                                      <div className="flex justify-between">
-                                        <span className="text-white">{item.name} x{item.quantity}</span>
-                                        <span className="text-[#D4AF37]">{order.currencySymbol || cafeCurrency}{(item.price * item.quantity).toFixed(2)}</span>
+                                      <div className="flex justify-between items-start gap-2">
+                                        <span className="text-white flex-1">{item.name} x{item.quantity}</span>
+                                        <div className="flex items-center gap-2 flex-shrink-0">
+                                          <span className="text-[#D4AF37]">{order.currencySymbol || cafeCurrency}{(item.price * item.quantity).toFixed(2)}</span>
+
+                                          {/* ── NEW: Remove Item button (desktop expanded row) ── */}
+                                          {order.orderStatus !== 'completed' && order.orderStatus !== 'cancelled' && (
+                                            isConfirmingRemove(order.id, idx) ? (
+                                              <div className="flex items-center gap-1" onClick={e => e.stopPropagation()}>
+                                                <button
+                                                  onClick={() => handleRemoveItem(order.id, idx)}
+                                                  data-testid={`confirm-remove-item-${order.id}-${idx}`}
+                                                  className="px-2 py-0.5 bg-red-500 hover:bg-red-600 text-white rounded text-xs font-bold transition-all"
+                                                  title="Confirm remove"
+                                                >
+                                                  Confirm
+                                                </button>
+                                                <button
+                                                  onClick={() => setRemovingItem(null)}
+                                                  className="px-2 py-0.5 bg-white/10 hover:bg-white/20 text-[#A3A3A3] rounded text-xs transition-all"
+                                                >
+                                                  Cancel
+                                                </button>
+                                              </div>
+                                            ) : (
+                                              <button
+                                                onClick={(e) => { e.stopPropagation(); setRemovingItem({ orderId: order.id, itemIndex: idx }); }}
+                                                data-testid={`remove-item-${order.id}-${idx}`}
+                                                className="flex items-center gap-0.5 px-2 py-0.5 rounded text-xs font-medium text-red-400 hover:text-red-300 hover:bg-red-500/10 border border-transparent hover:border-red-500/20 transition-all"
+                                                title="Remove this item"
+                                              >
+                                                <X className="w-3 h-3" />
+                                                Remove
+                                              </button>
+                                            )
+                                          )}
+                                        </div>
                                       </div>
                                       {/* comboItems display */}
                                       {item.comboItems?.length > 0 && (
@@ -1180,7 +1280,6 @@ const OrdersManagement = () => {
                                       <span>{order.deliveryAddress}</span>
                                     </div>
                                   )}
-                                  {/* ── Feature 1: Delivery address block ── */}
                                   {order?.orderType === 'delivery' && (
                                     <div className="text-sm mt-2">
                                       <strong className="text-[#D4AF37]">Delivery Address:</strong>
@@ -1243,7 +1342,6 @@ const OrdersManagement = () => {
                   {order.orderType === 'dine-in' && order.tableNumber && (
                     <span className="text-white text-sm">• Table {order.tableNumber}</span>
                   )}
-                  {/* ── Feature 1: Delivery address (mobile header strip) ── */}
                   {order.orderType === 'delivery' && order.deliveryAddress && (
                     <span className="text-[#A3A3A3] text-xs truncate max-w-[180px]">📍 {order.deliveryAddress}</span>
                   )}
@@ -1257,12 +1355,45 @@ const OrdersManagement = () => {
                   <div className="px-4 pb-4 border-t border-white/10 pt-4 space-y-4">
                     <div>
                       <h4 className="text-[#D4AF37] font-semibold mb-2 text-sm">Items</h4>
-                      <div className="space-y-1">
+                      <div className="space-y-2">
                         {order.items?.map((item, idx) => (
                           <div key={idx} className="text-sm">
-                            <div className="flex justify-between">
-                              <span className="text-white">{item.name} x{item.quantity}</span>
-                              <span className="text-[#D4AF37]">{order.currencySymbol || cafeCurrency}{(item.price * item.quantity).toFixed(2)}</span>
+                            <div className="flex justify-between items-start gap-2">
+                              <span className="text-white flex-1">{item.name} x{item.quantity}</span>
+                              <div className="flex items-center gap-2 flex-shrink-0">
+                                <span className="text-[#D4AF37]">{order.currencySymbol || cafeCurrency}{(item.price * item.quantity).toFixed(2)}</span>
+
+                                {/* ── NEW: Remove Item button (mobile expanded card) ── */}
+                                {order.orderStatus !== 'completed' && order.orderStatus !== 'cancelled' && (
+                                  isConfirmingRemove(order.id, idx) ? (
+                                    <div className="flex items-center gap-1" onClick={e => e.stopPropagation()}>
+                                      <button
+                                        onClick={() => handleRemoveItem(order.id, idx)}
+                                        data-testid={`confirm-remove-item-mobile-${order.id}-${idx}`}
+                                        className="px-2 py-0.5 bg-red-500 hover:bg-red-600 text-white rounded text-xs font-bold transition-all"
+                                      >
+                                        Confirm
+                                      </button>
+                                      <button
+                                        onClick={() => setRemovingItem(null)}
+                                        className="px-2 py-0.5 bg-white/10 text-[#A3A3A3] rounded text-xs transition-all"
+                                      >
+                                        Cancel
+                                      </button>
+                                    </div>
+                                  ) : (
+                                    <button
+                                      onClick={(e) => { e.stopPropagation(); setRemovingItem({ orderId: order.id, itemIndex: idx }); }}
+                                      data-testid={`remove-item-mobile-${order.id}-${idx}`}
+                                      className="flex items-center gap-0.5 px-2 py-0.5 rounded text-xs font-medium text-red-400 hover:text-red-300 hover:bg-red-500/10 border border-transparent hover:border-red-500/20 transition-all"
+                                      title="Remove this item"
+                                    >
+                                      <X className="w-3 h-3" />
+                                      Remove
+                                    </button>
+                                  )
+                                )}
+                              </div>
                             </div>
                             {/* comboItems display (mobile) */}
                             {item.comboItems?.length > 0 && (
@@ -1285,7 +1416,6 @@ const OrdersManagement = () => {
                       </div>
                     </div>
 
-                    {/* ── Feature 1: Delivery address in mobile expanded view ── */}
                     {order?.orderType === 'delivery' && (
                       <div className="text-sm">
                         <strong className="text-[#D4AF37]">Delivery Address:</strong>
@@ -1321,7 +1451,6 @@ const OrdersManagement = () => {
                       </select>
                     </div>
 
-                    {/* ── Feature 2: Invoice Buttons (mobile) ── */}
                     <div className="flex gap-2" onClick={(e) => e.stopPropagation()}>
                       <button
                         onClick={(e) => handleViewInvoice(order.id, e)}
@@ -1340,7 +1469,6 @@ const OrdersManagement = () => {
                         Download PDF
                       </button>
                     </div>
-                    {/* WhatsApp Send Invoice (mobile) — shown when customer phone exists */}
                     {order.customerPhone && (
                       <div onClick={(e) => e.stopPropagation()}>
                         <button
@@ -1353,7 +1481,6 @@ const OrdersManagement = () => {
                       </div>
                     )}
 
-                    {/* ── Add Items button (mobile) ── */}
                     {order.orderStatus !== 'completed' && order.orderStatus !== 'cancelled' && (
                       <div onClick={(e) => e.stopPropagation()}>
                         <button
@@ -1367,7 +1494,6 @@ const OrdersManagement = () => {
                       </div>
                     )}
 
-                    {/* Delete button (mobile) */}
                     <div onClick={(e) => e.stopPropagation()}>
                       {deleteConfirmId === order.id ? (
                         <div className="flex gap-2">
