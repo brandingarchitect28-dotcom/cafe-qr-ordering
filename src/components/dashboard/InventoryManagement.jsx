@@ -644,13 +644,15 @@ const InventoryManagement = () => {
       <AnimatePresence>
         {showForm && (
           <InventoryForm
-T={T}             initial={editTarget
+            T={T}
+            initial={editTarget
               ? {
                   itemName:          editTarget.itemName,
                   category:          editTarget.category,
                   quantity:          String(editTarget.quantity ?? ''),
                   unit:              editTarget.unit || 'pcs',
                   lowStockThreshold: String(editTarget.lowStockThreshold ?? ''),
+                  costPerUnit:       String(editTarget.costPerUnit ?? ''),
                 }
               : undefined
             }
