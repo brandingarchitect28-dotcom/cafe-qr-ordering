@@ -972,22 +972,34 @@ const CafeOrdering = () => {
               >
                 {/* Item Image */}
                 <div className="aspect-square overflow-hidden relative">
-                  {item.image ? (
-                    <motion.img
-                      src={item.image}
-                      alt={item.name}
-                      className="w-full h-full object-cover"
-                      whileHover={{ scale: 1.1 }}
-                      transition={{ duration: 0.3 }}
-                    />
-                  ) : (
+                  {(() => {
+                    const mediaUrl = item.image || item.video || item.mediaUrl || '';
+                    const isVideo  = mediaUrl.toLowerCase().includes('.mp4');
+                    return mediaUrl ? (
+                      isVideo ? (
+                        <video
+                          src={mediaUrl}
+                          autoPlay muted loop playsInline
+                          className="w-full h-full object-cover"
+                        />
+                      ) : (
+                        <motion.img
+                          src={mediaUrl}
+                          alt={item.name}
+                          className="w-full h-full object-cover"
+                          whileHover={{ scale: 1.1 }}
+                          transition={{ duration: 0.3 }}
+                        />
+                      )
+                    ) : (
                     <div 
                       className="w-full h-full flex items-center justify-center"
                       style={{ backgroundColor: COLORS.backgroundSecondary }}
                     >
                       <Coffee className="w-12 h-12" style={{ color: COLORS.textMuted }} />
                     </div>
-                  )}
+                  );
+                  })()}
                   
                   {/* Quick Add Button */}
                   <motion.button

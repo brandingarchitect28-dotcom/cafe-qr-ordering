@@ -185,7 +185,13 @@ const OfferDetailModal = ({ offer, menuItems, CUR, onAdd, onClose, primary = '#D
 // ─── Menu Item Card (premium) ─────────────────────────────────────────────────
 
 const MenuCard = React.memo(({ item, CUR, cartQty, onAdd, onAddWithAnim, onShowDetails, primary = '#D4AF37', theme }) => {
-  const mediaType = getMediaType(item.image);
+  // ── Media field resolution — add-only, zero removal ───────────────────────
+  // item.image  — manually uploaded via MediaUpload (existing path)
+  // item.video  — Pexels video URL saved by AIMenuUpload (new path)
+  // item.mediaUrl — canonical URL saved by AIMenuUpload (fallback)
+  // Priority: image → video → mediaUrl → '' (empty = show placeholder)
+  const mediaUrl  = item.image || item.video || item.mediaUrl || '';
+  const mediaType = getMediaType(mediaUrl);
   const T = theme || {
     bgCard: 'rgba(255,255,255,0.04)',
     border: 'rgba(255,255,255,0.08)',
@@ -210,17 +216,17 @@ const MenuCard = React.memo(({ item, CUR, cartQty, onAdd, onAddWithAnim, onShowD
     >
       {/* Media */}
       <div className="relative overflow-hidden aspect-[4/3]">
-        {item.image ? (
+        {mediaUrl ? (
           <>
             {mediaType === 'video' ? (
               <video
-                src={item.image}
+                src={mediaUrl}
                 autoPlay muted loop playsInline
                 className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
               />
             ) : (
               <img
-                src={item.image}
+                src={mediaUrl}
                 alt={item.name}
                 loading="lazy"
                 className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
@@ -488,23 +494,20 @@ const CafeOrderingPremium = () => {
   }, []);
 
   const addToCart = useCallback((item, size = null) => {
-    if (item.addons?.length > 0) {
-  setAddonModal({ ...item, selectedSize: size });
-  return;
-  }
-  
-  const selectedPrice = size && item.sizePricing?.[size]
+    if (!size && item.addons?.length > 0) {
+      setAddonModal(item);
+      return;
+    }
+    const selectedPrice = size && item.sizePricing?.[size]
       ? parseFloat(item.sizePricing[size])
       : item.price;
     directAddToCart({
       ...item,
       price:        selectedPrice,
-      basePrice:    selectedPrice,
       selectedSize: size || null,
       quantity:     1,
       addons:       [],
       addonTotal:   0,
-      comboItems:   [],
     });
   }, [directAddToCart]);
 
@@ -547,113 +550,6 @@ const CafeOrderingPremium = () => {
 
   // ── Add offer to cart ──────────────────────────────────────────────────────
   const addOfferToCart = (offer) => {
-    // TASK 2 + TASK 3: Apply correct offer pricing per type
-
-    // --- Combo: single cart entry at comboPrice ---
-    if (offer.type === 'combo' && offer.comboPrice) {
-      // BUG FIX: enrich combo items from menuItems so kitchen/dashboard has full details
-      const enrichedItems = (offer.items || []).map(oi => {
-        const menuItem = menuItems.find(m => m.id === oi.itemId);
-        return {
-          itemId:    oi.itemId,
-          itemName:  oi.itemName  || menuItem?.name      || '',
-          quantity:  oi.quantity  || 1,
-          itemPrice: oi.itemPrice || menuItem?.price      || 0,
-          image:     menuItem?.image || '',
-        };
-      });
-      const selectedPrice = parseFloat(offer.comboPrice);
-      const comboEntry = {
-        id:           offer.id,
-        name:         offer.title,
-        price:        selectedPrice,
-        basePrice:    selectedPrice,
-        quantity:     1,
-        addons:       [],
-        addonTotal:   0,
-        selectedSize: null,
-        isOffer:      true,
-        offerType:    'combo',
-        items:        enrichedItems,
-        comboItems:   enrichedItems.map(ei => ({
-          name:     ei.itemName,
-          price:    ei.itemPrice,
-          quantity: ei.quantity,
-        })),
-      };
-      setCart(prev => [...prev, comboEntry]);
-      toast.success(`${offer.title} added to cart ✓`);
-      return;
-    }
-
-    // --- % or flat discount: apply reduced price per item ---
-    if (offer.type === 'discount') {
-      (offer.items || []).forEach(oi => {
-        const menuItem = menuItems.find(m => m.id === oi.itemId);
-        if (!menuItem) return;
-        let discountedPrice = parseFloat(menuItem.price);
-        if (offer.discountType === 'percentage') {
-          discountedPrice = discountedPrice * (1 - parseFloat(offer.discountAmount) / 100);
-        } else {
-          discountedPrice = Math.max(0, discountedPrice - parseFloat(offer.discountAmount));
-        }
-        const selectedPrice = parseFloat(discountedPrice.toFixed(2));
-        setCart(prev => [...prev, {
-          ...menuItem,
-          price:        selectedPrice,
-          basePrice:    selectedPrice,
-          quantity:     oi.quantity || 1,
-          addons:       [],
-          addonTotal:   0,
-          selectedSize: null,
-          isOffer:      true,
-          offerType:    'discount',
-        }]);
-      });
-      toast.success(`${offer.title} added to cart ✓`);
-      return;
-    }
-
-    // --- Buy X Get Y: paid qty at normal price + free qty at zero ---
-    if (offer.type === 'buy_x_get_y') {
-      (offer.items || []).forEach(oi => {
-        const menuItem = menuItems.find(m => m.id === oi.itemId);
-        if (!menuItem) return;
-        const buyQty = offer.buyQuantity || oi.quantity || 1;
-        const getQty = offer.getQuantity || 0;
-        if (buyQty > 0) {
-          setCart(prev => [...prev, {
-            ...menuItem,
-            price:        parseFloat(menuItem.price),
-            basePrice:    parseFloat(menuItem.price),
-            quantity:     buyQty,
-            addons:       [],
-            addonTotal:   0,
-            selectedSize: null,
-            isOffer:      true,
-            offerType:    'buy_x_get_y',
-          }]);
-        }
-        if (getQty > 0) {
-          setCart(prev => [...prev, {
-            ...menuItem,
-            price:        0,
-            basePrice:    0,
-            quantity:     getQty,
-            addons:       [],
-            addonTotal:   0,
-            selectedSize: null,
-            isOffer:      true,
-            offerType:    'buy_x_get_y_free',
-            name:         `${menuItem.name} (Free)`,
-          }]);
-        }
-      });
-      toast.success(`${offer.title} added to cart ✓`);
-      return;
-    }
-
-    // --- Fallback: original behaviour — no breakage ---
     (offer.items || []).forEach(oi => {
       const menuItem = menuItems.find(m => m.id === oi.itemId);
       if (!menuItem) return;
@@ -696,11 +592,6 @@ const CafeOrderingPremium = () => {
           addons:       i.addons       || [],
           addonTotal:   i.addonTotal   || 0,
           selectedSize: i.selectedSize || null,
-          comboItems:   i.comboItems   || [],
-          // TASK 1 + TASK 5: pass offer fields to orders dashboard + kitchen
-          ...(i.isOffer   && { isOffer:   true        }),
-          ...(i.offerType && { offerType: i.offerType }),
-          ...(i.items     && { items:     i.items     }),
         })),
         subtotalAmount: subtotal,
         taxAmount,
@@ -1198,19 +1089,9 @@ const CafeOrderingPremium = () => {
                       <div className="flex-1 min-w-0">
                         <p className="text-sm font-medium truncate" style={{ color: T.text }}>{item.name}</p>
                         <p className="text-xs" style={{ color: T.textMuted }}>{CUR}{fmt(item.basePrice ?? item.price)}</p>
-                        {item.comboItems?.length > 0 && (
-                          <div className="mt-0.5">
-                            {item.comboItems.map((ci, cIdx) => (
-                              <p key={cIdx} className="text-xs" style={{ color: T.textMuted }}>
-                                — {ci.name}{ci.quantity > 1 ? ` ×${ci.quantity}` : ''}
-                              </p>
-                            ))}
-                          </div>
-                        )}
                         {item.addons?.length > 0 && (
                           <p className="text-xs mt-0.5 truncate" style={{ color: T.textMuted }}>
-                            {/* CHANGE 7 — Show qty suffix for addons with qty > 1 */}
-                            + {item.addons.map(a => a.quantity > 1 ? `${a.name} ×${a.quantity}` : a.name).join(', ')}
+                            + {item.addons.map(a => a.name).join(', ')}
                           </p>
                         )}
                       </div>
@@ -1411,19 +1292,9 @@ const CafeOrderingPremium = () => {
                         <span style={{ color: T.textMuted }}>{item.name} × {item.quantity}</span>
                         <span style={{ color: T.text }}>{CUR}{fmt(item.price * item.quantity)}</span>
                       </div>
-                      {item.comboItems?.length > 0 && (
-                        <div className="ml-2 mt-0.5">
-                          {item.comboItems.map((ci, cIdx) => (
-                            <p key={cIdx} className="text-xs" style={{ color: T.textFaint || T.textMuted }}>
-                              — {ci.name}{ci.quantity > 1 ? ` ×${ci.quantity}` : ''}
-                            </p>
-                          ))}
-                        </div>
-                      )}
                       {item.addons?.length > 0 && (
                         <p className="text-xs ml-2 mt-0.5" style={{ color: T.textFaint || T.textMuted }}>
-                          {/* CHANGE 8 — Show qty suffix for addons with qty > 1 */}
-                          + {item.addons.map(a => a.quantity > 1 ? `${a.name} ×${a.quantity}` : a.name).join(', ')}
+                          + {item.addons.map(a => a.name).join(', ')}
                         </p>
                       )}
                     </div>
