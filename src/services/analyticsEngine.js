@@ -177,7 +177,7 @@ export const calcProfit = (orders = [], inventory = [], recipes = []) => {
   recipes.forEach(r => {
     let cost = 0;
     (r.ingredients || []).forEach(ing => {
-      const invItem = inventory.find(i => i.id === ing.itemId);
+      const invItem = inventory.find(i => i.id === (ing.itemId || ing.inventoryItemId));
       if (invItem && invItem.costPerUnit) {
         cost += (invItem.costPerUnit || 0) * (ing.quantity || 0);
       }

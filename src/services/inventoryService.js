@@ -51,6 +51,7 @@ export const addInventoryItem = async (cafeId, itemData) => {
       quantity:          parseFloat(itemData.quantity) || 0,
       unit:              itemData.unit || 'pcs',
       lowStockThreshold: parseFloat(itemData.lowStockThreshold) || 0,
+      costPerUnit:       parseFloat(itemData.costPerUnit) || 0,
       lastUpdated:       serverTimestamp(),
       createdAt:         serverTimestamp(),
     });
@@ -71,6 +72,7 @@ export const updateInventoryItem = async (itemId, itemData) => {
       quantity:          parseFloat(itemData.quantity) || 0,
       unit:              itemData.unit || 'pcs',
       lowStockThreshold: parseFloat(itemData.lowStockThreshold) || 0,
+      costPerUnit:       parseFloat(itemData.costPerUnit) || 0,
       lastUpdated:       serverTimestamp(),
     });
     return { error: null };
