@@ -308,12 +308,28 @@ const AddMoreItemsModal = ({ order, onClose, primary, setAddonModal, setVariantM
   const addToNewCart = useCallback((item, forcedVariant) => {
     if (!item) return;
 
+    // DEBUG: log full item to console so field names are visible in DevTools
+    console.log('[SmartCafe] ADD ITEM DATA:', JSON.stringify({
+      id: item.id, name: item.name, price: item.price,
+      variants: item.variants, sizes: item.sizes, prices: item.prices,
+      options: item.options, priceVariants: item.priceVariants,
+      multiPrices: item.multiPrices, addons: item.addons,
+    }, null, 2));
+
     // STEP 1 — VARIANT CHECK (highest priority, always runs first)
     // Only skipped when forcedVariant is explicitly passed (user already picked one)
     if (!forcedVariant) {
-      const variants = Array.isArray(item.variants) ? item.variants
-        : Array.isArray(item.sizes)  ? item.sizes
-        : Array.isArray(item.prices) ? item.prices
+      // Covers every possible field name used across POS systems
+      const rawVariants =
+        item.variants      ||
+        item.prices        ||
+        item.sizes         ||
+        item.options       ||
+        item.priceVariants ||
+        item.multiPrices   ||
+        null;
+      const variants = Array.isArray(rawVariants)
+        ? rawVariants.filter(v => v && (v.price !== undefined))
         : null;
       if (variants && variants.length > 0) {
         setVariantModal(item);
@@ -323,7 +339,7 @@ const AddMoreItemsModal = ({ order, onClose, primary, setAddonModal, setVariantM
 
     // STEP 2 — resolve price from forced variant or item base price
     const resolvedPrice       = forcedVariant ? (parseFloat(forcedVariant.price) || parseFloat(item.price) || 0) : (parseFloat(item.price) || 0);
-    const resolvedVariantName = forcedVariant?.name || null;
+    const resolvedVariantName = forcedVariant?.name || forcedVariant?.label || forcedVariant?.size || forcedVariant?.title || null;
 
     // STEP 3 — ADDON CHECK (only after variant resolved)
     if (Array.isArray(item.addons) && item.addons.length > 0) {
@@ -349,7 +365,7 @@ const AddMoreItemsModal = ({ order, onClose, primary, setAddonModal, setVariantM
       addonTotal:      0,
       comboItems:      Array.isArray(item.comboItems) ? item.comboItems : [],
     });
-  }, [directAddToNewCart, setAddonModal]);
+  }, [directAddToNewCart, setAddonModal, setVariantModal]);
 
   const handleSave = async () => {
     if (newCart.length === 0) return;
@@ -1092,13 +1108,17 @@ const OrderTracking = () => {
         const CUR_V    = order?.currencySymbol || '₹';
         const fmt_v    = n => (parseFloat(n) || 0).toFixed(2);
         const primary_v = '#D4AF37';
-        const variants = (
-          Array.isArray(vItem.variants) ? vItem.variants :
-          Array.isArray(vItem.sizes)    ? vItem.sizes    :
-          Array.isArray(vItem.prices)   ? vItem.prices   :
-          Array.isArray(vItem.options)  ? vItem.options  :
-          []
-        ).filter(v => v && (v.name || v.label || v.size));
+        // Expand detection to all possible field names
+        const rawVariants =
+          vItem.variants      ||
+          vItem.prices        ||
+          vItem.sizes         ||
+          vItem.options       ||
+          vItem.priceVariants ||
+          vItem.multiPrices   ||
+          [];
+        const variants = (Array.isArray(rawVariants) ? rawVariants : [])
+          .filter(v => v && (v.price !== undefined));
         return (
           <div className="fixed inset-0 z-[200]">
             <div className="absolute inset-0 bg-black/75 backdrop-blur-sm" onClick={() => setAddMoreVariantModal(null)} />
@@ -1121,7 +1141,7 @@ const OrderTracking = () => {
                 </div>
                 <div className="px-4 py-3 space-y-2 pb-6">
                   {variants.map((v, vi) => {
-                    const label = v.name || v.label || v.size || `Option ${vi + 1}`;
+                    const label = v.name || v.label || v.size || v.title || `Option ${vi + 1}`;
                     const price = parseFloat(v.price) || 0;
                     return (
                       <button
