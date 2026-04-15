@@ -15,6 +15,45 @@ import AddOnModal from '../AddOnModal';
 // Notification sound (base64 encoded short beep)
 const NOTIFICATION_SOUND = 'data:audio/mp3;base64,SUQzBAAAAAAAI1RTU0UAAAAPAAADTGF2ZjU4Ljc2LjEwMAAAAAAAAAAAAAAA/+M4wAAAAAAAAAAAAEluZm8AAAAPAAAAAwAAAbAAqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV////////////////////////////////////////////AAAAAExhdmM1OC4xMwAAAAAAAAAAAAAAACQDgAAAAAAAAAGw3X+VkgAAAAAAAAAAAAAAAAD/4xjEAAJQAVAAAAAAvYCCB4P+UBn//+D4PoGH/ygM///KAHAY////4Pg+D7/8EMOD4f/6gYf///wfB9///5QGf/lAZ//+UAcH0GH////+oGH//6gYf5QBwfD4fygDg//+D5//ygMAAAAAAA/+MYxBYCwAFYAAAAAPHjx4sePHjx5OTk5FRUVFRU9PT09PT09PT0/////////////////////////////////+MYxCMAAADSAAAAAP///////////////////////////////////////////////+MYxDAAAADSAAAAAP///////////////////////////////////////////////+MYxD4AAADSAAAAAP//////////////////////////////////////////////'
 
+// ─── calculateOrderTotals — SINGLE SOURCE OF TRUTH ───────────────────────────
+// Used by every write path (handleSave, handleRemoveItem) AND every display
+// path (footer totals, Grand Total). Guarantees both screens always match.
+//
+// Addon quantity rule:
+//   Each addon entry has its own quantity (a.quantity, defaults 1).
+//   The item itself has item.quantity.
+//   addonLineTotal = a.price × a.quantity   (per-addon amount for 1 item)
+//   itemAddonTotal = SUM(addonLineTotals)   (all addons for 1 item)
+//   fullAddonTotal = itemAddonTotal × item.quantity  (scaled by item qty)
+//
+// Example: 2× Noodles, addon Sauce ×1 @ ₹10, addon Cheese ×2 @ ₹15
+//   itemAddonTotal = (10×1) + (15×2) = 40
+//   fullAddonTotal = 40 × 2 = 80
+//   itemBaseTotal  = 150 × 2 = 300
+//   itemTotal      = 300 + 80 = 380
+const calculateOrderTotals = (items = []) => {
+  const safeN = v => { const n = parseFloat(v); return isNaN(n) || !isFinite(n) ? 0 : n; };
+  let itemsTotal  = 0;
+  let addonsTotal = 0;
+
+  for (const item of items) {
+    const basePrice = safeN(item.basePrice ?? item.price);
+    const qty       = safeN(item.quantity) || 1;
+    const addons    = Array.isArray(item.addons) ? item.addons : [];
+
+    // per-addon qty is stored in a.quantity (from AddOnModal); default 1
+    const itemAddonAmt = addons.reduce(
+      (s, a) => s + safeN(a.price) * (parseInt(a.quantity) || 1),
+      0
+    );
+
+    itemsTotal  += basePrice    * qty;
+    addonsTotal += itemAddonAmt * qty;
+  }
+
+  return { itemsTotal, addonsTotal, grandTotal: itemsTotal + addonsTotal };
+};
+
 // ─── Add Items to Order Modal ─────────────────────────────────────────────────
 
 const AddItemsToOrderModal = ({ order, cafeCurrency, onClose }) => {
@@ -26,6 +65,8 @@ const AddItemsToOrderModal = ({ order, cafeCurrency, onClose }) => {
   const [loadingMenu, setLoadingMenu] = useState(true);
   const [newCart,     setNewCart    ] = useState([]);
   const [addonModal,  setAddonModal ] = useState(null);
+  // variantModal: holds the menuItem whose variants need to be picked first
+  const [variantModal, setVariantModal] = useState(null);
   const [saving,      setSaving     ] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
 
@@ -47,7 +88,8 @@ const AddItemsToOrderModal = ({ order, cafeCurrency, onClose }) => {
     !searchQuery || item.name.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
-  const newCartTotal = newCart.reduce((s, i) => s + i.price * i.quantity, 0);
+  // Use calculateOrderTotals so cart footer matches what will be saved
+  const { grandTotal: newCartTotal } = calculateOrderTotals(newCart);
 
   const directAddToNewCart = useCallback((cartEntry) => {
     setNewCart(prev => {
@@ -69,20 +111,46 @@ const AddItemsToOrderModal = ({ order, cafeCurrency, onClose }) => {
     });
   }, []);
 
-  const addToNewCart = useCallback((item) => {
-    if (item.addons?.length > 0) {
-      setAddonModal(item);
+  const addToNewCart = useCallback((item, forcedVariant) => {
+    // VARIANT FIX: if item has variants and no variant has been forced, show picker
+    const variants = Array.isArray(item.variants) ? item.variants
+      : Array.isArray(item.sizes) ? item.sizes
+      : Array.isArray(item.prices) ? item.prices
+      : null;
+
+    if (variants && variants.length > 0 && !forcedVariant) {
+      setVariantModal(item);
       return;
     }
+
+    // Build the resolved price: forced variant overrides base price
+    const resolvedPrice = forcedVariant
+      ? parseFloat(forcedVariant.price) || parseFloat(item.price)
+      : parseFloat(item.price);
+    const resolvedVariantName = forcedVariant?.name || null;
+
+    // ADDON FIX: item.addons here is the *available* addons config list
+    if (item.addons?.length > 0) {
+      // Pass resolved price + variant info into addon modal so it uses correct base
+      setAddonModal({
+        ...item,
+        price:           resolvedPrice,
+        basePrice:       resolvedPrice,
+        selectedVariant: resolvedVariantName,
+      });
+      return;
+    }
+
     directAddToNewCart({
       ...item,
-      price:        parseFloat(item.price),
-      basePrice:    parseFloat(item.price),
-      selectedSize: null,
-      quantity:     1,
-      addons:       [],
-      addonTotal:   0,
-      comboItems:   [],
+      price:           resolvedPrice,
+      basePrice:       resolvedPrice,
+      selectedSize:    resolvedVariantName,
+      selectedVariant: resolvedVariantName,
+      quantity:        1,
+      addons:          [],
+      addonTotal:      0,
+      comboItems:      [],
     });
   }, [directAddToNewCart]);
 
@@ -115,11 +183,8 @@ const AddItemsToOrderModal = ({ order, cafeCurrency, onClose }) => {
       }));
       const updatedItems = [...existingItems, ...newItems];
 
-      const newSubtotal = updatedItems.reduce((s, item) => {
-        const base = safeNum(item.price);
-        const addonAmt = (item.addons || []).reduce((as, a) => as + safeNum(a.price), 0);
-        return s + (base + addonAmt) * safeNum(item.quantity);
-      }, 0);
+      // FIX: use calculateOrderTotals so addon.quantity is respected
+      const { grandTotal: newSubtotal } = calculateOrderTotals(updatedItems);
 
       const cafeSnap = await getDoc(doc(db, 'cafes', order.cafeId));
       const cafe = cafeSnap.exists() ? cafeSnap.data() : {};
@@ -264,12 +329,23 @@ const AddItemsToOrderModal = ({ order, cafeCurrency, onClose }) => {
           {newCart.length > 0 && (
             <div className="px-4 py-4 flex-shrink-0 border-t border-white/5 space-y-3">
               <div className="space-y-1">
-                {newCart.map((item, idx) => (
-                  <div key={idx} className="flex justify-between text-xs text-[#A3A3A3]">
-                    <span>{item.name} × {item.quantity}</span>
-                    <span>{CUR}{fmt(item.price * item.quantity)}</span>
-                  </div>
-                ))}
+                {newCart.map((item, idx) => {
+                  // FIX: include addon cost in each cart line
+                  const addons = Array.isArray(item.addons) ? item.addons : [];
+                  const itemAddonAmt = addons.reduce((s, a) => s + (parseFloat(a.price) || 0) * (parseInt(a.quantity) || 1), 0);
+                  const lineTotal = (parseFloat(item.basePrice ?? item.price) + itemAddonAmt) * (parseInt(item.quantity) || 1);
+                  return (
+                    <div key={idx} className="flex justify-between text-xs text-[#A3A3A3]">
+                      <span>
+                        {item.name}
+                        {item.selectedVariant ? ` (${item.selectedVariant})` : ''}
+                        {' '}× {item.quantity}
+                        {addons.length > 0 ? ` +${addons.length} add-on${addons.length > 1 ? 's' : ''}` : ''}
+                      </span>
+                      <span>{CUR}{fmt(lineTotal)}</span>
+                    </div>
+                  );
+                })}
                 <div className="flex justify-between text-sm font-bold pt-1 border-t border-white/5">
                   <span className="text-[#A3A3A3]">New items total</span>
                   <span style={{ color: primary }}>{CUR}{fmt(newCartTotal)}</span>
@@ -304,6 +380,61 @@ const AddItemsToOrderModal = ({ order, cafeCurrency, onClose }) => {
             theme="dark"
           />
         )}
+
+        {/* ── VARIANT PICKER MODAL ─────────────────────────────────────────────
+            Shown when an item has variants (sizes/prices) before adding to cart.
+            Keeps EXACT same dark-luxury aesthetic — no new colors or layout styles.  */}
+        {variantModal && (() => {
+          const vItem    = variantModal;
+          const variants = Array.isArray(vItem.variants) ? vItem.variants
+            : Array.isArray(vItem.sizes)    ? vItem.sizes
+            : Array.isArray(vItem.prices)   ? vItem.prices
+            : [];
+          return (
+            <motion.div
+              className="fixed inset-0 z-[90] flex items-end sm:items-center justify-center"
+              initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+            >
+              <div className="absolute inset-0 bg-black/75 backdrop-blur-sm" onClick={() => setVariantModal(null)} />
+              <motion.div
+                className="relative w-full sm:max-w-sm rounded-t-3xl sm:rounded-2xl overflow-hidden"
+                style={{ background: '#0F0F0F', border: '1px solid rgba(255,255,255,0.08)' }}
+                initial={{ y: '100%' }} animate={{ y: 0 }} exit={{ y: '100%' }}
+                transition={{ type: 'spring', damping: 26, stiffness: 300 }}
+                onClick={e => e.stopPropagation()}
+              >
+                <div className="flex items-center justify-between px-5 py-4 border-b border-white/5">
+                  <div>
+                    <h3 className="text-white font-bold text-base" style={{ fontFamily: 'Playfair Display, serif' }}>
+                      Select Variant
+                    </h3>
+                    <p className="text-xs mt-0.5 text-[#A3A3A3]">{vItem.name}</p>
+                  </div>
+                  <button onClick={() => setVariantModal(null)} className="p-2 rounded-full hover:bg-white/10 transition-all">
+                    <X className="w-5 h-5 text-[#A3A3A3]" />
+                  </button>
+                </div>
+                <div className="px-4 py-3 space-y-2 pb-5">
+                  {variants.map((v, vi) => (
+                    <button
+                      key={vi}
+                      onClick={() => {
+                        setVariantModal(null);
+                        // Pass the resolved variant back into addToNewCart
+                        addToNewCart(vItem, v);
+                      }}
+                      className="w-full flex items-center justify-between p-3 rounded-xl transition-all hover:bg-white/8"
+                      style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)' }}
+                    >
+                      <span className="text-white text-sm font-medium">{v.name}</span>
+                      <span className="text-sm font-bold" style={{ color: primary }}>{CUR}{fmt(v.price)}</span>
+                    </button>
+                  ))}
+                </div>
+              </motion.div>
+            </motion.div>
+          );
+        })()}
       </motion.div>
     </AnimatePresence>
   );
@@ -546,12 +677,8 @@ const OrdersManagement = () => {
         return;
       }
 
-      // 4. Recalculate subtotal from remaining items
-      const newSubtotal = items.reduce((s, item) => {
-        const base     = safeNum(item.price);
-        const addonAmt = (item.addons || []).reduce((as, a) => as + safeNum(a.price), 0);
-        return s + (base + addonAmt) * safeNum(item.quantity);
-      }, 0);
+      // 4. Recalculate subtotal from remaining items — FIX: use calculateOrderTotals
+      const { grandTotal: newSubtotal } = calculateOrderTotals(items);
 
       // 5. Re-fetch cafe rates for accurate fee recalculation
       const cid = orderData.cafeId;
@@ -1208,7 +1335,11 @@ const OrdersManagement = () => {
                                     <div key={idx} className="text-sm pb-2 mb-1 border-b border-white/5 last:border-0 last:mb-0 last:pb-0">
                                       {/* Row 1: name × qty + remove button + item total */}
                                       <div className="flex justify-between items-start gap-2">
-                                        <span className="text-white font-medium flex-1">{item.name} ×{qty}</span>
+                                        <span className="text-white font-medium flex-1">
+                                          {item.name}
+                                          {(item.selectedVariant || item.selectedSize) ? ` (${item.selectedVariant || item.selectedSize})` : ''}
+                                          {' '}×{qty}
+                                        </span>
                                         <div className="flex items-center gap-2 flex-shrink-0">
                                           <span className="text-[#D4AF37] font-semibold">{CUR_D}{itemTotal.toFixed(2)}</span>
                                           {/* Remove Item button (desktop expanded row) */}
@@ -1289,33 +1420,29 @@ const OrdersManagement = () => {
                                   {(() => {
                                     const CUR_D   = order.currencySymbol || cafeCurrency;
                                     const safeN   = v => { const n = parseFloat(v); return isNaN(n) ? 0 : n; };
-                                    const itemsBase  = (order.items || []).reduce((s, i) => s + safeN(i.basePrice ?? i.price) * safeN(i.quantity), 0);
-                                    const addonsAll  = (order.items || []).reduce((s, i) => {
-                                      const addons = Array.isArray(i.addons) ? i.addons : [];
-                                      return s + addons.reduce((as, a) => as + (safeN(a.price) * (parseInt(a.quantity) || 1)), 0) * safeN(i.quantity);
-                                    }, 0);
+                                    const { itemsTotal, addonsTotal, grandTotal: itemsPlusAddons } = calculateOrderTotals(order.items || []);
+                                    // Apply fees on top of the computed subtotal
+                                    const fees = safeN(order.gstAmount) + safeN(order.taxAmount) + safeN(order.serviceChargeAmount) + safeN(order.platformFeeAmount);
+                                    const computedGrand = itemsPlusAddons + fees;
                                     return (
                                       <div className="border-t border-white/10 pt-2 mt-2 space-y-1">
                                         <div className="flex justify-between text-xs" style={{ color: '#666' }}>
                                           <span>Items Total</span>
-                                          <span>{CUR_D}{itemsBase.toFixed(2)}</span>
+                                          <span>{CUR_D}{itemsTotal.toFixed(2)}</span>
                                         </div>
-                                        {addonsAll > 0 && (
+                                        {addonsTotal > 0 && (
                                           <div className="flex justify-between text-xs" style={{ color: '#666' }}>
                                             <span>Add-ons Total</span>
-                                            <span>+{CUR_D}{addonsAll.toFixed(2)}</span>
+                                            <span>+{CUR_D}{addonsTotal.toFixed(2)}</span>
                                           </div>
                                         )}
-                                        {(safeN(order.gstAmount) > 0 || safeN(order.taxAmount) > 0 || safeN(order.serviceChargeAmount) > 0) && (
-                                          <>
-                                            {safeN(order.gstAmount) > 0 && <div className="flex justify-between text-xs" style={{ color: '#555' }}><span>GST</span><span>+{CUR_D}{safeN(order.gstAmount).toFixed(2)}</span></div>}
-                                            {safeN(order.taxAmount) > 0 && <div className="flex justify-between text-xs" style={{ color: '#555' }}><span>Tax</span><span>+{CUR_D}{safeN(order.taxAmount).toFixed(2)}</span></div>}
-                                            {safeN(order.serviceChargeAmount) > 0 && <div className="flex justify-between text-xs" style={{ color: '#555' }}><span>Service Charge</span><span>+{CUR_D}{safeN(order.serviceChargeAmount).toFixed(2)}</span></div>}
-                                          </>
-                                        )}
+                                        {safeN(order.gstAmount) > 0 && <div className="flex justify-between text-xs" style={{ color: '#555' }}><span>GST</span><span>+{CUR_D}{safeN(order.gstAmount).toFixed(2)}</span></div>}
+                                        {safeN(order.taxAmount) > 0 && <div className="flex justify-between text-xs" style={{ color: '#555' }}><span>Tax</span><span>+{CUR_D}{safeN(order.taxAmount).toFixed(2)}</span></div>}
+                                        {safeN(order.serviceChargeAmount) > 0 && <div className="flex justify-between text-xs" style={{ color: '#555' }}><span>Service Charge</span><span>+{CUR_D}{safeN(order.serviceChargeAmount).toFixed(2)}</span></div>}
+                                        {safeN(order.platformFeeAmount) > 0 && <div className="flex justify-between text-xs" style={{ color: '#555' }}><span>Platform Fee</span><span>+{CUR_D}{safeN(order.platformFeeAmount).toFixed(2)}</span></div>}
                                         <div className="flex justify-between font-bold text-sm pt-1 border-t border-white/10">
                                           <span className="text-white">Grand Total</span>
-                                          <span className="text-[#D4AF37]">{CUR_D}{(safeN(order.totalAmount) || safeN(order.total) || 0).toFixed(2)}</span>
+                                          <span className="text-[#D4AF37]">{CUR_D}{computedGrand.toFixed(2)}</span>
                                         </div>
                                       </div>
                                     );
@@ -1508,29 +1635,28 @@ const OrdersManagement = () => {
                         {(() => {
                           const CUR_M   = order.currencySymbol || cafeCurrency;
                           const safeN   = v => { const n = parseFloat(v); return isNaN(n) ? 0 : n; };
-                          const itemsBase = (order.items || []).reduce((s, i) => s + safeN(i.basePrice ?? i.price) * safeN(i.quantity), 0);
-                          const addonsAll = (order.items || []).reduce((s, i) => {
-                            const addons = Array.isArray(i.addons) ? i.addons : [];
-                            return s + addons.reduce((as, a) => as + (safeN(a.price) * (parseInt(a.quantity) || 1)), 0) * safeN(i.quantity);
-                          }, 0);
+                          const { itemsTotal, addonsTotal, grandTotal: itemsPlusAddons } = calculateOrderTotals(order.items || []);
+                          const fees = safeN(order.gstAmount) + safeN(order.taxAmount) + safeN(order.serviceChargeAmount) + safeN(order.platformFeeAmount);
+                          const computedGrand = itemsPlusAddons + fees;
                           return (
                             <div className="border-t border-white/10 pt-2 mt-1 space-y-1">
                               <div className="flex justify-between text-xs" style={{ color: '#666' }}>
                                 <span>Items Total</span>
-                                <span>{CUR_M}{itemsBase.toFixed(2)}</span>
+                                <span>{CUR_M}{itemsTotal.toFixed(2)}</span>
                               </div>
-                              {addonsAll > 0 && (
+                              {addonsTotal > 0 && (
                                 <div className="flex justify-between text-xs" style={{ color: '#666' }}>
                                   <span>Add-ons Total</span>
-                                  <span>+{CUR_M}{addonsAll.toFixed(2)}</span>
+                                  <span>+{CUR_M}{addonsTotal.toFixed(2)}</span>
                                 </div>
                               )}
                               {safeN(order.gstAmount) > 0 && <div className="flex justify-between text-xs" style={{ color: '#555' }}><span>GST</span><span>+{CUR_M}{safeN(order.gstAmount).toFixed(2)}</span></div>}
                               {safeN(order.taxAmount) > 0 && <div className="flex justify-between text-xs" style={{ color: '#555' }}><span>Tax</span><span>+{CUR_M}{safeN(order.taxAmount).toFixed(2)}</span></div>}
                               {safeN(order.serviceChargeAmount) > 0 && <div className="flex justify-between text-xs" style={{ color: '#555' }}><span>Service Charge</span><span>+{CUR_M}{safeN(order.serviceChargeAmount).toFixed(2)}</span></div>}
+                              {safeN(order.platformFeeAmount) > 0 && <div className="flex justify-between text-xs" style={{ color: '#555' }}><span>Platform Fee</span><span>+{CUR_M}{safeN(order.platformFeeAmount).toFixed(2)}</span></div>}
                               <div className="flex justify-between font-bold text-sm pt-1 border-t border-white/10">
                                 <span className="text-white">Grand Total</span>
-                                <span className="text-[#D4AF37]">{CUR_M}{(safeN(order.totalAmount) || safeN(order.total) || 0).toFixed(2)}</span>
+                                <span className="text-[#D4AF37]">{CUR_M}{computedGrand.toFixed(2)}</span>
                               </div>
                             </div>
                           );
