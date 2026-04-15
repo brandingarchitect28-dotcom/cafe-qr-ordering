@@ -16,10 +16,6 @@ import AddOnModal from '../AddOnModal';
 const NOTIFICATION_SOUND = 'data:audio/mp3;base64,SUQzBAAAAAAAI1RTU0UAAAAPAAADTGF2ZjU4Ljc2LjEwMAAAAAAAAAAAAAAA/+M4wAAAAAAAAAAAAEluZm8AAAAPAAAAAwAAAbAAqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV////////////////////////////////////////////AAAAAExhdmM1OC4xMwAAAAAAAAAAAAAAACQDgAAAAAAAAAGw3X+VkgAAAAAAAAAAAAAAAAD/4xjEAAJQAVAAAAAAvYCCB4P+UBn//+D4PoGH/ygM///KAHAY////4Pg+D7/8EMOD4f/6gYf///wfB9///5QGf/lAZ//+UAcH0GH////+oGH//6gYf5QBwfD4fygDg//+D5//ygMAAAAAAA/+MYxBYCwAFYAAAAAPHjx4sePHjx5OTk5FRUVFRU9PT09PT09PT0/////////////////////////////////+MYxCMAAADSAAAAAP///////////////////////////////////////////////+MYxDAAAADSAAAAAP///////////////////////////////////////////////+MYxD4AAADSAAAAAP//////////////////////////////////////////////'
 
 // ─── calculateOrderTotals — SINGLE SOURCE OF TRUTH ───────────────────────────
-// Used by every write path (handleSave, handleRemoveItem) AND every display
-// path (footer totals, Grand Total). Guarantees both screens always match.
-//
-// NULL-SAFE: all fields guarded — never crashes on missing/null data.
 const calculateOrderTotals = (items = []) => {
   if (!Array.isArray(items)) return { itemsTotal: 0, addonsTotal: 0, grandTotal: 0 };
   const safeN = v => { const n = parseFloat(v); return isNaN(n) || !isFinite(n) ? 0 : n; };
@@ -29,7 +25,6 @@ const calculateOrderTotals = (items = []) => {
     if (!item) continue;
     const base = safeN(item.basePrice ?? item.price);
     const qty  = safeN(item.quantity) || 1;
-    // Each addon has its own quantity (a.quantity, default 1)
     const addons    = Array.isArray(item.addons) ? item.addons : [];
     const addonAmt  = addons.reduce((s, a) => {
       if (!a) return s;
@@ -53,8 +48,6 @@ const AddItemsToOrderModal = ({ order, cafeCurrency, onClose, setVariantModal, v
   const [loadingMenu, setLoadingMenu] = useState(true);
   const [newCart,     setNewCart    ] = useState([]);
   const [addonModal,  setAddonModal ] = useState(null);
-  // variantModal state LIFTED to OrdersManagement root (setVariantModal prop)
-  // so the picker renders outside Framer Motion's stacking context
   const [saving,      setSaving     ] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
 
@@ -76,7 +69,6 @@ const AddItemsToOrderModal = ({ order, cafeCurrency, onClose, setVariantModal, v
     !searchQuery || item.name.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
-  // Use calculateOrderTotals so cart footer matches what will be saved
   const { grandTotal: newCartTotal } = calculateOrderTotals(newCart);
 
   const directAddToNewCart = useCallback((cartEntry) => {
@@ -102,11 +94,7 @@ const AddItemsToOrderModal = ({ order, cafeCurrency, onClose, setVariantModal, v
   const addToNewCart = useCallback((item, forcedVariant) => {
     if (!item) return;
 
-    // STEP 1 — VARIANT CHECK (highest priority, always runs first)
-    // Matches EXACT same field (item.sizePricing) used by CafeOrderingPremium main menu
     if (!forcedVariant) {
-      // ── PRIMARY: item.sizePricing — SAME field as CafeOrderingPremium main menu ──
-      // Structure: { enabled: true, small: 100, medium: 150, large: 200 }
       const sp = item.sizePricing;
       if (sp && sp.enabled === true) {
         const sizePricingVariants = [
@@ -116,11 +104,10 @@ const AddItemsToOrderModal = ({ order, cafeCurrency, onClose, setVariantModal, v
         ].filter(Boolean);
         if (sizePricingVariants.length > 0) {
           setVariantModal({ ...item, _resolvedVariants: sizePricingVariants });
-          return; // STOP — wait for size selection
+          return;
         }
       }
 
-      // ── FALLBACK: array-based variant fields (other possible schemas) ──
       const rawVariants =
         item.variants      ||
         item.prices        ||
@@ -134,15 +121,13 @@ const AddItemsToOrderModal = ({ order, cafeCurrency, onClose, setVariantModal, v
         : null;
       if (variants && variants.length > 0) {
         setVariantModal({ ...item, _resolvedVariants: variants });
-        return; // STOP — wait for variant selection
+        return;
       }
     }
 
-    // STEP 2 — resolve price from forced variant or item base price
     const resolvedPrice       = forcedVariant ? (parseFloat(forcedVariant.price) || parseFloat(item.price) || 0) : (parseFloat(item.price) || 0);
     const resolvedVariantName = forcedVariant?.name || forcedVariant?.label || forcedVariant?.size || forcedVariant?.title || null;
 
-    // STEP 3 — ADDON CHECK (only after variant is resolved)
     if (item.addons?.length > 0) {
       setAddonModal({
         ...item,
@@ -150,10 +135,9 @@ const AddItemsToOrderModal = ({ order, cafeCurrency, onClose, setVariantModal, v
         basePrice:       resolvedPrice,
         selectedVariant: resolvedVariantName,
       });
-      return; // STOP — wait for addon selection
+      return;
     }
 
-    // STEP 4 — add to cart
     directAddToNewCart({
       ...item,
       price:           resolvedPrice,
@@ -167,11 +151,9 @@ const AddItemsToOrderModal = ({ order, cafeCurrency, onClose, setVariantModal, v
     });
   }, [directAddToNewCart, setAddonModal, setVariantModal]);
 
-  // Expose addToNewCart to parent via variantAddRef so root-level variant picker
-  // can call addToNewCart(item, variant) without duplicating any logic
   useEffect(() => {
     if (variantAddRef) variantAddRef.current = (item, variant) => addToNewCart(item, variant);
-  }); // no dep array — always keep the freshest addToNewCart closure
+  });
 
   const removeFromNewCart = useCallback((id) => {
     setNewCart(prev => {
@@ -202,7 +184,6 @@ const AddItemsToOrderModal = ({ order, cafeCurrency, onClose, setVariantModal, v
       }));
       const updatedItems = [...existingItems, ...newItems];
 
-      // FIX: use calculateOrderTotals so addon.quantity is respected
       const { grandTotal: newSubtotal } = calculateOrderTotals(updatedItems);
 
       const cafeSnap = await getDoc(doc(db, 'cafes', order.cafeId));
@@ -295,7 +276,6 @@ const AddItemsToOrderModal = ({ order, cafeCurrency, onClose, setVariantModal, v
               filteredItems.map(item => {
                 const qty = newCartQtyFor(item.id);
 
-                // ── Variant-aware helpers — PRIMARY: item.sizePricing (main menu field) ──
                 const sp = item.sizePricing;
                 const sizePricingVariants = (sp && sp.enabled === true)
                   ? [
@@ -305,7 +285,6 @@ const AddItemsToOrderModal = ({ order, cafeCurrency, onClose, setVariantModal, v
                     ].filter(Boolean)
                   : [];
 
-                // FALLBACK: array-based fields
                 const rawVariants =
                   item.variants || item.prices || item.sizes ||
                   item.options  || item.priceVariants || item.multiPrices || null;
@@ -322,7 +301,6 @@ const AddItemsToOrderModal = ({ order, cafeCurrency, onClose, setVariantModal, v
                   ? `from ${CUR}${fmt(minPrice)}`
                   : `${CUR}${fmt(item.price)}`;
 
-                // Button label mirrors main menu
                 const btnLabel = hasVariants ? 'Select Size' : hasAddons ? 'Customize' : 'Add';
 
                 return (
@@ -336,7 +314,6 @@ const AddItemsToOrderModal = ({ order, cafeCurrency, onClose, setVariantModal, v
                       {item.category && (
                         <p className="text-xs mt-0.5 text-[#555]">{item.category}</p>
                       )}
-                      {/* Show all variant sizes inline — matches main menu display */}
                       {hasVariants ? (
                         <div className="flex flex-wrap gap-1 mt-1">
                           {itemVariants.map((v, vi) => (
@@ -356,8 +333,6 @@ const AddItemsToOrderModal = ({ order, cafeCurrency, onClose, setVariantModal, v
                       )}
                     </div>
 
-                    {/* For variant items: always show the select button (each tap = new selection)
-                        For non-variant items: show +/- stepper when already in cart */}
                     {!hasVariants && qty > 0 ? (
                       <div className="flex items-center gap-2 flex-shrink-0">
                         <button
@@ -370,7 +345,6 @@ const AddItemsToOrderModal = ({ order, cafeCurrency, onClose, setVariantModal, v
                         <span className="text-white font-bold text-sm min-w-[16px] text-center">{qty}</span>
                         <button
                           onClick={() => {
-                            // Increment existing cart entry directly — bypasses variant picker
                             const entry = newCart.find(i => i.id === item.id);
                             if (entry) directAddToNewCart({ ...entry });
                             else addToNewCart(item);
@@ -403,7 +377,6 @@ const AddItemsToOrderModal = ({ order, cafeCurrency, onClose, setVariantModal, v
             <div className="px-4 py-4 flex-shrink-0 border-t border-white/5 space-y-3">
               <div className="space-y-1">
                 {newCart.map((item, idx) => {
-                  // FIX: include addon cost in each cart line
                   const addons = Array.isArray(item.addons) ? item.addons : [];
                   const itemAddonAmt = addons.reduce((s, a) => s + (parseFloat(a.price) || 0) * (parseInt(a.quantity) || 1), 0);
                   const lineTotal = (parseFloat(item.basePrice ?? item.price) + itemAddonAmt) * (parseInt(item.quantity) || 1);
@@ -475,7 +448,6 @@ const OrdersManagement = () => {
   const previousOrdersRef = useRef([]);
   const audioRef = useRef(null);
 
-  // ── FIX ISSUE 3: drag-to-scroll for the orders desktop table ─────────────
   const dragScrollRef  = useRef(null);
   const dragState      = useRef({ active: false, startX: 0, startY: 0, scrollLeft: 0, scrollTop: 0 });
 
@@ -515,25 +487,14 @@ const OrdersManagement = () => {
     el.style.userSelect = '';
   }, []);
 
-  // ── Feature 1: Invoice state ─────────────────────────────────────────────
   const [viewingInvoice, setViewingInvoice]   = useState(null);
   const [invoiceLoading, setInvoiceLoading]   = useState(null);
-
-  // ── External Orders: modal state ─────────────────────────────────────────
   const [showExternalModal, setShowExternalModal] = useState(false);
-
-  // ── Soft-delete state ────────────────────────────────────────────────────
   const [deleteConfirmId, setDeleteConfirmId] = useState(null);
   const [deleting, setDeleting]               = useState(false);
-
-  // ── Add Items to Order state ──────────────────────────────────────────────
   const [addItemsOrder, setAddItemsOrder] = useState(null);
-  // VARIANT FIX: lifted to root so picker renders outside Framer Motion stacking context
   const [addItemsVariantModal, setAddItemsVariantModal] = useState(null);
   const addItemsVariantAddRef = useRef(null);
-
-  // ── NEW: Remove Item state — tracks which (orderId, itemIndex) is pending confirm ──
-  // removingItem: { orderId: string, itemIndex: number } | null
   const [removingItem, setRemovingItem] = useState(null);
 
   useEffect(() => {
@@ -626,7 +587,6 @@ const OrdersManagement = () => {
     }
   };
 
-  // ── Soft-delete handler ───────────────────────────────────────────────────
   const handleSoftDelete = async (orderId) => {
     setDeleting(true);
     try {
@@ -645,26 +605,12 @@ const OrdersManagement = () => {
     }
   };
 
-  // ── NEW: Remove a single item from an existing order ─────────────────────
-  //
-  // Design:
-  //  1. Fetch fresh order data from Firestore to avoid stale-closure issues.
-  //  2. Splice the item at itemIndex from the items array.
-  //  3. If the resulting array is empty → mark order as 'cancelled' (no ghost orders).
-  //  4. Otherwise recalculate subtotal, then re-apply cafe fee rates (tax, GST,
-  //     service charge, platform fee) fetched fresh from cafes/{cafeId}.
-  //  5. Clamp total to 0 to guard against negative values.
-  //  6. Write everything back with serverTimestamp() on updatedAt.
-  //  7. onSnapshot listeners in both OrderTracking and this component pick up
-  //     the change instantly — no extra wiring needed.
   const handleRemoveItem = useCallback(async (orderId, itemIndex) => {
-    // Clear the pending confirm state immediately so UI resets
     setRemovingItem(null);
 
     try {
       const safeNum = (v) => { const n = parseFloat(v); return isNaN(n) || !isFinite(n) ? 0 : n; };
 
-      // 1. Fetch fresh order data
       const orderRef  = doc(db, 'orders', orderId);
       const orderSnap = await getDoc(orderRef);
       if (!orderSnap.exists()) {
@@ -673,7 +619,6 @@ const OrdersManagement = () => {
       }
       const orderData = orderSnap.data();
 
-      // 2. Build updated items array
       const items = Array.isArray(orderData.items) ? [...orderData.items] : [];
       if (itemIndex < 0 || itemIndex >= items.length) {
         toast.error('Item index out of range');
@@ -682,7 +627,6 @@ const OrdersManagement = () => {
       const removedItem = items[itemIndex];
       items.splice(itemIndex, 1);
 
-      // 3. Empty order → cancel
       if (items.length === 0) {
         await updateDoc(orderRef, {
           items:        [],
@@ -698,10 +642,8 @@ const OrdersManagement = () => {
         return;
       }
 
-      // 4. Recalculate subtotal from remaining items — FIX: use calculateOrderTotals
       const { grandTotal: newSubtotal } = calculateOrderTotals(items);
 
-      // 5. Re-fetch cafe rates for accurate fee recalculation
       const cid = orderData.cafeId;
       let cafe = {};
       if (cid) {
@@ -714,10 +656,8 @@ const OrdersManagement = () => {
       const newGST      = cafe?.gstEnabled            ? newSubtotal * safeNum(cafe.gstRate)            / 100 : 0;
       const newPlatform = cafe?.platformFeeEnabled     ? safeNum(cafe.platformFeeAmount)                     : 0;
 
-      // 6. Clamp total to 0 (safety: never negative)
       const newTotal = Math.max(0, Math.round(newSubtotal + newTax + newSC + newGST + newPlatform));
 
-      // 7. Write back to Firestore — onSnapshot in OrderTracking & here picks up instantly
       await updateDoc(orderRef, {
         items,
         subtotalAmount:      newSubtotal,
@@ -782,7 +722,7 @@ const OrdersManagement = () => {
       'Phone': order.customerPhone || '',
       'Order Type': order.orderType || '',
       'Table/Address': order.tableNumber || order.deliveryAddress || '',
-      'Items': order.items?.map(item => `${item.name} x${item.quantity}`).join(', ') || '',
+      'Items': order.items?.map(item => `${item.name}${item.selectedVariant ? ` (${item.selectedVariant})` : ''} x${item.quantity}`).join(', ') || '',
       'Total': order.totalAmount || order.total || 0,
       'Payment Mode': order.paymentMode || '',
       'Payment Status': order.paymentStatus || '',
@@ -821,7 +761,6 @@ const OrdersManagement = () => {
     setNewOrderNotification(null);
   };
 
-  // ── Invoice handlers ─────────────────────────────────────────────────────
   const handleViewInvoice = async (orderId, e) => {
     if (e) e.stopPropagation();
     if (!orderId) {
@@ -965,7 +904,6 @@ const OrdersManagement = () => {
     }
   };
 
-  // ── WhatsApp Invoice Send ────────────────────────────────────────────────────
   const formatWhatsAppNumber = (raw) => {
     if (!raw) return '';
     const digits = String(raw).replace(/\D/g, '');
@@ -994,10 +932,6 @@ const OrdersManagement = () => {
     }
   };
 
-  // ── NEW: Inline confirmation check helpers ────────────────────────────────
-  // We use an inline per-item confirm instead of window.confirm() so it works
-  // cleanly on mobile (iOS blocks window.confirm in some contexts).
-  // removingItem = { orderId, itemIndex } | null
   const isConfirmingRemove = (orderId, itemIndex) =>
     removingItem?.orderId === orderId && removingItem?.itemIndex === itemIndex;
 
@@ -1034,15 +968,12 @@ const OrdersManagement = () => {
         </div>
       )}
 
-      {/* Variant picker rendered at root level z-[200] — outside ALL Framer Motion
-          stacking contexts. Mirrors the AddOnModal lift pattern from OrderTracking.
-          onConfirm calls addItemsVariantAddRef.current (= addToNewCart in the modal). */}
+      {/* Variant picker rendered at root level z-[200] */}
       {addItemsVariantModal && (() => {
         const vItem     = addItemsVariantModal;
         const primary_v = '#D4AF37';
         const CUR_V     = addItemsOrder?.currencySymbol || cafeCurrency || '₹';
         const fmt_v     = n => (parseFloat(n) || 0).toFixed(2);
-        // _resolvedVariants is pre-built by addToNewCart from sizePricing or array fields
         const variants  = vItem._resolvedVariants || [];
         return (
           <div className="fixed inset-0 z-[200]">
@@ -1410,16 +1341,14 @@ const OrdersManagement = () => {
                                     const itemTotal  = (basePrice + addonTotal) * qty;
                                     return (
                                     <div key={idx} className="text-sm pb-2 mb-1 border-b border-white/5 last:border-0 last:mb-0 last:pb-0">
-                                      {/* Row 1: name × qty + remove button + item total */}
+                                      {/* Row 1: name (size) × qty + remove button + item total */}
                                       <div className="flex justify-between items-start gap-2">
+                                        {/* PATCH: append (Size) from selectedVariant */}
                                         <span className="text-white font-medium flex-1">
-                                          {item.name}
-                                          {(item.selectedVariant || item.selectedSize) ? ` (${item.selectedVariant || item.selectedSize})` : ''}
-                                          {' '}×{qty}
+                                          {item.name}{item.selectedVariant ? ` (${item.selectedVariant})` : ''} ×{qty}
                                         </span>
                                         <div className="flex items-center gap-2 flex-shrink-0">
                                           <span className="text-[#D4AF37] font-semibold">{CUR_D}{itemTotal.toFixed(2)}</span>
-                                          {/* Remove Item button (desktop expanded row) */}
                                           {order.orderStatus !== 'completed' && order.orderStatus !== 'cancelled' && (
                                             isConfirmingRemove(order.id, idx) ? (
                                               <div className="flex items-center gap-1" onClick={e => e.stopPropagation()}>
@@ -1629,12 +1558,14 @@ const OrdersManagement = () => {
                           const itemTotal  = (basePrice + addonTotal) * qty;
                           return (
                           <div key={idx} className="text-sm pb-2 mb-1 border-b border-white/5 last:border-0 last:mb-0 last:pb-0">
-                            {/* Row 1: name × qty + remove button + item total */}
+                            {/* Row 1: name (size) × qty + remove button + item total */}
                             <div className="flex justify-between items-start gap-2">
-                              <span className="text-white font-medium flex-1">{item.name} ×{qty}</span>
+                              {/* PATCH: append (Size) from selectedVariant */}
+                              <span className="text-white font-medium flex-1">
+                                {item.name}{item.selectedVariant ? ` (${item.selectedVariant})` : ''} ×{qty}
+                              </span>
                               <div className="flex items-center gap-2 flex-shrink-0">
                                 <span className="text-[#D4AF37] font-semibold">{CUR_M}{itemTotal.toFixed(2)}</span>
-                                {/* Remove Item button (mobile expanded card) */}
                                 {order.orderStatus !== 'completed' && order.orderStatus !== 'cancelled' && (
                                   isConfirmingRemove(order.id, idx) ? (
                                     <div className="flex items-center gap-1" onClick={e => e.stopPropagation()}>
