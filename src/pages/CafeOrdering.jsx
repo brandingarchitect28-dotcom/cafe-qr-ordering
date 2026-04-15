@@ -569,8 +569,16 @@ const CafeOrdering = () => {
       const total = calculateTotal();
 
       // ── Utility: remove undefined values — Firestore rejects any undefined field ──
+      // ── Utility: remove undefined values — Firestore rejects any undefined field ──
+      // IMPORTANT: must skip Firestore FieldValue sentinels (serverTimestamp etc.)
+      // They are objects internally — recursing into them destroys them.
+      const isFieldValue = (v) =>
+        v != null && typeof v === 'object' && typeof v.isEqual === 'function';
+
       const removeUndefined = (obj) => {
         if (Array.isArray(obj)) return obj.map(removeUndefined);
+        // Never recurse into Firestore sentinels (serverTimestamp, increment, etc.)
+        if (isFieldValue(obj)) return obj;
         if (obj && typeof obj === 'object') {
           return Object.fromEntries(
             Object.entries(obj)
@@ -581,38 +589,42 @@ const CafeOrdering = () => {
         return obj;
       };
 
-      const orderData = removeUndefined({
-        cafeId,
-        orderNumber,
-        items: cart.map(item => removeUndefined({
-          name:         item.name         || '',
-          price:        parseFloat(item.price) || 0,
-          quantity:     item.quantity     || 1,
-          addons:       item.addons       || [],
-          addonTotal:   item.addonTotal   || 0,
-          selectedSize: item.selectedSize || null,
-          comboItems:   item.comboItems   || [],
-          ...(item.isOffer   && { isOffer:   true           }),
-          ...(item.offerType && { offerType: item.offerType }),
-        })),
-        subtotalAmount: subtotal,
-        taxAmount: taxAmount,
-        serviceChargeAmount: serviceChargeAmount,
-        gstAmount: gstAmount,
-        totalAmount: total,
-        currencyCode: cafe?.currencyCode || 'INR',
-        currencySymbol: cafe?.currencySymbol || '₹',
-        paymentStatus: (paymentMode === 'prepaid' || paymentMode === 'online') ? 'paid' : 'pending',
-        paymentMode,
-        orderStatus: 'new',
-        orderType,
-        customerName,
-        customerPhone,
-        ...(orderType === 'dine-in' && tableNumber && { tableNumber }),
-        ...(orderType === 'delivery' && deliveryAddress && { deliveryAddress }),
-        ...(specialInstructions && { specialInstructions }),
-        createdAt: serverTimestamp()
-      });
+      // createdAt added AFTER removeUndefined so the serverTimestamp sentinel
+      // is never touched by the recursive cleaner.
+      const orderData = {
+        ...removeUndefined({
+          cafeId,
+          orderNumber,
+          items: cart.map(item => removeUndefined({
+            name:         item.name         || '',
+            price:        parseFloat(item.price) || 0,
+            quantity:     item.quantity     || 1,
+            addons:       item.addons       || [],
+            addonTotal:   item.addonTotal   || 0,
+            selectedSize: item.selectedSize || null,
+            comboItems:   item.comboItems   || [],
+            ...(item.isOffer   && { isOffer:   true           }),
+            ...(item.offerType && { offerType: item.offerType }),
+          })),
+          subtotalAmount: subtotal,
+          taxAmount: taxAmount,
+          serviceChargeAmount: serviceChargeAmount,
+          gstAmount: gstAmount,
+          totalAmount: total,
+          currencyCode: cafe?.currencyCode || 'INR',
+          currencySymbol: cafe?.currencySymbol || '₹',
+          paymentStatus: (paymentMode === 'prepaid' || paymentMode === 'online') ? 'paid' : 'pending',
+          paymentMode,
+          orderStatus: 'new',
+          orderType,
+          customerName,
+          customerPhone,
+          ...(orderType === 'dine-in' && tableNumber && { tableNumber }),
+          ...(orderType === 'delivery' && deliveryAddress && { deliveryAddress }),
+          ...(specialInstructions && { specialInstructions }),
+        }),
+        createdAt: serverTimestamp(),
+      };
 
       console.log('[Order] Writing to Firestore:', {
         cafeId,

@@ -575,8 +575,15 @@ const CafeOrderingPremium = () => {
     setOrderPlacing(true);
     try {
       // ── Utility: remove undefined values — Firestore rejects any undefined field ──
+      // IMPORTANT: must skip Firestore FieldValue sentinels (serverTimestamp etc.)
+      // They are objects internally — recursing into them destroys them.
+      const isFieldValue = (v) =>
+        v != null && typeof v === 'object' && typeof v.isEqual === 'function';
+
       const removeUndefined = (obj) => {
         if (Array.isArray(obj)) return obj.map(removeUndefined);
+        // Never recurse into Firestore sentinels (serverTimestamp, increment, etc.)
+        if (isFieldValue(obj)) return obj;
         if (obj && typeof obj === 'object') {
           return Object.fromEntries(
             Object.entries(obj)
@@ -637,11 +644,15 @@ const CafeOrderingPremium = () => {
         ...(orderType === 'dine-in'  && tableNumber    && { tableNumber }),
         ...(orderType === 'delivery' && deliveryAddress && { deliveryAddress }),
         ...(specialInstructions && { specialInstructions }),
-        createdAt: serverTimestamp(),
       };
 
-      // Strip any remaining undefined values before Firestore write
-      const safeOrderData = removeUndefined(orderData);
+      // Strip any remaining undefined values before Firestore write.
+      // createdAt is added AFTER removeUndefined so the serverTimestamp
+      // sentinel is never touched by the recursive cleaner.
+      const safeOrderData = {
+        ...removeUndefined(orderData),
+        createdAt: serverTimestamp(),
+      };
       console.log('[Order] Writing to Firestore:', {
         cafeId,
         itemCount: safeOrderData.items?.length,
