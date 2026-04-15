@@ -298,35 +298,28 @@ const AddMoreItemsModal = ({ order, onClose, primary, setAddonModal, directAddRe
     return s + (base + addonAmt) * (parseInt(i.quantity) || 1);
   }, 0);
 
-  // VARIANT + ADDON aware addToNewCart
+  // VARIANT → ADDON → ADD flow (strict priority order)
   const addToNewCart = useCallback((item, forcedVariant) => {
     if (!item) return;
 
-    // If item already exists in cart without addons, increment it directly
-    // (avoids re-opening variant picker on the + increment button)
-    const existing = newCart.find(i =>
-      i.id === item.id && !(i.addons?.length > 0)
-    );
-    if (existing && !forcedVariant) {
-      directAddToNewCart({ ...existing });
-      return;
+    // STEP 1 — VARIANT CHECK (highest priority, always runs first)
+    // Only skipped when forcedVariant is explicitly passed (user already picked one)
+    if (!forcedVariant) {
+      const variants = Array.isArray(item.variants) ? item.variants
+        : Array.isArray(item.sizes)  ? item.sizes
+        : Array.isArray(item.prices) ? item.prices
+        : null;
+      if (variants && variants.length > 0) {
+        setVariantModal(item);
+        return; // STOP — wait for variant selection
+      }
     }
 
-    // Check for variants — intercept before anything else
-    const variants = Array.isArray(item.variants) ? item.variants
-      : Array.isArray(item.sizes)   ? item.sizes
-      : Array.isArray(item.prices)  ? item.prices
-      : null;
-
-    if (variants && variants.length > 0 && !forcedVariant) {
-      setVariantModal(item);
-      return;
-    }
-
+    // STEP 2 — resolve price from forced variant or item base price
     const resolvedPrice       = forcedVariant ? (parseFloat(forcedVariant.price) || parseFloat(item.price) || 0) : (parseFloat(item.price) || 0);
     const resolvedVariantName = forcedVariant?.name || null;
 
-    // If item has configurable addons, open addon modal with resolved price
+    // STEP 3 — ADDON CHECK (only after variant resolved)
     if (Array.isArray(item.addons) && item.addons.length > 0) {
       setAddonModal({
         ...item,
@@ -335,9 +328,10 @@ const AddMoreItemsModal = ({ order, onClose, primary, setAddonModal, directAddRe
         selectedVariant: resolvedVariantName,
         selectedSize:    resolvedVariantName,
       });
-      return;
+      return; // STOP — wait for addon selection
     }
 
+    // STEP 4 — add to cart
     directAddToNewCart({
       ...item,
       price:           resolvedPrice,
@@ -349,7 +343,7 @@ const AddMoreItemsModal = ({ order, onClose, primary, setAddonModal, directAddRe
       addonTotal:      0,
       comboItems:      Array.isArray(item.comboItems) ? item.comboItems : [],
     });
-  }, [directAddToNewCart, newCart, setAddonModal]);
+  }, [directAddToNewCart, setAddonModal]);
 
   const handleSave = async () => {
     if (newCart.length === 0) return;
@@ -493,7 +487,12 @@ const AddMoreItemsModal = ({ order, onClose, primary, setAddonModal, directAddRe
                         </button>
                         <span className="text-white font-bold text-sm min-w-[16px] text-center">{qty}</span>
                         <button
-                          onClick={() => addToNewCart(item)}
+                          onClick={() => {
+                            // Increment existing cart entry directly — bypasses variant picker
+                            const entry = newCart.find(i => i.id === item.id);
+                            if (entry) directAddToNewCart({ ...entry });
+                            else addToNewCart(item);
+                          }}
                           className="w-7 h-7 rounded-full flex items-center justify-center text-black font-bold"
                           style={{ background: primary }}
                         >
