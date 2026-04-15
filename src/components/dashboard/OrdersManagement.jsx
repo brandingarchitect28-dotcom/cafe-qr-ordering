@@ -174,13 +174,15 @@ const AddItemsToOrderModal = ({ order, cafeCurrency, onClose, setVariantModal, v
 
       const existingItems = order.items || [];
       const newItems = newCart.map(i => ({
-        name:         i.name,
-        price:        i.basePrice ?? i.price,
-        quantity:     i.quantity,
-        addons:       i.addons       || [],
-        addonTotal:   i.addonTotal   || 0,
-        selectedSize: i.selectedSize || null,
-        comboItems:   i.comboItems   || [],
+        name:            i.name,
+        price:           i.basePrice ?? i.price,
+        basePrice:       i.basePrice ?? i.price,
+        quantity:        i.quantity,
+        addons:          i.addons          || [],
+        addonTotal:      i.addonTotal      || 0,
+        selectedSize:    i.selectedSize    || null,
+        selectedVariant: i.selectedVariant || i.selectedSize || null,
+        comboItems:      i.comboItems      || [],
       }));
       const updatedItems = [...existingItems, ...newItems];
 
