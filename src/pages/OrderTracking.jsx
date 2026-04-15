@@ -231,6 +231,8 @@ const AddMoreItemsModal = ({ order, onClose, primary, setAddonModal, directAddRe
   const [newCart,     setNewCart    ] = useState([]);
   const [saving,      setSaving     ] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+  // VARIANT FIX: holds the menuItem whose variants need selection before adding
+  const [variantModal, setVariantModal] = useState(null);
 
   // Load menu items for this cafe
   useEffect(() => {
@@ -250,8 +252,6 @@ const AddMoreItemsModal = ({ order, onClose, primary, setAddonModal, directAddRe
   const filteredItems = menuItems.filter(item =>
     !searchQuery || item.name.toLowerCase().includes(searchQuery.toLowerCase())
   );
-
-  const newCartTotal = newCart.reduce((s, i) => s + i.price * i.quantity, 0);
 
   const directAddToNewCart = useCallback((cartEntry) => {
     setNewCart(prev => {
@@ -278,23 +278,6 @@ const AddMoreItemsModal = ({ order, onClose, primary, setAddonModal, directAddRe
     if (directAddRef) directAddRef.current = directAddToNewCart;
   }, [directAddToNewCart, directAddRef]);
 
-  const addToNewCart = useCallback((item) => {
-    if (item.addons?.length > 0) {
-      setAddonModal(item);
-      return;
-    }
-    directAddToNewCart({
-      ...item,
-      price:        parseFloat(item.price),
-      basePrice:    parseFloat(item.price),
-      selectedSize: null,
-      quantity:     1,
-      addons:       [],
-      addonTotal:   0,
-      comboItems:   [],
-    });
-  }, [directAddToNewCart, setAddonModal]);
-
   const removeFromNewCart = useCallback((id) => {
     setNewCart(prev => {
       const ex = prev.find(i => i.id === id);
@@ -305,6 +288,57 @@ const AddMoreItemsModal = ({ order, onClose, primary, setAddonModal, directAddRe
   }, []);
 
   const newCartQtyFor = (id) => newCart.find(i => i.id === id)?.quantity || 0;
+
+  // NULL-SAFE total including addon costs — matches calculateOrderTotals formula
+  const newCartTotal = newCart.reduce((s, i) => {
+    if (!i) return s;
+    const base     = parseFloat(i.basePrice ?? i.price) || 0;
+    const addons   = Array.isArray(i.addons) ? i.addons : [];
+    const addonAmt = addons.reduce((as, a) => as + (parseFloat(a?.price) || 0) * (parseInt(a?.quantity) || 1), 0);
+    return s + (base + addonAmt) * (parseInt(i.quantity) || 1);
+  }, 0);
+
+  // VARIANT + ADDON aware addToNewCart
+  const addToNewCart = useCallback((item, forcedVariant) => {
+    if (!item) return;
+    // Check for variants — intercept before anything else
+    const variants = Array.isArray(item.variants) ? item.variants
+      : Array.isArray(item.sizes)   ? item.sizes
+      : Array.isArray(item.prices)  ? item.prices
+      : null;
+
+    if (variants && variants.length > 0 && !forcedVariant) {
+      setVariantModal(item);
+      return;
+    }
+
+    const resolvedPrice       = forcedVariant ? (parseFloat(forcedVariant.price) || parseFloat(item.price) || 0) : (parseFloat(item.price) || 0);
+    const resolvedVariantName = forcedVariant?.name || null;
+
+    // If item has configurable addons, open addon modal with resolved price
+    if (Array.isArray(item.addons) && item.addons.length > 0) {
+      setAddonModal({
+        ...item,
+        price:           resolvedPrice,
+        basePrice:       resolvedPrice,
+        selectedVariant: resolvedVariantName,
+        selectedSize:    resolvedVariantName,
+      });
+      return;
+    }
+
+    directAddToNewCart({
+      ...item,
+      price:           resolvedPrice,
+      basePrice:       resolvedPrice,
+      selectedSize:    resolvedVariantName,
+      selectedVariant: resolvedVariantName,
+      quantity:        1,
+      addons:          [],
+      addonTotal:      0,
+      comboItems:      Array.isArray(item.comboItems) ? item.comboItems : [],
+    });
+  }, [directAddToNewCart, setAddonModal]);
 
   const handleSave = async () => {
     if (newCart.length === 0) return;
@@ -476,12 +510,23 @@ const AddMoreItemsModal = ({ order, onClose, primary, setAddonModal, directAddRe
           {newCart.length > 0 && (
             <div className="px-4 py-4 flex-shrink-0 border-t border-white/8 space-y-3">
               <div className="space-y-1">
-                {newCart.map((item, idx) => (
-                  <div key={idx} className="flex justify-between text-xs text-[#A3A3A3]">
-                    <span>{item.name} × {item.quantity}</span>
-                    <span>{CUR}{fmt(item.price * item.quantity)}</span>
-                  </div>
-                ))}
+                {newCart.map((item, idx) => {
+                  if (!item) return null;
+                  const addons   = Array.isArray(item.addons) ? item.addons : [];
+                  const addonAmt = addons.reduce((s, a) => s + (parseFloat(a?.price) || 0) * (parseInt(a?.quantity) || 1), 0);
+                  const lineTotal = ((parseFloat(item.basePrice ?? item.price) || 0) + addonAmt) * (parseInt(item.quantity) || 1);
+                  return (
+                    <div key={idx} className="flex justify-between text-xs text-[#A3A3A3]">
+                      <span>
+                        {item.name}
+                        {(item.selectedVariant || item.selectedSize) ? ` (${item.selectedVariant || item.selectedSize})` : ''}
+                        {' '}× {item.quantity}
+                        {addons.length > 0 ? ` +${addons.length} add-on${addons.length > 1 ? 's' : ''}` : ''}
+                      </span>
+                      <span>{CUR}{fmt(lineTotal)}</span>
+                    </div>
+                  );
+                })}
                 <div className="flex justify-between text-sm font-bold pt-1 border-t border-white/5">
                   <span style={{ color: '#A3A3A3' }}>New items total</span>
                   <span style={{ color: primary }}>{CUR}{fmt(newCartTotal)}</span>
@@ -507,6 +552,56 @@ const AddMoreItemsModal = ({ order, onClose, primary, setAddonModal, directAddRe
       </motion.div>
 
       {/* AddOnModal is rendered at OrderTracking level — see FIX ISSUE 1 comment */}
+
+      {/* ── VARIANT PICKER MODAL ─────────────────────────────────────────────
+          Shown when a menu item has variants before adding. Same dark-luxury style. */}
+      {variantModal && (() => {
+        const vItem    = variantModal;
+        const variants = Array.isArray(vItem.variants) ? vItem.variants
+          : Array.isArray(vItem.sizes)   ? vItem.sizes
+          : Array.isArray(vItem.prices)  ? vItem.prices
+          : [];
+        return (
+          <motion.div
+            className="fixed inset-0 z-[90] flex items-end sm:items-center justify-center"
+            initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+          >
+            <div className="absolute inset-0 bg-black/75 backdrop-blur-sm" onClick={() => setVariantModal(null)} />
+            <motion.div
+              className="relative w-full sm:max-w-sm rounded-t-3xl sm:rounded-2xl overflow-hidden"
+              style={{ background: '#0F0F0F', border: '1px solid rgba(255,255,255,0.08)' }}
+              initial={{ y: '100%' }} animate={{ y: 0 }} exit={{ y: '100%' }}
+              transition={{ type: 'spring', damping: 26, stiffness: 300 }}
+              onClick={e => e.stopPropagation()}
+            >
+              <div className="flex items-center justify-between px-5 py-4 border-b border-white/5">
+                <div>
+                  <h3 className="text-white font-bold text-base" style={{ fontFamily: 'Playfair Display, serif' }}>
+                    Select Variant
+                  </h3>
+                  <p className="text-xs mt-0.5" style={{ color: '#A3A3A3' }}>{vItem.name}</p>
+                </div>
+                <button onClick={() => setVariantModal(null)} className="p-2 rounded-full hover:bg-white/10 transition-all">
+                  <X className="w-5 h-5 text-[#A3A3A3]" />
+                </button>
+              </div>
+              <div className="px-4 py-3 space-y-2 pb-5">
+                {variants.map((v, vi) => (
+                  <button
+                    key={vi}
+                    onClick={() => { setVariantModal(null); addToNewCart(vItem, v); }}
+                    className="w-full flex items-center justify-between p-3 rounded-xl transition-all"
+                    style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)' }}
+                  >
+                    <span className="text-white text-sm font-medium">{v.name}</span>
+                    <span className="text-sm font-bold" style={{ color: primary }}>{CUR}{fmt(v.price)}</span>
+                  </button>
+                ))}
+              </div>
+            </motion.div>
+          </motion.div>
+        );
+      })()}
     </AnimatePresence>
   );
 };
@@ -606,20 +701,26 @@ const OrderTracking = () => {
   // ── SINGLE SOURCE OF TRUTH: identical formula to calculateOrderTotals ────────
   const safeN = v => { const n = parseFloat(v); return isNaN(n) ? 0 : n; };
   const _calcTotals = (itemList) => {
+    if (!Array.isArray(itemList)) return { itemsTotal: 0, addonsTotal: 0, grandTotal: 0 };
     let itemsTotal = 0, addonsTotal = 0;
     for (const item of itemList) {
+      if (!item) continue;
       const base     = safeN(item.basePrice ?? item.price);
       const qty      = safeN(item.quantity) || 1;
       const addons   = Array.isArray(item.addons) ? item.addons : [];
-      const addonAmt = addons.reduce((s, a) => s + safeN(a.price) * (parseInt(a.quantity) || 1), 0);
+      const addonAmt = addons.reduce((s, a) => {
+        if (!a) return s;
+        return s + safeN(a.price) * (parseInt(a.quantity) || 1);
+      }, 0);
       itemsTotal  += base     * qty;
       addonsTotal += addonAmt * qty;
     }
     return { itemsTotal, addonsTotal, grandTotal: itemsTotal + addonsTotal };
   };
-  const { itemsTotal: itemsBaseTotal, addonsTotal: addonsGrandTotal, grandTotal: computedSubtotal } = _calcTotals(items);
-  // Grand Total = computed subtotal + any cafe fees stored on the order
-  const feesTotal        = safeN(order.gstAmount) + safeN(order.taxAmount) + safeN(order.serviceChargeAmount) + safeN(order.platformFeeAmount);
+  // NULL-SAFE: order may be null during initial render — use optional chaining everywhere
+  const { itemsTotal: itemsBaseTotal, addonsTotal: addonsGrandTotal, grandTotal: computedSubtotal } = _calcTotals(order?.items || []);
+  // Grand Total = computed subtotal + any cafe fees stored on the order (all null-safe)
+  const feesTotal        = safeN(order?.gstAmount) + safeN(order?.taxAmount) + safeN(order?.serviceChargeAmount) + safeN(order?.platformFeeAmount);
   const computedGrandTotal = computedSubtotal + feesTotal;
 
   // ── Loading ───────────────────────────────────────────────────────────────────
@@ -842,26 +943,26 @@ const OrderTracking = () => {
                 </div>
               )}
 
-              {/* Fee lines */}
-              {(order.gstAmount || 0) > 0 && (
+              {/* Fee lines — null-safe */}
+              {(order?.gstAmount || 0) > 0 && (
                 <div className="flex justify-between text-xs text-[#555]">
                   <span>GST</span>
                   <span>+{CUR}{fmt(order.gstAmount)}</span>
                 </div>
               )}
-              {(order.taxAmount || 0) > 0 && (
+              {(order?.taxAmount || 0) > 0 && (
                 <div className="flex justify-between text-xs text-[#555]">
                   <span>Tax</span>
                   <span>+{CUR}{fmt(order.taxAmount)}</span>
                 </div>
               )}
-              {(order.serviceChargeAmount || 0) > 0 && (
+              {(order?.serviceChargeAmount || 0) > 0 && (
                 <div className="flex justify-between text-xs text-[#555]">
                   <span>Service Charge</span>
                   <span>+{CUR}{fmt(order.serviceChargeAmount)}</span>
                 </div>
               )}
-              {(order.platformFeeAmount || 0) > 0 && (
+              {(order?.platformFeeAmount || 0) > 0 && (
                 <div className="flex justify-between text-xs text-[#555]">
                   <span>Platform Fee</span>
                   <span>+{CUR}{fmt(order.platformFeeAmount)}</span>
