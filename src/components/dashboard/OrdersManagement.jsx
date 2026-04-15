@@ -287,6 +287,25 @@ const AddItemsToOrderModal = ({ order, cafeCurrency, onClose, setVariantModal, v
             ) : (
               filteredItems.map(item => {
                 const qty = newCartQtyFor(item.id);
+
+                // ── Variant-aware helpers (mirrors main menu logic) ──────────
+                const rawVariants =
+                  item.variants || item.prices || item.sizes ||
+                  item.options  || item.priceVariants || item.multiPrices || null;
+                const itemVariants = Array.isArray(rawVariants)
+                  ? rawVariants.filter(v => v && v.price !== undefined)
+                  : [];
+                const hasVariants = itemVariants.length > 0;
+                const hasAddons   = Array.isArray(item.addons) && item.addons.length > 0;
+
+                // Price display: "from ₹X" for variant items (matches main menu)
+                const displayPrice = hasVariants
+                  ? `from ${CUR}${fmt(Math.min(...itemVariants.map(v => parseFloat(v.price) || 0)))}`
+                  : `${CUR}${fmt(item.price)}`;
+
+                // Button label mirrors main menu
+                const btnLabel = hasVariants ? 'Select Size' : hasAddons ? 'Customize' : 'Add';
+
                 return (
                   <div
                     key={item.id}
@@ -298,11 +317,29 @@ const AddItemsToOrderModal = ({ order, cafeCurrency, onClose, setVariantModal, v
                       {item.category && (
                         <p className="text-xs mt-0.5 text-[#555]">{item.category}</p>
                       )}
-                      <p className="text-sm font-bold mt-0.5" style={{ color: primary }}>
-                        {CUR}{fmt(item.price)}
-                      </p>
+                      {/* Show all variant sizes inline — matches main menu display */}
+                      {hasVariants ? (
+                        <div className="flex flex-wrap gap-1 mt-1">
+                          {itemVariants.map((v, vi) => (
+                            <span
+                              key={vi}
+                              className="text-xs px-1.5 py-0.5 rounded"
+                              style={{ background: 'rgba(212,175,55,0.10)', color: '#D4AF37', fontSize: '0.65rem' }}
+                            >
+                              {v.name || v.label || v.size || v.title || `S${vi+1}`} {CUR}{fmt(v.price)}
+                            </span>
+                          ))}
+                        </div>
+                      ) : (
+                        <p className="text-sm font-bold mt-0.5" style={{ color: primary }}>
+                          {displayPrice}
+                        </p>
+                      )}
                     </div>
-                    {qty > 0 ? (
+
+                    {/* For variant items: always show the select button (each tap = new selection)
+                        For non-variant items: show +/- stepper when already in cart */}
+                    {!hasVariants && qty > 0 ? (
                       <div className="flex items-center gap-2 flex-shrink-0">
                         <button
                           onClick={() => removeFromNewCart(item.id)}
@@ -329,11 +366,11 @@ const AddItemsToOrderModal = ({ order, cafeCurrency, onClose, setVariantModal, v
                       <motion.button
                         whileTap={{ scale: 0.94 }}
                         onClick={() => addToNewCart(item)}
-                        className="flex-shrink-0 flex items-center gap-1 px-3 py-1.5 rounded-lg text-black font-bold text-xs"
+                        className="flex-shrink-0 flex items-center gap-1 px-3 py-1.5 rounded-lg text-black font-bold text-xs whitespace-nowrap"
                         style={{ background: primary }}
                       >
                         <Plus className="w-3 h-3" />
-                        Add
+                        {btnLabel}
                       </motion.button>
                     )}
                   </div>
