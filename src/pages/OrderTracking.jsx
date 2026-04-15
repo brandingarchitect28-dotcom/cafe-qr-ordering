@@ -305,21 +305,29 @@ const AddMoreItemsModal = ({ order, onClose, primary, setAddonModal, setVariantM
   }, 0);
 
   // VARIANT → ADDON → ADD flow (strict priority order)
+  // Matches EXACT same field (item.sizePricing) used by CafeOrderingPremium main menu
   const addToNewCart = useCallback((item, forcedVariant) => {
     if (!item) return;
-
-    // DEBUG: log full item to console so field names are visible in DevTools
-    console.log('[SmartCafe] ADD ITEM DATA:', JSON.stringify({
-      id: item.id, name: item.name, price: item.price,
-      variants: item.variants, sizes: item.sizes, prices: item.prices,
-      options: item.options, priceVariants: item.priceVariants,
-      multiPrices: item.multiPrices, addons: item.addons,
-    }, null, 2));
 
     // STEP 1 — VARIANT CHECK (highest priority, always runs first)
     // Only skipped when forcedVariant is explicitly passed (user already picked one)
     if (!forcedVariant) {
-      // Covers every possible field name used across POS systems
+      // ── PRIMARY: item.sizePricing — SAME field as CafeOrderingPremium main menu ──
+      // Structure: { enabled: true, small: 100, medium: 150, large: 200 }
+      const sp = item.sizePricing;
+      if (sp && sp.enabled === true) {
+        const sizePricingVariants = [
+          sp.small  != null && { name: 'Small',  price: parseFloat(sp.small)  },
+          sp.medium != null && { name: 'Medium', price: parseFloat(sp.medium) },
+          sp.large  != null && { name: 'Large',  price: parseFloat(sp.large)  },
+        ].filter(Boolean);
+        if (sizePricingVariants.length > 0) {
+          setVariantModal({ ...item, _resolvedVariants: sizePricingVariants });
+          return; // STOP — wait for size selection
+        }
+      }
+
+      // ── FALLBACK: array-based variant fields (other possible schemas) ──
       const rawVariants =
         item.variants      ||
         item.prices        ||
@@ -329,10 +337,10 @@ const AddMoreItemsModal = ({ order, onClose, primary, setAddonModal, setVariantM
         item.multiPrices   ||
         null;
       const variants = Array.isArray(rawVariants)
-        ? rawVariants.filter(v => v && (v.price !== undefined))
+        ? rawVariants.filter(v => v && v.price !== undefined)
         : null;
       if (variants && variants.length > 0) {
-        setVariantModal(item);
+        setVariantModal({ ...item, _resolvedVariants: variants });
         return; // STOP — wait for variant selection
       }
     }
@@ -484,19 +492,32 @@ const AddMoreItemsModal = ({ order, onClose, primary, setAddonModal, setVariantM
               filteredItems.map(item => {
                 const qty = newCartQtyFor(item.id);
 
-                // ── Variant-aware helpers (mirrors main menu logic) ──────────
+                // ── Variant-aware helpers — PRIMARY: item.sizePricing (main menu field) ──
+                const sp = item.sizePricing;
+                const sizePricingVariants = (sp && sp.enabled === true)
+                  ? [
+                      sp.small  != null && { name: 'Small',  price: parseFloat(sp.small)  },
+                      sp.medium != null && { name: 'Medium', price: parseFloat(sp.medium) },
+                      sp.large  != null && { name: 'Large',  price: parseFloat(sp.large)  },
+                    ].filter(Boolean)
+                  : [];
+
+                // FALLBACK: array-based fields
                 const rawVariants =
                   item.variants || item.prices || item.sizes ||
                   item.options  || item.priceVariants || item.multiPrices || null;
-                const itemVariants = Array.isArray(rawVariants)
+                const arrayVariants = Array.isArray(rawVariants)
                   ? rawVariants.filter(v => v && v.price !== undefined)
                   : [];
-                const hasVariants = itemVariants.length > 0;
-                const hasAddons   = Array.isArray(item.addons) && item.addons.length > 0;
 
-                // Price display: "from ₹X" for variant items (matches main menu)
+                const itemVariants = sizePricingVariants.length > 0 ? sizePricingVariants : arrayVariants;
+                const hasVariants  = itemVariants.length > 0;
+                const hasAddons    = Array.isArray(item.addons) && item.addons.length > 0;
+
+                // Price display: "from ₹X" for size items (matches main menu)
+                const minPrice     = hasVariants ? Math.min(...itemVariants.map(v => parseFloat(v.price) || 0)) : null;
                 const displayPrice = hasVariants
-                  ? `from ${CUR}${fmt(Math.min(...itemVariants.map(v => parseFloat(v.price) || 0)))}`
+                  ? `from ${CUR}${fmt(minPrice)}`
                   : `${CUR}${fmt(item.price)}`;
 
                 // Button label mirrors main menu
@@ -1137,24 +1158,15 @@ const OrderTracking = () => {
       )}
 
       {/* Variant picker rendered at root level with z-[200] — escapes Framer Motion
-          stacking context of AddMoreItemsModal. Same pattern as AddOnModal above.
-          onConfirm calls variantAddRef.current (= addToNewCart inside the modal). */}
+          stacking context. Uses _resolvedVariants pre-built from item.sizePricing
+          (same field as CafeOrderingPremium main menu) or array fallback fields. */}
       {addMoreVariantModal && (() => {
-        const vItem    = addMoreVariantModal;
-        const CUR_V    = order?.currencySymbol || '₹';
-        const fmt_v    = n => (parseFloat(n) || 0).toFixed(2);
+        const vItem     = addMoreVariantModal;
+        const CUR_V     = order?.currencySymbol || '₹';
+        const fmt_v     = n => (parseFloat(n) || 0).toFixed(2);
         const primary_v = '#D4AF37';
-        // Expand detection to all possible field names
-        const rawVariants =
-          vItem.variants      ||
-          vItem.prices        ||
-          vItem.sizes         ||
-          vItem.options       ||
-          vItem.priceVariants ||
-          vItem.multiPrices   ||
-          [];
-        const variants = (Array.isArray(rawVariants) ? rawVariants : [])
-          .filter(v => v && (v.price !== undefined));
+        // _resolvedVariants is pre-built by addToNewCart from sizePricing or array fields
+        const variants = vItem._resolvedVariants || [];
         return (
           <div className="fixed inset-0 z-[200]">
             <div className="absolute inset-0 bg-black/75 backdrop-blur-sm" onClick={() => setAddMoreVariantModal(null)} />
@@ -1167,7 +1179,7 @@ const OrderTracking = () => {
                 <div className="flex items-center justify-between px-5 py-4 border-b border-white/5">
                   <div>
                     <h3 className="text-white font-bold text-base" style={{ fontFamily: 'Playfair Display, serif' }}>
-                      Select Variant
+                      Select Size
                     </h3>
                     <p className="text-xs mt-0.5" style={{ color: '#A3A3A3' }}>{vItem.name}</p>
                   </div>
@@ -1176,25 +1188,20 @@ const OrderTracking = () => {
                   </button>
                 </div>
                 <div className="px-4 py-3 space-y-2 pb-6">
-                  {variants.map((v, vi) => {
-                    const label = v.name || v.label || v.size || v.title || `Option ${vi + 1}`;
-                    const price = parseFloat(v.price) || 0;
-                    return (
-                      <button
-                        key={vi}
-                        onClick={() => {
-                          setAddMoreVariantModal(null);
-                          // Call addToNewCart inside AddMoreItemsModal via ref
-                          variantAddRef.current?.(vItem, v);
-                        }}
-                        className="w-full flex items-center justify-between p-3 rounded-xl transition-all"
-                        style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)' }}
-                      >
-                        <span className="text-white text-sm font-medium">{label}</span>
-                        <span className="text-sm font-bold" style={{ color: primary_v }}>{CUR_V}{fmt_v(price)}</span>
-                      </button>
-                    );
-                  })}
+                  {variants.map((v, vi) => (
+                    <button
+                      key={vi}
+                      onClick={() => {
+                        setAddMoreVariantModal(null);
+                        variantAddRef.current?.(vItem, v);
+                      }}
+                      className="w-full flex items-center justify-between p-3.5 rounded-xl transition-all font-bold"
+                      style={{ background: `rgba(212,175,55,0.10)`, border: '1px solid rgba(212,175,55,0.30)', color: primary_v }}
+                    >
+                      <span className="text-sm">{v.name}</span>
+                      <span className="text-sm">{CUR_V}{fmt_v(v.price)}</span>
+                    </button>
+                  ))}
                 </div>
               </div>
             </div>
