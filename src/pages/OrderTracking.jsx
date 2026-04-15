@@ -314,20 +314,24 @@ const AddMoreItemsModal = ({ order, onClose, primary, setAddonModal, directAddRe
 
       const existingItems = order.items || [];
       const newItems = newCart.map(i => ({
-        name:         i.name,
-        price:        i.basePrice ?? i.price,
-        quantity:     i.quantity,
-        addons:       i.addons       || [],
-        addonTotal:   i.addonTotal   || 0,
-        selectedSize: i.selectedSize || null,
-        comboItems:   i.comboItems   || [],
+        name:            i.name,
+        price:           i.basePrice ?? i.price,
+        basePrice:       i.basePrice ?? i.price,
+        quantity:        i.quantity,
+        addons:          i.addons          || [],
+        addonTotal:      i.addonTotal      || 0,
+        selectedSize:    i.selectedSize    || null,
+        selectedVariant: i.selectedVariant || null,
+        comboItems:      i.comboItems      || [],
       }));
       const updatedItems = [...existingItems, ...newItems];
 
-      // Recalculate totals from scratch using all items
+      // FIX: use same formula as calculateOrderTotals — a.price × a.quantity
       const newSubtotal = updatedItems.reduce((s, item) => {
-        const base = safeNum(item.price);
-        const addonAmt = (item.addons || []).reduce((as, a) => as + safeNum(a.price), 0);
+        const base     = safeNum(item.basePrice ?? item.price);
+        const addonAmt = (item.addons || []).reduce(
+          (as, a) => as + safeNum(a.price) * (parseInt(a.quantity) || 1), 0
+        );
         return s + (base + addonAmt) * safeNum(item.quantity);
       }, 0);
 
@@ -599,15 +603,24 @@ const OrderTracking = () => {
     } catch { return ''; }
   })();
 
-  // ── ADDON TRANSPARENCY: order-level totals ────────────────────────────────────
+  // ── SINGLE SOURCE OF TRUTH: identical formula to calculateOrderTotals ────────
   const safeN = v => { const n = parseFloat(v); return isNaN(n) ? 0 : n; };
-  const itemsBaseTotal = items.reduce((s, item) =>
-    s + safeN(item.basePrice ?? item.price) * safeN(item.quantity), 0);
-  const addonsGrandTotal = items.reduce((s, item) => {
-    const addons = Array.isArray(item.addons) ? item.addons : [];
-    const addonSub = addons.reduce((as, a) => as + safeN(a.price) * (parseInt(a.quantity) || 1), 0);
-    return s + addonSub * safeN(item.quantity);
-  }, 0);
+  const _calcTotals = (itemList) => {
+    let itemsTotal = 0, addonsTotal = 0;
+    for (const item of itemList) {
+      const base     = safeN(item.basePrice ?? item.price);
+      const qty      = safeN(item.quantity) || 1;
+      const addons   = Array.isArray(item.addons) ? item.addons : [];
+      const addonAmt = addons.reduce((s, a) => s + safeN(a.price) * (parseInt(a.quantity) || 1), 0);
+      itemsTotal  += base     * qty;
+      addonsTotal += addonAmt * qty;
+    }
+    return { itemsTotal, addonsTotal, grandTotal: itemsTotal + addonsTotal };
+  };
+  const { itemsTotal: itemsBaseTotal, addonsTotal: addonsGrandTotal, grandTotal: computedSubtotal } = _calcTotals(items);
+  // Grand Total = computed subtotal + any cafe fees stored on the order
+  const feesTotal        = safeN(order.gstAmount) + safeN(order.taxAmount) + safeN(order.serviceChargeAmount) + safeN(order.platformFeeAmount);
+  const computedGrandTotal = computedSubtotal + feesTotal;
 
   // ── Loading ───────────────────────────────────────────────────────────────────
   if (loading) return (
@@ -758,7 +771,11 @@ const OrderTracking = () => {
                     {/* Item name + qty + line total */}
                     <div className="flex justify-between items-start">
                       <span className="text-[#D0D0D0] font-semibold text-sm flex-1 pr-2">
-                        {item.name} <span style={{ color: primary }}>×{qty}</span>
+                        {item.name}
+                        {(item.selectedVariant || item.selectedSize)
+                          ? ` (${item.selectedVariant || item.selectedSize})`
+                          : ''}
+                        {' '}<span style={{ color: primary }}>×{qty}</span>
                       </span>
                       <span className="text-white font-bold text-sm flex-shrink-0">{CUR}{fmt(lineTotal)}</span>
                     </div>
@@ -851,10 +868,10 @@ const OrderTracking = () => {
                 </div>
               )}
 
-              {/* Grand total */}
+              {/* Grand total — computed from items, never trusts stale stored value */}
               <div className="flex justify-between font-black text-sm pt-1 border-t border-white/10">
                 <span className="text-white">Grand Total</span>
-                <span style={{ color: primary }}>{CUR}{fmt(order.totalAmount)}</span>
+                <span style={{ color: primary }}>{CUR}{fmt(computedGrandTotal)}</span>
               </div>
             </div>
 
