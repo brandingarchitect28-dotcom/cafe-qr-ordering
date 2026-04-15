@@ -44,7 +44,7 @@ const calculateOrderTotals = (items = []) => {
 
 // ─── Add Items to Order Modal ─────────────────────────────────────────────────
 
-const AddItemsToOrderModal = ({ order, cafeCurrency, onClose }) => {
+const AddItemsToOrderModal = ({ order, cafeCurrency, onClose, setVariantModal, variantAddRef }) => {
   const CUR = order?.currencySymbol || cafeCurrency || '₹';
   const fmt = (n) => (parseFloat(n) || 0).toFixed(2);
   const primary = '#D4AF37';
@@ -53,8 +53,8 @@ const AddItemsToOrderModal = ({ order, cafeCurrency, onClose }) => {
   const [loadingMenu, setLoadingMenu] = useState(true);
   const [newCart,     setNewCart    ] = useState([]);
   const [addonModal,  setAddonModal ] = useState(null);
-  // variantModal: holds the menuItem whose variants need to be picked first
-  const [variantModal, setVariantModal] = useState(null);
+  // variantModal state LIFTED to OrdersManagement root (setVariantModal prop)
+  // so the picker renders outside Framer Motion's stacking context
   const [saving,      setSaving     ] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
 
@@ -143,6 +143,12 @@ const AddItemsToOrderModal = ({ order, cafeCurrency, onClose }) => {
       comboItems:      Array.isArray(item.comboItems) ? item.comboItems : [],
     });
   }, [directAddToNewCart]);
+
+  // Expose addToNewCart to parent via variantAddRef so root-level variant picker
+  // can call addToNewCart(item, variant) without duplicating any logic
+  useEffect(() => {
+    if (variantAddRef) variantAddRef.current = (item, variant) => addToNewCart(item, variant);
+  }); // no dep array — always keep the freshest addToNewCart closure
 
   const removeFromNewCart = useCallback((id) => {
     setNewCart(prev => {
@@ -375,61 +381,6 @@ const AddItemsToOrderModal = ({ order, cafeCurrency, onClose }) => {
             theme="dark"
           />
         )}
-
-        {/* ── VARIANT PICKER MODAL ─────────────────────────────────────────────
-            Shown when an item has variants (sizes/prices) before adding to cart.
-            Keeps EXACT same dark-luxury aesthetic — no new colors or layout styles.  */}
-        {variantModal && (() => {
-          const vItem    = variantModal;
-          const variants = Array.isArray(vItem.variants) ? vItem.variants
-            : Array.isArray(vItem.sizes)    ? vItem.sizes
-            : Array.isArray(vItem.prices)   ? vItem.prices
-            : [];
-          return (
-            <motion.div
-              className="fixed inset-0 z-[90] flex items-end sm:items-center justify-center"
-              initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-            >
-              <div className="absolute inset-0 bg-black/75 backdrop-blur-sm" onClick={() => setVariantModal(null)} />
-              <motion.div
-                className="relative w-full sm:max-w-sm rounded-t-3xl sm:rounded-2xl overflow-hidden"
-                style={{ background: '#0F0F0F', border: '1px solid rgba(255,255,255,0.08)' }}
-                initial={{ y: '100%' }} animate={{ y: 0 }} exit={{ y: '100%' }}
-                transition={{ type: 'spring', damping: 26, stiffness: 300 }}
-                onClick={e => e.stopPropagation()}
-              >
-                <div className="flex items-center justify-between px-5 py-4 border-b border-white/5">
-                  <div>
-                    <h3 className="text-white font-bold text-base" style={{ fontFamily: 'Playfair Display, serif' }}>
-                      Select Variant
-                    </h3>
-                    <p className="text-xs mt-0.5 text-[#A3A3A3]">{vItem.name}</p>
-                  </div>
-                  <button onClick={() => setVariantModal(null)} className="p-2 rounded-full hover:bg-white/10 transition-all">
-                    <X className="w-5 h-5 text-[#A3A3A3]" />
-                  </button>
-                </div>
-                <div className="px-4 py-3 space-y-2 pb-5">
-                  {variants.map((v, vi) => (
-                    <button
-                      key={vi}
-                      onClick={() => {
-                        setVariantModal(null);
-                        // Pass the resolved variant back into addToNewCart
-                        addToNewCart(vItem, v);
-                      }}
-                      className="w-full flex items-center justify-between p-3 rounded-xl transition-all hover:bg-white/8"
-                      style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)' }}
-                    >
-                      <span className="text-white text-sm font-medium">{v.name}</span>
-                      <span className="text-sm font-bold" style={{ color: primary }}>{CUR}{fmt(v.price)}</span>
-                    </button>
-                  ))}
-                </div>
-              </motion.div>
-            </motion.div>
-          );
-        })()}
       </motion.div>
     </AnimatePresence>
   );
@@ -505,6 +456,9 @@ const OrdersManagement = () => {
 
   // ── Add Items to Order state ──────────────────────────────────────────────
   const [addItemsOrder, setAddItemsOrder] = useState(null);
+  // VARIANT FIX: lifted to root so picker renders outside Framer Motion stacking context
+  const [addItemsVariantModal, setAddItemsVariantModal] = useState(null);
+  const addItemsVariantAddRef = useRef(null);
 
   // ── NEW: Remove Item state — tracks which (orderId, itemIndex) is pending confirm ──
   // removingItem: { orderId: string, itemIndex: number } | null
@@ -997,12 +951,77 @@ const OrdersManagement = () => {
 
       {/* ── Add Items to Order Modal ──────────────────────────────────────── */}
       {addItemsOrder && (
-        <AddItemsToOrderModal
-          order={addItemsOrder}
-          cafeCurrency={cafeCurrency}
-          onClose={() => setAddItemsOrder(null)}
-        />
+        <div style={{ visibility: addItemsVariantModal ? 'hidden' : 'visible' }}>
+          <AddItemsToOrderModal
+            order={addItemsOrder}
+            cafeCurrency={cafeCurrency}
+            onClose={() => setAddItemsOrder(null)}
+            setVariantModal={setAddItemsVariantModal}
+            variantAddRef={addItemsVariantAddRef}
+          />
+        </div>
       )}
+
+      {/* Variant picker rendered at root level z-[200] — outside ALL Framer Motion
+          stacking contexts. Mirrors the AddOnModal lift pattern from OrderTracking.
+          onConfirm calls addItemsVariantAddRef.current (= addToNewCart in the modal). */}
+      {addItemsVariantModal && (() => {
+        const vItem    = addItemsVariantModal;
+        const primary_v = '#D4AF37';
+        const CUR_V    = addItemsOrder?.currencySymbol || cafeCurrency || '₹';
+        const fmt_v    = n => (parseFloat(n) || 0).toFixed(2);
+        const variants = (
+          Array.isArray(vItem.variants) ? vItem.variants :
+          Array.isArray(vItem.sizes)    ? vItem.sizes    :
+          Array.isArray(vItem.prices)   ? vItem.prices   :
+          Array.isArray(vItem.options)  ? vItem.options  :
+          []
+        ).filter(v => v && (v.name || v.label || v.size));
+        return (
+          <div className="fixed inset-0 z-[200]">
+            <div className="absolute inset-0 bg-black/75 backdrop-blur-sm" onClick={() => setAddItemsVariantModal(null)} />
+            <div className="absolute inset-x-0 bottom-0 sm:inset-0 sm:flex sm:items-center sm:justify-center">
+              <div
+                className="relative w-full sm:max-w-sm rounded-t-3xl sm:rounded-2xl overflow-hidden"
+                style={{ background: '#0F0F0F', border: '1px solid rgba(255,255,255,0.08)' }}
+                onClick={e => e.stopPropagation()}
+              >
+                <div className="flex items-center justify-between px-5 py-4 border-b border-white/5">
+                  <div>
+                    <h3 className="text-white font-bold text-base" style={{ fontFamily: 'Playfair Display, serif' }}>
+                      Select Variant
+                    </h3>
+                    <p className="text-xs mt-0.5 text-[#A3A3A3]">{vItem.name}</p>
+                  </div>
+                  <button onClick={() => setAddItemsVariantModal(null)} className="p-2 rounded-full hover:bg-white/10 transition-all">
+                    <X className="w-5 h-5 text-[#A3A3A3]" />
+                  </button>
+                </div>
+                <div className="px-4 py-3 space-y-2 pb-6">
+                  {variants.map((v, vi) => {
+                    const label = v.name || v.label || v.size || `Option ${vi + 1}`;
+                    const price = parseFloat(v.price) || 0;
+                    return (
+                      <button
+                        key={vi}
+                        onClick={() => {
+                          setAddItemsVariantModal(null);
+                          addItemsVariantAddRef.current?.(vItem, v);
+                        }}
+                        className="w-full flex items-center justify-between p-3 rounded-xl transition-all"
+                        style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)' }}
+                      >
+                        <span className="text-white text-sm font-medium">{label}</span>
+                        <span className="text-sm font-bold" style={{ color: primary_v }}>{CUR_V}{fmt_v(price)}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
 
       {/* New Order Notification Popup */}
       <AnimatePresence>
