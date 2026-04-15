@@ -171,8 +171,9 @@ export const calcGST = (orders = [], menuItems = []) => {
 
 // ─── Profit Calculation ───────────────────────────────────────────────────────
 
-export const calcProfit = (orders = [], inventory = [], recipes = []) => {
+export const calcProfit = (orders = [], inventory = [], recipes = [], menuItems = []) => {
   // Build recipeMap: menuItemName → cost
+  // PRIMARY: recipes collection { menuItemName, ingredients: [{ itemId, quantity }] }
   const recipeMap = {};
   recipes.forEach(r => {
     let cost = 0;
@@ -183,6 +184,22 @@ export const calcProfit = (orders = [], inventory = [], recipes = []) => {
       }
     });
     recipeMap[r.menuItemName] = cost;
+  });
+
+  // FALLBACK: menuItems[].ingredients { inventoryItemId, quantityUsed }
+  // Used when recipes collection is empty or a menu item has no recipe entry.
+  // recipes take priority — only fills gaps.
+  menuItems.forEach(m => {
+    if (recipeMap[m.name] !== undefined) return; // recipes already covered this item
+    if (!Array.isArray(m.ingredients) || m.ingredients.length === 0) return;
+    let cost = 0;
+    m.ingredients.forEach(ing => {
+      const invItem = inventory.find(i => i.id === (ing.inventoryItemId || ing.itemId));
+      if (invItem && invItem.costPerUnit) {
+        cost += (invItem.costPerUnit || 0) * (ing.quantityUsed || ing.quantity || 0);
+      }
+    });
+    if (cost > 0) recipeMap[m.name] = cost;
   });
 
   let totalCost = 0;
@@ -278,7 +295,7 @@ export const buildAnalyticsSnapshot = (orders, menuItems, inventory, recipes) =>
   peakHours:    calcPeakHours(orders),
   items:        calcItemPerformance(orders, menuItems),
   gst:          calcGST(orders, menuItems),
-  profit:       calcProfit(orders, inventory, recipes),
+  profit:       calcProfit(orders, inventory, recipes, menuItems),
   categories:   calcCategoryAnalytics(orders, menuItems, inventory, recipes),
   revenueByDay: calcRevenueByDay(orders, 7),
   revenueBy30:  calcRevenueByDay(orders, 30),
