@@ -15,6 +15,7 @@
  * - Full bill breakdown
  * - Estimated time hint per status
  * - "Add More Items" button to append items to existing order
+ * - [ADDON TRANSPARENCY] Full per-item addon breakdown with counts, prices, totals
  */
 
 import React, { useState, useEffect, useCallback, useRef } from 'react';
@@ -163,19 +164,64 @@ const PaymentBadge = ({ status }) => {
   );
 };
 
+// ─── ADDON TRANSPARENCY: shared per-item breakdown renderer ──────────────────
+// Used in both OrderTracking items list and AddMoreItemsModal footer.
+// Pure display — no state, no side effects.
+const ItemAddonBreakdown = ({ item, CUR, primary }) => {
+  const basePrice  = parseFloat(item.basePrice ?? item.price) || 0;
+  const qty        = parseInt(item.quantity) || 1;
+  const addons     = Array.isArray(item.addons) ? item.addons : [];
+  const comboItems = Array.isArray(item.comboItems) ? item.comboItems : [];
+  const addonTotal = addons.reduce((s, a) => s + (parseFloat(a.price) || 0) * (parseInt(a.quantity) || 1), 0);
+
+  return (
+    <div className="mt-1 space-y-0.5">
+      {/* Base price line */}
+      <p className="text-xs ml-1" style={{ color: '#666' }}>
+        Base: {CUR}{basePrice.toFixed(2)}{qty > 1 ? ` ×${qty}` : ''}
+      </p>
+
+      {/* comboItems */}
+      {comboItems.length > 0 && (
+        <div className="ml-3 space-y-0.5">
+          {comboItems.map((ci, cIdx) => (
+            <p key={cIdx} className="text-xs" style={{ color: '#555' }}>
+              — {ci.name}{ci.quantity > 1 ? ` ×${ci.quantity}` : ''}
+            </p>
+          ))}
+        </div>
+      )}
+
+      {/* Add-ons */}
+      {addons.length > 0 ? (
+        <div className="ml-3 space-y-0.5 pt-0.5">
+          <p className="text-xs font-semibold" style={{ color: '#888' }}>
+            Add-ons ({addons.length}):
+          </p>
+          {addons.map((a, ai) => {
+            const aQty   = parseInt(a.quantity) || 1;
+            const aPrice = parseFloat(a.price)  || 0;
+            return (
+              <div key={ai} className="flex justify-between text-xs" style={{ color: '#777' }}>
+                <span>╰ {a.name} ×{aQty}</span>
+                <span style={{ color: '#888' }}>+{CUR}{(aPrice * aQty).toFixed(2)}</span>
+              </div>
+            );
+          })}
+          <div className="flex justify-between text-xs pt-0.5 border-t" style={{ color: '#666', borderColor: 'rgba(255,255,255,0.05)' }}>
+            <span>Add-ons total</span>
+            <span>+{CUR}{(addonTotal * qty).toFixed(2)}</span>
+          </div>
+        </div>
+      ) : (
+        <p className="text-xs ml-3 italic" style={{ color: '#444' }}>No add-ons selected</p>
+      )}
+    </div>
+  );
+};
+
 // ─── Add More Items Modal ─────────────────────────────────────────────────────
 
-// FIX — ISSUE 1: AddOnModal used to be rendered INSIDE this component which has
-// z-[70]. Because a fixed element inside a z-indexed stacking context resolves
-// its own z relative to that context, AddOnModal's z-[60] was BELOW the z-[70]
-// backdrop, making it invisible and unresponsive to taps.
-//
-// Fix: addonModal state lives in the parent (OrderTracking). This modal accepts:
-//   setAddonModal   — parent setter; called when an addon item is tapped
-//   directAddRef    — a React ref the parent provides; we store directAddToNewCart
-//                     in it so the parent's AddOnModal onConfirm can call it
-// AddOnModal is rendered in OrderTracking, outside any stacking context.
-// All other logic in this component is UNCHANGED.
 const AddMoreItemsModal = ({ order, onClose, primary, setAddonModal, directAddRef }) => {
   const CUR = order?.currencySymbol || '₹';
   const fmt = (n) => (parseFloat(n) || 0).toFixed(2);
@@ -183,7 +229,6 @@ const AddMoreItemsModal = ({ order, onClose, primary, setAddonModal, directAddRe
   const [menuItems,   setMenuItems  ] = useState([]);
   const [loadingMenu, setLoadingMenu] = useState(true);
   const [newCart,     setNewCart    ] = useState([]);
-  // addonModal state removed — now lives in OrderTracking (see fix comment above)
   const [saving,      setSaving     ] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
 
@@ -228,16 +273,13 @@ const AddMoreItemsModal = ({ order, onClose, primary, setAddonModal, directAddRe
     });
   }, []);
 
-  // FIX — expose directAddToNewCart to parent via ref so the root-level
-  // AddOnModal onConfirm can call it directly without re-inventing cart logic
+  // Expose directAddToNewCart to parent via ref
   useEffect(() => {
     if (directAddRef) directAddRef.current = directAddToNewCart;
   }, [directAddToNewCart, directAddRef]);
 
   const addToNewCart = useCallback((item) => {
     if (item.addons?.length > 0) {
-      // FIX — call parent setter instead of local state setter so the parent
-      // renders AddOnModal outside the z-[70] stacking context
       setAddonModal(item);
       return;
     }
@@ -474,11 +516,7 @@ const OrderTracking = () => {
   const [loading,        setLoading       ] = useState(true);
   const [notFound,       setNotFound      ] = useState(false);
   const [showAddMore,    setShowAddMore   ] = useState(false);
-  // FIX — ISSUE 1: addonModal state lives here so AddOnModal renders outside
-  // AddMoreItemsModal's z-[70] stacking context (see component comment above)
   const [addMoreAddonModal, setAddMoreAddonModal] = useState(null);
-  // directAddRef lets the root-level AddOnModal call directAddToNewCart which
-  // lives inside AddMoreItemsModal — avoids duplicating cart logic
   const directAddRef = useRef(null);
 
   // ── Google Review link — fetched per café from cafes/{cafeId} ───────────────
@@ -560,6 +598,16 @@ const OrderTracking = () => {
       return d ? d.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true }) : '';
     } catch { return ''; }
   })();
+
+  // ── ADDON TRANSPARENCY: order-level totals ────────────────────────────────────
+  const safeN = v => { const n = parseFloat(v); return isNaN(n) ? 0 : n; };
+  const itemsBaseTotal = items.reduce((s, item) =>
+    s + safeN(item.basePrice ?? item.price) * safeN(item.quantity), 0);
+  const addonsGrandTotal = items.reduce((s, item) => {
+    const addons = Array.isArray(item.addons) ? item.addons : [];
+    const addonSub = addons.reduce((as, a) => as + safeN(a.price) * (parseInt(a.quantity) || 1), 0);
+    return s + addonSub * safeN(item.quantity);
+  }, 0);
 
   // ── Loading ───────────────────────────────────────────────────────────────────
   if (loading) return (
@@ -691,49 +739,93 @@ const OrderTracking = () => {
             <p className="text-[#444] text-xs uppercase tracking-widest font-semibold mb-3">
               Your Order
             </p>
-            <div className="space-y-2">
+
+            {/* ── ADDON TRANSPARENCY: per-item full breakdown ── */}
+            <div className="space-y-3">
               {items.map((item, i) => {
-                const basePrice  = parseFloat(item.basePrice ?? item.price) || 0;
+                const basePrice  = safeN(item.basePrice ?? item.price);
                 const qty        = parseInt(item.quantity) || 1;
                 const addons     = Array.isArray(item.addons) ? item.addons : [];
-                const comboItems = Array.isArray(item.comboItems) ? item.comboItems : [];
-                const addonAmt   = addons.reduce((s, a) => s + (parseFloat(a.price) || 0), 0);
-                const lineTotal  = (basePrice + addonAmt) * qty;
+                const addonTotal = addons.reduce((s, a) => s + safeN(a.price) * (parseInt(a.quantity) || 1), 0);
+                const lineTotal  = (basePrice + addonTotal) * qty;
 
                 return (
-                  <div key={i} className="space-y-0.5">
-                    <div className="flex justify-between text-sm">
-                      <span className="text-[#D0D0D0] font-medium">
-                        {item.name} × {qty}
+                  <div
+                    key={i}
+                    className="rounded-xl p-3 space-y-1"
+                    style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.05)' }}
+                  >
+                    {/* Item name + qty + line total */}
+                    <div className="flex justify-between items-start">
+                      <span className="text-[#D0D0D0] font-semibold text-sm flex-1 pr-2">
+                        {item.name} <span style={{ color: primary }}>×{qty}</span>
                       </span>
-                      <span className="text-white font-semibold">{CUR}{fmt(lineTotal)}</span>
+                      <span className="text-white font-bold text-sm flex-shrink-0">{CUR}{fmt(lineTotal)}</span>
                     </div>
-                    {/* comboItems indented */}
-                    {comboItems.map((ci, cIdx) => (
-                      <div key={cIdx} className="flex items-center text-xs pl-3">
-                        <span className="text-[#555]">— {ci.name}{ci.quantity > 1 ? ` ×${ci.quantity}` : ''}</span>
+
+                    {/* Base price line */}
+                    <p className="text-xs" style={{ color: '#666' }}>
+                      Base: {CUR}{fmt(basePrice)}{qty > 1 ? ` ×${qty}` : ''}
+                    </p>
+
+                    {/* comboItems */}
+                    {Array.isArray(item.comboItems) && item.comboItems.length > 0 && (
+                      <div className="ml-2 space-y-0.5 pt-0.5">
+                        {item.comboItems.map((ci, cIdx) => (
+                          <p key={cIdx} className="text-xs" style={{ color: '#555' }}>
+                            — {ci.name}{ci.quantity > 1 ? ` ×${ci.quantity}` : ''}
+                          </p>
+                        ))}
                       </div>
-                    ))}
-                    {/* Add-ons indented */}
-                    {addons.map((a, ai) => (
-                      <div key={ai} className="flex justify-between text-xs pl-3">
-                        <span className="text-[#555]">╰ {a.name}</span>
-                        <span className="text-[#666]">+{CUR}{fmt(parseFloat(a.price) || 0)}</span>
+                    )}
+
+                    {/* Add-ons */}
+                    {addons.length > 0 ? (
+                      <div className="ml-2 pt-1 space-y-0.5 border-t" style={{ borderColor: 'rgba(255,255,255,0.05)' }}>
+                        <p className="text-xs font-semibold" style={{ color: '#888' }}>
+                          Add-ons ({addons.length}):
+                        </p>
+                        {addons.map((a, ai) => {
+                          const aQty   = parseInt(a.quantity) || 1;
+                          const aPrice = safeN(a.price);
+                          return (
+                            <div key={ai} className="flex justify-between text-xs">
+                              <span style={{ color: '#777' }}>╰ {a.name} ×{aQty}</span>
+                              <span style={{ color: '#888' }}>+{CUR}{fmt(aPrice * aQty)}</span>
+                            </div>
+                          );
+                        })}
+                        {/* Per-item addon sub-total */}
+                        <div className="flex justify-between text-xs pt-0.5" style={{ color: '#666' }}>
+                          <span>Add-ons total</span>
+                          <span>+{CUR}{fmt(addonTotal * qty)}</span>
+                        </div>
                       </div>
-                    ))}
+                    ) : (
+                      <p className="text-xs ml-2 italic" style={{ color: '#444' }}>No add-ons selected</p>
+                    )}
                   </div>
                 );
               })}
             </div>
 
-            {/* Bill summary */}
+            {/* ── ADDON TRANSPARENCY: full order total breakdown ── */}
             <div className="mt-4 pt-3 border-t border-white/5 space-y-1.5">
-              {order.subtotalAmount > 0 && order.subtotalAmount !== order.totalAmount && (
-                <div className="flex justify-between text-xs text-[#555]">
-                  <span>Subtotal</span>
-                  <span>{CUR}{fmt(order.subtotalAmount)}</span>
+              {/* Items base subtotal */}
+              <div className="flex justify-between text-xs" style={{ color: '#555' }}>
+                <span>Items Total</span>
+                <span>{CUR}{fmt(itemsBaseTotal)}</span>
+              </div>
+
+              {/* Add-ons total row — only if any addons exist */}
+              {addonsGrandTotal > 0 && (
+                <div className="flex justify-between text-xs" style={{ color: '#555' }}>
+                  <span>Add-ons Total</span>
+                  <span>+{CUR}{fmt(addonsGrandTotal)}</span>
                 </div>
               )}
+
+              {/* Fee lines */}
               {(order.gstAmount || 0) > 0 && (
                 <div className="flex justify-between text-xs text-[#555]">
                   <span>GST</span>
@@ -758,8 +850,10 @@ const OrderTracking = () => {
                   <span>+{CUR}{fmt(order.platformFeeAmount)}</span>
                 </div>
               )}
-              <div className="flex justify-between font-black text-sm pt-1">
-                <span className="text-white">Total</span>
+
+              {/* Grand total */}
+              <div className="flex justify-between font-black text-sm pt-1 border-t border-white/10">
+                <span className="text-white">Grand Total</span>
                 <span style={{ color: primary }}>{CUR}{fmt(order.totalAmount)}</span>
               </div>
             </div>
@@ -835,7 +929,7 @@ const OrderTracking = () => {
           </motion.button>
         )}
 
-        {/* ── Loyalty Promo — add-only, zero change to existing logic ────── */}
+        {/* ── Loyalty Promo ────────────────────────────────────────────────── */}
         <div className="mt-6 rounded-2xl overflow-hidden"
           style={{ background: 'linear-gradient(135deg, rgba(212,175,55,0.12), rgba(212,175,55,0.05))', border: '1px solid rgba(212,175,55,0.25)' }}>
           <div className="p-5 text-center">
@@ -872,8 +966,6 @@ const OrderTracking = () => {
 
       {/* ── Add More Items Modal ──────────────────────────────────────────── */}
       {showAddMore && order && (
-        // FIX — ISSUE 1: hide (not unmount) AddMoreItemsModal while addon modal
-        // is open so there is no visible overlap. Cart state is preserved.
         <div style={{ visibility: addMoreAddonModal ? 'hidden' : 'visible' }}>
           <AddMoreItemsModal
             order={order}
@@ -885,10 +977,7 @@ const OrderTracking = () => {
         </div>
       )}
 
-      {/* FIX — ISSUE 1: AddOnModal rendered at root level with z-[200] so it
-          is guaranteed above AddMoreItemsModal's z-[70] stacking context.
-          onConfirm calls directAddRef.current (= directAddToNewCart inside the
-          modal) so the cart entry is delivered without duplicating any logic. */}
+      {/* AddOnModal rendered at root level with z-[200] */}
       {addMoreAddonModal && (
         <div className="fixed inset-0 z-[200]">
           <AddOnModal
