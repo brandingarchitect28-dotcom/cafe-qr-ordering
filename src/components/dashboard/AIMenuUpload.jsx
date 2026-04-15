@@ -34,7 +34,7 @@ import {
 } from 'lucide-react';
 
 // ── NEW: enrichment + media services (add-only, never affect existing flow) ───
-import { enrichItems }          from '../../services/aiEnrichmentService';
+import { enrichItems, normalizeAddons } from '../../services/aiEnrichmentService';
 import { resolveMedia }         from '../../services/mediaService';
 import { processMediaForStorage } from '../../services/compressionService';
 
@@ -401,7 +401,9 @@ const AIMenuUpload = ({ onClose }) => {
           ...(item.protein     && { protein:     item.protein     }),
           ...(item.carbs       && { carbs:       item.carbs       }),
           ...(item.fat         && { fat:         item.fat         }),
-          ...(item.addons      && { addons:      item.addons      }),
+          // normalizeAddons ensures every addon has a stable id in Firestore
+          // Fixes: manual addons disappearing + all-addon-qty-sync bug
+          ...(item.addons && item.addons.length > 0 && { addons: normalizeAddons(item.addons) }),
           ...(item.sizePricing && { sizePricing: item.sizePricing }),
         })
       );
