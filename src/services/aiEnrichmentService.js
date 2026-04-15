@@ -43,12 +43,24 @@ const ADDON_RULES = [
     addons: [{name:'Extra Pav',price:15},{name:'Extra Butter',price:10},{name:'Add Cheese',price:20}] },
 ];
 
+// normalizeAddons — deterministic stable ids for every addon.
+// Fixes: undefined addon.id causing all addons to share one state key in AddOnModal.
+export const normalizeAddons = (list = []) =>
+  list.map((a, idx) => ({
+    ...a,
+    id:    a.id || `${a.name || 'addon'}-${idx}`,
+    name:  a.name  || '',
+    price: parseFloat(a.price) || 0,
+  }));
+
 export const getAddonSuggestions = (itemName = '') => {
   const lower = itemName.toLowerCase();
   for (const rule of ADDON_RULES) {
-    if (rule.keywords.some(kw => lower.includes(kw))) return rule.addons;
+    if (rule.keywords.some(kw => lower.includes(kw))) {
+      return normalizeAddons(rule.addons);
+    }
   }
-  return [{name:'Extra Portion',price:40},{name:'Add Drink',price:30}];
+  return normalizeAddons([{name:'Extra Portion',price:40},{name:'Add Drink',price:30}]);
 };
 
 // ─── Local nutrition database (150+ items, replaces CORS-blocked API) ─────────
