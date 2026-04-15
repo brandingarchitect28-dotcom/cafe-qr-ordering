@@ -1,4 +1,6 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
+import AddOnModal from '../components/AddOnModal';
+import { normalizeAddons } from '../services/aiEnrichmentService';
 import { useParams } from 'react-router-dom';
 import { collection, query, where, doc, addDoc, serverTimestamp, runTransaction, onSnapshot } from 'firebase/firestore';
 import { db } from '../lib/firebase';
@@ -124,6 +126,7 @@ const CafeOrdering = () => {
   const [menuItems, setMenuItems] = useState([]);
   const [offers, setOffers] = useState([]);
   const [cart, setCart] = useState([]);
+  const [addonModal, setAddonModal] = useState(null); // item awaiting addon selection
   const [loading, setLoading] = useState(true);
   const [menuLoading, setMenuLoading] = useState(true);
   const [offersLoading, setOffersLoading] = useState(true);
@@ -245,7 +248,16 @@ const CafeOrdering = () => {
     const unsubscribeMenu = onSnapshot(
       menuQuery,
       (snapshot) => {
-        const items = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        const items = snapshot.docs.map(doc => {
+          const data = doc.data();
+          return {
+            id: doc.id,
+            ...data,
+            // normalizeAddons: guarantees every addon has a stable id
+            // Fixes all-addon-sync bug when AI addons have no id field
+            addons: normalizeAddons(data.addons || []),
+          };
+        });
         setMenuItems(items);
         setMenuLoading(false);
         setLoading(false);
@@ -262,7 +274,14 @@ const CafeOrdering = () => {
           fallbackQuery,
           (fallbackSnapshot) => {
             const items = fallbackSnapshot.docs
-              .map(doc => ({ id: doc.id, ...doc.data() }))
+              .map(doc => {
+                const data = doc.data();
+                return {
+                  id: doc.id,
+                  ...data,
+                  addons: normalizeAddons(data.addons || []),
+                };
+              })
               .filter(item => item.available !== false);
             setMenuItems(items);
             setMenuLoading(false);
@@ -338,6 +357,13 @@ const CafeOrdering = () => {
 
   // Cart functions
   const addToCart = (item, size = null) => {
+    // ── Show addon modal if item has addons and no size is pre-selected ──────
+    // This matches CafeOrderingPremium behaviour — items with addons show
+    // the selection modal before being added to cart.
+    if (!size && item.addons?.length > 0) {
+      setAddonModal(item);
+      return;
+    }
     const selectedPrice = size && item.sizePricing?.[size]
       ? parseFloat(item.sizePricing[size])
       : item.price;
@@ -1409,6 +1435,28 @@ const CafeOrdering = () => {
           </motion.div>
         )}
       </AnimatePresence>
+
+      {/* ── AddOnModal — shows addon selection for items with addons ───────── */}
+      {addonModal && (
+        <AddOnModal
+          item={addonModal}
+          onConfirm={(entry) => {
+            // Add the confirmed cart entry (with selected addons) to cart
+            setCart(prev => [...prev, {
+              ...entry,
+              quantity:   entry.quantity   || 1,
+              addons:     entry.addons     || [],
+              addonTotal: entry.addonTotal || 0,
+            }]);
+            setAddonModal(null);
+            toast.success(`${entry.name} added to cart`, { duration: 2000 });
+          }}
+          onClose={() => setAddonModal(null)}
+          currencySymbol={cafe?.currencySymbol || '₹'}
+          primaryColor={cafe?.primaryColor   || '#D4AF37'}
+          theme={cafe?.mode}
+        />
+      )}
     </div>
   );
 };

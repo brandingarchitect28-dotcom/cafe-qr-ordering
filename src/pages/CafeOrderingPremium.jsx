@@ -32,6 +32,7 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 import AddOnModal from '../components/AddOnModal';
+import { normalizeAddons } from '../services/aiEnrichmentService';
 import { QRCodeSVG } from 'qrcode.react';
 import { MediaPreview, getMediaType } from '../components/MediaUpload';
 import FoodDetailPremium from '../components/dashboard/FoodDetailPremium';
@@ -413,7 +414,16 @@ const CafeOrderingPremium = () => {
     if (!cafeId) return;
     const q = query(collection(db, 'menuItems'), where('cafeId', '==', cafeId), where('available', '==', true));
     const unsub = onSnapshot(q, snap => {
-      setMenuItems(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+      setMenuItems(snap.docs.map(d => {
+        const data = d.data();
+        return {
+          id: d.id,
+          ...data,
+          // normalizeAddons: guarantees every addon has a stable id
+          // Fixes all-addon-sync bug when AI addons have no id field
+          addons: normalizeAddons(data.addons || []),
+        };
+      }));
     });
     unsubRef.current.push(unsub);
   }, [cafeId]);
