@@ -1,9 +1,9 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
 import { useCollection, useDocument } from '../../hooks/useFirestore';
 import { where, addDoc, collection, doc, updateDoc, deleteDoc } from 'firebase/firestore';
 import { db } from '../../lib/firebase';
-import { Plus, Edit, Trash2, X, RefreshCw } from 'lucide-react';
+import { Plus, Edit, Trash2, X, RefreshCw, Search } from 'lucide-react';
 import { toast } from 'sonner';
 import MediaUpload, { MediaPreview } from '../MediaUpload';
 import AddOnEditor from './AddOnEditor';
@@ -36,6 +36,12 @@ const MenuManagement = () => {
   // Keeps track purely for rendering — no effect on save/update logic.
   const [editingItemId, setEditingItemId] = useState(null);
 
+  // ── Search state ─────────────────────────────────────────────────────────────
+  const [searchQuery, setSearchQuery] = useState('');
+
+  // ── Delete All state ─────────────────────────────────────────────────────────
+  const [deletingAll, setDeletingAll] = useState(false);
+
   // ── Scroll-into-view when an item's edit form opens ─────────────────────────
   useEffect(() => {
     if (editingItemId) {
@@ -50,6 +56,19 @@ const MenuManagement = () => {
     'menuItems',
     cafeId ? [where('cafeId', '==', cafeId)] : []
   );
+
+  // ── Filtered items derived from menuItems + searchQuery ──────────────────────
+  // menuItems (raw Firestore data) is never mutated — only the render path changes.
+  const filteredItems = useMemo(() => {
+    if (!menuItems) return [];
+    if (!searchQuery.trim()) return menuItems;
+    const q = searchQuery.toLowerCase();
+    return menuItems.filter(
+      item =>
+        item.name?.toLowerCase().includes(q) ||
+        item.category?.toLowerCase().includes(q)
+    );
+  }, [menuItems, searchQuery]);
 
   // ── Upload + Save — UNCHANGED ────────────────────────────────────────────────
   const handleSubmit = async (e) => {
@@ -114,6 +133,7 @@ const MenuManagement = () => {
     setShowForm(true);
   };
 
+  // ── handleDelete — UNCHANGED ─────────────────────────────────────────────────
   const handleDelete = async (id) => {
     if (!window.confirm('Delete this menu item?')) return;
     try {
@@ -121,6 +141,27 @@ const MenuManagement = () => {
       toast.success('Item deleted');
     } catch (error) {
       toast.error('Failed to delete: ' + error.message);
+    }
+  };
+
+  // ── handleDeleteAll — reuses same deleteDoc call as handleDelete ─────────────
+  // Operates on menuItems (full live array) — never on filteredItems,
+  // so a search filter never hides items from deletion.
+  const handleDeleteAll = async () => {
+    if (!menuItems || menuItems.length === 0) {
+      toast.error('No menu items to delete');
+      return;
+    }
+    if (!window.confirm(`Delete ALL ${menuItems.length} menu items? This cannot be undone.`)) return;
+    setDeletingAll(true);
+    try {
+      await Promise.all(menuItems.map(item => deleteDoc(doc(db, 'menuItems', item.id))));
+      toast.success('All menu items deleted');
+      resetForm();
+    } catch (error) {
+      toast.error('Failed to delete all items: ' + error.message);
+    } finally {
+      setDeletingAll(false);
     }
   };
 
@@ -368,108 +409,150 @@ const MenuManagement = () => {
 
   return (
     <div className="space-y-6">
-      {/* Add New Item button — unchanged */}
-      <button
-        onClick={() => {
-          resetForm();           // clear any editing state
-          setShowForm(true);     // open the top form for new items
-        }}
-        className="bg-[#D4AF37] text-black hover:bg-[#C5A059] rounded-sm px-6 py-3 font-semibold transition-all duration-300 flex items-center gap-2"
-      >
-        <Plus className="w-5 h-5" />
-        Add Menu Item
-      </button>
+
+      {/* ── Top toolbar: Add + Delete All ───────────────────────────────────── */}
+      <div className="flex flex-wrap items-center gap-3">
+        <button
+          onClick={() => {
+            resetForm();
+            setShowForm(true);
+          }}
+          className="bg-[#D4AF37] text-black hover:bg-[#C5A059] rounded-sm px-6 py-3 font-semibold transition-all duration-300 flex items-center gap-2"
+        >
+          <Plus className="w-5 h-5" />
+          Add Menu Item
+        </button>
+
+        {menuItems && menuItems.length > 0 && (
+          <button
+            onClick={handleDeleteAll}
+            disabled={deletingAll}
+            className="bg-red-500/20 hover:bg-red-500/30 text-red-400 border border-red-500/30 rounded-sm px-6 py-3 font-semibold transition-all duration-300 flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {deletingAll ? (
+              <><RefreshCw className="w-4 h-4 animate-spin" />Deleting…</>
+            ) : (
+              <><Trash2 className="w-4 h-4" />Delete All</>
+            )}
+          </button>
+        )}
+      </div>
 
       {/* Top form — shown only for "Add New Item" (editingItem is null) ─────── */}
       {/* When editing an existing item the inline accordion below is used instead */}
       {showForm && !editingItem && renderEditForm()}
 
+      {/* ── Search bar ──────────────────────────────────────────────────────── */}
+      {menuItems && menuItems.length > 0 && (
+        <div className="relative">
+          <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-[#A3A3A3] pointer-events-none" />
+          <input
+            type="text"
+            value={searchQuery}
+            onChange={e => setSearchQuery(e.target.value)}
+            placeholder="Search by name or category…"
+            className="w-full bg-[#0F0F0F] border border-white/10 text-white placeholder:text-neutral-600 focus:border-[#D4AF37] focus:ring-1 focus:ring-[#D4AF37] rounded-sm h-11 pl-11 pr-4 text-sm transition-all"
+          />
+        </div>
+      )}
+
       {/* Menu items list */}
       {loading ? (
         <div className="text-center text-[#A3A3A3] py-8">Loading menu...</div>
       ) : menuItems && menuItems.length > 0 ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {menuItems.map((item) => (
-            <div
-              key={item.id}
-              id={`menu-item-${item.id}`}
-              className="bg-[#0F0F0F] border border-white/5 rounded-sm overflow-hidden hover:border-white/10 transition-colors"
-            >
-              {/* Item card — identical to original ──────────────────────────── */}
-              {item.image && (
-                <div className="aspect-video overflow-hidden">
-                  <MediaPreview
-                    url={item.image}
-                    alt={item.name}
-                    className="w-full h-full"
-                  />
-                </div>
-              )}
-              <div className="p-6">
-                <div className="flex justify-between items-start mb-2">
-                  <div>
-                    <h3 className="text-xl font-semibold text-white">{item.name}</h3>
-                    {item.category && <p className="text-[#A3A3A3] text-sm">{item.category}</p>}
+        filteredItems.length > 0 ? (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {filteredItems.map((item) => (
+              <div
+                key={item.id}
+                id={`menu-item-${item.id}`}
+                className="bg-[#0F0F0F] border border-white/5 rounded-sm overflow-hidden hover:border-white/10 transition-colors"
+              >
+                {/* Item card — identical to original ──────────────────────── */}
+                {item.image && (
+                  <div className="aspect-video overflow-hidden">
+                    <MediaPreview
+                      url={item.image}
+                      alt={item.name}
+                      className="w-full h-full"
+                    />
                   </div>
-                  <div className="text-right">
-                    {item.sizePricing?.enabled ? (
-                      <div className="text-xs space-y-0.5">
-                        {item.sizePricing.small  && <p className="text-[#D4AF37] font-semibold">S {CUR}{parseFloat(item.sizePricing.small).toFixed(2)}</p>}
-                        {item.sizePricing.medium && <p className="text-[#D4AF37] font-semibold">M {CUR}{parseFloat(item.sizePricing.medium).toFixed(2)}</p>}
-                        {item.sizePricing.large  && <p className="text-[#D4AF37] font-semibold">L {CUR}{parseFloat(item.sizePricing.large).toFixed(2)}</p>}
-                      </div>
-                    ) : (
-                      <span className="text-lg font-bold text-[#D4AF37]">{CUR}{item.price.toFixed(2)}</span>
-                    )}
+                )}
+                <div className="p-6">
+                  <div className="flex justify-between items-start mb-2">
+                    <div>
+                      <h3 className="text-xl font-semibold text-white">{item.name}</h3>
+                      {item.category && <p className="text-[#A3A3A3] text-sm">{item.category}</p>}
+                    </div>
+                    <div className="text-right">
+                      {item.sizePricing?.enabled ? (
+                        <div className="text-xs space-y-0.5">
+                          {item.sizePricing.small  && <p className="text-[#D4AF37] font-semibold">S {CUR}{parseFloat(item.sizePricing.small).toFixed(2)}</p>}
+                          {item.sizePricing.medium && <p className="text-[#D4AF37] font-semibold">M {CUR}{parseFloat(item.sizePricing.medium).toFixed(2)}</p>}
+                          {item.sizePricing.large  && <p className="text-[#D4AF37] font-semibold">L {CUR}{parseFloat(item.sizePricing.large).toFixed(2)}</p>}
+                        </div>
+                      ) : (
+                        <span className="text-lg font-bold text-[#D4AF37]">{CUR}{item.price.toFixed(2)}</span>
+                      )}
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2 mb-4">
+                    <div className={`px-2 py-1 rounded-sm text-xs font-medium ${item.available ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-red-400'}`}>
+                      {item.available ? 'Available' : 'Unavailable'}
+                    </div>
+                  </div>
+                  <div className="flex gap-2">
+                    {/* Edit button — calls handleEdit (unchanged) AND toggles accordion */}
+                    <button
+                      onClick={() => {
+                        const opening = editingItemId !== item.id;
+                        setEditingItemId(opening ? item.id : null);
+                        if (opening) {
+                          handleEdit(item);
+                        } else {
+                          resetForm();
+                        }
+                      }}
+                      className={`flex-1 rounded-sm px-4 py-2 transition-all flex items-center justify-center gap-2 ${
+                        editingItemId === item.id
+                          ? 'bg-[#D4AF37]/20 text-[#D4AF37] border border-[#D4AF37]/30'
+                          : 'bg-white/5 hover:bg-white/10 text-white'
+                      }`}
+                    >
+                      <Edit className="w-4 h-4" />
+                      {editingItemId === item.id ? 'Close' : 'Edit'}
+                    </button>
+                    <button
+                      onClick={() => toggleAvailability(item.id, item.available)}
+                      className="bg-[#D4AF37]/20 hover:bg-[#D4AF37]/30 text-[#D4AF37] rounded-sm px-4 py-2 transition-all"
+                    >
+                      {item.available ? 'Hide' : 'Show'}
+                    </button>
+                    <button
+                      onClick={() => handleDelete(item.id)}
+                      className="bg-red-500/20 hover:bg-red-500/30 text-red-400 rounded-sm px-4 py-2 transition-all"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
                   </div>
                 </div>
-                <div className="flex items-center gap-2 mb-4">
-                  <div className={`px-2 py-1 rounded-sm text-xs font-medium ${item.available ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-red-400'}`}>
-                    {item.available ? 'Available' : 'Unavailable'}
-                  </div>
-                </div>
-                <div className="flex gap-2">
-                  {/* Edit button — calls handleEdit (unchanged) AND toggles accordion */}
-                  <button
-                    onClick={() => {
-                      const opening = editingItemId !== item.id;
-                      setEditingItemId(opening ? item.id : null);
-                      if (opening) {
-                        handleEdit(item); // populate formData + set editingItem — unchanged
-                      } else {
-                        resetForm();      // close accordion + clear state
-                      }
-                    }}
-                    className={`flex-1 rounded-sm px-4 py-2 transition-all flex items-center justify-center gap-2 ${
-                      editingItemId === item.id
-                        ? 'bg-[#D4AF37]/20 text-[#D4AF37] border border-[#D4AF37]/30'
-                        : 'bg-white/5 hover:bg-white/10 text-white'
-                    }`}
-                  >
-                    <Edit className="w-4 h-4" />
-                    {editingItemId === item.id ? 'Close' : 'Edit'}
-                  </button>
-                  <button
-                    onClick={() => toggleAvailability(item.id, item.available)}
-                    className="bg-[#D4AF37]/20 hover:bg-[#D4AF37]/30 text-[#D4AF37] rounded-sm px-4 py-2 transition-all"
-                  >
-                    {item.available ? 'Hide' : 'Show'}
-                  </button>
-                  <button
-                    onClick={() => handleDelete(item.id)}
-                    className="bg-red-500/20 hover:bg-red-500/30 text-red-400 rounded-sm px-4 py-2 transition-all"
-                  >
-                    <Trash2 className="w-4 h-4" />
-                  </button>
-                </div>
-              </div>
 
-              {/* Inline edit accordion — opens below this card only ─────────── */}
-              {/* All form fields and save logic are identical to the top form */}
-              {editingItemId === item.id && renderEditForm()}
-            </div>
-          ))}
-        </div>
+                {/* Inline edit accordion — opens below this card only ─────── */}
+                {editingItemId === item.id && renderEditForm()}
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div className="bg-[#0F0F0F] border border-white/5 rounded-sm p-12 text-center">
+            <p className="text-[#A3A3A3] text-lg">No items match &quot;{searchQuery}&quot;</p>
+            <button
+              onClick={() => setSearchQuery('')}
+              className="mt-3 text-[#D4AF37] text-sm hover:underline"
+            >
+              Clear search
+            </button>
+          </div>
+        )
       ) : (
         <div className="bg-[#0F0F0F] border border-white/5 rounded-sm p-12 text-center">
           <p className="text-[#A3A3A3] text-lg">No menu items yet. Add your first item!</p>
