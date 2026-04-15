@@ -29,19 +29,39 @@ export default function FoodDetailPremium({ item, onClose }) {
 
   const hasMedia   = item.image || item.video;
   const hasMacros  = item.calories || item.protein || item.carbs || item.fats;
-  const hasIngreds = item.ingredients?.trim();
-  const hasMicros  = item.micros?.trim();
 
+  // ── Safe ingredients handling ─────────────────────────────────────────────
+  // item.ingredients can be:
+  //   • string  — "Paneer, Spices, Onion"   (old MenuManagement format)
+  //   • Array   — ['Paneer', 'Spices']       (new aiEnrichmentService format)
+  //   • undefined / null                     (item has no details yet)
+  const ingredients = (() => {
+    const raw = item.ingredients;
+    if (!raw) return [];
+    if (Array.isArray(raw)) {
+      // Already an array — sanitise each element to string
+      return raw.map(c => String(c || '').trim()).filter(Boolean);
+    }
+    if (typeof raw === 'string') {
+      // Comma-separated string
+      return raw.split(',').map(s => s.trim()).filter(Boolean);
+    }
+    return [];
+  })();
+
+  const hasIngreds = ingredients.length > 0;
+
+  // ── Safe micros handling ──────────────────────────────────────────────────
+  // item.micros may be undefined, null, or a non-string value
+  const hasMicros  = item.micros && typeof item.micros === 'string' && item.micros.trim();
+
+  // ── Macro tiles — safe String() wrapping so numbers/undefined don't crash ─
   const macros = [
     { label: 'Calories', value: item.calories ? `${item.calories}` : '—', unit: 'kcal', icon: <Flame  className="w-4 h-4" />, color: '#FF6B35' },
     { label: 'Protein',  value: item.protein  ? `${item.protein}`  : '—', unit: 'g',    icon: <Dumbbell className="w-4 h-4" />, color: '#4FC3F7' },
     { label: 'Carbs',    value: item.carbs    ? `${item.carbs}`    : '—', unit: 'g',    icon: <Wheat    className="w-4 h-4" />, color: '#FFD54F' },
     { label: 'Fats',     value: item.fats     ? `${item.fats}`     : '—', unit: 'g',    icon: <Droplets className="w-4 h-4" />, color: '#A5D6A7' },
   ];
-
-  const ingredients = hasIngreds
-    ? item.ingredients.split(',').map(s => s.trim()).filter(Boolean)
-    : [];
 
   return (
     <AnimatePresence>
