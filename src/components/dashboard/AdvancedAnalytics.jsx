@@ -199,16 +199,18 @@ const daysAgo = (n) => { const d = new Date(); d.setDate(d.getDate()-n); return 
 const buildExplanation = (data, CUR='₹') => {
   if (!data) return {};
   const { revenue, payment, categories, items, gst } = data;
-  const topPay  = payment?.sort((a,b)=>b.revenue-a.revenue)[0];
-  const topCat  = categories?.categories?.[0];
-  const topItem = items?.top?.[0];
+  const topPay    = payment?.sort((a,b)=>b.revenue-a.revenue)[0];
+  const topCat    = categories?.categories?.[0];
+  const topItem   = items?.top?.[0];
+  const topSource = data.source?.sort((a,b)=>b.count-a.count)[0];
   return {
     revenue:   `Total of ${revenue?.totalOrders} orders in the selected period. Average order value is ${CUR}${(revenue?.aov||0).toFixed(2)}.`,
-    payment:   topPay  ? `${topPay.method} is the most-used payment method, contributing ${topPay.pct}% of revenue (${CUR}${topPay.revenue?.toFixed(2)}).` : '',
-    category:  topCat  ? `"${topCat.category}" is the highest-earning category at ${CUR}${topCat.revenue?.toFixed(2)} (${topCat.pct}% of total revenue).` : '',
-    items:     topItem ? `"${topItem.name}" is the top-selling item with ${topItem.qty} units sold, generating ${CUR}${topItem.revenue?.toFixed(2)}.` : '',
+    payment:   topPay    ? `${topPay.method} is the most-used payment method, contributing ${topPay.pct}% of revenue (${CUR}${topPay.revenue?.toFixed(2)}).` : '',
+    category:  topCat    ? `"${topCat.category}" is the highest-earning category at ${CUR}${topCat.revenue?.toFixed(2)} (${topCat.pct}% of total revenue).` : '',
+    items:     topItem   ? `"${topItem.name}" is the top-selling item with ${topItem.qty} units sold, generating ${CUR}${topItem.revenue?.toFixed(2)}.` : '',
     gst:       `Total GST collected: ${CUR}${(gst?.totalGST||0).toFixed(2)} across ${gst?.byRate?.length||0} GST slab(s).`,
     profit:    `Net profit after deducting COGS and GST. ${data.profit?.hasCostData ? 'Recipe costs are included.' : 'Add recipe costs in Inventory for full profit calculation.'}`,
+    source:    topSource ? `${topSource.source} leads with ${topSource.pct}% of orders (${topSource.count} total). ${data.source?.length > 1 ? `${data.source.length} channels active in this period.` : ''}` : 'Breakdown of where orders came from — QR code, Zomato, Swiggy, phone, walk-in.',
   };
 };
 
@@ -671,53 +673,95 @@ const AdvancedAnalytics = () => {
           {/* ── Payment + Source — DATA + logic UNCHANGED ────────── */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             <SectionCard T={T} title="Payment Methods" icon={IndianRupee} delay={0.25} explanation={explanations.payment}>
-              <ResponsiveContainer width="100%" height={200}>
-                <PieChart>
-                  <Pie data={data.payment} cx="50%" cy="50%" outerRadius={75} dataKey="count"
-                    label={({ method, pct }) => `${method}: ${pct}%`} labelLine={false}>
-                    {data.payment.map((_,i) => <Cell key={i} fill={COLORS[i%COLORS.length]} />)}
-                  </Pie>
-                  <Tooltip content={<CustomTooltip CUR={CUR} />} />
-                </PieChart>
-              </ResponsiveContainer>
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 8 }}>
-                {data.payment.map((p,i) => (
-                  <span key={p.method} style={{
-                    fontSize: 11, padding: '4px 10px', borderRadius: 20,
-                    background: `${COLORS[i%COLORS.length]}15`,
-                    color: COLORS[i%COLORS.length],
-                    border: `1px solid ${COLORS[i%COLORS.length]}30`,
-                    fontWeight: 600,
-                  }}>
-                    {p.method} {p.pct}% · {CUR}{p.revenue?.toFixed(0)}
-                  </span>
-                ))}
+              {/* Desktop: chart left, legend+insight right. Mobile: stacked. */}
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: 16, alignItems: 'center' }}>
+                {/* Chart — labels removed to prevent overlap; tooltip + legend carry all info */}
+                <ResponsiveContainer width="100%" height={200}>
+                  <PieChart>
+                    <Pie
+                      data={data.payment}
+                      cx="50%" cy="50%"
+                      innerRadius={44} outerRadius={78}
+                      dataKey="count"
+                      label={false}
+                      labelLine={false}
+                    >
+                      {data.payment.map((_,i) => <Cell key={i} fill={COLORS[i%COLORS.length]} />)}
+                    </Pie>
+                    <Tooltip content={<CustomTooltip CUR={CUR} />} />
+                  </PieChart>
+                </ResponsiveContainer>
+
+                {/* Legend + per-row breakdown */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                  {data.payment.map((p,i) => (
+                    <div key={p.method} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      {/* Color swatch */}
+                      <div style={{ width: 10, height: 10, borderRadius: 3, flexShrink: 0, background: COLORS[i%COLORS.length] }} />
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 4 }}>
+                          <span style={{ color: '#ccc', fontSize: 12, fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                            {p.method}
+                          </span>
+                          <span style={{ color: COLORS[i%COLORS.length], fontSize: 12, fontWeight: 700, flexShrink: 0 }}>
+                            {p.pct}%
+                          </span>
+                        </div>
+                        {/* Mini bar */}
+                        <div style={{ height: 3, borderRadius: 2, background: 'rgba(255,255,255,0.06)', marginTop: 3, overflow: 'hidden' }}>
+                          <div style={{ height: '100%', width: `${p.pct}%`, background: COLORS[i%COLORS.length], borderRadius: 2 }} />
+                        </div>
+                        <span style={{ color: '#444', fontSize: 11 }}>{CUR}{p.revenue?.toFixed(0)}</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
               </div>
             </SectionCard>
 
             <SectionCard T={T} title="Order Sources" icon={ShoppingBag} delay={0.3}
-              explanation="Breakdown of where orders came from — QR code, Zomato, Swiggy, phone, walk-in.">
-              <ResponsiveContainer width="100%" height={200}>
-                <PieChart>
-                  <Pie data={data.source} cx="50%" cy="50%" outerRadius={75} dataKey="count"
-                    label={({ source, pct }) => `${source}: ${pct}%`} labelLine={false}>
-                    {data.source.map((_,i) => <Cell key={i} fill={COLORS[i%COLORS.length]} />)}
-                  </Pie>
-                  <Tooltip content={<CustomTooltip CUR={CUR} />} />
-                </PieChart>
-              </ResponsiveContainer>
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 8 }}>
-                {data.source.map((s,i) => (
-                  <span key={s.source} style={{
-                    fontSize: 11, padding: '4px 10px', borderRadius: 20,
-                    background: `${COLORS[i%COLORS.length]}15`,
-                    color: COLORS[i%COLORS.length],
-                    border: `1px solid ${COLORS[i%COLORS.length]}30`,
-                    fontWeight: 600,
-                  }}>
-                    {s.source} {s.pct}% ({s.count})
-                  </span>
-                ))}
+              explanation={explanations.source}>
+              {/* Desktop: chart left, legend+insight right. Mobile: stacked. */}
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: 16, alignItems: 'center' }}>
+                {/* Chart — labels removed to prevent overlap */}
+                <ResponsiveContainer width="100%" height={200}>
+                  <PieChart>
+                    <Pie
+                      data={data.source}
+                      cx="50%" cy="50%"
+                      innerRadius={44} outerRadius={78}
+                      dataKey="count"
+                      label={false}
+                      labelLine={false}
+                    >
+                      {data.source.map((_,i) => <Cell key={i} fill={COLORS[i%COLORS.length]} />)}
+                    </Pie>
+                    <Tooltip content={<CustomTooltip CUR={CUR} />} />
+                  </PieChart>
+                </ResponsiveContainer>
+
+                {/* Legend + per-row breakdown */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                  {data.source.map((s,i) => (
+                    <div key={s.source} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <div style={{ width: 10, height: 10, borderRadius: 3, flexShrink: 0, background: COLORS[i%COLORS.length] }} />
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 4 }}>
+                          <span style={{ color: '#ccc', fontSize: 12, fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                            {s.source}
+                          </span>
+                          <span style={{ color: COLORS[i%COLORS.length], fontSize: 12, fontWeight: 700, flexShrink: 0 }}>
+                            {s.pct}%
+                          </span>
+                        </div>
+                        <div style={{ height: 3, borderRadius: 2, background: 'rgba(255,255,255,0.06)', marginTop: 3, overflow: 'hidden' }}>
+                          <div style={{ height: '100%', width: `${s.pct}%`, background: COLORS[i%COLORS.length], borderRadius: 2 }} />
+                        </div>
+                        <span style={{ color: '#444', fontSize: 11 }}>{s.count} order{s.count !== 1 ? 's' : ''}</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
               </div>
             </SectionCard>
           </div>
@@ -798,12 +842,14 @@ const AdvancedAnalytics = () => {
                 )}
               </div>
 
-              {/* Pie chart — UNCHANGED */}
+              {/* Pie chart — labels removed; bar list on left serves as legend */}
               <ResponsiveContainer width="100%" height={200}>
                 <PieChart>
-                  <Pie data={(data.categories.categories||[]).slice(0,6)} cx="50%" cy="50%" outerRadius={75}
-                    dataKey="revenue" nameKey="category" labelLine={false}
-                    label={({ category, pct }) => pct>8 ? `${category?.slice(0,8)}: ${pct}%` : ''}>
+                  <Pie data={(data.categories.categories||[]).slice(0,6)} cx="50%" cy="50%"
+                    innerRadius={36} outerRadius={75}
+                    dataKey="revenue" nameKey="category"
+                    label={false}
+                    labelLine={false}>
                     {(data.categories.categories||[]).slice(0,6).map((_,i) => <Cell key={i} fill={COLORS[i%COLORS.length]} />)}
                   </Pie>
                   <Tooltip content={<CustomTooltip CUR={CUR} />} formatter={(v) => [`${CUR}${v.toFixed(2)}`, 'Revenue']} />
