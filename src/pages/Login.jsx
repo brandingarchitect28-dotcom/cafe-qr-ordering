@@ -4,7 +4,7 @@ import { auth, db } from '../lib/firebase';
 import { doc, getDoc } from 'firebase/firestore';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
-import { AlertCircle } from 'lucide-react';
+import { AlertCircle, Eye, EyeOff } from 'lucide-react';
 import { AnimatePresence } from 'framer-motion';
 import ForgotPassword from '../components/ForgotPassword';
 
@@ -16,6 +16,8 @@ const Login = () => {
   const navigate = useNavigate();
   const { userRole } = useAuth();
   const [showForgot, setShowForgot] = useState(false);
+  // SHOW/HIDE PASSWORD: local state only, no effect on form logic
+  const [showPassword, setShowPassword] = useState(false);
 
   React.useEffect(() => {
     if (userRole === 'admin') navigate('/admin');
@@ -145,15 +147,32 @@ const Login = () => {
                   Forgot password?
                 </button>
               </div>
-              <input
-                type="password"
-                data-testid="login-password-input"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                className="w-full bg-black/20 border border-white/10 text-white placeholder:text-neutral-600 focus:border-[#D4AF37] focus:ring-1 focus:ring-[#D4AF37] rounded-sm h-12 px-4 transition-all"
-                placeholder="••••••••"
-                required
-              />
+              {/* SHOW/HIDE PASSWORD: wrapper div added, input and toggle button inside.
+                  Input: type controlled by showPassword state — all other props unchanged.
+                  Button: type="button" prevents form submission, toggles showPassword only. */}
+              <div className="relative">
+                <input
+                  type={showPassword ? 'text' : 'password'}
+                  data-testid="login-password-input"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  className="w-full bg-black/20 border border-white/10 text-white placeholder:text-neutral-600 focus:border-[#D4AF37] focus:ring-1 focus:ring-[#D4AF37] rounded-sm h-12 px-4 pr-12 transition-all"
+                  placeholder="••••••••"
+                  required
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(prev => !prev)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 p-1 rounded transition-colors text-[#555] hover:text-[#D4AF37]"
+                  tabIndex={-1}
+                  aria-label={showPassword ? 'Hide password' : 'Show password'}
+                >
+                  {showPassword
+                    ? <EyeOff className="w-4 h-4" />
+                    : <Eye    className="w-4 h-4" />
+                  }
+                </button>
+              </div>
             </div>
 
             <button
