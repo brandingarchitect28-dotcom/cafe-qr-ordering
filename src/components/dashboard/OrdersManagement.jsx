@@ -23,7 +23,8 @@ const calculateOrderTotals = (items = []) => {
 
   for (const item of items) {
     if (!item) continue;
-    const base = safeN(item.basePrice ?? item.price);
+    // FREE ITEM FIX: isFree items have price:0 — honour that, skip basePrice fallback
+    const base = item.isFree ? 0 : safeN(item.basePrice ?? item.price);
     const qty  = safeN(item.quantity) || 1;
     const addons    = Array.isArray(item.addons) ? item.addons : [];
     const addonAmt  = addons.reduce((s, a) => {
@@ -1336,21 +1337,24 @@ const OrdersManagement = () => {
                                 <div className="space-y-2">
                                   {order.items?.map((item, idx) => {
                                     const CUR_D = order.currencySymbol || cafeCurrency;
-                                    const basePrice  = parseFloat(item.basePrice ?? item.price) || 0;
+                                    // FREE ITEM FIX: honour isFree flag in display price
+                                    const basePrice  = item.isFree ? 0 : (parseFloat(item.basePrice ?? item.price) || 0);
                                     const qty        = parseInt(item.quantity) || 1;
                                     const addons     = Array.isArray(item.addons) ? item.addons : [];
                                     const addonTotal = addons.reduce((s, a) => s + (parseFloat(a.price) || 0) * (parseInt(a.quantity) || 1), 0);
                                     const itemTotal  = (basePrice + addonTotal) * qty;
                                     return (
                                     <div key={idx} className="text-sm pb-2 mb-1 border-b border-white/5 last:border-0 last:mb-0 last:pb-0">
-                                      {/* Row 1: name (size) × qty + remove button + item total */}
                                       <div className="flex justify-between items-start gap-2">
-                                        {/* PATCH: append (Size) from selectedVariant */}
                                         <span className="text-white font-medium flex-1">
                                           {item.name}{item.selectedVariant ? ` (${item.selectedVariant})` : ''} ×{qty}
                                         </span>
                                         <div className="flex items-center gap-2 flex-shrink-0">
-                                          <span className="text-[#D4AF37] font-semibold">{CUR_D}{itemTotal.toFixed(2)}</span>
+                                          {item.isFree ? (
+                                            <span className="text-xs font-bold px-2 py-0.5 rounded-full" style={{ background: 'rgba(16,185,129,0.15)', color: '#10B981' }}>FREE</span>
+                                          ) : (
+                                            <span className="text-[#D4AF37] font-semibold">{CUR_D}{itemTotal.toFixed(2)}</span>
+                                          )}
                                           {order.orderStatus !== 'completed' && order.orderStatus !== 'cancelled' && (
                                             isConfirmingRemove(order.id, idx) ? (
                                               <div className="flex items-center gap-1" onClick={e => e.stopPropagation()}>
@@ -1383,11 +1387,12 @@ const OrdersManagement = () => {
                                           )}
                                         </div>
                                       </div>
-                                      {/* Row 2: base price */}
                                       <p className="text-xs mt-0.5 ml-1" style={{ color: '#666' }}>
-                                        Base: {CUR_D}{basePrice.toFixed(2)}{qty > 1 ? ` ×${qty}` : ''}
+                                        {item.isFree
+                                          ? <span style={{ color: '#10B981' }}>FREE · was {CUR_D}{(parseFloat(item.actualPrice) || 0).toFixed(2)}</span>
+                                          : <>Base: {CUR_D}{basePrice.toFixed(2)}{qty > 1 ? ` ×${qty}` : ''}</>
+                                        }
                                       </p>
-                                      {/* comboItems */}
                                       {item.comboItems?.length > 0 && (
                                         <div className="ml-3 mt-0.5 space-y-0.5">
                                           {item.comboItems.map((ci, cIdx) => (
@@ -1397,7 +1402,6 @@ const OrdersManagement = () => {
                                           ))}
                                         </div>
                                       )}
-                                      {/* Add-ons breakdown */}
                                       {addons.length > 0 ? (
                                         <div className="ml-3 mt-1 space-y-0.5">
                                           <p className="text-xs font-semibold" style={{ color: '#888' }}>
@@ -1553,21 +1557,24 @@ const OrdersManagement = () => {
                       <div className="space-y-2">
                         {order.items?.map((item, idx) => {
                           const CUR_M      = order.currencySymbol || cafeCurrency;
-                          const basePrice  = parseFloat(item.basePrice ?? item.price) || 0;
+                          // FREE ITEM FIX: honour isFree flag in display price
+                          const basePrice  = item.isFree ? 0 : (parseFloat(item.basePrice ?? item.price) || 0);
                           const qty        = parseInt(item.quantity) || 1;
                           const addons     = Array.isArray(item.addons) ? item.addons : [];
                           const addonTotal = addons.reduce((s, a) => s + (parseFloat(a.price) || 0) * (parseInt(a.quantity) || 1), 0);
                           const itemTotal  = (basePrice + addonTotal) * qty;
                           return (
                           <div key={idx} className="text-sm pb-2 mb-1 border-b border-white/5 last:border-0 last:mb-0 last:pb-0">
-                            {/* Row 1: name (size) × qty + remove button + item total */}
                             <div className="flex justify-between items-start gap-2">
-                              {/* PATCH: append (Size) from selectedVariant */}
                               <span className="text-white font-medium flex-1">
                                 {item.name}{item.selectedVariant ? ` (${item.selectedVariant})` : ''} ×{qty}
                               </span>
                               <div className="flex items-center gap-2 flex-shrink-0">
-                                <span className="text-[#D4AF37] font-semibold">{CUR_M}{itemTotal.toFixed(2)}</span>
+                                {item.isFree ? (
+                                  <span className="text-xs font-bold px-2 py-0.5 rounded-full" style={{ background: 'rgba(16,185,129,0.15)', color: '#10B981' }}>FREE</span>
+                                ) : (
+                                  <span className="text-[#D4AF37] font-semibold">{CUR_M}{itemTotal.toFixed(2)}</span>
+                                )}
                                 {order.orderStatus !== 'completed' && order.orderStatus !== 'cancelled' && (
                                   isConfirmingRemove(order.id, idx) ? (
                                     <div className="flex items-center gap-1" onClick={e => e.stopPropagation()}>
@@ -1599,11 +1606,12 @@ const OrdersManagement = () => {
                                 )}
                               </div>
                             </div>
-                            {/* Row 2: base price */}
                             <p className="text-xs mt-0.5 ml-1" style={{ color: '#666' }}>
-                              Base: {CUR_M}{basePrice.toFixed(2)}{qty > 1 ? ` ×${qty}` : ''}
+                              {item.isFree
+                                ? <span style={{ color: '#10B981' }}>FREE · was {CUR_M}{(parseFloat(item.actualPrice) || 0).toFixed(2)}</span>
+                                : <>Base: {CUR_M}{basePrice.toFixed(2)}{qty > 1 ? ` ×${qty}` : ''}</>
+                              }
                             </p>
-                            {/* comboItems */}
                             {item.comboItems?.length > 0 && (
                               <div className="ml-3 mt-0.5 space-y-0.5">
                                 {item.comboItems.map((ci, cIdx) => (
@@ -1613,7 +1621,6 @@ const OrdersManagement = () => {
                                 ))}
                               </div>
                             )}
-                            {/* Add-ons breakdown */}
                             {addons.length > 0 ? (
                               <div className="ml-3 mt-1 space-y-0.5">
                                 <p className="text-xs font-semibold" style={{ color: '#888' }}>
