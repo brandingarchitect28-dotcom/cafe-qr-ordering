@@ -478,8 +478,7 @@ const MenuCard = React.memo(({
         )}
 
         {/* Show Food Details */}
-        {/* ZERO FIX: Boolean() prevents React rendering "0" when all numeric fields are 0 */}
-        {Boolean(item.ingredients || item.calories || item.protein || item.carbs || item.fats) && (
+        {(item.ingredients || item.calories || item.protein || item.carbs || item.fats) && (
           <button
             onClick={() => onShowDetails?.(item)}
             className="w-full text-xs mt-2 py-1.5 text-center opacity-60 hover:opacity-100 transition-opacity"
@@ -822,6 +821,13 @@ const CafeOrderingPremium = () => {
   };
 
   const addToCart = useCallback((item, size = null) => {
+    // STORE ON/OFF: block cart if owner closed the store.
+    // cafe?.storeOpen === false means undefined (old cafe docs) = OPEN — safe default.
+    if (cafe?.storeOpen === false) {
+      const openMsg = cafe?.openingTime ? ` Opens at ${cafe.openingTime}.` : '';
+      toast.error(`Café is currently closed.${openMsg}`);
+      return;
+    }
     if (item.addons?.length > 0) {
       const sizeLabel = sizeKeyToLabel(size);
       setAddonModal({ ...item, selectedSize: sizeLabel, selectedVariant: sizeLabel });
@@ -1091,10 +1097,17 @@ const CafeOrderingPremium = () => {
     toast.success(`${offer.title} added to cart ✓`);
   };
 
-  // ── Order placement — COMPLETELY UNCHANGED ───────────────────────────────
+  // ── Order placement — store-closed guard added at top, all else UNCHANGED ──
   const handlePlaceOrder = async () => {
     if (!customerName.trim()) { toast.error('Enter your name'); return; }
     if (!customerPhone.trim()) { toast.error('Enter your phone number'); return; }
+    // STORE ON/OFF fail-safe: re-check store status before writing to Firestore.
+    // Catches any edge case where cart was populated before the store was closed.
+    if (cafe?.storeOpen === false) {
+      const openMsg = cafe?.openingTime ? ` Opens at ${cafe.openingTime}.` : '';
+      toast.error(`Café is currently closed.${openMsg}`);
+      return;
+    }
     setOrderPlacing(true);
     try {
       const counterRef = doc(db, 'system', 'counters');
@@ -1258,6 +1271,64 @@ const CafeOrderingPremium = () => {
         <h1 className="text-2xl font-bold mb-3" style={{ fontFamily: 'Playfair Display, serif', color: T.text }}>Service Temporarily Unavailable</h1>
         <p className="text-sm max-w-xs mx-auto" style={{ color: T.textMuted }}>We're not accepting online orders right now. Please visit us in person.</p>
       </div>
+    </div>
+  );
+
+  // STORE ON/OFF: show closed screen when owner toggles store off.
+  // === false means undefined (old cafe docs without the field) passes through — safe.
+  if (cafe.storeOpen === false) return (
+    <div className="min-h-screen flex items-center justify-center text-center p-6" style={{ background: T.bg }}>
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.4 }}
+        className="max-w-sm w-full"
+      >
+        {/* Animated closed icon */}
+        <motion.div
+          animate={{ scale: [1, 1.06, 1] }}
+          transition={{ duration: 2.5, repeat: Infinity, ease: 'easeInOut' }}
+          className="w-24 h-24 rounded-full mx-auto mb-6 flex items-center justify-center"
+          style={{ background: 'rgba(239,68,68,0.12)', border: '2px solid rgba(239,68,68,0.35)' }}
+        >
+          <span className="text-4xl">🔒</span>
+        </motion.div>
+
+        {/* Cafe name */}
+        {cafe.name && (
+          <p className="text-sm font-semibold mb-2 uppercase tracking-widest" style={{ color: primary }}>
+            {cafe.name}
+          </p>
+        )}
+
+        <h1 className="text-2xl font-black mb-3" style={{ fontFamily: 'Playfair Display, serif', color: T.text }}>
+          We're Closed Right Now
+        </h1>
+
+        {/* Opens at time */}
+        <div
+          className="inline-flex items-center gap-2 px-5 py-3 rounded-2xl mb-4"
+          style={{ background: `${primary}12`, border: `1px solid ${primary}30` }}
+        >
+          <span className="text-lg">🕐</span>
+          <p className="font-semibold text-sm" style={{ color: primary }}>
+            {cafe.openingTime
+              ? `Opens at ${cafe.openingTime}`
+              : 'Opening time not set — check back soon'}
+          </p>
+        </div>
+
+        {/* Optional closing time */}
+        {cafe.closingTime && (
+          <p className="text-xs mt-1 mb-4" style={{ color: T.textMuted }}>
+            Open until {cafe.closingTime}
+          </p>
+        )}
+
+        <p className="text-sm mt-2" style={{ color: T.textMuted }}>
+          Please come back during our opening hours.
+        </p>
+      </motion.div>
     </div>
   );
 
