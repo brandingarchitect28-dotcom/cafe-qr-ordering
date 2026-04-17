@@ -3,6 +3,10 @@
  *
  * Dashboard Overview — real-time stats + real-time recent orders.
  *
+ * STORE ON/OFF TOGGLE ADDED (new StoreStatusCard section):
+ *  - Writes storeOpen (boolean), openingTime (string), closingTime (string) to cafes/{cafeId}
+ *  - All existing stats, orders, summary, low-stock logic: 100% UNCHANGED
+ *
  * Architecture:
  *  - useCollection('orders') already uses onSnapshot — fully real-time, zero extra listeners.
  *  - recentOrders: client-side sorted newest-first, limited to 10 (avoids composite index).
@@ -15,12 +19,13 @@
 import React, { useMemo, useRef, useState, useEffect } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
 import { useCollection, useDocument } from '../../hooks/useFirestore';
-import { where } from 'firebase/firestore';
+import { where, doc, updateDoc } from 'firebase/firestore';
+import { db } from '../../lib/firebase';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   IndianRupee, ShoppingBag, TrendingUp, Clock,
   AlertTriangle, Zap, MapPin, Package, ExternalLink,
-  Send, RefreshCw,
+  Send, RefreshCw, Store,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { generateAndSendReport, startDailyReportScheduler } from '../../services/whatsappReportService';
@@ -42,11 +47,11 @@ const fmtTime = (ts) => {
 };
 
 const STATUS = {
-  completed: { dot: 'bg-green-500',   text: 'text-green-400',   label: 'Completed' },
-  ready:     { dot: 'bg-emerald-400', text: 'text-emerald-400', label: 'Ready'     },
-  preparing: { dot: 'bg-amber-400',   text: 'text-amber-400',   label: 'Preparing' },
-  cancelled: { dot: 'bg-red-500',     text: 'text-red-400',     label: 'Cancelled' },
-  new:       { dot: 'bg-blue-400',    text: 'text-blue-400',    label: 'New'       },
+  completed: { dot: 'bg-green-500',   text: 'text-green-400',   label: 'Completed', dotColor: '#22c55e' },
+  ready:     { dot: 'bg-emerald-400', text: 'text-emerald-400', label: 'Ready',     dotColor: '#34d399' },
+  preparing: { dot: 'bg-amber-400',   text: 'text-amber-400',   label: 'Preparing', dotColor: '#fbbf24' },
+  cancelled: { dot: 'bg-red-500',     text: 'text-red-400',     label: 'Cancelled', dotColor: '#ef4444' },
+  new:       { dot: 'bg-blue-400',    text: 'text-blue-400',    label: 'New',       dotColor: '#60a5fa' },
 };
 const getStatus = (s) => STATUS[s] || STATUS.new;
 
@@ -92,11 +97,13 @@ const RecentOrderCard = React.memo(({ order, isNew, CUR }) => {
       animate={{ opacity: 1, y: 0,   scale: 1    }}
       exit={{    opacity: 0, y: 10,   scale: 0.97 }}
       transition={{ type: 'spring', stiffness: 320, damping: 26 }}
-      className={`relative rounded-sm border overflow-hidden transition-colors duration-700 ${
-        lit
-          ? 'border-[#D4AF37]/50 bg-[#D4AF37]/5'
-          : 'border-white/5 bg-black/20 hover:border-white/8 hover:bg-black/30'
-      }`}
+      className="relative rounded-xl border overflow-hidden transition-all duration-500"
+      style={{
+        background:  lit ? 'rgba(212,175,55,0.06)' : 'rgba(255,255,255,0.025)',
+        border:      lit ? '1px solid rgba(212,175,55,0.45)' : '1px solid rgba(255,255,255,0.06)',
+        borderLeft:  lit ? '3px solid #D4AF37' : `3px solid ${st.dotColor || 'rgba(255,255,255,0.10)'}`,
+        boxShadow:   lit ? '0 2px 20px rgba(212,175,55,0.10)' : 'none',
+      }}
       data-testid={`overview-order-${order.id}`}
     >
       {/* Gold flash bar at top */}
@@ -197,6 +204,186 @@ const RecentOrderCard = React.memo(({ order, isNew, CUR }) => {
 });
 RecentOrderCard.displayName = 'RecentOrderCard';
 
+// ─── StoreStatusCard ──────────────────────────────────────────────────────────
+// NEW component — purely additive. Reads/writes cafes/{cafeId} only.
+// Does not touch orders, cart, menu, or any existing logic.
+
+const StoreStatusCard = ({ cafe, cafeId }) => {
+  // Derive current values from cafe doc.
+  // storeOpen undefined (old docs) = treat as open (safe default).
+  const isOpen      = cafe?.storeOpen !== false;
+  const [openTime,  setOpenTime ] = useState(cafe?.openingTime  || '');
+  const [closeTime, setCloseTime] = useState(cafe?.closingTime  || '');
+  const [saving,    setSaving   ] = useState(false);
+
+  // Sync local inputs if cafe doc updates externally (real-time listener)
+  useEffect(() => { setOpenTime(cafe?.openingTime  || ''); }, [cafe?.openingTime ]);
+  useEffect(() => { setCloseTime(cafe?.closingTime || ''); }, [cafe?.closingTime]);
+
+  const handleToggle = async () => {
+    if (!cafeId) return;
+    // Opening time required when turning store ON
+    if (isOpen === false && !openTime.trim()) {
+      toast.error('Set an opening time before opening the store');
+      return;
+    }
+    setSaving(true);
+    try {
+      await updateDoc(doc(db, 'cafes', cafeId), {
+        storeOpen:   !isOpen,
+        openingTime: openTime.trim()  || '',
+        closingTime: closeTime.trim() || '',
+      });
+      toast.success(isOpen ? '🔒 Store closed' : '✅ Store is now open!');
+    } catch (err) {
+      console.error('[StoreToggle]', err);
+      toast.error('Failed to update store status');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleSaveTimes = async () => {
+    if (!cafeId) return;
+    setSaving(true);
+    try {
+      await updateDoc(doc(db, 'cafes', cafeId), {
+        openingTime: openTime.trim()  || '',
+        closingTime: closeTime.trim() || '',
+      });
+      toast.success('Opening hours saved');
+    } catch (err) {
+      toast.error('Failed to save hours');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 8 }}
+      animate={{ opacity: 1, y: 0 }}
+      className="rounded-xl overflow-hidden border"
+      style={{
+        background: isOpen
+          ? 'linear-gradient(135deg, rgba(16,185,129,0.08), rgba(16,185,129,0.03))'
+          : 'linear-gradient(135deg, rgba(239,68,68,0.10), rgba(239,68,68,0.04))',
+        borderColor: isOpen ? 'rgba(16,185,129,0.25)' : 'rgba(239,68,68,0.25)',
+      }}
+    >
+      {/* Top row — status + toggle */}
+      <div className="flex items-center justify-between px-5 py-4">
+
+        {/* Left — icon + label */}
+        <div className="flex items-center gap-3">
+          <div
+            className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0"
+            style={{
+              background: isOpen ? 'rgba(16,185,129,0.15)' : 'rgba(239,68,68,0.15)',
+            }}
+          >
+            <Store className="w-5 h-5" style={{ color: isOpen ? '#10B981' : '#EF4444' }} />
+          </div>
+          <div>
+            <div className="flex items-center gap-2">
+              {/* Pulsing dot */}
+              <span
+                className="w-2 h-2 rounded-full flex-shrink-0"
+                style={{
+                  background: isOpen ? '#10B981' : '#EF4444',
+                  boxShadow:  isOpen ? '0 0 6px #10B981' : '0 0 6px #EF4444',
+                  animation:  isOpen ? 'pulse 2s infinite' : 'none',
+                }}
+              />
+              <p className="text-white font-bold text-base">
+                Store is{' '}
+                <span style={{ color: isOpen ? '#10B981' : '#EF4444' }}>
+                  {isOpen ? 'OPEN' : 'CLOSED'}
+                </span>
+              </p>
+            </div>
+            <p className="text-xs mt-0.5" style={{ color: '#A3A3A3' }}>
+              {isOpen
+                ? (openTime ? `Open until ${closeTime || '—'}` : 'Accepting orders')
+                : (openTime ? `Will open at ${openTime}` : 'Not accepting orders')}
+            </p>
+          </div>
+        </div>
+
+        {/* Right — toggle switch */}
+        <button
+          onClick={handleToggle}
+          disabled={saving}
+          title={isOpen ? 'Close store' : 'Open store'}
+          className="relative flex-shrink-0 w-14 h-7 rounded-full transition-all duration-300 disabled:opacity-60"
+          style={{
+            background: isOpen ? '#10B981' : 'rgba(255,255,255,0.10)',
+            border:     isOpen ? 'none' : '1px solid rgba(255,255,255,0.15)',
+          }}
+        >
+          <motion.span
+            layout
+            transition={{ type: 'spring', stiffness: 500, damping: 30 }}
+            className="absolute top-0.5 w-6 h-6 rounded-full bg-white shadow-md"
+            style={{ left: isOpen ? '50%' : '2px' }}
+          />
+        </button>
+      </div>
+
+      {/* Bottom row — opening hours */}
+      <div
+        className="px-5 py-3 flex flex-wrap items-end gap-3 border-t"
+        style={{ borderColor: isOpen ? 'rgba(16,185,129,0.12)' : 'rgba(239,68,68,0.12)' }}
+      >
+        {/* Opening time — required */}
+        <div className="flex-1 min-w-[120px]">
+          <label className="block text-xs font-medium mb-1" style={{ color: '#A3A3A3' }}>
+            Opening Time <span style={{ color: '#EF4444' }}>*</span>
+          </label>
+          <input
+            type="time"
+            value={openTime}
+            onChange={e => setOpenTime(e.target.value)}
+            className="w-full rounded-lg px-3 py-2 text-sm outline-none text-white"
+            style={{
+              background: 'rgba(255,255,255,0.06)',
+              border:     '1px solid rgba(255,255,255,0.10)',
+            }}
+          />
+        </div>
+
+        {/* Closing time — optional */}
+        <div className="flex-1 min-w-[120px]">
+          <label className="block text-xs font-medium mb-1" style={{ color: '#A3A3A3' }}>
+            Closing Time <span style={{ color: '#555' }}>(optional)</span>
+          </label>
+          <input
+            type="time"
+            value={closeTime}
+            onChange={e => setCloseTime(e.target.value)}
+            className="w-full rounded-lg px-3 py-2 text-sm outline-none text-white"
+            style={{
+              background: 'rgba(255,255,255,0.06)',
+              border:     '1px solid rgba(255,255,255,0.10)',
+            }}
+          />
+        </div>
+
+        {/* Save times button */}
+        <button
+          onClick={handleSaveTimes}
+          disabled={saving}
+          className="flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-semibold transition-all disabled:opacity-50 flex-shrink-0"
+          style={{ background: 'rgba(212,175,55,0.15)', color: '#D4AF37', border: '1px solid rgba(212,175,55,0.25)' }}
+        >
+          {saving ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : null}
+          Save Hours
+        </button>
+      </div>
+    </motion.div>
+  );
+};
+
 // ─── Overview ─────────────────────────────────────────────────────────────────
 
 const Overview = () => {
@@ -215,15 +402,12 @@ const Overview = () => {
   const CUR = cafe?.currencySymbol || '₹';
 
   // ── Global isDeleted filter — applied once, used everywhere below ──────────
-  // Soft-deleted orders (isDeleted: true) are excluded from every section.
-  // Firestore real-time listener already removes hard-deleted docs automatically.
   const liveOrders = useMemo(
     () => orders?.filter(o => !o.isDeleted) ?? [],
     [orders]
   );
 
   // ── Sound notification ─────────────────────────────────────────────────────
-  // Two-tone chime via Web Audio API — no audio files needed.
   const playNotify = () => {
     try {
       const ctx = new (window.AudioContext || window.webkitAudioContext)();
@@ -243,8 +427,6 @@ const Overview = () => {
   };
 
   // ── New-order detection ────────────────────────────────────────────────────
-  // Tracks IDs seen on previous render; genuinely new ones flash for 4.5 s.
-  // Uses liveOrders so deleted orders don't trigger notifications.
   const seenRef = useRef(new Set());
   const [newIds, setNewIds] = useState(new Set());
 
@@ -252,7 +434,7 @@ const Overview = () => {
     if (!liveOrders?.length) return;
     const incoming = new Set(liveOrders.map(o => o.id));
 
-    if (seenRef.current.size === 0) {   // first load — seed without flagging
+    if (seenRef.current.size === 0) {
       seenRef.current = incoming;
       return;
     }
@@ -274,7 +456,7 @@ const Overview = () => {
     seenRef.current = incoming;
   }, [liveOrders]);
 
-  // ── Recent orders — newest first, max 10, no deleted ──────────────────────
+  // ── Recent orders ──────────────────────────────────────────────────────────
   const recentOrders = useMemo(() => {
     if (!liveOrders.length) return [];
     return [...liveOrders]
@@ -288,9 +470,6 @@ const Overview = () => {
   }, [liveOrders]);
 
   // ── Stat cards ─────────────────────────────────────────────────────────────
-  // Revenue and avgOrderValue from PAID orders only.
-  // ordersToday = all non-deleted today orders (shows total activity count).
-  // activeOrders = non-deleted, non-completed (kitchen queue).
   const stats = useMemo(() => {
     if (!liveOrders.length) return { todayRevenue: 0, ordersToday: 0, avgOrderValue: 0, activeOrders: 0 };
     const today = new Date(); today.setHours(0, 0, 0, 0);
@@ -298,7 +477,6 @@ const Overview = () => {
     const todayOrders = liveOrders.filter(
       o => (o.createdAt?.toDate?.() || new Date(0)) >= today
     );
-    // PAID filter — paymentStatus === 'paid' OR status === 'paid'
     const paid = todayOrders.filter(
       o => o.paymentStatus === 'paid' || o.status === 'paid'
     );
@@ -312,7 +490,7 @@ const Overview = () => {
     };
   }, [liveOrders]);
 
-  // ── Low stock alert ────────────────────────────────────────────────────────
+  // ── Low stock ──────────────────────────────────────────────────────────────
   const lowStockItems = useMemo(() => {
     if (!inventory) return [];
     return inventory.filter(i =>
@@ -331,9 +509,7 @@ const Overview = () => {
 
   // ── WhatsApp Daily Report ──────────────────────────────────────────────────
   const [reportSending, setReportSending] = useState(false);
-
-  // Toggle for Today's Business Summary (hidden by default)
-  const [showSummary, setShowSummary] = useState(false);
+  const [showSummary,   setShowSummary  ] = useState(false);
 
   useEffect(() => {
     if (!cafeId || !cafe?.whatsappNumber) return;
@@ -365,37 +541,58 @@ const Overview = () => {
   return (
     <div className="space-y-6">
 
-      {/* ── 4 Stat Cards ──────────────────────────────────────────────────── */}
+      {/* ── STORE STATUS CARD — NEW ────────────────────────────────────────── */}
+      {/* Purely additive. Reads/writes cafes/{cafeId} only.                   */}
+      {/* Zero effect on orders, stats, menu, cart, or any existing logic.     */}
+      {cafeId && (
+        <StoreStatusCard cafe={cafe} cafeId={cafeId} />
+      )}
+
+      {/* ── 4 Stat Cards — UNCHANGED ──────────────────────────────────────── */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         {statCards.map((stat) => {
           const Icon = stat.icon;
           return (
-            <div
+            <motion.div
               key={stat.label}
+              whileHover={{ y: -3, boxShadow: `0 8px 32px ${stat.accent}18` }}
+              transition={{ duration: 0.2 }}
               data-testid={`stat-${stat.label.toLowerCase().replace(/\s+/g, '-')}`}
-              className="bg-[#0F0F0F] border border-white/5 rounded-sm p-6 hover:border-white/10 transition-colors"
-              style={{ borderLeft: `3px solid ${stat.accent}22` }}
+              className="relative overflow-hidden rounded-xl border border-white/8 p-6 cursor-default"
+              style={{
+                background:  `linear-gradient(135deg, ${stat.accent}0a 0%, rgba(15,15,15,1) 60%)`,
+                borderLeft:  `3px solid ${stat.accent}55`,
+                boxShadow:   `0 2px 16px ${stat.accent}0a`,
+              }}
             >
+              {/* Subtle glow blob behind icon */}
+              <div
+                className="absolute top-3 right-3 w-14 h-14 rounded-full blur-2xl pointer-events-none"
+                style={{ background: `${stat.accent}18` }}
+              />
               <div className="flex items-center justify-between mb-4">
-                <p className="text-[#A3A3A3] text-sm uppercase tracking-wide">{stat.label}</p>
-                <Icon className={`w-5 h-5 ${stat.color}`} />
+                <p className="text-[#A3A3A3] text-xs uppercase tracking-widest font-medium">{stat.label}</p>
+                {/* Icon with glow ring */}
+                <div
+                  className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0"
+                  style={{ background: `${stat.accent}18`, boxShadow: `0 0 0 1px ${stat.accent}30` }}
+                >
+                  <Icon className={`w-4.5 h-4.5 ${stat.color}`} style={{ width: 18, height: 18 }} />
+                </div>
               </div>
-              <p className="text-3xl font-bold text-white">{stat.value}</p>
-            </div>
+              <p className="text-3xl font-black text-white tracking-tight">{stat.value}</p>
+            </motion.div>
           );
         })}
       </div>
 
-      {/* ── Today's Business Summary (toggle) ──────────────────────────────── */}
-      {/* Calculations run only when liveOrders exist — values unchanged */}
+      {/* ── Today's Business Summary (toggle) — UNCHANGED ─────────────────── */}
       {liveOrders.length > 0 && (() => {
         const today = new Date(); today.setHours(0, 0, 0, 0);
 
-        // isDeleted already excluded via liveOrders
         const todayOrders = liveOrders.filter(
           o => (o.createdAt?.toDate?.() || new Date(0)) >= today
         );
-        // PAID only — paymentStatus === 'paid' OR status === 'paid'
         const paid    = todayOrders.filter(o => o.paymentStatus === 'paid' || o.status === 'paid');
         const pending = todayOrders.filter(o => o.paymentStatus !== 'paid' && o.status !== 'paid');
 
@@ -403,14 +600,12 @@ const Overview = () => {
         const totalGST = paid.reduce((s, o) => s + (o.gstAmount || o.taxAmount || 0), 0);
         const totalSC  = paid.reduce((s, o) => s + (o.serviceChargeAmount || 0), 0);
 
-        // Top items — qty from paid orders only
         const itemMap = {};
         paid.forEach(o => (o.items || []).forEach(i => {
           itemMap[i.name] = (itemMap[i.name] || 0) + (i.quantity || 1);
         }));
         const topItems = Object.entries(itemMap).sort((a, b) => b[1] - a[1]).slice(0, 3);
 
-        // Category revenue — paid orders only
         const catMap = {};
         paid.forEach(o => (o.items || []).forEach(i => {
           const cat = i.category || 'Other';
@@ -422,16 +617,28 @@ const Overview = () => {
           <motion.div
             initial={{ opacity: 0, y: 8 }}
             animate={{ opacity: 1, y: 0 }}
-            className="bg-[#0F0F0F] border border-[#D4AF37]/20 rounded-xl overflow-hidden"
+            className="rounded-xl overflow-hidden"
+            style={{
+              background: 'rgba(12,12,12,0.96)',
+              border:     '1px solid rgba(212,175,55,0.22)',
+              boxShadow:  '0 4px 32px rgba(212,175,55,0.06)',
+            }}
           >
-            {/* Header — clickable toggle */}
+            {/* Header — clickable toggle, visual upgrade only */}
             <div
               onClick={() => setShowSummary(prev => !prev)}
-              className="cursor-pointer flex items-center justify-between px-5 py-4 border-b border-white/5 hover:bg-white/2 transition-colors"
-              style={{ background: 'linear-gradient(135deg, rgba(212,175,55,0.08), transparent)' }}
+              className="cursor-pointer flex items-center justify-between px-5 py-4 border-b transition-colors"
+              style={{
+                background:   'linear-gradient(135deg, rgba(212,175,55,0.10), rgba(212,175,55,0.02))',
+                borderColor:  'rgba(212,175,55,0.12)',
+              }}
             >
               <div className="flex items-center gap-3">
-                <div className="w-8 h-8 rounded-lg bg-[#D4AF37]/15 flex items-center justify-center">
+                {/* Icon with stronger glow ring */}
+                <div
+                  className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0"
+                  style={{ background: 'rgba(212,175,55,0.18)', boxShadow: '0 0 0 1px rgba(212,175,55,0.32)' }}
+                >
                   <TrendingUp className="w-4 h-4 text-[#D4AF37]" />
                 </div>
                 <div>
@@ -444,19 +651,22 @@ const Overview = () => {
                 </div>
               </div>
               <div className="flex items-center gap-3">
-                <span className="text-[#D4AF37] text-xs font-semibold px-2 py-1 rounded-full bg-[#D4AF37]/10 border border-[#D4AF37]/20">
+                <span className="text-[#D4AF37] text-xs font-semibold px-2.5 py-1 rounded-full bg-[#D4AF37]/12 border border-[#D4AF37]/25">
                   {todayOrders.length} orders today
                 </span>
-                <span className="text-[#A3A3A3] text-sm opacity-70 select-none">
-                  {showSummary ? 'Hide ▲' : 'View ▼'}
-                </span>
+                {/* Animated rotating chevron */}
+                <motion.span
+                  animate={{ rotate: showSummary ? 180 : 0 }}
+                  transition={{ duration: 0.25 }}
+                  className="text-[#A3A3A3] text-sm opacity-60 select-none inline-block"
+                >
+                  ▼
+                </motion.span>
               </div>
             </div>
 
-            {/* Content — visible only when showSummary is true */}
             {showSummary && (
               <>
-                {/* 4 financial figures — all paid-only */}
                 <div className="p-5 grid grid-cols-2 sm:grid-cols-4 gap-4">
                   <div className="space-y-1">
                     <p className="text-[#555] text-xs uppercase tracking-wide">Revenue</p>
@@ -480,7 +690,6 @@ const Overview = () => {
                   </div>
                 </div>
 
-                {/* Top items + category breakdown */}
                 {(topItems.length > 0 || topCats.length > 0) && (
                   <div className="px-5 pb-5 grid grid-cols-1 sm:grid-cols-2 gap-4">
                     {topItems.length > 0 && (
@@ -521,14 +730,20 @@ const Overview = () => {
         );
       })()}
 
-      {/* ── Low Stock Alert ────────────────────────────────────────────────── */}
+      {/* ── Low Stock Alert — UNCHANGED ────────────────────────────────────── */}
       <AnimatePresence>
         {lowStockItems.length > 0 && (
           <motion.div
             initial={{ opacity: 0, y: -8 }}
             animate={{ opacity: 1, y: 0  }}
             exit={{    opacity: 0, y: -8  }}
-            className="bg-red-500/8 border border-red-500/20 rounded-sm p-5"
+            className="relative overflow-hidden rounded-xl p-5"
+            style={{
+              background:  'rgba(239,68,68,0.06)',
+              border:      '1px solid rgba(239,68,68,0.28)',
+              borderLeft:  '3px solid rgba(239,68,68,0.70)',
+              boxShadow:   '0 2px 20px rgba(239,68,68,0.08)',
+            }}
             data-testid="overview-low-stock"
           >
             <div className="flex items-center justify-between mb-3">
@@ -556,11 +771,17 @@ const Overview = () => {
         )}
       </AnimatePresence>
 
-      {/* ── Recent Orders ──────────────────────────────────────────────────── */}
-      <div className="bg-[#0F0F0F] border border-white/5 rounded-sm overflow-hidden">
-
-        {/* Header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-white/5">
+      {/* ── Recent Orders — visual upgrade only, all data/logic unchanged ──── */}
+      <div
+        className="rounded-xl overflow-hidden"
+        style={{
+          background: 'rgba(10,10,10,0.96)',
+          border:     '1px solid rgba(255,255,255,0.07)',
+          boxShadow:  '0 4px 32px rgba(0,0,0,0.25)',
+        }}
+      >
+        <div className="flex items-center justify-between px-6 py-4 border-b"
+          style={{ borderColor: 'rgba(255,255,255,0.06)', background: 'linear-gradient(135deg, rgba(16,185,129,0.05), transparent)' }}>
           <div className="flex items-center gap-3">
             <h3 className="text-xl font-semibold text-white" style={{ fontFamily: 'Playfair Display, serif' }}>
               Recent Orders
@@ -590,7 +811,6 @@ const Overview = () => {
           </div>
         </div>
 
-        {/* Order cards */}
         <div className="p-4 space-y-2">
           {ordersLoading ? (
             <div className="space-y-2">
@@ -619,7 +839,6 @@ const Overview = () => {
           )}
         </div>
 
-        {/* Footer */}
         {!ordersLoading && recentOrders.length > 0 && (
           <div className="px-6 py-3 border-t border-white/5 flex items-center justify-between">
             <p className="text-[#555] text-xs flex items-center gap-1.5">
