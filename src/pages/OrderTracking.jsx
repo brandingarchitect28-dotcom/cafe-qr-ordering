@@ -16,6 +16,10 @@
  * - Estimated time hint per status
  * - "Add More Items" button to append items to existing order
  * - [ADDON TRANSPARENCY] Full per-item addon breakdown with counts, prices, totals
+ *
+ * FREE ITEM FIX:
+ * - _calcTotals now guards isFree items (base = 0 instead of basePrice)
+ * - Item display shows FREE badge + "was ₹X" for isFree items
  */
 
 import React, { useState, useEffect, useCallback, useRef } from 'react';
@@ -165,8 +169,6 @@ const PaymentBadge = ({ status }) => {
 };
 
 // ─── ADDON TRANSPARENCY: shared per-item breakdown renderer ──────────────────
-// Used in both OrderTracking items list and AddMoreItemsModal footer.
-// Pure display — no state, no side effects.
 const ItemAddonBreakdown = ({ item, CUR, primary }) => {
   const basePrice  = parseFloat(item.basePrice ?? item.price) || 0;
   const qty        = parseInt(item.quantity) || 1;
@@ -176,12 +178,9 @@ const ItemAddonBreakdown = ({ item, CUR, primary }) => {
 
   return (
     <div className="mt-1 space-y-0.5">
-      {/* Base price line */}
       <p className="text-xs ml-1" style={{ color: '#666' }}>
         Base: {CUR}{basePrice.toFixed(2)}{qty > 1 ? ` ×${qty}` : ''}
       </p>
-
-      {/* comboItems */}
       {comboItems.length > 0 && (
         <div className="ml-3 space-y-0.5">
           {comboItems.map((ci, cIdx) => (
@@ -191,8 +190,6 @@ const ItemAddonBreakdown = ({ item, CUR, primary }) => {
           ))}
         </div>
       )}
-
-      {/* Add-ons */}
       {addons.length > 0 ? (
         <div className="ml-3 space-y-0.5 pt-0.5">
           <p className="text-xs font-semibold" style={{ color: '#888' }}>
@@ -231,10 +228,7 @@ const AddMoreItemsModal = ({ order, onClose, primary, setAddonModal, setVariantM
   const [newCart,     setNewCart    ] = useState([]);
   const [saving,      setSaving     ] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
-  // variantModal state is LIFTED to OrderTracking root (setVariantModal prop)
-  // so the picker renders outside Framer Motion's stacking context
 
-  // Load menu items for this cafe
   useEffect(() => {
     if (!order?.cafeId) return;
     const q = query(
@@ -273,16 +267,13 @@ const AddMoreItemsModal = ({ order, onClose, primary, setAddonModal, setVariantM
     });
   }, []);
 
-  // Expose directAddToNewCart to parent via ref
   useEffect(() => {
     if (directAddRef) directAddRef.current = directAddToNewCart;
   }, [directAddToNewCart, directAddRef]);
 
-  // Expose addToNewCart to parent via variantAddRef
-  // so root-level variant picker can call addToNewCart(item, variant)
   useEffect(() => {
     if (variantAddRef) variantAddRef.current = (item, variant) => addToNewCart(item, variant);
-  }); // no deps — always keep current closure
+  });
 
   const removeFromNewCart = useCallback((id) => {
     setNewCart(prev => {
@@ -295,7 +286,6 @@ const AddMoreItemsModal = ({ order, onClose, primary, setAddonModal, setVariantM
 
   const newCartQtyFor = (id) => newCart.find(i => i.id === id)?.quantity || 0;
 
-  // NULL-SAFE total including addon costs — matches calculateOrderTotals formula
   const newCartTotal = newCart.reduce((s, i) => {
     if (!i) return s;
     const base     = parseFloat(i.basePrice ?? i.price) || 0;
@@ -304,16 +294,10 @@ const AddMoreItemsModal = ({ order, onClose, primary, setAddonModal, setVariantM
     return s + (base + addonAmt) * (parseInt(i.quantity) || 1);
   }, 0);
 
-  // VARIANT → ADDON → ADD flow (strict priority order)
-  // Matches EXACT same field (item.sizePricing) used by CafeOrderingPremium main menu
   const addToNewCart = useCallback((item, forcedVariant) => {
     if (!item) return;
 
-    // STEP 1 — VARIANT CHECK (highest priority, always runs first)
-    // Only skipped when forcedVariant is explicitly passed (user already picked one)
     if (!forcedVariant) {
-      // ── PRIMARY: item.sizePricing — SAME field as CafeOrderingPremium main menu ──
-      // Structure: { enabled: true, small: 100, medium: 150, large: 200 }
       const sp = item.sizePricing;
       if (sp && sp.enabled === true) {
         const sizePricingVariants = [
@@ -323,11 +307,10 @@ const AddMoreItemsModal = ({ order, onClose, primary, setAddonModal, setVariantM
         ].filter(Boolean);
         if (sizePricingVariants.length > 0) {
           setVariantModal({ ...item, _resolvedVariants: sizePricingVariants });
-          return; // STOP — wait for size selection
+          return;
         }
       }
 
-      // ── FALLBACK: array-based variant fields (other possible schemas) ──
       const rawVariants =
         item.variants      ||
         item.prices        ||
@@ -341,15 +324,13 @@ const AddMoreItemsModal = ({ order, onClose, primary, setAddonModal, setVariantM
         : null;
       if (variants && variants.length > 0) {
         setVariantModal({ ...item, _resolvedVariants: variants });
-        return; // STOP — wait for variant selection
+        return;
       }
     }
 
-    // STEP 2 — resolve price from forced variant or item base price
     const resolvedPrice       = forcedVariant ? (parseFloat(forcedVariant.price) || parseFloat(item.price) || 0) : (parseFloat(item.price) || 0);
     const resolvedVariantName = forcedVariant?.name || forcedVariant?.label || forcedVariant?.size || forcedVariant?.title || null;
 
-    // STEP 3 — ADDON CHECK (only after variant resolved)
     if (Array.isArray(item.addons) && item.addons.length > 0) {
       setAddonModal({
         ...item,
@@ -358,10 +339,9 @@ const AddMoreItemsModal = ({ order, onClose, primary, setAddonModal, setVariantM
         selectedVariant: resolvedVariantName,
         selectedSize:    resolvedVariantName,
       });
-      return; // STOP — wait for addon selection
+      return;
     }
 
-    // STEP 4 — add to cart
     directAddToNewCart({
       ...item,
       price:           resolvedPrice,
@@ -395,7 +375,6 @@ const AddMoreItemsModal = ({ order, onClose, primary, setAddonModal, setVariantM
       }));
       const updatedItems = [...existingItems, ...newItems];
 
-      // FIX: use same formula as calculateOrderTotals — a.price × a.quantity
       const newSubtotal = updatedItems.reduce((s, item) => {
         const base     = safeNum(item.basePrice ?? item.price);
         const addonAmt = (item.addons || []).reduce(
@@ -404,7 +383,6 @@ const AddMoreItemsModal = ({ order, onClose, primary, setAddonModal, setVariantM
         return s + (base + addonAmt) * safeNum(item.quantity);
       }, 0);
 
-      // Re-fetch cafe for rates
       const cafeSnap = await getDoc(doc(db, 'cafes', order.cafeId));
       const cafe = cafeSnap.exists() ? cafeSnap.data() : {};
 
@@ -492,7 +470,6 @@ const AddMoreItemsModal = ({ order, onClose, primary, setAddonModal, setVariantM
               filteredItems.map(item => {
                 const qty = newCartQtyFor(item.id);
 
-                // ── Variant-aware helpers — PRIMARY: item.sizePricing (main menu field) ──
                 const sp = item.sizePricing;
                 const sizePricingVariants = (sp && sp.enabled === true)
                   ? [
@@ -502,7 +479,6 @@ const AddMoreItemsModal = ({ order, onClose, primary, setAddonModal, setVariantM
                     ].filter(Boolean)
                   : [];
 
-                // FALLBACK: array-based fields
                 const rawVariants =
                   item.variants || item.prices || item.sizes ||
                   item.options  || item.priceVariants || item.multiPrices || null;
@@ -514,13 +490,11 @@ const AddMoreItemsModal = ({ order, onClose, primary, setAddonModal, setVariantM
                 const hasVariants  = itemVariants.length > 0;
                 const hasAddons    = Array.isArray(item.addons) && item.addons.length > 0;
 
-                // Price display: "from ₹X" for size items (matches main menu)
                 const minPrice     = hasVariants ? Math.min(...itemVariants.map(v => parseFloat(v.price) || 0)) : null;
                 const displayPrice = hasVariants
                   ? `from ${CUR}${fmt(minPrice)}`
                   : `${CUR}${fmt(item.price)}`;
 
-                // Button label mirrors main menu
                 const btnLabel = hasVariants ? 'Select Size' : hasAddons ? 'Customize' : 'Add';
 
                 return (
@@ -534,7 +508,6 @@ const AddMoreItemsModal = ({ order, onClose, primary, setAddonModal, setVariantM
                       {item.category && (
                         <p className="text-xs mt-0.5" style={{ color: '#555' }}>{item.category}</p>
                       )}
-                      {/* Show all variant sizes inline — matches main menu display */}
                       {hasVariants ? (
                         <div className="flex flex-wrap gap-1 mt-1">
                           {itemVariants.map((v, vi) => (
@@ -554,8 +527,6 @@ const AddMoreItemsModal = ({ order, onClose, primary, setAddonModal, setVariantM
                       )}
                     </div>
 
-                    {/* For variant items: always show the select button (each tap = new selection)
-                        For non-variant items: show +/- stepper when already in cart */}
                     {!hasVariants && qty > 0 ? (
                       <div className="flex items-center gap-2 flex-shrink-0">
                         <button
@@ -639,8 +610,6 @@ const AddMoreItemsModal = ({ order, onClose, primary, setAddonModal, setVariantM
           )}
         </motion.div>
       </motion.div>
-
-      {/* AddOnModal is rendered at OrderTracking level — see FIX ISSUE 1 comment */}
     </AnimatePresence>
   );
 };
@@ -655,13 +624,10 @@ const OrderTracking = () => {
   const [notFound,       setNotFound      ] = useState(false);
   const [showAddMore,    setShowAddMore   ] = useState(false);
   const [addMoreAddonModal, setAddMoreAddonModal] = useState(null);
-  // VARIANT FIX: lifted to root so picker renders outside Framer Motion stacking context
   const [addMoreVariantModal, setAddMoreVariantModal] = useState(null);
   const directAddRef   = useRef(null);
-  // variantAddRef: holds addToNewCart from AddMoreItemsModal so root-level picker can call it
   const variantAddRef  = useRef(null);
 
-  // ── Google Review link — fetched per café from cafes/{cafeId} ───────────────
   const [googleReviewLink, setGoogleReviewLink] = useState('');
 
   useEffect(() => {
@@ -681,7 +647,7 @@ const OrderTracking = () => {
 
   const [waSending, setWaSending] = useState(false);
 
-  // ── Real-time listener — UNCHANGED from existing system ──────────────────────
+  // ── Real-time listener — UNCHANGED ───────────────────────────────────────────
   useEffect(() => {
     if (!orderId) { setNotFound(true); setLoading(false); return; }
 
@@ -700,7 +666,6 @@ const OrderTracking = () => {
     return () => unsub();
   }, [orderId]);
 
-  // ── Send invoice to customer via WhatsApp (optional, not auto-redirect) ──────
   const handleSendInvoice = useCallback(() => {
     if (!order) return;
     const phone = (order.customerPhone || '').replace(/\D/g, '');
@@ -741,14 +706,15 @@ const OrderTracking = () => {
     } catch { return ''; }
   })();
 
-  // ── SINGLE SOURCE OF TRUTH: identical formula to calculateOrderTotals ────────
+  // ── SINGLE SOURCE OF TRUTH — FREE ITEM FIX applied here ─────────────────────
   const safeN = v => { const n = parseFloat(v); return isNaN(n) ? 0 : n; };
   const _calcTotals = (itemList) => {
     if (!Array.isArray(itemList)) return { itemsTotal: 0, addonsTotal: 0, grandTotal: 0 };
     let itemsTotal = 0, addonsTotal = 0;
     for (const item of itemList) {
       if (!item) continue;
-      const base     = safeN(item.basePrice ?? item.price);
+      // FREE ITEM FIX: isFree items have price:0 — honour that, skip basePrice fallback
+      const base     = item.isFree ? 0 : safeN(item.basePrice ?? item.price);
       const qty      = safeN(item.quantity) || 1;
       const addons   = Array.isArray(item.addons) ? item.addons : [];
       const addonAmt = addons.reduce((s, a) => {
@@ -760,10 +726,9 @@ const OrderTracking = () => {
     }
     return { itemsTotal, addonsTotal, grandTotal: itemsTotal + addonsTotal };
   };
-  // NULL-SAFE: order may be null during initial render — use optional chaining everywhere
+
   const { itemsTotal: itemsBaseTotal, addonsTotal: addonsGrandTotal, grandTotal: computedSubtotal } = _calcTotals(order?.items || []);
-  // Grand Total = computed subtotal + any cafe fees stored on the order (all null-safe)
-  const feesTotal        = safeN(order?.gstAmount) + safeN(order?.taxAmount) + safeN(order?.serviceChargeAmount) + safeN(order?.platformFeeAmount);
+  const feesTotal          = safeN(order?.gstAmount) + safeN(order?.taxAmount) + safeN(order?.serviceChargeAmount) + safeN(order?.platformFeeAmount);
   const computedGrandTotal = computedSubtotal + feesTotal;
 
   // ── Loading ───────────────────────────────────────────────────────────────────
@@ -799,7 +764,7 @@ const OrderTracking = () => {
       className="min-h-screen bg-[#050505] flex flex-col items-center justify-start py-8 px-4"
       style={{ fontFamily: 'Manrope, sans-serif' }}
     >
-      {/* Ambient glow behind card */}
+      {/* Ambient glow */}
       <motion.div
         animate={{ opacity: [0.08, 0.18, 0.08] }}
         transition={{ duration: 3.5, repeat: Infinity }}
@@ -897,10 +862,10 @@ const OrderTracking = () => {
               Your Order
             </p>
 
-            {/* ── ADDON TRANSPARENCY: per-item full breakdown ── */}
             <div className="space-y-3">
               {items.map((item, i) => {
-                const basePrice  = safeN(item.basePrice ?? item.price);
+                // FREE ITEM FIX: honour isFree flag — base and lineTotal use 0 for free items
+                const basePrice  = item.isFree ? 0 : safeN(item.basePrice ?? item.price);
                 const qty        = parseInt(item.quantity) || 1;
                 const addons     = Array.isArray(item.addons) ? item.addons : [];
                 const addonTotal = addons.reduce((s, a) => s + safeN(a.price) * (parseInt(a.quantity) || 1), 0);
@@ -921,13 +886,29 @@ const OrderTracking = () => {
                           : ''}
                         {' '}<span style={{ color: primary }}>×{qty}</span>
                       </span>
-                      <span className="text-white font-bold text-sm flex-shrink-0">{CUR}{fmt(lineTotal)}</span>
+                      {/* FREE ITEM FIX: show FREE badge instead of ₹0 line total */}
+                      {item.isFree ? (
+                        <span
+                          className="text-xs font-bold px-2 py-0.5 rounded-full flex-shrink-0"
+                          style={{ background: 'rgba(16,185,129,0.15)', color: '#10B981' }}
+                        >
+                          FREE
+                        </span>
+                      ) : (
+                        <span className="text-white font-bold text-sm flex-shrink-0">{CUR}{fmt(lineTotal)}</span>
+                      )}
                     </div>
 
-                    {/* Base price line */}
-                    <p className="text-xs" style={{ color: '#666' }}>
-                      Base: {CUR}{fmt(basePrice)}{qty > 1 ? ` ×${qty}` : ''}
-                    </p>
+                    {/* Base price line — show "FREE · was ₹X" for free items */}
+                    {item.isFree ? (
+                      <p className="text-xs" style={{ color: '#10B981' }}>
+                        FREE · was {CUR}{fmt(item.actualPrice ?? item.basePrice ?? item.price)}
+                      </p>
+                    ) : (
+                      <p className="text-xs" style={{ color: '#666' }}>
+                        Base: {CUR}{fmt(basePrice)}{qty > 1 ? ` ×${qty}` : ''}
+                      </p>
+                    )}
 
                     {/* comboItems */}
                     {Array.isArray(item.comboItems) && item.comboItems.length > 0 && (
@@ -956,7 +937,6 @@ const OrderTracking = () => {
                             </div>
                           );
                         })}
-                        {/* Per-item addon sub-total */}
                         <div className="flex justify-between text-xs pt-0.5" style={{ color: '#666' }}>
                           <span>Add-ons total</span>
                           <span>+{CUR}{fmt(addonTotal * qty)}</span>
@@ -970,23 +950,18 @@ const OrderTracking = () => {
               })}
             </div>
 
-            {/* ── ADDON TRANSPARENCY: full order total breakdown ── */}
+            {/* ── Full order total breakdown ── */}
             <div className="mt-4 pt-3 border-t border-white/5 space-y-1.5">
-              {/* Items base subtotal */}
               <div className="flex justify-between text-xs" style={{ color: '#555' }}>
                 <span>Items Total</span>
                 <span>{CUR}{fmt(itemsBaseTotal)}</span>
               </div>
-
-              {/* Add-ons total row — only if any addons exist */}
               {addonsGrandTotal > 0 && (
                 <div className="flex justify-between text-xs" style={{ color: '#555' }}>
                   <span>Add-ons Total</span>
                   <span>+{CUR}{fmt(addonsGrandTotal)}</span>
                 </div>
               )}
-
-              {/* Fee lines — null-safe */}
               {(order?.gstAmount || 0) > 0 && (
                 <div className="flex justify-between text-xs text-[#555]">
                   <span>GST</span>
@@ -1011,8 +986,6 @@ const OrderTracking = () => {
                   <span>+{CUR}{fmt(order.platformFeeAmount)}</span>
                 </div>
               )}
-
-              {/* Grand total — computed from items, never trusts stale stored value */}
               <div className="flex justify-between font-black text-sm pt-1 border-t border-white/10">
                 <span className="text-white">Grand Total</span>
                 <span style={{ color: primary }}>{CUR}{fmt(computedGrandTotal)}</span>
@@ -1036,7 +1009,6 @@ const OrderTracking = () => {
 
         {/* ── Action buttons ──────────────────────────────────────────────── */}
         <div className="flex gap-3 mt-4">
-          {/* Back to menu */}
           {order.cafeId && (
             <motion.button
               whileHover={{ scale: 1.03 }} whileTap={{ scale: 0.97 }}
@@ -1048,8 +1020,6 @@ const OrderTracking = () => {
               Back to Menu
             </motion.button>
           )}
-
-          {/* Send invoice on WhatsApp — optional, not auto-redirect */}
           {order.customerPhone && (
             <motion.button
               whileHover={{ scale: 1.03 }} whileTap={{ scale: 0.97 }}
@@ -1072,7 +1042,7 @@ const OrderTracking = () => {
           )}
         </div>
 
-        {/* ── Add More Items button — shown only for active (non-completed/cancelled) orders ── */}
+        {/* ── Add More Items button ── */}
         {order.orderStatus !== 'completed' && order.orderStatus !== 'cancelled' && order.cafeId && (
           <motion.button
             whileHover={{ scale: 1.02 }}
@@ -1090,7 +1060,7 @@ const OrderTracking = () => {
           </motion.button>
         )}
 
-        {/* ── Loyalty Promo ────────────────────────────────────────────────── */}
+        {/* ── Loyalty Promo ── */}
         <div className="mt-6 rounded-2xl overflow-hidden"
           style={{ background: 'linear-gradient(135deg, rgba(212,175,55,0.12), rgba(212,175,55,0.05))', border: '1px solid rgba(212,175,55,0.25)' }}>
           <div className="p-5 text-center">
@@ -1140,7 +1110,7 @@ const OrderTracking = () => {
         </div>
       )}
 
-      {/* AddOnModal rendered at root level with z-[200] */}
+      {/* AddOnModal at root level z-[200] */}
       {addMoreAddonModal && (
         <div className="fixed inset-0 z-[200]">
           <AddOnModal
@@ -1157,16 +1127,13 @@ const OrderTracking = () => {
         </div>
       )}
 
-      {/* Variant picker rendered at root level with z-[200] — escapes Framer Motion
-          stacking context. Uses _resolvedVariants pre-built from item.sizePricing
-          (same field as CafeOrderingPremium main menu) or array fallback fields. */}
+      {/* Variant picker at root level z-[200] */}
       {addMoreVariantModal && (() => {
         const vItem     = addMoreVariantModal;
         const CUR_V     = order?.currencySymbol || '₹';
         const fmt_v     = n => (parseFloat(n) || 0).toFixed(2);
         const primary_v = '#D4AF37';
-        // _resolvedVariants is pre-built by addToNewCart from sizePricing or array fields
-        const variants = vItem._resolvedVariants || [];
+        const variants  = vItem._resolvedVariants || [];
         return (
           <div className="fixed inset-0 z-[200]">
             <div className="absolute inset-0 bg-black/75 backdrop-blur-sm" onClick={() => setAddMoreVariantModal(null)} />

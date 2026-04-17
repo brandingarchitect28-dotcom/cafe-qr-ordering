@@ -1075,6 +1075,8 @@ const CafeOrderingPremium = () => {
           image:           freeMenuItem?.image || '',
           isOffer:         true,
           offerType:       'buy_x_get_y_free',
+          isFree:          true,        // FREE ITEM FIX: marks this as a zero-price item
+          actualPrice:     freePrice,   // original price preserved for invoice display
         }]);
       }
       toast.success(`${offer.title} added to cart ✓`);
@@ -1115,17 +1117,22 @@ const CafeOrderingPremium = () => {
         orderNumber: oNum,
         items: cart.map(i => ({
           name:            i.name,
-          price:           i.basePrice ?? i.price,
-          basePrice:       i.basePrice ?? i.price,
+          // FREE ITEM FIX: free items have price:0 in cart; preserve it.
+          // For all other items, use basePrice ?? price as before.
+          price:           i.isFree ? 0 : (i.basePrice ?? i.price),
+          basePrice:       i.isFree ? 0 : (i.basePrice ?? i.price),
           quantity:        i.quantity,
           addons:          i.addons          || [],
           addonTotal:      i.addonTotal      || 0,
           selectedSize:    i.selectedSize    || null,
           selectedVariant: i.selectedVariant || null,
           comboItems:      i.comboItems      || [],
-          ...(i.isOffer   && { isOffer:   true        }),
-          ...(i.offerType && { offerType: i.offerType }),
-          ...(i.items     && { items:     i.items     }),
+          ...(i.isOffer    && { isOffer:      true           }),
+          ...(i.offerType  && { offerType:    i.offerType    }),
+          ...(i.items      && { items:        i.items        }),
+          // Preserve isFree flag and original price for display/receipts
+          ...(i.isFree     && { isFree:       true,
+                                actualPrice:  i.basePrice ?? i.price }),
         })),
         subtotalAmount:      subtotal,
         taxAmount,
