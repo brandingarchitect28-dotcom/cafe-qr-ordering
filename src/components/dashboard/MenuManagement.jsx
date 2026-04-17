@@ -23,17 +23,23 @@ const MenuManagement = () => {
     name: '', price: '', category: '', image: '', available: true,
     addons: [],
     sizePricing: { enabled: false, small: '', medium: '', large: '' },
-    // ── Nutrition fields (add-only) ───────────────────────────────────────────
+    // ── Nutrition fields ──────────────────────────────────────────────────────
     ingredients: '',
     calories:    '',
     protein:     '',
     carbs:       '',
     fats:        '',
     micros:      '',
+    // ── NEW: Tag fields (additive — all optional booleans) ────────────────────
+    // Existing items without these fields → undefined → treated as false.
+    // No migration needed. No effect on pricing, cart, or any existing logic.
+    isVeg:        false,
+    isNonVeg:     false,
+    isNew:        false,
+    isBestSeller: false,
   });
 
   // ── UI-only: which item has its inline edit accordion open ───────────────────
-  // Keeps track purely for rendering — no effect on save/update logic.
   const [editingItemId, setEditingItemId] = useState(null);
 
   // ── Search state ─────────────────────────────────────────────────────────────
@@ -57,8 +63,7 @@ const MenuManagement = () => {
     cafeId ? [where('cafeId', '==', cafeId)] : []
   );
 
-  // ── Filtered items derived from menuItems + searchQuery ──────────────────────
-  // menuItems (raw Firestore data) is never mutated — only the render path changes.
+  // ── Filtered items — UNCHANGED ────────────────────────────────────────────────
   const filteredItems = useMemo(() => {
     if (!menuItems) return [];
     if (!searchQuery.trim()) return menuItems;
@@ -70,7 +75,7 @@ const MenuManagement = () => {
     );
   }, [menuItems, searchQuery]);
 
-  // ── Upload + Save — UNCHANGED ────────────────────────────────────────────────
+  // ── handleSubmit — existing logic UNCHANGED, new fields ride along via spread ─
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!cafeId) { toast.error('Cafe ID not found — please refresh'); return; }
@@ -83,15 +88,22 @@ const MenuManagement = () => {
         category:    formData.category,
         image:       formData.image,
         available:   formData.available,
-        addons:      formData.addons      || [],   // [] = no add-ons; backward-compatible
-        sizePricing: formData.sizePricing || null, // null = no size pricing; backward-compatible
-        // ── Nutrition fields (additive — existing items without these work unchanged) ──
+        addons:      formData.addons      || [],
+        sizePricing: formData.sizePricing || null,
+        // ── Nutrition fields — UNCHANGED ───────────────────────────────────────
         ingredients: formData.ingredients || '',
         calories:    Number(formData.calories)  || 0,
         protein:     Number(formData.protein)   || 0,
         carbs:       Number(formData.carbs)     || 0,
         fats:        Number(formData.fats)      || 0,
         micros:      formData.micros      || '',
+        // ── NEW: Tag fields (written to Firestore alongside existing fields) ───
+        // All are boolean. Firestore stores them; customer UI reads them.
+        // If admin never sets them they stay false — zero effect on anything.
+        isVeg:        formData.isVeg        || false,
+        isNonVeg:     formData.isNonVeg     || false,
+        isNew:        formData.isNew        || false,
+        isBestSeller: formData.isBestSeller || false,
         cafeId,
       };
 
@@ -111,7 +123,7 @@ const MenuManagement = () => {
     }
   };
 
-  // ── handleEdit — UNCHANGED (sets editingItem + formData + showForm) ──────────
+  // ── handleEdit — existing logic UNCHANGED, new fields read from item ──────────
   const handleEdit = (item) => {
     setEditingItem(item);
     setFormData({
@@ -122,13 +134,20 @@ const MenuManagement = () => {
       available:   item.available,
       addons:      item.addons      || [],
       sizePricing: item.sizePricing || { enabled: false, small: '', medium: '', large: '' },
-      // ── Nutrition fields ───────────────────────────────────────────────────
+      // ── Nutrition fields — UNCHANGED ───────────────────────────────────────
       ingredients: item.ingredients || '',
       calories:    item.calories    != null ? String(item.calories) : '',
       protein:     item.protein     != null ? String(item.protein)  : '',
       carbs:       item.carbs       != null ? String(item.carbs)    : '',
       fats:        item.fats        != null ? String(item.fats)     : '',
       micros:      item.micros      || '',
+      // ── NEW: Tag fields — read from Firestore, default false if missing ─────
+      // item.isVeg etc. will be undefined on old items → || false → unchecked.
+      // No migration needed. Existing items open in edit form with all toggles off.
+      isVeg:        item.isVeg        || false,
+      isNonVeg:     item.isNonVeg     || false,
+      isNew:        item.isNew        || false,
+      isBestSeller: item.isBestSeller || false,
     });
     setShowForm(true);
   };
@@ -144,9 +163,7 @@ const MenuManagement = () => {
     }
   };
 
-  // ── handleDeleteAll — reuses same deleteDoc call as handleDelete ─────────────
-  // Operates on menuItems (full live array) — never on filteredItems,
-  // so a search filter never hides items from deletion.
+  // ── handleDeleteAll — UNCHANGED ───────────────────────────────────────────────
   const handleDeleteAll = async () => {
     if (!menuItems || menuItems.length === 0) {
       toast.error('No menu items to delete');
@@ -165,6 +182,7 @@ const MenuManagement = () => {
     }
   };
 
+  // ── toggleAvailability — UNCHANGED ────────────────────────────────────────────
   const toggleAvailability = async (id, currentStatus) => {
     try {
       await updateDoc(doc(db, 'menuItems', id), { available: !currentStatus });
@@ -173,16 +191,33 @@ const MenuManagement = () => {
     }
   };
 
+  // ── resetForm — UNCHANGED (new fields reset via initial state) ────────────────
   const resetForm = () => {
-    setFormData({ name: '', price: '', category: '', image: '', available: true });
+    setFormData({
+      name: '', price: '', category: '', image: '', available: true,
+      addons: [],
+      sizePricing: { enabled: false, small: '', medium: '', large: '' },
+      ingredients: '', calories: '', protein: '', carbs: '', fats: '', micros: '',
+      // new fields also reset to false
+      isVeg: false, isNonVeg: false, isNew: false, isBestSeller: false,
+    });
     setEditingItem(null);
     setSaving(false);
     setShowForm(false);
-    setEditingItemId(null); // also close any open inline accordion
+    setEditingItemId(null);
   };
 
-  // ── Inline edit form JSX — identical markup to the top form ──────────────────
-  // Extracted so it can be rendered both at the top (Add New) and inline (Edit).
+  // ── NEW: Veg / Non-Veg mutual-exclusivity toggle ──────────────────────────────
+  // Selecting Veg clears NonVeg and vice versa. No other state is touched.
+  const handleVegToggle = (type) => {
+    if (type === 'veg') {
+      setFormData(prev => ({ ...prev, isVeg: !prev.isVeg, isNonVeg: false }));
+    } else {
+      setFormData(prev => ({ ...prev, isNonVeg: !prev.isNonVeg, isVeg: false }));
+    }
+  };
+
+  // ── renderEditForm — all existing fields UNCHANGED, Tags section appended ─────
   const renderEditForm = () => (
     <div className="bg-[#0F0F0F] border border-[#D4AF37]/30 rounded-sm p-6 mt-2">
       <div className="flex items-center justify-between mb-6">
@@ -195,7 +230,8 @@ const MenuManagement = () => {
       </div>
 
       <form onSubmit={handleSubmit} className="space-y-4">
-        {/* Name */}
+
+        {/* ── Name — UNCHANGED ─────────────────────────────────────────────── */}
         <div>
           <label className="block text-white text-sm font-medium mb-2">Item Name</label>
           <input
@@ -209,7 +245,7 @@ const MenuManagement = () => {
           />
         </div>
 
-        {/* Price + Category */}
+        {/* ── Price + Category — UNCHANGED ─────────────────────────────────── */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
             <label className="block text-white text-sm font-medium mb-2">{`Price (${CUR})`}</label>
@@ -237,7 +273,7 @@ const MenuManagement = () => {
           </div>
         </div>
 
-        {/* Media Upload — supports image, gif, mp4 */}
+        {/* ── Media Upload — UNCHANGED ─────────────────────────────────────── */}
         <MediaUpload
           label="Item Media (Image / GIF / Video)"
           value={formData.image}
@@ -247,7 +283,7 @@ const MenuManagement = () => {
           disabled={saving}
         />
 
-        {/* Available checkbox */}
+        {/* ── Available checkbox — UNCHANGED ───────────────────────────────── */}
         <div className="flex items-center gap-3">
           <input
             type="checkbox"
@@ -259,7 +295,7 @@ const MenuManagement = () => {
           <label className="text-white">Available for order</label>
         </div>
 
-        {/* Add-ons / Customisations — restored from original build */}
+        {/* ── Add-ons — UNCHANGED ──────────────────────────────────────────── */}
         <AddOnEditor
           addons={formData.addons || []}
           onChange={(updated) => setFormData(prev => ({ ...prev, addons: updated }))}
@@ -267,7 +303,7 @@ const MenuManagement = () => {
           disabled={saving}
         />
 
-        {/* Size-based pricing — new feature */}
+        {/* ── Size Pricing — UNCHANGED ─────────────────────────────────────── */}
         <div className="border border-white/10 rounded-sm p-4 space-y-3">
           <label className="flex items-center gap-2 cursor-pointer">
             <input
@@ -285,9 +321,7 @@ const MenuManagement = () => {
           {formData.sizePricing?.enabled && (
             <div className="grid grid-cols-3 gap-2 mt-2">
               <input
-                type="number"
-                min="0"
-                step="0.01"
+                type="number" min="0" step="0.01"
                 placeholder={`Small ${CUR}`}
                 value={formData.sizePricing?.small || ''}
                 onChange={(e) => setFormData(prev => ({
@@ -298,9 +332,7 @@ const MenuManagement = () => {
                 className="w-full bg-black/20 border border-white/10 text-white placeholder:text-neutral-600 focus:border-[#D4AF37] focus:ring-1 focus:ring-[#D4AF37] rounded-sm h-11 px-3 text-sm transition-all"
               />
               <input
-                type="number"
-                min="0"
-                step="0.01"
+                type="number" min="0" step="0.01"
                 placeholder={`Medium ${CUR}`}
                 value={formData.sizePricing?.medium || ''}
                 onChange={(e) => setFormData(prev => ({
@@ -311,9 +343,7 @@ const MenuManagement = () => {
                 className="w-full bg-black/20 border border-white/10 text-white placeholder:text-neutral-600 focus:border-[#D4AF37] focus:ring-1 focus:ring-[#D4AF37] rounded-sm h-11 px-3 text-sm transition-all"
               />
               <input
-                type="number"
-                min="0"
-                step="0.01"
+                type="number" min="0" step="0.01"
                 placeholder={`Large ${CUR}`}
                 value={formData.sizePricing?.large || ''}
                 onChange={(e) => setFormData(prev => ({
@@ -327,13 +357,11 @@ const MenuManagement = () => {
           )}
         </div>
 
-        {/* ── Nutrition / Food Details (Add-Only) ──────────────────────────── */}
+        {/* ── Nutrition / Food Details — UNCHANGED ─────────────────────────── */}
         <div className="border border-white/10 rounded-sm p-4 space-y-3">
           <p className="text-white text-sm font-medium">
             Food Details <span className="text-[#A3A3A3] font-normal">(optional — shown in customer menu)</span>
           </p>
-
-          {/* Ingredients */}
           <div>
             <label className="block text-[#A3A3A3] text-xs mb-1">Ingredients (comma separated)</label>
             <input
@@ -345,8 +373,6 @@ const MenuManagement = () => {
               className="w-full bg-black/20 border border-white/10 text-white placeholder:text-neutral-600 focus:border-[#D4AF37] focus:ring-1 focus:ring-[#D4AF37] rounded-sm h-11 px-4 transition-all text-sm"
             />
           </div>
-
-          {/* Macros row */}
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
             {[
               { key: 'calories', label: 'Calories (kcal)' },
@@ -357,9 +383,7 @@ const MenuManagement = () => {
               <div key={key}>
                 <label className="block text-[#A3A3A3] text-xs mb-1">{label}</label>
                 <input
-                  type="number"
-                  min="0"
-                  step="any"
+                  type="number" min="0" step="any"
                   value={formData[key]}
                   onChange={e => setFormData(prev => ({ ...prev, [key]: e.target.value }))}
                   placeholder="0"
@@ -369,8 +393,6 @@ const MenuManagement = () => {
               </div>
             ))}
           </div>
-
-          {/* Micros */}
           <div>
             <label className="block text-[#A3A3A3] text-xs mb-1">Micronutrients (optional)</label>
             <input
@@ -384,7 +406,125 @@ const MenuManagement = () => {
           </div>
         </div>
 
-        {/* Buttons */}
+        {/* ── NEW: Item Tags ────────────────────────────────────────────────── */}
+        {/* Purely additive. No required field. No effect on price/cart/logic.  */}
+        {/* All 4 toggle as off by default. Veg/NonVeg are mutually exclusive.  */}
+        <div className="border border-white/10 rounded-sm p-4 space-y-3">
+          <p className="text-white text-sm font-medium">
+            Item Tags{' '}
+            <span className="text-[#A3A3A3] font-normal">(optional — shown on customer menu)</span>
+          </p>
+
+          <div className="grid grid-cols-2 gap-3">
+
+            {/* Veg */}
+            <button
+              type="button"
+              disabled={saving}
+              onClick={() => handleVegToggle('veg')}
+              className={`flex items-center gap-3 p-3 rounded-sm border transition-all text-left disabled:opacity-50 ${
+                formData.isVeg
+                  ? 'border-green-500/50 bg-green-500/10'
+                  : 'border-white/10 bg-black/20 hover:bg-white/5'
+              }`}
+            >
+              {/* FSSAI-style veg symbol */}
+              <div
+                className="w-5 h-5 rounded-sm flex items-center justify-center flex-shrink-0"
+                style={{ border: `1.5px solid ${formData.isVeg ? '#16a34a' : '#555'}` }}
+              >
+                <div
+                  className="w-2.5 h-2.5 rounded-full"
+                  style={{ background: formData.isVeg ? '#16a34a' : '#555' }}
+                />
+              </div>
+              <div>
+                <p className={`text-sm font-semibold leading-tight ${formData.isVeg ? 'text-green-400' : 'text-[#A3A3A3]'}`}>
+                  Veg
+                </p>
+                <p className="text-xs text-[#555] mt-0.5">Green dot</p>
+              </div>
+            </button>
+
+            {/* Non-Veg */}
+            <button
+              type="button"
+              disabled={saving}
+              onClick={() => handleVegToggle('nonveg')}
+              className={`flex items-center gap-3 p-3 rounded-sm border transition-all text-left disabled:opacity-50 ${
+                formData.isNonVeg
+                  ? 'border-red-500/50 bg-red-500/10'
+                  : 'border-white/10 bg-black/20 hover:bg-white/5'
+              }`}
+            >
+              {/* FSSAI-style non-veg symbol */}
+              <div
+                className="w-5 h-5 rounded-sm flex items-center justify-center flex-shrink-0"
+                style={{ border: `1.5px solid ${formData.isNonVeg ? '#dc2626' : '#555'}` }}
+              >
+                <div
+                  className="w-2.5 h-2.5 rounded-full"
+                  style={{ background: formData.isNonVeg ? '#dc2626' : '#555' }}
+                />
+              </div>
+              <div>
+                <p className={`text-sm font-semibold leading-tight ${formData.isNonVeg ? 'text-red-400' : 'text-[#A3A3A3]'}`}>
+                  Non-Veg
+                </p>
+                <p className="text-xs text-[#555] mt-0.5">Red dot</p>
+              </div>
+            </button>
+
+            {/* Newly Arrived */}
+            <button
+              type="button"
+              disabled={saving}
+              onClick={() => setFormData(prev => ({ ...prev, isNew: !prev.isNew }))}
+              className={`flex items-center gap-3 p-3 rounded-sm border transition-all text-left disabled:opacity-50 ${
+                formData.isNew
+                  ? 'border-[#D4AF37]/50 bg-[#D4AF37]/10'
+                  : 'border-white/10 bg-black/20 hover:bg-white/5'
+              }`}
+            >
+              <span className="text-xl leading-none flex-shrink-0">✨</span>
+              <div>
+                <p className={`text-sm font-semibold leading-tight ${formData.isNew ? 'text-[#D4AF37]' : 'text-[#A3A3A3]'}`}>
+                  Newly Arrived
+                </p>
+                <p className="text-xs text-[#555] mt-0.5">Shows in "New" section</p>
+              </div>
+            </button>
+
+            {/* Best Seller */}
+            <button
+              type="button"
+              disabled={saving}
+              onClick={() => setFormData(prev => ({ ...prev, isBestSeller: !prev.isBestSeller }))}
+              className={`flex items-center gap-3 p-3 rounded-sm border transition-all text-left disabled:opacity-50 ${
+                formData.isBestSeller
+                  ? 'border-[#D4AF37]/50 bg-[#D4AF37]/10'
+                  : 'border-white/10 bg-black/20 hover:bg-white/5'
+              }`}
+            >
+              <span className="text-xl leading-none flex-shrink-0">⭐</span>
+              <div>
+                <p className={`text-sm font-semibold leading-tight ${formData.isBestSeller ? 'text-[#D4AF37]' : 'text-[#A3A3A3]'}`}>
+                  Best Seller
+                </p>
+                <p className="text-xs text-[#555] mt-0.5">Shows in "Best Sellers"</p>
+              </div>
+            </button>
+
+          </div>
+
+          {/* Mutual exclusivity hint */}
+          <p className="text-xs text-[#444]">
+            Veg and Non-Veg are mutually exclusive — selecting one clears the other.
+          </p>
+        </div>
+        {/* ── End Item Tags ─────────────────────────────────────────────────── */}
+
+        {/* ── Submit / Cancel — UNCHANGED ──────────────────────────────────── */}
         <div className="flex gap-3">
           <button
             type="submit"
@@ -403,14 +543,16 @@ const MenuManagement = () => {
             Cancel
           </button>
         </div>
+
       </form>
     </div>
   );
 
+  // ── Return — UNCHANGED ────────────────────────────────────────────────────────
   return (
     <div className="space-y-6">
 
-      {/* ── Top toolbar: Add + Delete All ───────────────────────────────────── */}
+      {/* ── Top toolbar: Add + Delete All — UNCHANGED ──────────────────────── */}
       <div className="flex flex-wrap items-center gap-3">
         <button
           onClick={() => {
@@ -438,11 +580,10 @@ const MenuManagement = () => {
         )}
       </div>
 
-      {/* Top form — shown only for "Add New Item" (editingItem is null) ─────── */}
-      {/* When editing an existing item the inline accordion below is used instead */}
+      {/* Top form — Add New Item only — UNCHANGED ────────────────────────── */}
       {showForm && !editingItem && renderEditForm()}
 
-      {/* ── Search bar ──────────────────────────────────────────────────────── */}
+      {/* ── Search bar — UNCHANGED ─────────────────────────────────────────── */}
       {menuItems && menuItems.length > 0 && (
         <div className="relative">
           <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-[#A3A3A3] pointer-events-none" />
@@ -456,7 +597,7 @@ const MenuManagement = () => {
         </div>
       )}
 
-      {/* Menu items list */}
+      {/* ── Menu items list — UNCHANGED ──────────────────────────────────────── */}
       {loading ? (
         <div className="text-center text-[#A3A3A3] py-8">Loading menu...</div>
       ) : menuItems && menuItems.length > 0 ? (
@@ -468,14 +609,10 @@ const MenuManagement = () => {
                 id={`menu-item-${item.id}`}
                 className="bg-[#0F0F0F] border border-white/5 rounded-sm overflow-hidden hover:border-white/10 transition-colors"
               >
-                {/* Item card — identical to original ──────────────────────── */}
+                {/* Item card — UNCHANGED ────────────────────────────────────── */}
                 {item.image && (
                   <div className="aspect-video overflow-hidden">
-                    <MediaPreview
-                      url={item.image}
-                      alt={item.name}
-                      className="w-full h-full"
-                    />
+                    <MediaPreview url={item.image} alt={item.name} className="w-full h-full" />
                   </div>
                 )}
                 <div className="p-6">
@@ -496,13 +633,45 @@ const MenuManagement = () => {
                       )}
                     </div>
                   </div>
+
+                  {/* ── NEW: Tag badges on item card (read-only display) ─────── */}
+                  {/* Shows admin what tags are active. Visual only, no interaction. */}
+                  {(item.isVeg || item.isNonVeg || item.isNew || item.isBestSeller) && (
+                    <div className="flex flex-wrap gap-1.5 mb-3">
+                      {item.isVeg && (
+                        <span className="flex items-center gap-1 px-2 py-0.5 rounded-sm text-xs font-medium bg-green-500/15 text-green-400 border border-green-500/25">
+                          <span className="w-2 h-2 rounded-full bg-green-500 inline-block" />
+                          Veg
+                        </span>
+                      )}
+                      {item.isNonVeg && (
+                        <span className="flex items-center gap-1 px-2 py-0.5 rounded-sm text-xs font-medium bg-red-500/15 text-red-400 border border-red-500/25">
+                          <span className="w-2 h-2 rounded-full bg-red-500 inline-block" />
+                          Non-Veg
+                        </span>
+                      )}
+                      {item.isNew && (
+                        <span className="px-2 py-0.5 rounded-sm text-xs font-medium bg-[#D4AF37]/15 text-[#D4AF37] border border-[#D4AF37]/25">
+                          ✨ New
+                        </span>
+                      )}
+                      {item.isBestSeller && (
+                        <span className="px-2 py-0.5 rounded-sm text-xs font-medium bg-[#D4AF37]/15 text-[#D4AF37] border border-[#D4AF37]/25">
+                          ⭐ Best Seller
+                        </span>
+                      )}
+                    </div>
+                  )}
+                  {/* ── End tag badges ─────────────────────────────────────── */}
+
                   <div className="flex items-center gap-2 mb-4">
                     <div className={`px-2 py-1 rounded-sm text-xs font-medium ${item.available ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-red-400'}`}>
                       {item.available ? 'Available' : 'Unavailable'}
                     </div>
                   </div>
+
+                  {/* Action buttons — UNCHANGED ───────────────────────────── */}
                   <div className="flex gap-2">
-                    {/* Edit button — calls handleEdit (unchanged) AND toggles accordion */}
                     <button
                       onClick={() => {
                         const opening = editingItemId !== item.id;
@@ -537,7 +706,7 @@ const MenuManagement = () => {
                   </div>
                 </div>
 
-                {/* Inline edit accordion — opens below this card only ─────── */}
+                {/* Inline edit accordion — UNCHANGED ───────────────────────── */}
                 {editingItemId === item.id && renderEditForm()}
               </div>
             ))}
