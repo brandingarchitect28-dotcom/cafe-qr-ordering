@@ -478,7 +478,8 @@ const MenuCard = React.memo(({
         )}
 
         {/* Show Food Details */}
-        {(item.ingredients || item.calories || item.protein || item.carbs || item.fats) && (
+        {/* ZERO FIX: Boolean() prevents React rendering "0" when all numeric fields are 0 */}
+        {Boolean(item.ingredients || item.calories || item.protein || item.carbs || item.fats) && (
           <button
             onClick={() => onShowDetails?.(item)}
             className="w-full text-xs mt-2 py-1.5 text-center opacity-60 hover:opacity-100 transition-opacity"
