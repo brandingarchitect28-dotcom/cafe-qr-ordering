@@ -138,7 +138,17 @@ const OfferDetailModal = ({ offer, menuItems, CUR, onAdd, onClose, primary = '#D
                     </div>
                   )}
                   <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium truncate" style={{ color: T.text }}>{item.itemName}</p>
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                      <p className="text-sm font-medium truncate" style={{ color: T.text }}>{item.itemName}</p>
+                      {item.selectedSize && (
+                        <span
+                          className="text-[10px] font-bold px-1.5 py-0.5 rounded-full flex-shrink-0"
+                          style={{ background: `${primary}25`, color: primary, border: `1px solid ${primary}40` }}
+                        >
+                          {item.selectedSize}
+                        </span>
+                      )}
+                    </div>
                     <p className="text-xs" style={{ color: T.textMuted }}>
                       {CUR}{fmt(item.itemPrice)} × {item.quantity}
                     </p>
@@ -165,9 +175,32 @@ const OfferDetailModal = ({ offer, menuItems, CUR, onAdd, onClose, primary = '#D
               </div>
             )}
             {offer.type === 'buy_x_get_y' && (
-              <p className="text-sm font-semibold" style={{ color: T.text }}>
-                Buy {offer.buyQuantity} Get {offer.getQuantity} Free
-              </p>
+              <div>
+                <p className="text-sm font-semibold" style={{ color: T.text }}>
+                  Buy {offer.buyQuantity} {offer.items?.[0]?.itemName || 'item'}
+                  {offer.items?.[0]?.selectedSize && (
+                    <span
+                      className="ml-1.5 text-[10px] font-bold px-1.5 py-0.5 rounded-full"
+                      style={{ background: `${primary}25`, color: primary, border: `1px solid ${primary}40` }}
+                    >
+                      {offer.items[0].selectedSize}
+                    </span>
+                  )}
+                  {', '}Get {offer.getQuantity}{' '}
+                  <span style={{ color: primary }}>
+                    {offer.getItemName || 'item'}
+                    {offer.getItemSize && (
+                      <span
+                        className="ml-1.5 text-[10px] font-bold px-1.5 py-0.5 rounded-full"
+                        style={{ background: `${primary}25`, color: primary, border: `1px solid ${primary}40` }}
+                      >
+                        {offer.getItemSize}
+                      </span>
+                    )}
+                    {' '}FREE!
+                  </span>
+                </p>
+              </div>
             )}
           </div>
 
@@ -335,7 +368,12 @@ const MenuCard = React.memo(({
         <div className="flex items-start justify-between gap-2 mb-3">
           <h3 className="font-semibold text-base leading-tight" style={{ color: T.text }}>{item.name}</h3>
           <span className="font-black text-base flex-shrink-0" style={{ color: primary }}>
-            {pickedSize ? `${CUR}${fmt(finalPrice)}` : `${CUR}${fmt(item.price)}`}
+            {pickedSize
+              ? `${CUR}${fmt(finalPrice)}`
+              : hasSizes && sizeOptions.length > 0
+                ? `${CUR}${fmt(sizeOptions[0].price)}`
+                : `${CUR}${fmt(item.price)}`
+            }
           </span>
         </div>
 
@@ -862,7 +900,7 @@ const CafeOrderingPremium = () => {
 
   const getFinalPrice = useCallback((item) => {
     const size      = selectedSize[item.id];
-    const basePrice = size?.price ?? parseFloat(item.price) ?? 0;
+    const basePrice = size?.price != null ? size.price : (parseFloat(item.price) || 0);
     const addons    = selectedAddons[item.id] || {};
     const addonTotal = Object.values(addons).reduce(
       (sum, a) => sum + (parseFloat(a.price) || 0) * (a.qty || 0), 0,
@@ -992,26 +1030,53 @@ const CafeOrderingPremium = () => {
       return;
     }
     if (offer.type === 'buy_x_get_y') {
+      // ── Step 1: Add the "buy" items ──────────────────────────────────────
       (offer.items || []).forEach(oi => {
         const menuItem = menuItems.find(m => m.id === oi.itemId);
         if (!menuItem) return;
         const buyQty = offer.buyQuantity || oi.quantity || 1;
-        const getQty = offer.getQuantity || 0;
         if (buyQty > 0) {
+          // Use size-correct price stored in offer item, fallback to menuItem.price
+          const buyPrice = oi.itemPrice ? parseFloat(oi.itemPrice) : parseFloat(menuItem.price);
           setCart(prev => [...prev, {
-            ...menuItem, price: parseFloat(menuItem.price), basePrice: parseFloat(menuItem.price),
-            quantity: buyQty, addons: [], addonTotal: 0, selectedSize: null, selectedVariant: null,
-            isOffer: true, offerType: 'buy_x_get_y',
-          }]);
-        }
-        if (getQty > 0) {
-          setCart(prev => [...prev, {
-            ...menuItem, price: 0, basePrice: 0,
-            quantity: getQty, addons: [], addonTotal: 0, selectedSize: null, selectedVariant: null,
-            isOffer: true, offerType: 'buy_x_get_y_free', name: `${menuItem.name} (Free)`,
+            ...menuItem,
+            price:           buyPrice,
+            basePrice:       buyPrice,
+            quantity:        buyQty,
+            addons:          [],
+            addonTotal:      0,
+            selectedSize:    oi.selectedSize    || null,
+            selectedVariant: oi.selectedSize    || null,
+            isOffer:         true,
+            offerType:       'buy_x_get_y',
           }]);
         }
       });
+      // ── Step 2: Add the correct "get free" item ──────────────────────────
+      const getQty = offer.getQuantity || 1;
+      if (getQty > 0 && offer.getItemId) {
+        const freeMenuItem = menuItems.find(m => m.id === offer.getItemId);
+        // Use stored name/size from offer (admin-selected), fallback to live menuItem
+        const freeName  = offer.getItemName  || freeMenuItem?.name  || 'Free Item';
+        const freeSize  = offer.getItemSize  || null;
+        const freeSizeV = offer.getItemSize  || null;
+        const freePrice = offer.getItemPrice != null ? parseFloat(offer.getItemPrice) : parseFloat(freeMenuItem?.price || 0);
+        setCart(prev => [...prev, {
+          ...(freeMenuItem || {}),
+          id:              offer.getItemId,
+          name:            `${freeName} (Free)`,
+          price:           0,
+          basePrice:       freePrice,   // original price stored for receipts
+          quantity:        getQty,
+          addons:          [],
+          addonTotal:      0,
+          selectedSize:    freeSize,
+          selectedVariant: freeSizeV,
+          image:           freeMenuItem?.image || '',
+          isOffer:         true,
+          offerType:       'buy_x_get_y_free',
+        }]);
+      }
       toast.success(`${offer.title} added to cart ✓`);
       return;
     }
@@ -1351,6 +1416,12 @@ const CafeOrderingPremium = () => {
                     <p className="font-bold text-sm" style={{ color: T.text }}>{offer.title}</p>
                     {offer.description && (
                       <p className="text-xs mt-0.5 line-clamp-2" style={{ color: T.textMuted }}>{offer.description}</p>
+                    )}
+                    {offer.type === 'buy_x_get_y' && offer.getItemName && (
+                      <p className="text-xs mt-0.5 font-semibold line-clamp-1" style={{ color: primary }}>
+                        Buy {offer.buyQuantity} → Get {offer.getItemName}
+                        {offer.getItemSize ? ` (${offer.getItemSize})` : ''} Free
+                      </p>
                     )}
                     <p className="text-xs font-semibold mt-2" style={{ color: primary }}>Tap to see details →</p>
                   </div>
