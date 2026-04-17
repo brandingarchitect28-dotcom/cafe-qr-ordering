@@ -459,21 +459,23 @@ MenuCard.displayName = 'MenuCard';
 // ─── NEW: CompactItemCard ─────────────────────────────────────────────────────
 // Lightweight card for Newly Arrived / Best Sellers horizontal sections.
 // Shows: image, name, optional tag badge, cart-in-progress dot.
-// NO price breakdown, NO size buttons, NO addon stepper, NO quantity counter.
+// NO inline size buttons, NO addon stepper, NO quantity counter on card.
 //
-// CLICK BEHAVIOUR — reuses existing addToCart function from parent (passed as onAdd).
-// addToCart already routes:
-//   • item with addons  → opens AddOnModal (existing popup, unchanged)
-//   • item with sizes   → opens size picker (existing flow, unchanged)
-//   • simple item       → goes straight to directAddToCart (unchanged)
-// Zero new logic. Zero new state. 100% same cart behaviour as main grid.
+// CLICK BEHAVIOUR — calls onCompactClick(item) which is handleCompactItemClick:
+//   1. Item has sizePricing  → opens size picker bottom sheet
+//   2. After size chosen     → addToCart(item, sizeKey) → AddOnModal if addons
+//   3. No sizes              → addToCart(item) → AddOnModal if addons, else direct
+// Identical flow to main MenuCard. Zero new logic or state.
+//
+// STYLING — matches Special Offers card: gold gradient bg, gold border, gold glow.
 const CompactItemCard = React.memo(({
   item,
   primary,
+  glowSoft,      // passed from parent — same glowSoft used by Special Offers
   theme,
   cartQty,
-  onAdd,       // ← exact same addToCart reference from parent
-  tagLabel,    // 'New' | 'Best Seller' | undefined
+  onCompactClick, // handleCompactItemClick from parent
+  tagLabel,       // 'New' | 'Best Seller'
 }) => {
   const T = theme || {
     bgCard:   'rgba(255,255,255,0.04)',
@@ -485,14 +487,16 @@ const CompactItemCard = React.memo(({
 
   return (
     <motion.div
-      whileHover={{ y: -4, boxShadow: `0 12px 32px rgba(0,0,0,0.25)` }}
+      whileHover={{ scale: 1.03, y: -2 }}
       whileTap={{ scale: 0.97 }}
       transition={{ duration: 0.2 }}
-      onClick={() => onAdd(item)}   // ← triggers existing addToCart — same as main grid
-      className="flex-shrink-0 w-36 rounded-2xl overflow-hidden cursor-pointer relative"
+      onClick={() => onCompactClick(item)}
+      className="flex-shrink-0 w-40 rounded-2xl overflow-hidden cursor-pointer relative"
       style={{
-        background:    T.bgCard,
-        border:        `1px solid ${T.border}`,
+        // Gold gradient background — matches Special Offers card exactly
+        background:    `linear-gradient(135deg, ${primary}20, ${primary}08)`,
+        border:        `1px solid ${primary}30`,
+        boxShadow:     `0 4px 20px ${glowSoft}`,
         backdropFilter:'blur(12px)',
         scrollSnapAlign: 'start',
       }}
@@ -509,8 +513,8 @@ const CompactItemCard = React.memo(({
           )
         ) : (
           <div className="w-full h-full flex items-center justify-center"
-            style={{ background: `${primary}10` }}>
-            <Coffee className="w-8 h-8" style={{ color: primary, opacity: 0.3 }} />
+            style={{ background: `${primary}15` }}>
+            <Coffee className="w-8 h-8" style={{ color: primary, opacity: 0.4 }} />
           </div>
         )}
 
@@ -523,7 +527,7 @@ const CompactItemCard = React.memo(({
             <span
               className="text-[10px] font-bold px-1.5 py-0.5 rounded-full"
               style={{
-                background: `${primary}dd`,
+                background: `${primary}ee`,
                 color: '#000',
                 backdropFilter: 'blur(4px)',
               }}
@@ -533,15 +537,14 @@ const CompactItemCard = React.memo(({
           </div>
         )}
 
-        {/* Veg / Non-Veg dot — reuse existing VegNonVegDot */}
+        {/* Veg / Non-Veg dot */}
         {(item.isVeg || item.isNonVeg) && (
           <div className="absolute bottom-1.5 left-1.5 z-10">
             <VegNonVegDot isVeg={item.isVeg} isNonVeg={item.isNonVeg} />
           </div>
         )}
 
-        {/* Cart-in-progress dot — shown when item already in cart */}
-        {/* Guard: cartQty > 0 — never shows 0 */}
+        {/* Cart-in-progress badge — guard: cartQty > 0, never shows 0 */}
         {cartQty > 0 && (
           <motion.div
             initial={{ scale: 0 }}
@@ -554,13 +557,13 @@ const CompactItemCard = React.memo(({
         )}
       </div>
 
-      {/* Name */}
-      <div className="px-2.5 py-2">
-        <p
-          className="text-xs font-semibold leading-tight line-clamp-2"
-          style={{ color: T.text }}
-        >
+      {/* Name + tap hint */}
+      <div className="px-2.5 py-2.5">
+        <p className="text-xs font-semibold leading-tight line-clamp-2" style={{ color: T.text }}>
           {item.name}
+        </p>
+        <p className="text-[10px] mt-1 font-medium" style={{ color: primary }}>
+          Tap to add →
         </p>
       </div>
     </motion.div>
@@ -568,18 +571,19 @@ const CompactItemCard = React.memo(({
 });
 CompactItemCard.displayName = 'CompactItemCard';
 
-// ─── NEW: HorizontalMenuSection ───────────────────────────────────────────────
+// ─── HorizontalMenuSection ────────────────────────────────────────────────────
 // Renders a labelled horizontal-scroll row of CompactItemCards.
-// onAdd is the parent's addToCart — identical reference, same routing logic.
+// Passes glowSoft and onCompactClick through to each card.
 // Renders nothing (null) when items array is empty → no layout impact.
 const HorizontalMenuSection = ({
   title,
   icon,
   items,
   primary,
+  glowSoft,
   theme,
   cartQtyFor,
-  onAdd,
+  onCompactClick,
   tagLabel,
 }) => {
   if (!items || items.length === 0) return null;
@@ -593,8 +597,6 @@ const HorizontalMenuSection = ({
         {icon}
         {title}
       </h2>
-
-      {/* Horizontal scroll — same pattern as Special Offers */}
       <div
         className="flex gap-3 overflow-x-auto pb-3 scrollbar-none"
         style={{ scrollSnapType: 'x mandatory' }}
@@ -604,9 +606,10 @@ const HorizontalMenuSection = ({
             key={item.id}
             item={item}
             primary={primary}
+            glowSoft={glowSoft}
             theme={theme}
             cartQty={cartQtyFor(item.id)}
-            onAdd={onAdd}
+            onCompactClick={onCompactClick}
             tagLabel={tagLabel}
           />
         ))}
@@ -630,6 +633,8 @@ const CafeOrderingPremium = () => {
   const [searchQuery,   setSearchQuery  ] = useState('');
   const [selectedCat,   setSelectedCat  ] = useState('all');
   const [filterType,    setFilterType   ] = useState('all'); // 'all' | 'veg' | 'nonVeg'
+  // ── compact section size picker: holds the item whose size sheet is open ──
+  const [compactSizeItem, setCompactSizeItem] = useState(null);
   const [showCart,      setShowCart     ] = useState(false);
   const [showCheckout,  setShowCheckout ] = useState(false);
   const [selectedOffer, setSelectedOffer] = useState(null);
@@ -820,6 +825,22 @@ const CafeOrderingPremium = () => {
       from: { x: rect.left + rect.width / 2 - 10, y: rect.top + rect.height / 2 - 10 },
       to:   { x: cartRect.left + cartRect.width / 2 - 10, y: cartRect.top + cartRect.height / 2 - 10 },
     }]);
+  }, [addToCart]);
+
+  // ── handleCompactItemClick — used by CompactItemCard (Newly Arrived / Best Sellers)
+  // Implements the EXACT same flow as the main MenuCard:
+  //   1. Item has sizePricing  → open size picker bottom sheet (compactSizeItem)
+  //   2. Item has addons only  → addToCart → routes to AddOnModal (unchanged)
+  //   3. Simple item           → addToCart → directAddToCart (unchanged)
+  // sizeKey is passed when user picks a size from the sheet → falls to step 2/3.
+  const handleCompactItemClick = useCallback((item, sizeKey = null) => {
+    // Step 1: has sizes AND no size chosen yet → open size picker
+    if (!sizeKey && item.sizePricing?.enabled === true) {
+      setCompactSizeItem(item);
+      return;
+    }
+    // Step 2 & 3: size chosen (or no sizes) → addToCart handles addons + direct
+    addToCart(item, sizeKey);
   }, [addToCart]);
 
   const handleSizeSelect = useCallback((itemId, sizeObj) => {
@@ -1349,9 +1370,10 @@ const CafeOrderingPremium = () => {
           icon={<Sparkles className="w-5 h-5" style={{ color: primary }} />}
           items={newlyArrivedItems}
           primary={primary}
+          glowSoft={glowSoft}
           theme={T}
           cartQtyFor={cartQtyFor}
-          onAdd={addToCart}
+          onCompactClick={handleCompactItemClick}
           tagLabel="New"
         />
 
@@ -1364,9 +1386,10 @@ const CafeOrderingPremium = () => {
           icon={<Star className="w-5 h-5" style={{ color: primary }} />}
           items={bestSellerItems}
           primary={primary}
+          glowSoft={glowSoft}
           theme={T}
           cartQtyFor={cartQtyFor}
-          onAdd={addToCart}
+          onCompactClick={handleCompactItemClick}
           tagLabel="Best Seller"
         />
 
@@ -1718,6 +1741,87 @@ const CafeOrderingPremium = () => {
             </motion.button>
           </motion.div>
         )}
+      </AnimatePresence>
+
+      {/* ── Compact Size Picker — for Newly Arrived / Best Sellers items ──────
+          Triggered by handleCompactItemClick when item has sizePricing.enabled.
+          On size select: calls handleCompactItemClick(item, sizeKey) which then
+          routes to AddOnModal (if addons) or directAddToCart (if no addons).
+          Zero new logic — reuses handleCompactItemClick with sizeKey argument.
+          z-[70] sits above AddOnModal (z-[60]) so stacking is correct.        */}
+      <AnimatePresence>
+        {compactSizeItem && (() => {
+          const sp = compactSizeItem.sizePricing;
+          const sizeOptions = [
+            sp?.small  != null && { key: 'small',  label: 'Small',  price: parseFloat(sp.small)  },
+            sp?.medium != null && { key: 'medium', label: 'Medium', price: parseFloat(sp.medium) },
+            sp?.large  != null && { key: 'large',  label: 'Large',  price: parseFloat(sp.large)  },
+          ].filter(Boolean);
+          return (
+            <motion.div
+              className="fixed inset-0 z-[70] flex items-end sm:items-center justify-center"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+            >
+              {/* Backdrop */}
+              <motion.div
+                className="absolute inset-0 bg-black/70 backdrop-blur-sm"
+                onClick={() => setCompactSizeItem(null)}
+              />
+              {/* Sheet */}
+              <motion.div
+                className="relative w-full sm:max-w-sm rounded-t-3xl sm:rounded-2xl overflow-hidden"
+                style={{ background: '#0F0F0F', border: '1px solid rgba(255,255,255,0.08)' }}
+                initial={{ y: '100%' }}
+                animate={{ y: 0 }}
+                exit={{ y: '100%' }}
+                transition={{ type: 'spring', damping: 26, stiffness: 300 }}
+                onClick={e => e.stopPropagation()}
+              >
+                {/* Header */}
+                <div className="flex items-center justify-between px-5 py-4 border-b border-white/5">
+                  <div>
+                    <h3 className="text-white font-bold text-base" style={{ fontFamily: 'Playfair Display, serif' }}>
+                      Select Size
+                    </h3>
+                    <p className="text-xs mt-0.5 text-[#A3A3A3]">{compactSizeItem.name}</p>
+                  </div>
+                  <button
+                    onClick={() => setCompactSizeItem(null)}
+                    className="p-2 rounded-full hover:bg-white/10 transition-all"
+                  >
+                    <X className="w-5 h-5 text-[#A3A3A3]" />
+                  </button>
+                </div>
+                {/* Size options */}
+                <div className="px-4 py-3 space-y-2 pb-6">
+                  {sizeOptions.map(sz => (
+                    <motion.button
+                      key={sz.key}
+                      whileTap={{ scale: 0.97 }}
+                      onClick={() => {
+                        setCompactSizeItem(null);
+                        // Route through handleCompactItemClick with chosen sizeKey
+                        // → addToCart(item, sizeKey) → AddOnModal if addons, else direct
+                        handleCompactItemClick(compactSizeItem, sz.key);
+                      }}
+                      className="w-full flex items-center justify-between p-3.5 rounded-xl font-bold transition-all"
+                      style={{
+                        background: `rgba(${hexToRgb(primary).r},${hexToRgb(primary).g},${hexToRgb(primary).b},0.10)`,
+                        border: `1px solid ${primary}40`,
+                        color: primary,
+                      }}
+                    >
+                      <span className="text-sm">{sz.label}</span>
+                      <span className="text-sm">{CUR}{sz.price.toFixed(2)}</span>
+                    </motion.button>
+                  ))}
+                </div>
+              </motion.div>
+            </motion.div>
+          );
+        })()}
       </AnimatePresence>
 
       {/* Add-on selection modal — UNCHANGED */}
