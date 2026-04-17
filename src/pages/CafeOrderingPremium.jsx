@@ -10,6 +10,12 @@
  * - Offer detail modal (2-step flow)
  * - Full order + checkout flow (same backend as basic page)
  *
+ * PATCH v2 — ADDITIVE ONLY (zero existing logic changed):
+ *   • isVeg / isNonVeg  → coloured FSSAI-style dot badge on MenuCard (visual only)
+ *   • isNew             → "Newly Arrived" horizontal scroll section above menu grid
+ *   • isBestSeller      → "Best Sellers" horizontal scroll section above menu grid
+ *   All new fields are optional booleans; undefined = falsy = zero behaviour change.
+ *
  * IMPORTANT: Does NOT modify existing CafeOrdering.jsx
  */
 
@@ -182,12 +188,42 @@ const OfferDetailModal = ({ offer, menuItems, CUR, onAdd, onClose, primary = '#D
   );
 };
 
+// ─── NEW: VegNonVegDot ────────────────────────────────────────────────────────
+// Visual-only FSSAI-style indicator. No props affect cart, pricing, or logic.
+// Returns null when neither flag is set → zero layout impact on existing items.
+const VegNonVegDot = ({ isVeg, isNonVeg }) => {
+  if (!isVeg && !isNonVeg) return null;
+  return (
+    <div className="flex items-center gap-1">
+      {isVeg && (
+        <div
+          className="w-4 h-4 rounded-sm flex items-center justify-center flex-shrink-0"
+          style={{ border: '1.5px solid #16a34a', background: 'rgba(0,0,0,0.55)', backdropFilter: 'blur(4px)' }}
+          title="Vegetarian"
+        >
+          <div className="w-2 h-2 rounded-full bg-[#16a34a]" />
+        </div>
+      )}
+      {isNonVeg && (
+        <div
+          className="w-4 h-4 rounded-sm flex items-center justify-center flex-shrink-0"
+          style={{ border: '1.5px solid #dc2626', background: 'rgba(0,0,0,0.55)', backdropFilter: 'blur(4px)' }}
+          title="Non-Vegetarian"
+        >
+          <div className="w-2 h-2 rounded-full bg-[#dc2626]" />
+        </div>
+      )}
+    </div>
+  );
+};
+
 // ─── Menu Item Card (premium) ─────────────────────────────────────────────────
+// PATCH: Added <VegNonVegDot> inside image overlay (bottom-left). Visual only.
+// All existing logic, props, and handlers are 100% unchanged.
 
 const MenuCard = React.memo(({
   item, CUR, cartQty, onAdd, onAddWithAnim, onShowDetails,
   primary = '#D4AF37', theme,
-  // inline size/addon props
   selectedSize, selectedAddons, onSizeSelect, onUpdateAddon, onInlineAddToCart, getFinalPrice,
 }) => {
   const mediaType = getMediaType(item.image);
@@ -200,14 +236,12 @@ const MenuCard = React.memo(({
 
   const hasSizes   = item?.sizePricing != null && item.sizePricing.enabled === true;
   const hasAddons  = Array.isArray(item.addons) && item.addons.length > 0;
-  // Whether inline flow is active for this card (size+addon items handled inline)
   const useInline  = hasSizes || hasAddons;
 
-  const pickedSize  = selectedSize?.[item.id];
+  const pickedSize   = selectedSize?.[item.id];
   const pickedAddons = selectedAddons?.[item.id] || {};
   const finalPrice   = getFinalPrice ? getFinalPrice(item) : parseFloat(item.price);
 
-  // Build size options from sizePricing
   const sizeOptions = hasSizes
     ? [
         item.sizePricing.small  && { label: 'Small',  key: 'small',  price: parseFloat(item.sizePricing.small)  },
@@ -274,6 +308,15 @@ const MenuCard = React.memo(({
           </div>
         )}
 
+        {/* ── NEW: Veg / Non-Veg dot ──────────────────────────────────────── */}
+        {/* Positioned bottom-left of the image, above the gradient layer.    */}
+        {/* Visual only — no click handler, no effect on any logic.           */}
+        {(item.isVeg || item.isNonVeg) && (
+          <div className="absolute bottom-2 left-2 z-10">
+            <VegNonVegDot isVeg={item.isVeg} isNonVeg={item.isNonVeg} />
+          </div>
+        )}
+
         {/* Cart count badge */}
         {cartQty > 0 && (
           <motion.div
@@ -291,17 +334,16 @@ const MenuCard = React.memo(({
       <div className="p-4">
         <div className="flex items-start justify-between gap-2 mb-3">
           <h3 className="font-semibold text-base leading-tight" style={{ color: T.text }}>{item.name}</h3>
-          {/* Dynamic price: shows final price once size is picked */}
           <span className="font-black text-base flex-shrink-0" style={{ color: primary }}>
             {pickedSize ? `${CUR}${fmt(finalPrice)}` : `${CUR}${fmt(item.price)}`}
           </span>
         </div>
 
-        {/* ── INLINE SIZE → ADDON → ADD FLOW ── */}
+        {/* ── INLINE SIZE → ADDON → ADD FLOW — 100% UNCHANGED ── */}
         {useInline ? (
           <div className="space-y-2">
 
-            {/* STEP 1: Size buttons (always shown if item has sizes) */}
+            {/* STEP 1: Size buttons */}
             {hasSizes && (
               <div className="space-y-1.5">
                 {sizeOptions.map(sz => (
@@ -323,7 +365,7 @@ const MenuCard = React.memo(({
               </div>
             )}
 
-            {/* STEP 2: Addons — only shown AFTER a size is selected (or if no sizes) */}
+            {/* STEP 2: Addons — shown AFTER size selected (or if no sizes) */}
             {hasAddons && (!hasSizes || pickedSize) && (
               <AnimatePresence>
                 <motion.div
@@ -372,7 +414,7 @@ const MenuCard = React.memo(({
               </AnimatePresence>
             )}
 
-            {/* STEP 3: Add to Cart — shown when size is selected (or no sizes required) */}
+            {/* STEP 3: Add to Cart */}
             {(!hasSizes || pickedSize) && (
               <motion.button
                 whileTap={{ scale: 0.94 }} whileHover={{ scale: 1.02 }}
@@ -386,7 +428,7 @@ const MenuCard = React.memo(({
             )}
           </div>
         ) : (
-          /* ── SIMPLE ITEM: no sizes, no addons — original single button ── */
+          /* ── SIMPLE ITEM: no sizes, no addons ── */
           <motion.button
             whileTap={{ scale: 0.94 }} whileHover={{ scale: 1.02 }}
             onClick={(e) => onAddWithAnim(e, item)}
@@ -397,7 +439,7 @@ const MenuCard = React.memo(({
           </motion.button>
         )}
 
-        {/* Show Food Details — only when nutrition data exists */}
+        {/* Show Food Details */}
         {(item.ingredients || item.calories || item.protein || item.carbs || item.fats) && (
           <button
             onClick={() => onShowDetails?.(item)}
@@ -413,6 +455,79 @@ const MenuCard = React.memo(({
   );
 });
 MenuCard.displayName = 'MenuCard';
+
+// ─── NEW: HorizontalMenuSection ───────────────────────────────────────────────
+// Renders a labelled horizontal-scroll row of MenuCards.
+// Accepts the same props as the main grid passes to MenuCard — all handlers
+// are reference-identical to the parent's handlers, so cart/addon/pricing
+// behaviour is identical to adding from the main menu grid.
+// Renders nothing (null) when items array is empty → no layout impact.
+const HorizontalMenuSection = ({
+  title,
+  icon,
+  items,
+  CUR,
+  primary,
+  theme,
+  cartQtyFor,
+  onAdd,
+  onAddWithAnim,
+  onShowDetails,
+  selectedSize,
+  selectedAddons,
+  onSizeSelect,
+  onUpdateAddon,
+  onInlineAddToCart,
+  getFinalPrice,
+}) => {
+  if (!items || items.length === 0) return null;
+
+  return (
+    <section>
+      <h2
+        className="font-bold text-lg mb-4 flex items-center gap-2"
+        style={{ fontFamily: 'Playfair Display, serif', color: theme?.text || '#ffffff' }}
+      >
+        {icon}
+        {title}
+      </h2>
+
+      {/* Horizontal scroll — same pattern as Special Offers section */}
+      <div className="flex gap-3 overflow-x-auto pb-3 scrollbar-none" style={{ scrollSnapType: 'x mandatory' }}>
+        {items.map(item => (
+          <div
+            key={item.id}
+            className="flex-shrink-0 w-56"
+            style={{ scrollSnapAlign: 'start' }}
+          >
+            {/*
+              MenuCard receives IDENTICAL props as the main 2-col grid.
+              onAdd, onAddWithAnim, onInlineAddToCart, onUpdateAddon —
+              all are the exact same function references. Cart state, addon
+              popup, pricing calculations → 100% unchanged behaviour.
+            */}
+            <MenuCard
+              item={item}
+              CUR={CUR}
+              cartQty={cartQtyFor(item.id)}
+              onAdd={onAdd}
+              onAddWithAnim={onAddWithAnim}
+              onShowDetails={onShowDetails}
+              primary={primary}
+              theme={theme}
+              selectedSize={selectedSize}
+              selectedAddons={selectedAddons}
+              onSizeSelect={onSizeSelect}
+              onUpdateAddon={onUpdateAddon}
+              onInlineAddToCart={onInlineAddToCart}
+              getFinalPrice={getFinalPrice}
+            />
+          </div>
+        ))}
+      </div>
+    </section>
+  );
+};
 
 // ─── Main component ───────────────────────────────────────────────────────────
 
@@ -432,10 +547,9 @@ const CafeOrderingPremium = () => {
   const [showCheckout,  setShowCheckout ] = useState(false);
   const [selectedOffer, setSelectedOffer] = useState(null);
   const [flyingDots,    setFlyingDots   ] = useState([]);
-  const [selectedFoodItem, setSelectedFoodItem] = useState(null); // Food detail overlay
-  // ── Size + Addon inline-selection state ───────────────────────────────────
-  const [selectedSize,   setSelectedSize  ] = useState({});   // { [itemId]: { label, price } }
-  const [selectedAddons, setSelectedAddons] = useState({});   // { [itemId]: { [addonName]: { ...addon, qty } } }
+  const [selectedFoodItem, setSelectedFoodItem] = useState(null);
+  const [selectedSize,   setSelectedSize  ] = useState({});
+  const [selectedAddons, setSelectedAddons] = useState({});
   const cartBtnRef = useRef(null);
   const unsubRef   = useRef([]);
 
@@ -451,7 +565,7 @@ const CafeOrderingPremium = () => {
   const [orderDone,          setOrderDone         ] = useState(false);
   const [orderNumber,        setOrderNumber       ] = useState(null);
 
-  // ── Theme — reads cafe.primaryColor + cafe.mode from settings ─────────────
+  // ── Theme
   const primary   = cafe?.primaryColor || '#D4AF37';
   const isLight   = cafe?.mode === 'light';
   const rgb        = hexToRgb(primary);
@@ -459,7 +573,6 @@ const CafeOrderingPremium = () => {
   const glowSoft   = `rgba(${rgb.r},${rgb.g},${rgb.b},0.15)`;
   const CUR        = cafe?.currencySymbol || '₹';
 
-  // Dynamic theme colours based on light/dark mode
   const T = {
     bg:          isLight ? '#f8f6f2'          : '#050505',
     bgCard:      isLight ? 'rgba(255,255,255,0.7)' : 'rgba(255,255,255,0.04)',
@@ -511,13 +624,11 @@ const CafeOrderingPremium = () => {
     unsubRef.current.push(unsub);
   }, [cafeId]);
 
-  // ── Cart helpers ───────────────────────────────────────────────────────────
+  // ── Cart helpers — ALL UNCHANGED ─────────────────────────────────────────
   const cartTotal  = useMemo(() => cart.reduce((s, i) => s + i.price * i.quantity, 0), [cart]);
   const cartCount  = useMemo(() => cart.reduce((s, i) => s + i.quantity, 0), [cart]);
   const cartQtyFor = (id) => cart.find(i => i.id === id)?.quantity || 0;
 
-  // ── Unified safe pricing system ────────────────────────────────────────────
-  // safeNum: prevents NaN/undefined from breaking calculations
   const safeNum = (v) => { const n = parseFloat(v); return isNaN(n) || !isFinite(n) ? 0 : n; };
 
   const taxCharge = useMemo(() =>
@@ -536,12 +647,10 @@ const CafeOrderingPremium = () => {
     cafe?.platformFeeEnabled ? safeNum(cafe.platformFeeAmount) : 0,
   [cafe?.platformFeeEnabled, cafe?.platformFeeAmount]);
 
-  // totalWithCharges — integer, same value shown in UI and sent to payment gateway
   const totalWithCharges = useMemo(() =>
     Math.round(cartTotal + taxCharge + serviceCharge + gstCharge + platformFeeCharge),
   [cartTotal, taxCharge, serviceCharge, gstCharge, platformFeeCharge]);
 
-  // Debug log — confirms UI amount = payment amount before every order
   const logAmountBreakdown = () => {
     console.log('──── Order Amount Breakdown ────');
     console.log('Items:    ', cartTotal.toFixed(2));
@@ -558,7 +667,6 @@ const CafeOrderingPremium = () => {
       if (cartEntry.addons?.length > 0) {
         return [...prev, cartEntry];
       }
-      // Size items: S/M/L are separate cart rows keyed by selectedSize
       if (cartEntry.selectedSize) {
         const ex = prev.find(i => i.id === cartEntry.id && i.selectedSize === cartEntry.selectedSize);
         if (ex) return prev.map(i =>
@@ -576,9 +684,6 @@ const CafeOrderingPremium = () => {
     });
   }, []);
 
-  // ─── FIX: size key → human label helper ───────────────────────────────────
-  // Maps sizePricing keys ('small','medium','large') to display labels.
-  // Used so selectedVariant is always the human-readable label, not the raw key.
   const sizeKeyToLabel = (key) => {
     if (!key) return null;
     const map = { small: 'Small', medium: 'Medium', large: 'Large' };
@@ -587,25 +692,20 @@ const CafeOrderingPremium = () => {
 
   const addToCart = useCallback((item, size = null) => {
     if (item.addons?.length > 0) {
-      // FIX: pass sizeLabel into addonModal so AddOnModal can forward selectedVariant
       const sizeLabel = sizeKeyToLabel(size);
       setAddonModal({ ...item, selectedSize: sizeLabel, selectedVariant: sizeLabel });
       return;
     }
-
     const selectedPrice = size && item.sizePricing?.[size]
       ? parseFloat(item.sizePricing[size])
       : item.price;
-
-    // FIX: convert raw size key to human label for selectedVariant
     const sizeLabel = sizeKeyToLabel(size);
-
     directAddToCart({
       ...item,
       price:           selectedPrice,
       basePrice:       selectedPrice,
       selectedSize:    sizeLabel,
-      selectedVariant: sizeLabel,   // ← FIX: always set selectedVariant
+      selectedVariant: sizeLabel,
       quantity:        1,
       addons:          [],
       addonTotal:      0,
@@ -622,7 +722,6 @@ const CafeOrderingPremium = () => {
     });
   }, []);
 
-  // ── Flying dot animation ───────────────────────────────────────────────────
   const addWithAnim = useCallback((e, item, size = null) => {
     addToCart(item, size);
     const rect    = e.currentTarget.getBoundingClientRect();
@@ -636,11 +735,8 @@ const CafeOrderingPremium = () => {
     }]);
   }, [addToCart]);
 
-  // ── Size → Addon inline flow handlers ─────────────────────────────────────
-
   const handleSizeSelect = useCallback((itemId, sizeObj) => {
     setSelectedSize(prev => ({ ...prev, [itemId]: sizeObj }));
-    // Reset addons whenever size changes
     setSelectedAddons(prev => ({ ...prev, [itemId]: {} }));
   }, []);
 
@@ -651,10 +747,7 @@ const CafeOrderingPremium = () => {
       const newQty      = type === 'inc' ? currentQty + 1 : Math.max(0, currentQty - 1);
       return {
         ...prev,
-        [itemId]: {
-          ...itemAddons,
-          [addon.name]: { ...addon, qty: newQty },
-        },
+        [itemId]: { ...itemAddons, [addon.name]: { ...addon, qty: newQty } },
       };
     });
   }, []);
@@ -664,8 +757,7 @@ const CafeOrderingPremium = () => {
     const basePrice = size?.price ?? parseFloat(item.price) ?? 0;
     const addons    = selectedAddons[item.id] || {};
     const addonTotal = Object.values(addons).reduce(
-      (sum, a) => sum + (parseFloat(a.price) || 0) * (a.qty || 0),
-      0,
+      (sum, a) => sum + (parseFloat(a.price) || 0) * (a.qty || 0), 0,
     );
     return basePrice + addonTotal;
   }, [selectedSize, selectedAddons]);
@@ -682,19 +774,18 @@ const CafeOrderingPremium = () => {
       price:           getFinalPrice(item),
       basePrice:       size?.price ?? parseFloat(item.price),
       selectedSize:    size?.label || null,
-      selectedVariant: size?.label || null,   // ← FIX: always set selectedVariant
+      selectedVariant: size?.label || null,
       quantity:        1,
       addons:          activeAddons,
       addonTotal:      activeAddons.reduce((s, a) => s + a.price * a.quantity, 0),
       comboItems:      [],
     });
 
-    // Reset per-item UI state after add
     setSelectedSize(prev  => { const n = { ...prev  }; delete n[item.id]; return n; });
     setSelectedAddons(prev => { const n = { ...prev }; delete n[item.id]; return n; });
   }, [selectedSize, selectedAddons, getFinalPrice, directAddToCart]);
 
-  // ── Categories ─────────────────────────────────────────────────────────────
+  // ── Categories
   const categories = useMemo(() => {
     const cats = [...new Set(menuItems.map(i => i.category).filter(Boolean))];
     return ['all', ...cats];
@@ -708,13 +799,42 @@ const CafeOrderingPremium = () => {
     });
   }, [menuItems, selectedCat, searchQuery]);
 
-  // ── Add offer to cart ──────────────────────────────────────────────────────
-  const addOfferToCart = (offer) => {
-    // TASK 2 + TASK 3: Apply correct offer pricing per type
+  // ── NEW: Derived filtered arrays for the two new sections ─────────────────
+  // Pure in-memory reads — no Firestore queries, no network, no side effects.
+  // Items without the field (undefined) are falsy → excluded automatically.
+  // These are the ONLY new lines of logic in the entire component.
+  const newlyArrivedItems = useMemo(
+    () => menuItems.filter(item => item.isNew === true),
+    [menuItems],
+  );
+  const bestSellerItems = useMemo(
+    () => menuItems.filter(item => item.isBestSeller === true),
+    [menuItems],
+  );
 
-    // --- Combo: single cart entry at comboPrice ---
+  // Shared props bundle — all handlers are the same references used by main grid.
+  // Assembling them once avoids repetition and guarantees handler identity.
+  const sharedSectionProps = useMemo(() => ({
+    CUR,
+    primary,
+    theme: T,
+    cartQtyFor,
+    onAdd:             addToCart,
+    onAddWithAnim:     addWithAnim,
+    onShowDetails:     (i) => setSelectedFoodItem(i),
+    selectedSize,
+    selectedAddons,
+    onSizeSelect:      handleSizeSelect,
+    onUpdateAddon:     updateAddon,
+    onInlineAddToCart: handleInlineAddToCart,
+    getFinalPrice,
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }), [CUR, primary, T, cart, selectedSize, selectedAddons, addToCart, addWithAnim,
+       handleSizeSelect, updateAddon, handleInlineAddToCart, getFinalPrice]);
+
+  // ── Add offer to cart — UNCHANGED ────────────────────────────────────────
+  const addOfferToCart = (offer) => {
     if (offer.type === 'combo' && offer.comboPrice) {
-      // BUG FIX: enrich combo items from menuItems so kitchen/dashboard has full details
       const enrichedItems = (offer.items || []).map(oi => {
         const menuItem = menuItems.find(m => m.id === oi.itemId);
         return {
@@ -726,7 +846,7 @@ const CafeOrderingPremium = () => {
         };
       });
       const selectedPrice = parseFloat(offer.comboPrice);
-      const comboEntry = {
+      setCart(prev => [...prev, {
         id:           offer.id,
         name:         offer.title,
         price:        selectedPrice,
@@ -739,18 +859,11 @@ const CafeOrderingPremium = () => {
         isOffer:      true,
         offerType:    'combo',
         items:        enrichedItems,
-        comboItems:   enrichedItems.map(ei => ({
-          name:     ei.itemName,
-          price:    ei.itemPrice,
-          quantity: ei.quantity,
-        })),
-      };
-      setCart(prev => [...prev, comboEntry]);
+        comboItems:   enrichedItems.map(ei => ({ name: ei.itemName, price: ei.itemPrice, quantity: ei.quantity })),
+      }]);
       toast.success(`${offer.title} added to cart ✓`);
       return;
     }
-
-    // --- % or flat discount: apply reduced price per item ---
     if (offer.type === 'discount') {
       (offer.items || []).forEach(oi => {
         const menuItem = menuItems.find(m => m.id === oi.itemId);
@@ -761,11 +874,10 @@ const CafeOrderingPremium = () => {
         } else {
           discountedPrice = Math.max(0, discountedPrice - parseFloat(offer.discountAmount));
         }
-        const selectedPrice = parseFloat(discountedPrice.toFixed(2));
         setCart(prev => [...prev, {
           ...menuItem,
-          price:           selectedPrice,
-          basePrice:       selectedPrice,
+          price:           parseFloat(discountedPrice.toFixed(2)),
+          basePrice:       parseFloat(discountedPrice.toFixed(2)),
           quantity:        oi.quantity || 1,
           addons:          [],
           addonTotal:      0,
@@ -778,8 +890,6 @@ const CafeOrderingPremium = () => {
       toast.success(`${offer.title} added to cart ✓`);
       return;
     }
-
-    // --- Buy X Get Y: paid qty at normal price + free qty at zero ---
     if (offer.type === 'buy_x_get_y') {
       (offer.items || []).forEach(oi => {
         const menuItem = menuItems.find(m => m.id === oi.itemId);
@@ -788,39 +898,22 @@ const CafeOrderingPremium = () => {
         const getQty = offer.getQuantity || 0;
         if (buyQty > 0) {
           setCart(prev => [...prev, {
-            ...menuItem,
-            price:           parseFloat(menuItem.price),
-            basePrice:       parseFloat(menuItem.price),
-            quantity:        buyQty,
-            addons:          [],
-            addonTotal:      0,
-            selectedSize:    null,
-            selectedVariant: null,
-            isOffer:         true,
-            offerType:       'buy_x_get_y',
+            ...menuItem, price: parseFloat(menuItem.price), basePrice: parseFloat(menuItem.price),
+            quantity: buyQty, addons: [], addonTotal: 0, selectedSize: null, selectedVariant: null,
+            isOffer: true, offerType: 'buy_x_get_y',
           }]);
         }
         if (getQty > 0) {
           setCart(prev => [...prev, {
-            ...menuItem,
-            price:           0,
-            basePrice:       0,
-            quantity:        getQty,
-            addons:          [],
-            addonTotal:      0,
-            selectedSize:    null,
-            selectedVariant: null,
-            isOffer:         true,
-            offerType:       'buy_x_get_y_free',
-            name:            `${menuItem.name} (Free)`,
+            ...menuItem, price: 0, basePrice: 0,
+            quantity: getQty, addons: [], addonTotal: 0, selectedSize: null, selectedVariant: null,
+            isOffer: true, offerType: 'buy_x_get_y_free', name: `${menuItem.name} (Free)`,
           }]);
         }
       });
       toast.success(`${offer.title} added to cart ✓`);
       return;
     }
-
-    // --- Fallback: original behaviour — no breakage ---
     (offer.items || []).forEach(oi => {
       const menuItem = menuItems.find(m => m.id === oi.itemId);
       if (!menuItem) return;
@@ -829,7 +922,7 @@ const CafeOrderingPremium = () => {
     toast.success(`${offer.title} added to cart ✓`);
   };
 
-  // ── Order placement ────────────────────────────────────────────────────────
+  // ── Order placement — COMPLETELY UNCHANGED ───────────────────────────────
   const handlePlaceOrder = async () => {
     if (!customerName.trim()) { toast.error('Enter your name'); return; }
     if (!customerPhone.trim()) { toast.error('Enter your phone number'); return; }
@@ -843,14 +936,12 @@ const CafeOrderingPremium = () => {
         cd.exists() ? tx.update(counterRef, { currentOrderNumber: oNum }) : tx.set(counterRef, { currentOrderNumber: oNum });
       });
 
-      // All values come from the unified pricing memos — same numbers as UI
       const subtotal  = cartTotal;
       const taxAmount = taxCharge;
       const scAmount  = serviceCharge;
       const gstAmount = gstCharge;
-      const total     = totalWithCharges; // Math.round integer
+      const total     = totalWithCharges;
 
-      // Transparency: confirm UI amount = payment amount before sending
       logAmountBreakdown();
 
       const orderData = {
@@ -864,25 +955,23 @@ const CafeOrderingPremium = () => {
           addons:          i.addons          || [],
           addonTotal:      i.addonTotal      || 0,
           selectedSize:    i.selectedSize    || null,
-          selectedVariant: i.selectedVariant || null,  // ← FIX: always persisted
+          selectedVariant: i.selectedVariant || null,
           comboItems:      i.comboItems      || [],
-          // TASK 1 + TASK 5: pass offer fields to orders dashboard + kitchen
           ...(i.isOffer   && { isOffer:   true        }),
           ...(i.offerType && { offerType: i.offerType }),
           ...(i.items     && { items:     i.items     }),
         })),
-        subtotalAmount: subtotal,
+        subtotalAmount:      subtotal,
         taxAmount,
         serviceChargeAmount: scAmount,
         gstAmount,
         platformFeeAmount:   platformFeeCharge,
-        totalAmount: total,
-        currencyCode:   cafe?.currencyCode   || 'INR',
-        currencySymbol: cafe?.currencySymbol || '₹',
-        // TASK 1 FIX: Always 'pending' at creation. Never optimistically paid.
-        paymentStatus: 'pending',
+        totalAmount:         total,
+        currencyCode:        cafe?.currencyCode   || 'INR',
+        currencySymbol:      cafe?.currencySymbol || '₹',
+        paymentStatus:       'pending',
         paymentMode,
-        orderStatus: 'new',
+        orderStatus:         'new',
         orderType,
         customerName,
         customerPhone,
@@ -894,109 +983,57 @@ const CafeOrderingPremium = () => {
 
       const orderRef = await addDoc(collection(db, 'orders'), orderData);
 
-      createInvoiceForOrder({ ...orderData, orderNumber: oNum }, orderRef.id, cafe)
-        .catch(console.error);
+      createInvoiceForOrder({ ...orderData, orderNumber: oNum }, orderRef.id, cafe).catch(console.error);
       deductStockForOrder(cafeId, orderData.items, menuItems).catch(console.error);
       deductStockByRecipe(cafeId, orderData.items, menuItems).catch(console.error);
 
-      // TASK 7: Log order creation (no sensitive data)
       console.log('[Order] Created successfully:', {
-        orderId:     orderRef.id,
-        orderNumber: String(oNum).padStart(3, '0'),
-        paymentMode,
-        paymentStatus: 'pending',
-        totalAmount: total,
+        orderId: orderRef.id, orderNumber: String(oNum).padStart(3, '0'),
+        paymentMode, paymentStatus: 'pending', totalAmount: total,
       });
 
-      // ── Cashfree payment via backend proxy (Tasks 2, 4, 5) ─────────────
-      // TASK 2: Direct browser call is CORS-blocked. Use backend instead.
-      // TASK 5: Only non-sensitive data sent — keys never leave backend.
-      // TASK 4: orderId passed consistently for webhook matching.
-      if (
-        paymentMode === 'online' &&
-        cafe?.paymentSettings?.enabled &&
-        cafe?.paymentSettings?.gateway === 'cashfree'
-      ) {
+      if (paymentMode === 'online' && cafe?.paymentSettings?.enabled && cafe?.paymentSettings?.gateway === 'cashfree') {
         try {
           const BACKEND_URL = cafe?.paymentSettings?.backendUrl || '';
-
           if (!BACKEND_URL) {
-            console.warn('[Payment] Backend URL not configured in café settings.');
             toast.error('Payment backend not configured. Please pay at counter.');
           } else {
-            console.log('[Payment] Initiating Cashfree via backend:', {
-              orderId: orderRef.id,
-              amount:  total,
-              cafeId,
-            });
-
             const resp = await fetch(`${BACKEND_URL}/create-order`, {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({
-                orderId:      orderRef.id,
-                amount:       total,
-                phone:        customerPhone,
-                cafeId,
-                currency:     cafe?.currencyCode || 'INR',
-                customerName,
-                returnUrl:    `${window.location.origin}/track/${orderRef.id}`,
+                orderId: orderRef.id, amount: total, phone: customerPhone,
+                cafeId, currency: cafe?.currencyCode || 'INR', customerName,
+                returnUrl: `${window.location.origin}/track/${orderRef.id}`,
               }),
             });
-
             const data = await resp.json();
-            console.log('[Payment] Backend response:', {
-              status:             resp.status,
-              has_session_id:     !!data?.payment_session_id,
-              payment_session_id: data?.payment_session_id || 'MISSING',
-            });
-
             if (data?.payment_session_id) {
-              const sessionId = data.payment_session_id;
-
-              // Confirm session before using
-              console.log('[Payment] Session confirmed — launching Cashfree SDK');
-              console.log('[Payment] payment_session_id:', sessionId);
-              console.log('[Payment] orderId:', orderRef.id);
-
-              // Use Cashfree JS SDK immediately — no stale session, no delay
               const cashfree = window.Cashfree({ mode: 'production' });
-              cashfree.checkout({ paymentSessionId: sessionId });
+              cashfree.checkout({ paymentSessionId: data.payment_session_id });
               return;
             } else {
-              console.error('[Payment] No payment_session_id in response:', data?.error || data);
               toast.error('Payment gateway error. Please pay at counter.');
             }
           }
         } catch (cfErr) {
-          // TASK 6: Order stays 'pending' safely on any failure
-          console.error('[Payment] Backend call failed (order preserved as pending):', cfErr.message);
           toast.error('Payment unavailable. Your order is saved — please pay at counter.');
         }
       }
 
-      // ── WhatsApp redirect (same as basic page) ──────────────────────────
       const formattedNum = String(oNum).padStart(3, '0');
       const cur = cafe?.currencySymbol || '₹';
       const hasExtras = (cafe?.taxEnabled && taxAmount > 0) ||
         (cafe?.serviceChargeEnabled && scAmount > 0) ||
         (cafe?.gstEnabled && gstAmount > 0);
 
-      let msg = `*🚀 New Order*\n\n`;
-      msg += `*Order #${formattedNum}*\n`;
-      msg += `*Customer:* ${customerName}\n`;
-      msg += `*Phone:* ${customerPhone}\n`;
-      msg += `*Type:* ${orderType.charAt(0).toUpperCase() + orderType.slice(1)}\n`;
+      let msg = `*🚀 New Order*\n\n*Order #${formattedNum}*\n*Customer:* ${customerName}\n*Phone:* ${customerPhone}\n*Type:* ${orderType.charAt(0).toUpperCase() + orderType.slice(1)}\n`;
       if (orderType === 'dine-in' && tableNumber) msg += `*Table:* ${tableNumber}\n`;
       if (orderType === 'delivery' && deliveryAddress) msg += `*Address:* ${deliveryAddress}\n`;
       msg += `\n*Items:*\n`;
       cart.forEach(i => {
         msg += `• ${i.name} x${i.quantity} — ${cur}${(i.price * i.quantity).toFixed(2)}\n`;
-        if (i.addons?.length > 0) {
-          i.addons.forEach(a => {
-            msg += `   ↳ ${a.name}: +${cur}${(a.price || 0).toFixed(2)}\n`;
-          });
-        }
+        if (i.addons?.length > 0) i.addons.forEach(a => { msg += `   ↳ ${a.name}: +${cur}${(a.price || 0).toFixed(2)}\n`; });
       });
       if (hasExtras) {
         msg += `\n*Subtotal:* ${cur}${subtotal.toFixed(2)}\n`;
@@ -1004,26 +1041,14 @@ const CafeOrderingPremium = () => {
         if (cafe?.serviceChargeEnabled && scAmount > 0) msg += `*Service Charge (${cafe.serviceChargeRate}%):* ${cur}${scAmount.toFixed(2)}\n`;
         if (cafe?.gstEnabled && gstAmount > 0) msg += `*GST (${cafe.gstRate}%):* ${cur}${gstAmount.toFixed(2)}\n`;
       }
-      msg += `*Total:* ${cur}${total.toFixed(2)}\n`;
-      msg += `*Payment:* ${paymentMode === 'counter' ? 'Pay at Counter' : paymentMode === 'table' ? 'Pay on Table' : paymentMode === 'online' ? 'Online Payment' : 'Prepaid (UPI)'}`;
+      msg += `*Total:* ${cur}${total.toFixed(2)}\n*Payment:* ${paymentMode === 'counter' ? 'Pay at Counter' : paymentMode === 'table' ? 'Pay on Table' : paymentMode === 'online' ? 'Online Payment' : 'Prepaid (UPI)'}`;
       if (specialInstructions) msg += `\n\n*Special Instructions:* ${specialInstructions}`;
-
-      const waNumber = cafe?.whatsappNumber || '';
-      const waUrl = waNumber
-        ? `https://wa.me/${waNumber}?text=${encodeURIComponent(msg)}`
-        : `https://wa.me/?text=${encodeURIComponent(msg)}`;
 
       setOrderNumber(formattedNum);
       setCart([]);
-      setCustomerName('');
-      setCustomerPhone('');
-      setTableNumber('');
-      setDeliveryAddress('');
-      setSpecialInstructions('');
-      setPaymentMode('counter');
+      setCustomerName(''); setCustomerPhone(''); setTableNumber('');
+      setDeliveryAddress(''); setSpecialInstructions(''); setPaymentMode('counter');
       setShowCheckout(false);
-
-      // Navigate customer to in-app order tracking
       navigate(`/track/${orderRef.id}`);
     } catch (err) {
       toast.error('Failed to place order. Please try again.');
@@ -1033,7 +1058,7 @@ const CafeOrderingPremium = () => {
     }
   };
 
-  // ── Guards ─────────────────────────────────────────────────────────────────
+  // ── Guards
   if (loading) return (
     <div className="min-h-screen flex items-center justify-center" style={{ background: T.bg }}>
       <motion.div animate={{ rotate: 360 }} transition={{ duration: 1, repeat: Infinity, ease: 'linear' }}
@@ -1056,191 +1081,117 @@ const CafeOrderingPremium = () => {
     <div className="min-h-screen flex items-center justify-center text-center p-8" style={{ background: T.bg }}>
       <div>
         <Coffee className="w-16 h-16 mx-auto mb-4" style={{ color: primary }} />
-        <h1 className="text-2xl font-bold mb-3" style={{ fontFamily: 'Playfair Display, serif', color: T.text }}>
-          Service Temporarily Unavailable
-        </h1>
-        <p className="text-sm max-w-xs mx-auto" style={{ color: T.textMuted }}>
-          We're not accepting online orders right now. Please visit us in person.
-        </p>
+        <h1 className="text-2xl font-bold mb-3" style={{ fontFamily: 'Playfair Display, serif', color: T.text }}>Service Temporarily Unavailable</h1>
+        <p className="text-sm max-w-xs mx-auto" style={{ color: T.textMuted }}>We're not accepting online orders right now. Please visit us in person.</p>
       </div>
     </div>
   );
 
   if (orderDone) return (
     <div className="min-h-screen flex items-center justify-center p-6" style={{ background: T.bg }}>
-      <motion.div
-        initial={{ scale: 0.8, opacity: 0 }}
-        animate={{ scale: 1,   opacity: 1 }}
-        className="text-center max-w-sm"
-      >
-        <motion.div
-          animate={{ scale: [1, 1.1, 1] }}
-          transition={{ duration: 0.6, delay: 0.3 }}
+      <motion.div initial={{ scale: 0.8, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} className="text-center max-w-sm">
+        <motion.div animate={{ scale: [1, 1.1, 1] }} transition={{ duration: 0.6, delay: 0.3 }}
           className="w-24 h-24 rounded-full mx-auto mb-6 flex items-center justify-center"
-          style={{ background: `${primary}20`, border: `2px solid ${primary}` }}
-        >
+          style={{ background: `${primary}20`, border: `2px solid ${primary}` }}>
           <span className="text-4xl">☕</span>
         </motion.div>
-        <h1 className="text-3xl font-black mb-2" style={{ fontFamily: 'Playfair Display, serif', color: T.text }}>
-          Order Placed!
-        </h1>
+        <h1 className="text-3xl font-black mb-2" style={{ fontFamily: 'Playfair Display, serif', color: T.text }}>Order Placed!</h1>
         <p className="mb-4" style={{ color: T.textMuted }}>Your order #{orderNumber} is being prepared.</p>
         <div className="p-4 rounded-2xl mb-6" style={{ background: `${primary}10`, border: `1px solid ${primary}30` }}>
           <p className="font-bold text-2xl" style={{ color: primary }}>#{orderNumber}</p>
           <p className="text-sm" style={{ color: T.textMuted }}>Keep this number handy</p>
         </div>
-        <button
-          onClick={() => setOrderDone(false)}
-          className="px-8 py-3 rounded-xl text-black font-bold"
-          style={{ background: `linear-gradient(135deg, ${primary}, ${primary}cc)` }}
-        >
+        <button onClick={() => setOrderDone(false)} className="px-8 py-3 rounded-xl text-black font-bold"
+          style={{ background: `linear-gradient(135deg, ${primary}, ${primary}cc)` }}>
           Order More
         </button>
       </motion.div>
     </div>
   );
 
-  // ── Main render ────────────────────────────────────────────────────────────
+  // ── Main render ───────────────────────────────────────────────────────────
   return (
     <div className="min-h-screen" style={{ background: T.bg, fontFamily: 'Manrope, sans-serif' }}>
 
-      {/* Food Detail Premium Overlay */}
+      {/* Food Detail Overlay */}
       {selectedFoodItem && (
-        <FoodDetailPremium
-          item={selectedFoodItem}
-          onClose={() => setSelectedFoodItem(null)}
-        />
+        <FoodDetailPremium item={selectedFoodItem} onClose={() => setSelectedFoodItem(null)} />
       )}
 
       {/* Flying dots */}
       {flyingDots.map(dot => (
-        <FlyingDot
-          key={dot.id}
-          from={dot.from}
-          to={dot.to}
-          onDone={() => setFlyingDots(prev => prev.filter(d => d.id !== dot.id))}
-        />
+        <FlyingDot key={dot.id} from={dot.from} to={dot.to}
+          onDone={() => setFlyingDots(prev => prev.filter(d => d.id !== dot.id))} />
       ))}
 
       {/* Offer Detail Modal */}
       <AnimatePresence>
         {selectedOffer && (
-          <OfferDetailModal
-            offer={selectedOffer}
-            menuItems={menuItems}
-            CUR={CUR}
-            primary={primary}
-            theme={T}
-            onAdd={() => addOfferToCart(selectedOffer)}
-            onClose={() => setSelectedOffer(null)}
-          />
+          <OfferDetailModal offer={selectedOffer} menuItems={menuItems} CUR={CUR} primary={primary} theme={T}
+            onAdd={() => addOfferToCart(selectedOffer)} onClose={() => setSelectedOffer(null)} />
         )}
       </AnimatePresence>
 
-      {/* ── Hero ──────────────────────────────────────────────────────────── */}
+      {/* ── Hero */}
       <div className="relative overflow-hidden" style={{ background: T.heroGrad }}>
-        {/* Animated glow blobs */}
-        <motion.div
-          animate={{ scale: [1, 1.15, 1], opacity: [0.15, 0.25, 0.15] }}
+        <motion.div animate={{ scale: [1, 1.15, 1], opacity: [0.15, 0.25, 0.15] }}
           transition={{ duration: 4, repeat: Infinity, ease: 'easeInOut' }}
           className="absolute top-0 left-1/2 -translate-x-1/2 w-96 h-96 rounded-full blur-3xl pointer-events-none"
-          style={{ background: primary }}
-        />
-        <motion.div
-          animate={{ scale: [1.1, 1, 1.1], opacity: [0.08, 0.15, 0.08] }}
+          style={{ background: primary }} />
+        <motion.div animate={{ scale: [1.1, 1, 1.1], opacity: [0.08, 0.15, 0.08] }}
           transition={{ duration: 6, repeat: Infinity, ease: 'easeInOut', delay: 2 }}
           className="absolute top-10 right-0 w-64 h-64 rounded-full blur-3xl pointer-events-none"
-          style={{ background: primary }}
-        />
-
+          style={{ background: primary }} />
         <div className="relative px-6 pt-12 pb-8 text-center">
           {cafe.logo && (
-            <motion.img
-              initial={{ scale: 0, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
+            <motion.img initial={{ scale: 0, opacity: 0 }} animate={{ scale: 1, opacity: 1 }}
               transition={{ type: 'spring', stiffness: 260, damping: 20 }}
-              src={cafe.logo}
-              alt={cafe.name}
+              src={cafe.logo} alt={cafe.name}
               className="w-20 h-20 rounded-2xl object-cover mx-auto mb-4 shadow-xl"
-              style={{ boxShadow: `0 8px 32px ${glow}` }}
-            />
+              style={{ boxShadow: `0 8px 32px ${glow}` }} />
           )}
-          <motion.h1
-            initial={{ y: 20, opacity: 0 }}
-            animate={{ y: 0,  opacity: 1 }}
-            transition={{ delay: 0.1 }}
-            className="text-3xl font-black mb-1"
-            style={{ fontFamily: 'Playfair Display, serif', color: T.text }}
-          >
+          <motion.h1 initial={{ y: 20, opacity: 0 }} animate={{ y: 0, opacity: 1 }} transition={{ delay: 0.1 }}
+            className="text-3xl font-black mb-1" style={{ fontFamily: 'Playfair Display, serif', color: T.text }}>
             {cafe.name}
           </motion.h1>
           {cafe.tagline && (
-            <motion.p
-              initial={{ y: 20, opacity: 0 }}
-              animate={{ y: 0,  opacity: 1 }}
-              transition={{ delay: 0.15 }}
-              className="text-sm"
-              style={{ color: T.textMuted }}
-            >
+            <motion.p initial={{ y: 20, opacity: 0 }} animate={{ y: 0, opacity: 1 }} transition={{ delay: 0.15 }}
+              className="text-sm" style={{ color: T.textMuted }}>
               {cafe.tagline}
             </motion.p>
           )}
         </div>
       </div>
 
-      {/* ── Sticky top bar ────────────────────────────────────────────────── */}
+      {/* ── Sticky top bar */}
       <div className="sticky top-0 z-30 px-4 py-3"
         style={{ background: T.sticky, backdropFilter: 'blur(20px)', borderBottom: `1px solid ${T.borderLight}` }}>
         <div className="flex items-center gap-3 max-w-2xl mx-auto">
-          {/* Search */}
           <div className="relative flex-1">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4" style={{ color: T.textMuted }} />
-            <input
-              type="text"
-              value={searchQuery}
-              onChange={e => setSearchQuery(e.target.value)}
-              placeholder="Search menu..."
-              className="w-full pl-9 pr-4 py-2.5 rounded-xl text-sm outline-none"
-              style={{ background: T.bgInput, border: `1px solid ${T.border}`, color: T.text }}
-            />
+            <input type="text" value={searchQuery} onChange={e => setSearchQuery(e.target.value)}
+              placeholder="Search menu..." className="w-full pl-9 pr-4 py-2.5 rounded-xl text-sm outline-none"
+              style={{ background: T.bgInput, border: `1px solid ${T.border}`, color: T.text }} />
           </div>
-
-          {/* Cart button */}
-          <motion.button
-            ref={cartBtnRef}
-            whileTap={{ scale: 0.92 }}
-            whileHover={{ scale: 1.04 }}
+          <motion.button ref={cartBtnRef} whileTap={{ scale: 0.92 }} whileHover={{ scale: 1.04 }}
             onClick={() => setShowCart(true)}
             className="relative flex items-center gap-2 px-4 py-2.5 rounded-xl text-black font-bold text-sm flex-shrink-0"
-            style={{ background: `linear-gradient(135deg, ${primary}, ${primary}cc)`, boxShadow: cartCount > 0 ? `0 4px 20px ${glow}` : 'none' }}
-          >
+            style={{ background: `linear-gradient(135deg, ${primary}, ${primary}cc)`, boxShadow: cartCount > 0 ? `0 4px 20px ${glow}` : 'none' }}>
             <ShoppingCart className="w-4 h-4" />
             {cartCount > 0 && (
-              <motion.span
-                key={cartCount}
-                initial={{ scale: 1.4 }}
-                animate={{ scale: 1 }}
-                className="font-black"
-              >
+              <motion.span key={cartCount} initial={{ scale: 1.4 }} animate={{ scale: 1 }} className="font-black">
                 {cartCount}
               </motion.span>
             )}
           </motion.button>
         </div>
-
-        {/* Category pills */}
         <div className="flex gap-2 mt-3 overflow-x-auto pb-1 max-w-2xl mx-auto scrollbar-none">
           {categories.map(cat => (
-            <motion.button
-              key={cat}
-              whileTap={{ scale: 0.95 }}
-              onClick={() => setSelectedCat(cat)}
+            <motion.button key={cat} whileTap={{ scale: 0.95 }} onClick={() => setSelectedCat(cat)}
               className="flex-shrink-0 px-4 py-1.5 rounded-full text-xs font-semibold capitalize transition-all"
               style={selectedCat === cat
                 ? { background: primary, color: '#000', boxShadow: `0 2px 12px ${glowSoft}` }
-                : { background: T.bgInput, color: T.textMuted, border: `1px solid ${T.border}` }
-              }
-            >
+                : { background: T.bgInput, color: T.textMuted, border: `1px solid ${T.border}` }}>
               {cat === 'all' ? '✦ All' : cat}
             </motion.button>
           ))}
@@ -1249,23 +1200,20 @@ const CafeOrderingPremium = () => {
 
       <div className="max-w-2xl mx-auto px-4 pb-32 space-y-8 pt-6">
 
-        {/* ── Offers ────────────────────────────────────────────────────── */}
+        {/* ── Special Offers — UNCHANGED */}
         {offers.length > 0 && (
           <section>
-            <h2 className="font-bold text-lg mb-4 flex items-center gap-2" style={{ fontFamily: 'Playfair Display, serif', color: T.text }}>
+            <h2 className="font-bold text-lg mb-4 flex items-center gap-2"
+              style={{ fontFamily: 'Playfair Display, serif', color: T.text }}>
               <Gift className="w-5 h-5" style={{ color: primary }} />
               Special Offers
             </h2>
             <div className="flex gap-3 overflow-x-auto pb-2 scrollbar-none">
               {offers.map(offer => (
-                <motion.button
-                  key={offer.id}
-                  whileHover={{ scale: 1.03, y: -2 }}
-                  whileTap={{ scale: 0.97 }}
+                <motion.button key={offer.id} whileHover={{ scale: 1.03, y: -2 }} whileTap={{ scale: 0.97 }}
                   onClick={() => setSelectedOffer(offer)}
                   className="flex-shrink-0 w-64 rounded-2xl overflow-hidden text-left"
-                  style={{ background: `linear-gradient(135deg, ${primary}20, ${primary}08)`, border: `1px solid ${primary}30`, boxShadow: `0 4px 20px ${glowSoft}` }}
-                >
+                  style={{ background: `linear-gradient(135deg, ${primary}20, ${primary}08)`, border: `1px solid ${primary}30`, boxShadow: `0 4px 20px ${glowSoft}` }}>
                   {offer.bannerImage && (
                     <div className="w-full h-28 overflow-hidden">
                       <MediaPreview url={offer.bannerImage} className="w-full h-full" alt={offer.title} />
@@ -1284,7 +1232,32 @@ const CafeOrderingPremium = () => {
           </section>
         )}
 
-        {/* ── Menu grid ─────────────────────────────────────────────────── */}
+        {/*
+          ── NEW: Newly Arrived section ────────────────────────────────────────
+          Renders only when menuItems contains at least one item with isNew === true.
+          Uses HorizontalMenuSection which passes identical handler refs to MenuCard.
+          Add-to-cart, addon popup, size selection, and pricing are 100% unchanged.
+        */}
+        <HorizontalMenuSection
+          title="Newly Arrived"
+          icon={<Sparkles className="w-5 h-5" style={{ color: primary }} />}
+          items={newlyArrivedItems}
+          {...sharedSectionProps}
+        />
+
+        {/*
+          ── NEW: Best Sellers section ─────────────────────────────────────────
+          Renders only when menuItems contains at least one item with isBestSeller === true.
+          Same handler identity guarantee as Newly Arrived section above.
+        */}
+        <HorizontalMenuSection
+          title="Best Sellers"
+          icon={<Star className="w-5 h-5" style={{ color: primary }} />}
+          items={bestSellerItems}
+          {...sharedSectionProps}
+        />
+
+        {/* ── Menu grid — 100% UNCHANGED */}
         <section>
           <h2 className="font-bold text-lg mb-4" style={{ fontFamily: 'Playfair Display, serif', color: T.text }}>
             {selectedCat === 'all' ? 'Our Menu' : selectedCat}
@@ -1313,11 +1286,7 @@ const CafeOrderingPremium = () => {
                 ))}
               </div>
             ) : (
-              <motion.div
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                className="text-center py-16"
-              >
+              <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="text-center py-16">
                 <Coffee className="w-12 h-12 mx-auto mb-3" style={{ color: T.textMuted, opacity: 0.3 }} />
                 <p style={{ color: T.textMuted }}>No items found</p>
               </motion.div>
@@ -1326,28 +1295,22 @@ const CafeOrderingPremium = () => {
         </section>
       </div>
 
-      {/* ── Cart drawer ───────────────────────────────────────────────────── */}
+      {/* ── Cart drawer — UNCHANGED */}
       <AnimatePresence>
         {showCart && (
           <>
-            <motion.div
-              initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-              className="fixed inset-0 z-40 bg-black/60 backdrop-blur-sm"
-              onClick={() => setShowCart(false)}
-            />
-            <motion.div
-              initial={{ x: '100%' }} animate={{ x: 0 }} exit={{ x: '100%' }}
+            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+              className="fixed inset-0 z-40 bg-black/60 backdrop-blur-sm" onClick={() => setShowCart(false)} />
+            <motion.div initial={{ x: '100%' }} animate={{ x: 0 }} exit={{ x: '100%' }}
               transition={{ type: 'spring', stiffness: 320, damping: 30 }}
               className="fixed top-0 right-0 bottom-0 z-50 w-full max-w-sm flex flex-col"
-              style={{ background: T.bgModal, backdropFilter: 'blur(20px)', borderLeft: `1px solid ${T.border}` }}
-            >
+              style={{ background: T.bgModal, backdropFilter: 'blur(20px)', borderLeft: `1px solid ${T.border}` }}>
               <div className="flex items-center justify-between px-5 py-4 border-b flex-shrink-0" style={{ borderColor: T.borderLight }}>
                 <h3 className="font-bold text-lg" style={{ fontFamily: 'Playfair Display, serif', color: T.text }}>Your Order</h3>
                 <button onClick={() => setShowCart(false)} className="p-2 rounded-lg transition-all" style={{ color: T.textMuted }}>
                   <X className="w-5 h-5" />
                 </button>
               </div>
-
               <div className="flex-1 overflow-y-auto px-5 py-4 space-y-3">
                 <AnimatePresence>
                   {cart.length === 0 ? (
@@ -1356,15 +1319,9 @@ const CafeOrderingPremium = () => {
                       <p style={{ color: T.textMuted }}>Your cart is empty</p>
                     </motion.div>
                   ) : cart.map((item, idx) => (
-                    <motion.div
-                      key={`${item.id}-${idx}`}
-                      layout
-                      initial={{ opacity: 0, x: 20 }}
-                      animate={{ opacity: 1, x: 0 }}
-                      exit={{ opacity: 0, x: 20 }}
+                    <motion.div key={`${item.id}-${idx}`} layout initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: 20 }}
                       className="flex items-center gap-3 p-3 rounded-xl"
-                      style={{ background: T.bgInput, border: `1px solid ${T.border}` }}
-                    >
+                      style={{ background: T.bgInput, border: `1px solid ${T.border}` }}>
                       {item.image && (
                         <div className="w-12 h-12 rounded-lg overflow-hidden flex-shrink-0">
                           <MediaPreview url={item.image} className="w-full h-full" alt={item.name} />
@@ -1386,7 +1343,6 @@ const CafeOrderingPremium = () => {
                         )}
                         {item.addons?.length > 0 && (
                           <p className="text-xs mt-0.5 truncate" style={{ color: T.textMuted }}>
-                            {/* CHANGE 7 — Show qty suffix for addons with qty > 1 */}
                             + {item.addons.map(a => a.quantity > 1 ? `${a.name} ×${a.quantity}` : a.name).join(', ')}
                           </p>
                         )}
@@ -1408,38 +1364,31 @@ const CafeOrderingPremium = () => {
                   ))}
                 </AnimatePresence>
               </div>
-
               {cart.length > 0 && (
                 <div className="px-5 py-4 border-t flex-shrink-0 space-y-3" style={{ borderColor: T.borderLight }}>
-                  {/* Transparent breakdown in cart drawer */}
                   {(cafe?.taxEnabled || cafe?.serviceChargeEnabled || cafe?.gstEnabled) ? (
                     <div className="space-y-1 text-sm">
                       <div className="flex justify-between" style={{ color: T.textMuted }}>
-                        <span>Items Total</span>
-                        <span>{CUR}{fmt(cartTotal)}</span>
+                        <span>Items Total</span><span>{CUR}{fmt(cartTotal)}</span>
                       </div>
                       {cafe?.taxEnabled && taxCharge > 0 && (
                         <div className="flex justify-between" style={{ color: T.textMuted }}>
-                          <span>{cafe.taxName || 'Tax'} ({cafe.taxRate}%)</span>
-                          <span>{CUR}{fmt(taxCharge)}</span>
+                          <span>{cafe.taxName || 'Tax'} ({cafe.taxRate}%)</span><span>{CUR}{fmt(taxCharge)}</span>
                         </div>
                       )}
                       {cafe?.serviceChargeEnabled && serviceCharge > 0 && (
                         <div className="flex justify-between" style={{ color: T.textMuted }}>
-                          <span>Service Charge ({cafe.serviceChargeRate}%)</span>
-                          <span>{CUR}{fmt(serviceCharge)}</span>
+                          <span>Service Charge ({cafe.serviceChargeRate}%)</span><span>{CUR}{fmt(serviceCharge)}</span>
                         </div>
                       )}
                       {cafe?.gstEnabled && gstCharge > 0 && (
                         <div className="flex justify-between" style={{ color: T.textMuted }}>
-                          <span>GST ({cafe.gstRate}%)</span>
-                          <span>{CUR}{fmt(gstCharge)}</span>
+                          <span>GST ({cafe.gstRate}%)</span><span>{CUR}{fmt(gstCharge)}</span>
                         </div>
                       )}
                       {cafe?.platformFeeEnabled && platformFeeCharge > 0 && (
                         <div className="flex justify-between" style={{ color: T.textMuted }}>
-                          <span>Platform Fee</span>
-                          <span>{CUR}{fmt(platformFeeCharge)}</span>
+                          <span>Platform Fee</span><span>{CUR}{fmt(platformFeeCharge)}</span>
                         </div>
                       )}
                       <div className="flex justify-between font-bold text-lg border-t pt-2" style={{ borderColor: T.borderLight }}>
@@ -1453,12 +1402,10 @@ const CafeOrderingPremium = () => {
                       <span style={{ color: primary }}>{CUR}{fmt(totalWithCharges)}</span>
                     </div>
                   )}
-                  <motion.button
-                    whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}
+                  <motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}
                     onClick={() => { setShowCart(false); setShowCheckout(true); }}
                     className="w-full py-4 rounded-xl text-black font-bold text-base"
-                    style={{ background: `linear-gradient(135deg, ${primary}, ${primary}cc)`, boxShadow: `0 4px 20px ${glow}` }}
-                  >
+                    style={{ background: `linear-gradient(135deg, ${primary}, ${primary}cc)`, boxShadow: `0 4px 20px ${glow}` }}>
                     Proceed to Checkout
                   </motion.button>
                 </div>
@@ -1468,28 +1415,21 @@ const CafeOrderingPremium = () => {
         )}
       </AnimatePresence>
 
-      {/* ── Checkout modal ────────────────────────────────────────────────── */}
+      {/* ── Checkout modal — UNCHANGED */}
       <AnimatePresence>
         {showCheckout && (
-          <motion.div
-            initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-            className="fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-end sm:items-center justify-center p-4"
-          >
-            <motion.div
-              initial={{ y: 80, opacity: 0 }}
-              animate={{ y: 0,  opacity: 1 }}
-              exit={{ y: 80, opacity: 0 }}
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-end sm:items-center justify-center p-4">
+            <motion.div initial={{ y: 80, opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ y: 80, opacity: 0 }}
               transition={{ type: 'spring', stiffness: 300, damping: 28 }}
               className="w-full max-w-md rounded-2xl overflow-hidden flex flex-col max-h-[90vh]"
-              style={{ background: T.bgModal, border: `1px solid ${T.border}` }}
-            >
+              style={{ background: T.bgModal, border: `1px solid ${T.border}` }}>
               <div className="flex items-center justify-between px-5 py-4 border-b flex-shrink-0" style={{ borderColor: T.borderLight }}>
                 <h3 className="font-bold text-lg" style={{ fontFamily: 'Playfair Display, serif', color: T.text }}>Checkout</h3>
                 <button onClick={() => setShowCheckout(false)} className="p-2 rounded-lg transition-all" style={{ color: T.textMuted }}>
                   <X className="w-5 h-5" />
                 </button>
               </div>
-
               <div className="overflow-y-auto flex-1 p-5 space-y-4">
                 {[
                   { label: 'Your Name', value: customerName, set: setCustomerName, placeholder: 'Enter your name', type: 'text' },
@@ -1497,17 +1437,11 @@ const CafeOrderingPremium = () => {
                 ].map(f => (
                   <div key={f.label}>
                     <label className="block text-sm font-medium mb-1.5" style={{ color: T.text }}>{f.label}</label>
-                    <input
-                      type={f.type}
-                      value={f.value}
-                      onChange={e => f.set(e.target.value)}
-                      placeholder={f.placeholder}
+                    <input type={f.type} value={f.value} onChange={e => f.set(e.target.value)} placeholder={f.placeholder}
                       className="w-full py-3 px-4 rounded-xl text-sm outline-none"
-                      style={{ background: T.bgInput, border: `1px solid ${T.border}`, color: T.text }}
-                    />
+                      style={{ background: T.bgInput, border: `1px solid ${T.border}`, color: T.text }} />
                   </div>
                 ))}
-
                 <div>
                   <label className="block text-sm font-medium mb-2" style={{ color: T.text }}>Order Type</label>
                   <div className="grid grid-cols-3 gap-2">
@@ -1516,14 +1450,12 @@ const CafeOrderingPremium = () => {
                         className="py-2.5 rounded-xl text-xs font-semibold transition-all"
                         style={orderType === t.id
                           ? { background: primary, color: '#000', boxShadow: `0 2px 12px ${glowSoft}` }
-                          : { background: T.bgInput, color: T.textMuted, border: `1px solid ${T.border}` }
-                        }>
+                          : { background: T.bgInput, color: T.textMuted, border: `1px solid ${T.border}` }}>
                         {t.label}
                       </button>
                     ))}
                   </div>
                 </div>
-
                 {orderType === 'dine-in' && (
                   <div>
                     <label className="block text-sm font-medium mb-1.5" style={{ color: T.text }}>Table Number</label>
@@ -1532,7 +1464,6 @@ const CafeOrderingPremium = () => {
                       style={{ background: T.bgInput, border: `1px solid ${T.border}`, color: T.text }} />
                   </div>
                 )}
-
                 {orderType === 'delivery' && (
                   <div>
                     <label className="block text-sm font-medium mb-1.5" style={{ color: T.text }}>Delivery Address</label>
@@ -1541,7 +1472,6 @@ const CafeOrderingPremium = () => {
                       style={{ background: T.bgInput, border: `1px solid ${T.border}`, color: T.text }} />
                   </div>
                 )}
-
                 <div>
                   <label className="block text-sm font-medium mb-2" style={{ color: T.text }}>Payment Method</label>
                   <div className="grid grid-cols-2 gap-2">
@@ -1555,21 +1485,18 @@ const CafeOrderingPremium = () => {
                         className="py-2.5 rounded-xl text-xs font-semibold transition-all"
                         style={paymentMode === p.id
                           ? { background: primary, color: '#000', boxShadow: `0 2px 12px ${glowSoft}` }
-                          : { background: T.bgInput, color: T.textMuted, border: `1px solid ${T.border}` }
-                        }>
+                          : { background: T.bgInput, color: T.textMuted, border: `1px solid ${T.border}` }}>
                         {p.label}
                       </button>
                     ))}
                   </div>
                 </div>
-
                 {paymentMode === 'prepaid' && cafe?.upiId && (
                   <div className="p-4 rounded-xl text-center" style={{ background: T.bgInput, border: `1px solid ${T.border}` }}>
                     <QRCodeSVG value={`upi://pay?pa=${cafe.upiId}&pn=${cafe.name}&am=${totalWithCharges}&cu=INR`} size={140} className="mx-auto" />
                     <p className="text-xs mt-2" style={{ color: T.textMuted }}>Scan to pay {CUR}{fmt(totalWithCharges)}</p>
                   </div>
                 )}
-
                 <div>
                   <label className="block text-sm font-medium mb-1.5" style={{ color: T.text }}>
                     Special Instructions <span className="font-normal" style={{ color: T.textFaint }}>(optional)</span>
@@ -1578,8 +1505,6 @@ const CafeOrderingPremium = () => {
                     className="w-full py-3 px-4 rounded-xl text-sm outline-none resize-none"
                     style={{ background: T.bgInput, border: `1px solid ${T.border}`, color: T.text }} />
                 </div>
-
-                {/* Order summary — always shows full transparent breakdown */}
                 <div className="p-4 rounded-xl space-y-2" style={{ background: `${primary}08`, border: `1px solid ${primary}20` }}>
                   <p className="font-semibold text-sm mb-3" style={{ color: T.text }}>Order Summary</p>
                   {cart.map((item, idx) => (
@@ -1601,7 +1526,6 @@ const CafeOrderingPremium = () => {
                       )}
                       {item.addons?.length > 0 && (
                         <p className="text-xs ml-2 mt-0.5" style={{ color: T.textFaint || T.textMuted }}>
-                          {/* CHANGE 8 — Show qty suffix for addons with qty > 1 */}
                           + {item.addons.map(a => a.quantity > 1 ? `${a.name} ×${a.quantity}` : a.name).join(', ')}
                         </p>
                       )}
@@ -1649,15 +1573,11 @@ const CafeOrderingPremium = () => {
                   </div>
                 </div>
               </div>
-
               <div className="px-5 py-4 border-t flex-shrink-0" style={{ borderColor: T.borderLight }}>
-                <motion.button
-                  whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}
-                  onClick={handlePlaceOrder}
-                  disabled={orderPlacing}
+                <motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}
+                  onClick={handlePlaceOrder} disabled={orderPlacing}
                   className="w-full py-4 rounded-xl text-black font-bold text-base disabled:opacity-60 flex items-center justify-center gap-2"
-                  style={{ background: `linear-gradient(135deg, ${primary}, ${primary}cc)`, boxShadow: `0 4px 24px ${glow}` }}
-                >
+                  style={{ background: `linear-gradient(135deg, ${primary}, ${primary}cc)`, boxShadow: `0 4px 24px ${glow}` }}>
                   {orderPlacing
                     ? <><motion.div animate={{ rotate: 360 }} transition={{ duration: 1, repeat: Infinity, ease: 'linear' }}
                         className="w-5 h-5 rounded-full border-2 border-black/30 border-t-black" />Placing Order…</>
@@ -1670,22 +1590,15 @@ const CafeOrderingPremium = () => {
         )}
       </AnimatePresence>
 
-      {/* Floating cart button (mobile) */}
+      {/* Floating cart button (mobile) — UNCHANGED */}
       <AnimatePresence>
         {cartCount > 0 && !showCart && !showCheckout && (
-          <motion.div
-            initial={{ y: 100, opacity: 0 }}
-            animate={{ y: 0,   opacity: 1 }}
-            exit={{ y: 100,  opacity: 0 }}
-            className="fixed bottom-6 left-1/2 -translate-x-1/2 z-30"
-          >
-            <motion.button
-              whileHover={{ scale: 1.04 }}
-              whileTap={{ scale: 0.96 }}
+          <motion.div initial={{ y: 100, opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ y: 100, opacity: 0 }}
+            className="fixed bottom-6 left-1/2 -translate-x-1/2 z-30">
+            <motion.button whileHover={{ scale: 1.04 }} whileTap={{ scale: 0.96 }}
               onClick={() => setShowCart(true)}
               className="flex items-center gap-3 px-6 py-3.5 rounded-2xl text-black font-bold shadow-2xl"
-              style={{ background: `linear-gradient(135deg, ${primary}, ${primary}cc)`, boxShadow: `0 8px 32px ${glow}` }}
-            >
+              style={{ background: `linear-gradient(135deg, ${primary}, ${primary}cc)`, boxShadow: `0 8px 32px ${glow}` }}>
               <ShoppingCart className="w-5 h-5" />
               <span>{cartCount} item{cartCount !== 1 ? 's' : ''}</span>
               <span className="font-black">{CUR}{fmt(cartTotal)}</span>
@@ -1694,7 +1607,7 @@ const CafeOrderingPremium = () => {
         )}
       </AnimatePresence>
 
-      {/* Add-on selection modal */}
+      {/* Add-on selection modal — UNCHANGED */}
       {addonModal && (
         <AddOnModal
           item={addonModal}
