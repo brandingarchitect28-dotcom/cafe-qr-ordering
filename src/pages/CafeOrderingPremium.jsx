@@ -398,7 +398,7 @@ const MenuCard = React.memo(({
                           >
                             <Minus className="w-3 h-3" />
                           </button>
-                          <span className="text-xs font-bold w-4 text-center" style={{ color: T.text }}>{qty}</span>
+                          <span className="text-xs font-bold w-4 text-center" style={{ color: T.text }}>{qty > 0 ? qty : ''}</span>
                           <button
                             onClick={() => onUpdateAddon(item.id, addon, 'inc')}
                             className="w-6 h-6 rounded-full flex items-center justify-center text-black transition-all"
@@ -543,6 +543,7 @@ const CafeOrderingPremium = () => {
   const [cafeNotFound,  setCafeNotFound ] = useState(false);
   const [searchQuery,   setSearchQuery  ] = useState('');
   const [selectedCat,   setSelectedCat  ] = useState('all');
+  const [filterType,    setFilterType   ] = useState('all'); // 'all' | 'veg' | 'nonVeg'
   const [showCart,      setShowCart     ] = useState(false);
   const [showCheckout,  setShowCheckout ] = useState(false);
   const [selectedOffer, setSelectedOffer] = useState(null);
@@ -795,21 +796,34 @@ const CafeOrderingPremium = () => {
     return menuItems.filter(item => {
       const matchCat    = selectedCat === 'all' || item.category === selectedCat;
       const matchSearch = !searchQuery || item.name.toLowerCase().includes(searchQuery.toLowerCase());
-      return matchCat && matchSearch;
+      const matchVeg    = filterType === 'all'
+        || (filterType === 'veg'    && item.isVeg    === true)
+        || (filterType === 'nonVeg' && item.isNonVeg === true);
+      return matchCat && matchSearch && matchVeg;
     });
-  }, [menuItems, selectedCat, searchQuery]);
+  }, [menuItems, selectedCat, searchQuery, filterType]);
 
   // ── NEW: Derived filtered arrays for the two new sections ─────────────────
   // Pure in-memory reads — no Firestore queries, no network, no side effects.
   // Items without the field (undefined) are falsy → excluded automatically.
   // These are the ONLY new lines of logic in the entire component.
   const newlyArrivedItems = useMemo(
-    () => menuItems.filter(item => item.isNew === true),
-    [menuItems],
+    () => menuItems.filter(item => {
+      const matchVeg = filterType === 'all'
+        || (filterType === 'veg'    && item.isVeg    === true)
+        || (filterType === 'nonVeg' && item.isNonVeg === true);
+      return item.isNew === true && matchVeg;
+    }),
+    [menuItems, filterType],
   );
   const bestSellerItems = useMemo(
-    () => menuItems.filter(item => item.isBestSeller === true),
-    [menuItems],
+    () => menuItems.filter(item => {
+      const matchVeg = filterType === 'all'
+        || (filterType === 'veg'    && item.isVeg    === true)
+        || (filterType === 'nonVeg' && item.isNonVeg === true);
+      return item.isBestSeller === true && matchVeg;
+    }),
+    [menuItems, filterType],
   );
 
   // Shared props bundle — all handlers are the same references used by main grid.
@@ -1196,6 +1210,33 @@ const CafeOrderingPremium = () => {
             </motion.button>
           ))}
         </div>
+
+        {/* ── NEW: Veg / Non-Veg filter toggle ──────────────────────────────── */}
+        {/* Sits below category pills. Combines with category + search filters.  */}
+        {/* filterType state only — zero touch to cart, pricing, or any logic.   */}
+        <div className="flex gap-2 mt-2 max-w-2xl mx-auto">
+          {[
+            { id: 'all',    label: 'All Items', emoji: '✦' },
+            { id: 'veg',    label: 'Veg',       emoji: '🟢' },
+            { id: 'nonVeg', label: 'Non-Veg',   emoji: '🔴' },
+          ].map(f => (
+            <motion.button
+              key={f.id}
+              whileTap={{ scale: 0.95 }}
+              onClick={() => setFilterType(f.id)}
+              className="flex-shrink-0 flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-xs font-semibold transition-all"
+              style={filterType === f.id
+                ? { background: primary, color: '#000', boxShadow: `0 2px 12px ${glowSoft}` }
+                : { background: T.bgInput, color: T.textMuted, border: `1px solid ${T.border}` }
+              }
+            >
+              <span>{f.emoji}</span>
+              <span>{f.label}</span>
+            </motion.button>
+          ))}
+        </div>
+        {/* ── End Veg / Non-Veg filter toggle ───────────────────────────────── */}
+
       </div>
 
       <div className="max-w-2xl mx-auto px-4 pb-32 space-y-8 pt-6">
