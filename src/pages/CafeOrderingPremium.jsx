@@ -456,73 +456,159 @@ const MenuCard = React.memo(({
 });
 MenuCard.displayName = 'MenuCard';
 
+// ─── NEW: CompactItemCard ─────────────────────────────────────────────────────
+// Lightweight card for Newly Arrived / Best Sellers horizontal sections.
+// Shows: image, name, optional tag badge, cart-in-progress dot.
+// NO price breakdown, NO size buttons, NO addon stepper, NO quantity counter.
+//
+// CLICK BEHAVIOUR — reuses existing addToCart function from parent (passed as onAdd).
+// addToCart already routes:
+//   • item with addons  → opens AddOnModal (existing popup, unchanged)
+//   • item with sizes   → opens size picker (existing flow, unchanged)
+//   • simple item       → goes straight to directAddToCart (unchanged)
+// Zero new logic. Zero new state. 100% same cart behaviour as main grid.
+const CompactItemCard = React.memo(({
+  item,
+  primary,
+  theme,
+  cartQty,
+  onAdd,       // ← exact same addToCart reference from parent
+  tagLabel,    // 'New' | 'Best Seller' | undefined
+}) => {
+  const T = theme || {
+    bgCard:   'rgba(255,255,255,0.04)',
+    border:   'rgba(255,255,255,0.08)',
+    text:     '#ffffff',
+    textMuted:'#A3A3A3',
+  };
+  const mediaType = getMediaType(item.image);
+
+  return (
+    <motion.div
+      whileHover={{ y: -4, boxShadow: `0 12px 32px rgba(0,0,0,0.25)` }}
+      whileTap={{ scale: 0.97 }}
+      transition={{ duration: 0.2 }}
+      onClick={() => onAdd(item)}   // ← triggers existing addToCart — same as main grid
+      className="flex-shrink-0 w-36 rounded-2xl overflow-hidden cursor-pointer relative"
+      style={{
+        background:    T.bgCard,
+        border:        `1px solid ${T.border}`,
+        backdropFilter:'blur(12px)',
+        scrollSnapAlign: 'start',
+      }}
+    >
+      {/* Image area */}
+      <div className="relative overflow-hidden" style={{ aspectRatio: '1 / 1' }}>
+        {item.image ? (
+          mediaType === 'video' ? (
+            <video src={item.image} autoPlay muted loop playsInline
+              className="w-full h-full object-cover" />
+          ) : (
+            <img src={item.image} alt={item.name} loading="lazy"
+              className="w-full h-full object-cover" />
+          )
+        ) : (
+          <div className="w-full h-full flex items-center justify-center"
+            style={{ background: `${primary}10` }}>
+            <Coffee className="w-8 h-8" style={{ color: primary, opacity: 0.3 }} />
+          </div>
+        )}
+
+        {/* Gradient overlay */}
+        <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent" />
+
+        {/* Tag badge — "New" or "Best Seller" */}
+        {tagLabel && (
+          <div className="absolute top-2 left-2">
+            <span
+              className="text-[10px] font-bold px-1.5 py-0.5 rounded-full"
+              style={{
+                background: `${primary}dd`,
+                color: '#000',
+                backdropFilter: 'blur(4px)',
+              }}
+            >
+              {tagLabel}
+            </span>
+          </div>
+        )}
+
+        {/* Veg / Non-Veg dot — reuse existing VegNonVegDot */}
+        {(item.isVeg || item.isNonVeg) && (
+          <div className="absolute bottom-1.5 left-1.5 z-10">
+            <VegNonVegDot isVeg={item.isVeg} isNonVeg={item.isNonVeg} />
+          </div>
+        )}
+
+        {/* Cart-in-progress dot — shown when item already in cart */}
+        {/* Guard: cartQty > 0 — never shows 0 */}
+        {cartQty > 0 && (
+          <motion.div
+            initial={{ scale: 0 }}
+            animate={{ scale: 1 }}
+            className="absolute top-2 right-2 w-5 h-5 rounded-full text-black text-[10px] font-black flex items-center justify-center shadow-md"
+            style={{ background: primary }}
+          >
+            {cartQty}
+          </motion.div>
+        )}
+      </div>
+
+      {/* Name */}
+      <div className="px-2.5 py-2">
+        <p
+          className="text-xs font-semibold leading-tight line-clamp-2"
+          style={{ color: T.text }}
+        >
+          {item.name}
+        </p>
+      </div>
+    </motion.div>
+  );
+});
+CompactItemCard.displayName = 'CompactItemCard';
+
 // ─── NEW: HorizontalMenuSection ───────────────────────────────────────────────
-// Renders a labelled horizontal-scroll row of MenuCards.
-// Accepts the same props as the main grid passes to MenuCard — all handlers
-// are reference-identical to the parent's handlers, so cart/addon/pricing
-// behaviour is identical to adding from the main menu grid.
+// Renders a labelled horizontal-scroll row of CompactItemCards.
+// onAdd is the parent's addToCart — identical reference, same routing logic.
 // Renders nothing (null) when items array is empty → no layout impact.
 const HorizontalMenuSection = ({
   title,
   icon,
   items,
-  CUR,
   primary,
   theme,
   cartQtyFor,
   onAdd,
-  onAddWithAnim,
-  onShowDetails,
-  selectedSize,
-  selectedAddons,
-  onSizeSelect,
-  onUpdateAddon,
-  onInlineAddToCart,
-  getFinalPrice,
+  tagLabel,
 }) => {
   if (!items || items.length === 0) return null;
 
   return (
     <section>
       <h2
-        className="font-bold text-lg mb-4 flex items-center gap-2"
+        className="font-bold text-lg mb-3 flex items-center gap-2"
         style={{ fontFamily: 'Playfair Display, serif', color: theme?.text || '#ffffff' }}
       >
         {icon}
         {title}
       </h2>
 
-      {/* Horizontal scroll — same pattern as Special Offers section */}
-      <div className="flex gap-3 overflow-x-auto pb-3 scrollbar-none" style={{ scrollSnapType: 'x mandatory' }}>
+      {/* Horizontal scroll — same pattern as Special Offers */}
+      <div
+        className="flex gap-3 overflow-x-auto pb-3 scrollbar-none"
+        style={{ scrollSnapType: 'x mandatory' }}
+      >
         {items.map(item => (
-          <div
+          <CompactItemCard
             key={item.id}
-            className="flex-shrink-0 w-56"
-            style={{ scrollSnapAlign: 'start' }}
-          >
-            {/*
-              MenuCard receives IDENTICAL props as the main 2-col grid.
-              onAdd, onAddWithAnim, onInlineAddToCart, onUpdateAddon —
-              all are the exact same function references. Cart state, addon
-              popup, pricing calculations → 100% unchanged behaviour.
-            */}
-            <MenuCard
-              item={item}
-              CUR={CUR}
-              cartQty={cartQtyFor(item.id)}
-              onAdd={onAdd}
-              onAddWithAnim={onAddWithAnim}
-              onShowDetails={onShowDetails}
-              primary={primary}
-              theme={theme}
-              selectedSize={selectedSize}
-              selectedAddons={selectedAddons}
-              onSizeSelect={onSizeSelect}
-              onUpdateAddon={onUpdateAddon}
-              onInlineAddToCart={onInlineAddToCart}
-              getFinalPrice={getFinalPrice}
-            />
-          </div>
+            item={item}
+            primary={primary}
+            theme={theme}
+            cartQty={cartQtyFor(item.id)}
+            onAdd={onAdd}
+            tagLabel={tagLabel}
+          />
         ))}
       </div>
     </section>
@@ -825,26 +911,6 @@ const CafeOrderingPremium = () => {
     }),
     [menuItems, filterType],
   );
-
-  // Shared props bundle — all handlers are the same references used by main grid.
-  // Assembling them once avoids repetition and guarantees handler identity.
-  const sharedSectionProps = useMemo(() => ({
-    CUR,
-    primary,
-    theme: T,
-    cartQtyFor,
-    onAdd:             addToCart,
-    onAddWithAnim:     addWithAnim,
-    onShowDetails:     (i) => setSelectedFoodItem(i),
-    selectedSize,
-    selectedAddons,
-    onSizeSelect:      handleSizeSelect,
-    onUpdateAddon:     updateAddon,
-    onInlineAddToCart: handleInlineAddToCart,
-    getFinalPrice,
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }), [CUR, primary, T, cart, selectedSize, selectedAddons, addToCart, addWithAnim,
-       handleSizeSelect, updateAddon, handleInlineAddToCart, getFinalPrice]);
 
   // ── Add offer to cart — UNCHANGED ────────────────────────────────────────
   const addOfferToCart = (offer) => {
@@ -1274,28 +1340,34 @@ const CafeOrderingPremium = () => {
         )}
 
         {/*
-          ── NEW: Newly Arrived section ────────────────────────────────────────
-          Renders only when menuItems contains at least one item with isNew === true.
-          Uses HorizontalMenuSection which passes identical handler refs to MenuCard.
-          Add-to-cart, addon popup, size selection, and pricing are 100% unchanged.
+          ── Newly Arrived section ─────────────────────────────────────────────
+          Uses CompactItemCard. Click triggers addToCart → routes to addon/size
+          picker or direct cart via existing unchanged logic.
         */}
         <HorizontalMenuSection
           title="Newly Arrived"
           icon={<Sparkles className="w-5 h-5" style={{ color: primary }} />}
           items={newlyArrivedItems}
-          {...sharedSectionProps}
+          primary={primary}
+          theme={T}
+          cartQtyFor={cartQtyFor}
+          onAdd={addToCart}
+          tagLabel="New"
         />
 
         {/*
-          ── NEW: Best Sellers section ─────────────────────────────────────────
-          Renders only when menuItems contains at least one item with isBestSeller === true.
-          Same handler identity guarantee as Newly Arrived section above.
+          ── Best Sellers section ──────────────────────────────────────────────
+          Uses CompactItemCard. Same addToCart routing as Newly Arrived.
         */}
         <HorizontalMenuSection
           title="Best Sellers"
           icon={<Star className="w-5 h-5" style={{ color: primary }} />}
           items={bestSellerItems}
-          {...sharedSectionProps}
+          primary={primary}
+          theme={T}
+          cartQtyFor={cartQtyFor}
+          onAdd={addToCart}
+          tagLabel="Best Seller"
         />
 
         {/* ── Menu grid — 100% UNCHANGED */}
