@@ -787,7 +787,6 @@ const CafeOrderingPremium = () => {
   const [cart,          setCart         ] = useState([]);
   const [addonModal,    setAddonModal   ] = useState(null);
   const [loading,       setLoading      ] = useState(true);
-  const [showSplash,    setShowSplash   ] = useState(true);
   const [cafeNotFound,  setCafeNotFound ] = useState(false);
   const [searchQuery,   setSearchQuery  ] = useState('');
   const [selectedCat,   setSelectedCat  ] = useState('all');
@@ -844,12 +843,6 @@ const CafeOrderingPremium = () => {
 
   // Cleanup
   useEffect(() => () => unsubRef.current.forEach(u => u?.()), []);
-
-  // ── Splash screen: always show chef loading for at least 1.4s (visual only)
-  useEffect(() => {
-    const t = setTimeout(() => setShowSplash(false), 1400);
-    return () => clearTimeout(t);
-  }, []);
 
   // Load cafe
   useEffect(() => {
@@ -1350,111 +1343,9 @@ const CafeOrderingPremium = () => {
   };
 
   // ── Guards ────────────────────────────────────────────────────────────────
-  // showSplash ensures chef screen shows for minimum 1.4s even on cached loads
-  if (loading || showSplash) {
-    const floatingFoods = ['🍕','🍔','☕','🍜','🧁','🥗','🍣','🌮','🍰','🥐'];
-    return (
-      <div style={{ minHeight: '100vh', background: '#050505', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', overflow: 'hidden', position: 'relative', fontFamily: 'Manrope, sans-serif' }}>
-
-        {/* Ambient gold glow */}
-        <motion.div
-          animate={{ scale: [1, 1.3, 1], opacity: [0.08, 0.2, 0.08] }}
-          transition={{ duration: 4, repeat: Infinity, ease: 'easeInOut' }}
-          style={{ position: 'absolute', top: '20%', left: '50%', transform: 'translateX(-50%)', width: 340, height: 340, borderRadius: '50%', background: '#D4AF37', filter: 'blur(90px)', pointerEvents: 'none' }}
-        />
-        <motion.div
-          animate={{ scale: [1.2, 1, 1.2], opacity: [0.04, 0.1, 0.04] }}
-          transition={{ duration: 6, repeat: Infinity, ease: 'easeInOut', delay: 2 }}
-          style={{ position: 'absolute', bottom: '15%', right: '8%', width: 200, height: 200, borderRadius: '50%', background: '#ff6b35', filter: 'blur(70px)', pointerEvents: 'none' }}
-        />
-
-        {/* Floating food emojis drifting upward */}
-        {floatingFoods.map((food, i) => (
-          <motion.div
-            key={i}
-            animate={{ opacity: [0, 0.45, 0.45, 0], y: [0, -70, -150, -210] }}
-            transition={{ duration: 4 + i * 0.45, repeat: Infinity, delay: i * 0.65, ease: 'easeOut' }}
-            style={{ position: 'absolute', left: `${8 + (i * 9) % 82}%`, bottom: `${8 + (i * 13) % 28}%`, fontSize: 18 + (i % 3) * 7, pointerEvents: 'none', userSelect: 'none' }}
-          >
-            {food}
-          </motion.div>
-        ))}
-
-        {/* Main card */}
-        <motion.div
-          initial={{ opacity: 0, y: 28, scale: 0.93 }}
-          animate={{ opacity: 1, y: 0, scale: 1 }}
-          transition={{ duration: 0.55, ease: [0.22, 1, 0.36, 1] }}
-          style={{ position: 'relative', zIndex: 10, background: 'linear-gradient(160deg, rgba(32,22,6,0.97) 0%, rgba(10,8,3,0.99) 100%)', border: '1px solid rgba(212,175,55,0.28)', borderRadius: 32, padding: '44px 40px 38px', maxWidth: 310, width: '86vw', textAlign: 'center', boxShadow: '0 28px 80px rgba(0,0,0,0.65), inset 0 1px 0 rgba(212,175,55,0.12)' }}
-        >
-          {/* Chef + spinning plate */}
-          <div style={{ position: 'relative', width: 112, height: 112, margin: '0 auto 26px' }}>
-            {/* Plate */}
-            <motion.div
-              animate={{ scale: [1, 1.06, 1] }}
-              transition={{ duration: 2.2, repeat: Infinity, ease: 'easeInOut' }}
-              style={{ position: 'absolute', bottom: 0, left: '50%', transform: 'translateX(-50%)', width: 86, height: 86, borderRadius: '50%', background: 'radial-gradient(circle at 38% 38%, rgba(212,175,55,0.2), rgba(212,175,55,0.04))', border: '2px solid rgba(212,175,55,0.38)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
-            >
-              <motion.span
-                animate={{ rotate: [0, 360] }}
-                transition={{ duration: 9, repeat: Infinity, ease: 'linear' }}
-                style={{ fontSize: 28, display: 'block', lineHeight: 1 }}
-              >
-                🍽️
-              </motion.span>
-            </motion.div>
-            {/* Chef hat bouncing */}
-            <motion.span
-              animate={{ y: [0, -10, 0], rotate: [-5, 5, -5] }}
-              transition={{ duration: 1.9, repeat: Infinity, ease: 'easeInOut' }}
-              style={{ position: 'absolute', top: 0, left: '50%', transform: 'translateX(-50%)', fontSize: 40, lineHeight: 1, display: 'block' }}
-            >
-              👨‍🍳
-            </motion.span>
-          </div>
-
-          {/* Heading */}
-          <h2 style={{ margin: '0 0 7px', color: '#ffffff', fontWeight: 900, fontSize: 22, fontFamily: 'Playfair Display, serif', letterSpacing: '-0.01em' }}>
-            Hold tight!
-          </h2>
-          <p style={{ margin: '0 0 28px', color: '#D4AF37', fontWeight: 700, fontSize: 13, opacity: 0.88 }}>
-            Chef is preparing your menu…
-          </p>
-
-          {/* Bouncing gold dots */}
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, marginBottom: 22 }}>
-            {[0, 1, 2, 3].map(i => (
-              <motion.div
-                key={i}
-                animate={{ scale: [1, 1.8, 1], opacity: [0.28, 1, 0.28] }}
-                transition={{ duration: 1.1, repeat: Infinity, delay: i * 0.19, ease: 'easeInOut' }}
-                style={{ width: 7, height: 7, borderRadius: '50%', background: '#D4AF37', flexShrink: 0 }}
-              />
-            ))}
-          </div>
-
-          {/* Shimmer progress bar */}
-          <div style={{ height: 3, background: 'rgba(255,255,255,0.06)', borderRadius: 99, overflow: 'hidden' }}>
-            <motion.div
-              animate={{ x: ['-100%', '250%'] }}
-              transition={{ duration: 1.4, repeat: Infinity, ease: 'easeInOut' }}
-              style={{ height: '100%', width: '38%', background: 'linear-gradient(90deg, transparent, #D4AF37, transparent)', borderRadius: 99 }}
-            />
-          </div>
-        </motion.div>
-
-        {/* Bottom whisper */}
-        <motion.p
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ delay: 0.7, duration: 0.6 }}
-          style={{ marginTop: 30, color: 'rgba(255,255,255,0.16)', fontSize: 11, fontWeight: 600, letterSpacing: '0.15em', textTransform: 'uppercase', zIndex: 10, position: 'relative', userSelect: 'none' }}
-        >
-          Crafting your experience
-        </motion.p>
-      </div>
-    );
-  }
+  // Chef loading screen is now handled by App.jsx (CafeOrderingRouter)
+  // This prevents double-rendering of the chef screen
+  if (loading) return null;
 
   if (cafeNotFound || !cafe) return (
     <div className="min-h-screen flex items-center justify-center text-center p-8 cop" style={{ background: T.bg }}>
