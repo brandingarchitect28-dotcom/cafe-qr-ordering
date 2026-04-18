@@ -9,15 +9,14 @@
  * - Search + filter by payment status
  * - Real-time listener (same pattern as Orders)
  *
+ * UI UPGRADE: Café-vibe premium aesthetic. Zero logic changes.
+ *
  * IMPROVEMENTS (additive — zero existing logic removed):
- *  1. Orders fallback: also listens to the orders collection and derives
- *     synthetic invoice objects for paid, non-deleted orders that have no
- *     matching invoice document. This ensures the page is never empty when
- *     orders exist but haven't been through the invoice-generation flow.
- *  2. isDeleted filter: deleted orders are excluded from the fallback list.
- *  3. CSV download button added next to status filters.
- *  4. Delivery address shown on invoice cards for delivery orders.
- *  5. Empty state copy improved: "No paid invoices yet."
+ *  1. Orders fallback synthetic invoice objects for paid orders
+ *  2. isDeleted filter
+ *  3. CSV download button
+ *  4. Delivery address shown on invoice cards
+ *  5. Empty state copy improved
  */
 
 import React, { useState, useMemo, useEffect } from 'react';
@@ -33,16 +32,65 @@ import {
 import { toast } from 'sonner';
 import InvoiceModal from './InvoiceModal';
 
+// ── Inject café-vibe CSS once ─────────────────────────────────────────────────
+if (typeof document !== 'undefined' && !document.getElementById('inv-cafe-css')) {
+  const el = document.createElement('style');
+  el.id = 'inv-cafe-css';
+  el.textContent = `
+    @import url('https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800;900&family=Fredoka+One&display=swap');
+    .inv { font-family: 'Nunito', system-ui, sans-serif; }
+    .inv-title { font-family: 'Fredoka One', system-ui, sans-serif !important; }
+    .inv-card {
+      background: #141008;
+      border: 1.5px solid rgba(255,255,255,0.07);
+      border-radius: 16px;
+      overflow: hidden;
+      transition: border-color 200ms;
+    }
+    .inv-card:hover { border-color: rgba(255,140,0,0.22); }
+    .inv-btn {
+      display: inline-flex; align-items: center; gap: 5px;
+      font-family: 'Nunito', system-ui, sans-serif;
+      font-weight: 800; font-size: 12px;
+      padding: 6px 12px; border-radius: 10px;
+      border: 1.5px solid transparent;
+      cursor: pointer; transition: all 180ms;
+      white-space: nowrap;
+    }
+    .inv-btn:hover { transform: translateY(-1px); filter: brightness(1.1); }
+    .inv-btn:active { transform: scale(0.96); }
+    .inv-btn-gold   { background: rgba(212,175,55,0.12); color: #D4AF37; border-color: rgba(212,175,55,0.25); }
+    .inv-btn-gold:hover { background: rgba(212,175,55,0.22); }
+    .inv-btn-green  { background: rgba(37,211,102,0.1); color: #25D366; border-color: rgba(37,211,102,0.25); }
+    .inv-btn-green:hover { background: rgba(37,211,102,0.18); }
+    .inv-input {
+      background: #1c1509; border: 1.5px solid rgba(255,255,255,0.08); border-radius: 12px;
+      color: #fff8ee; padding: 10px 14px; font-size: 14px; font-weight: 600;
+      font-family: 'Nunito', system-ui, sans-serif;
+      outline: none; width: 100%; transition: border-color 180ms, box-shadow 180ms;
+    }
+    .inv-input:focus { border-color: rgba(255,140,0,0.55); box-shadow: 0 0 0 3px rgba(255,140,0,0.1); }
+    .inv-input::placeholder { color: #3d3020; }
+    @keyframes invIn { from { opacity:0; transform:translateY(8px); } to { opacity:1; transform:translateY(0); } }
+    .inv-in { animation: invIn 280ms ease forwards; }
+  `;
+  document.head.appendChild(el);
+}
+
 const fmt = (n) => (parseFloat(n) || 0).toFixed(2);
 
 const StatusBadge = ({ status }) => {
-  const cfg = status === 'paid'
-    ? { cls: 'bg-emerald-500/15 text-emerald-400 border-emerald-500/20', icon: CheckCircle, label: 'Paid' }
-    : { cls: 'bg-amber-500/15 text-amber-400 border-amber-500/20',   icon: Clock,        label: 'Pending' };
+  const isPaid = status === 'paid';
   return (
-    <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded border text-xs font-semibold ${cfg.cls}`}>
-      <cfg.icon className="w-3 h-3" />
-      {cfg.label}
+    <span
+      className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-black"
+      style={{
+        background: isPaid ? 'rgba(16,185,129,0.12)' : 'rgba(245,158,11,0.12)',
+        color:      isPaid ? '#34d399'               : '#fbbf24',
+        border:     `1.5px solid ${isPaid ? 'rgba(16,185,129,0.22)' : 'rgba(245,158,11,0.22)'}`,
+      }}
+    >
+      {isPaid ? '💰 Paid' : '⏳ Pending'}
     </span>
   );
 };
@@ -53,7 +101,7 @@ const InvoicesTab = () => {
   const { data: cafe } = useDocument('cafes', cafeId);
   const CUR = cafe?.currencySymbol || '₹';
 
-  // ── Real Firestore invoice documents (unchanged from original) ──────────────
+  // ── Real Firestore invoice documents (unchanged) ──────────────────────────
   const [firestoreInvoices, setFirestoreInvoices] = useState([]);
   const [invoicesLoading,   setInvoicesLoading  ] = useState(true);
 
@@ -78,11 +126,7 @@ const InvoicesTab = () => {
     return () => unsub();
   }, [cafeId]);
 
-  // ── IMPROVEMENT 1: Orders fallback ─────────────────────────────────────────
-  // Listen to orders collection to catch paid orders that were placed before
-  // the invoice-generation system existed (no matching invoice document).
-  // These are shaped to match the invoice object schema so the UI renders them
-  // identically — the only difference is _source: 'order'.
+  // ── Orders fallback ───────────────────────────────────────────────────────
   const [rawOrders,     setRawOrders    ] = useState([]);
   const [ordersLoading, setOrdersLoading] = useState(true);
 
@@ -102,27 +146,16 @@ const InvoicesTab = () => {
 
   const loading = invoicesLoading || ordersLoading;
 
-  // ── IMPROVEMENT 2: Derive paid, non-deleted orders that need fallback ───────
   const isPaidOrder = (o) =>
-    (o.paymentStatus === 'paid' ||
-     o.paymentStatus === 'SUCCESS' ||
-     o.status === 'paid') &&
-    !o.isDeleted;
+    (o.paymentStatus === 'paid' || o.paymentStatus === 'SUCCESS' || o.status === 'paid') && !o.isDeleted;
 
   const invoices = useMemo(() => {
-    // Set of orderIds that already have a real invoice document
-    const coveredOrderIds = new Set(
-      firestoreInvoices.map(inv => inv.orderId).filter(Boolean)
-    );
-
-    // Build synthetic invoice objects from paid, non-deleted orders that
-    // have NO matching Firestore invoice doc yet
+    const coveredOrderIds = new Set(firestoreInvoices.map(inv => inv.orderId).filter(Boolean));
     const syntheticInvoices = rawOrders
       .filter(o => isPaidOrder(o) && !coveredOrderIds.has(o.id))
       .map(o => ({
-        // Shape matches Firestore invoice schema for seamless rendering
         id:                   `order_${o.id}`,
-        _source:              'order',          // marks as derived, not a real invoice doc
+        _source:              'order',
         orderId:              o.id,
         orderNumber:          o.orderNumber,
         cafeId:               o.cafeId,
@@ -130,7 +163,7 @@ const InvoicesTab = () => {
         customerPhone:        o.customerPhone  || '',
         tableNumber:          o.tableNumber    || '',
         orderType:            o.orderType      || 'dine-in',
-        deliveryAddress:      o.deliveryAddress || '',   // IMPROVEMENT 4 data
+        deliveryAddress:      o.deliveryAddress || '',
         items:                o.items          || [],
         subtotalAmount:       o.subtotalAmount ?? o.totalAmount ?? 0,
         gstAmount:            o.gstAmount      ?? o.taxAmount ?? 0,
@@ -139,13 +172,11 @@ const InvoicesTab = () => {
         paymentMode:          o.paymentMode    || 'counter',
         paymentStatus:        'paid',
         currencySymbol:       o.currencySymbol || CUR,
-        invoiceNumber:        null,             // no invoice number — derived from order
+        invoiceNumber:        null,
         createdAt:            o.createdAt,
         cafeName:             cafe?.name       || '',
       }));
 
-    // Merge: real Firestore invoices first, then synthetic fallbacks
-    // Sort combined list newest-first
     return [...firestoreInvoices, ...syntheticInvoices].sort((a, b) => {
       const ta = a.createdAt?.toDate?.() || new Date(0);
       const tb = b.createdAt?.toDate?.() || new Date(0);
@@ -153,7 +184,7 @@ const InvoicesTab = () => {
     });
   }, [firestoreInvoices, rawOrders, CUR, cafe?.name]);
 
-  // ── Search / filter (unchanged logic) ──────────────────────────────────────
+  // ── Search / filter ───────────────────────────────────────────────────────
   const [viewingInvoice, setViewingInvoice] = useState(null);
   const [search,         setSearch        ] = useState('');
   const [statusFilter,   setStatusFilter  ] = useState('all');
@@ -171,19 +202,14 @@ const InvoicesTab = () => {
     });
   }, [invoices, search, statusFilter]);
 
-  // ── Stats (IMPROVEMENT 3: all from paid orders / real invoices) ────────────
-  const paidInvoices    = invoices.filter(i => i.paymentStatus === 'paid');
-  const pendingOrders   = rawOrders.filter(
-    o => !isPaidOrder(o) && !o.isDeleted
-  ).length;
-  const totalRevenue    = paidInvoices.reduce((s, i) => s + (i.totalAmount || 0), 0);
+  // ── Stats ─────────────────────────────────────────────────────────────────
+  const paidInvoices  = invoices.filter(i => i.paymentStatus === 'paid');
+  const pendingOrders = rawOrders.filter(o => !isPaidOrder(o) && !o.isDeleted).length;
+  const totalRevenue  = paidInvoices.reduce((s, i) => s + (i.totalAmount || 0), 0);
 
-  // ── IMPROVEMENT 3: CSV download ────────────────────────────────────────────
+  // ── CSV download ──────────────────────────────────────────────────────────
   const downloadCSV = () => {
-    if (invoices.length === 0) {
-      toast.error('No invoices to export');
-      return;
-    }
+    if (invoices.length === 0) { toast.error('No invoices to export'); return; }
     try {
       const rows = invoices.map(o => ({
         invoiceNumber: o.invoiceNumber || '',
@@ -207,13 +233,8 @@ const InvoicesTab = () => {
           } catch { return ''; }
         })(),
       }));
-
-      const headers = Object.keys(rows[0]).join(',');
-      const csvRows = rows.map(r =>
-        Object.values(r).map(v =>
-          `"${String(v).replace(/"/g, '""')}"`
-        ).join(',')
-      );
+      const headers  = Object.keys(rows[0]).join(',');
+      const csvRows  = rows.map(r => Object.values(r).map(v => `"${String(v).replace(/"/g, '""')}"`).join(','));
       const csvContent = [headers, ...csvRows].join('\n');
       const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
       const url  = URL.createObjectURL(blob);
@@ -231,27 +252,22 @@ const InvoicesTab = () => {
     }
   };
 
-  // ── WhatsApp send (unchanged from original) ─────────────────────────────────
+  // ── WhatsApp send (unchanged) ─────────────────────────────────────────────
   const handleSendWA = (inv) => {
     const phone = (inv.customerPhone || '').replace(/\D/g, '');
     if (!phone) { toast.error('No customer phone number on this invoice'); return; }
-
-    const items = (inv.items || [])
-      .map(i => `• ${i.name} × ${i.quantity} — ${CUR}${fmt(i.price * i.quantity)}`)
-      .join('\n');
-
+    const items = (inv.items || []).map(i => `• ${i.name} × ${i.quantity} — ${CUR}${fmt(i.price * i.quantity)}`).join('\n');
     let msg = `🧾 *Invoice ${inv.invoiceNumber || ''}*\n`;
     msg += `*Order #${String(inv.orderNumber || '').padStart(3, '0')}*\n`;
     if (inv.customerName) msg += `*Customer:* ${inv.customerName}\n`;
     msg += `\n*Items:*\n${items}\n\n`;
-    if (inv.subtotalAmount)         msg += `*Subtotal:* ${CUR}${fmt(inv.subtotalAmount)}\n`;
-    if (inv.gstAmount > 0)          msg += `*GST (${inv.gstRate || ''}%):* ${CUR}${fmt(inv.gstAmount)}\n`;
+    if (inv.subtotalAmount)          msg += `*Subtotal:* ${CUR}${fmt(inv.subtotalAmount)}\n`;
+    if (inv.gstAmount > 0)           msg += `*GST:* ${CUR}${fmt(inv.gstAmount)}\n`;
     if (inv.serviceChargeAmount > 0) msg += `*Service Charge:* ${CUR}${fmt(inv.serviceChargeAmount)}\n`;
     msg += `*Total:* ${CUR}${fmt(inv.totalAmount)}\n`;
     msg += `*Payment:* ${inv.paymentStatus === 'paid' ? '✅ Paid' : '⏳ Pending'}\n`;
     if (inv.paymentMode) msg += `*Mode:* ${inv.paymentMode}\n`;
     msg += `\nThank you for visiting ${inv.cafeName || ''} ☕`;
-
     window.location.href = `https://wa.me/${phone}?text=${encodeURIComponent(msg)}`;
   };
 
@@ -263,74 +279,80 @@ const InvoicesTab = () => {
     } catch { return '—'; }
   };
 
-  // ── Render ──────────────────────────────────────────────────────────────────
+  // ── Render ────────────────────────────────────────────────────────────────
   return (
-    <div className="space-y-5">
-      {/* Viewing invoice modal */}
+    <div className="inv space-y-5">
+
       {viewingInvoice && (
         <InvoiceModal invoice={viewingInvoice} onClose={() => setViewingInvoice(null)} />
       )}
 
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-        <div>
-          <h2 className="text-white font-bold text-2xl" style={{ fontFamily: 'Playfair Display, serif' }}>
-            Invoices
-          </h2>
-          <p className="text-[#555] text-xs mt-0.5">
-            {invoices.length} total · {paidInvoices.length} paid
-          </p>
+        <div className="flex items-center gap-3">
+          <div className="w-11 h-11 rounded-2xl flex items-center justify-center text-xl flex-shrink-0"
+            style={{ background: 'rgba(255,140,0,0.1)', border: '1.5px solid rgba(255,140,0,0.2)' }}>
+            🧾
+          </div>
+          <div>
+            <h2 className="text-white font-black text-2xl inv-title">Invoices</h2>
+            <p className="text-xs font-bold mt-0.5" style={{ color: '#7a6a55' }}>
+              {invoices.length} total · {paidInvoices.length} paid
+            </p>
+          </div>
         </div>
       </div>
 
-      {/* Filters + CSV button */}
+      {/* Filters + CSV */}
       <div className="flex flex-col sm:flex-row gap-3">
         <div className="relative flex-1">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[#555]" />
+          <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm">🔍</span>
           <input
             type="text"
             value={search}
             onChange={e => setSearch(e.target.value)}
             placeholder="Search by invoice #, order #, customer name or phone…"
-            className="w-full pl-9 pr-4 h-10 bg-black/20 border border-white/10 text-white placeholder:text-neutral-600 focus:border-[#D4AF37] focus:ring-1 focus:ring-[#D4AF37] rounded-sm text-sm outline-none"
+            className="inv-input"
+            style={{ paddingLeft: '2.2rem' }}
           />
         </div>
         <div className="flex gap-2 flex-wrap">
           {['all', 'paid', 'pending'].map(s => (
             <button key={s} onClick={() => setStatusFilter(s)}
-              className="px-4 h-10 rounded-sm text-sm font-medium capitalize transition-all"
+              className="px-4 h-10 rounded-xl text-sm font-black capitalize transition-all"
               style={statusFilter === s
-                ? { background: '#D4AF37', color: '#000' }
-                : { background: 'rgba(255,255,255,0.05)', color: '#A3A3A3', border: '1px solid rgba(255,255,255,0.1)' }
+                ? { background: 'linear-gradient(135deg,#FF7A20,#E55A00)', color: '#fff', boxShadow: '0 3px 12px rgba(255,120,0,0.3)' }
+                : { background: 'rgba(255,255,255,0.04)', color: '#7a6a55', border: '1.5px solid rgba(255,255,255,0.07)' }
               }>
-              {s === 'all' ? 'All' : s}
+              {s === 'all' ? '📋 All' : s === 'paid' ? '💰 Paid' : '⏳ Pending'}
             </button>
           ))}
-          {/* IMPROVEMENT 3: CSV download button */}
           <button
             onClick={downloadCSV}
-            className="flex items-center gap-1.5 px-4 h-10 rounded-sm text-sm font-medium transition-all"
-            style={{ background: 'rgba(255,255,255,0.05)', color: '#A3A3A3', border: '1px solid rgba(255,255,255,0.1)' }}
+            className="flex items-center gap-1.5 px-4 h-10 rounded-xl text-sm font-black transition-all"
+            style={{ background: 'rgba(255,255,255,0.04)', color: '#7a6a55', border: '1.5px solid rgba(255,255,255,0.07)' }}
           >
             <Download className="w-4 h-4" />
-            <span className="hidden sm:inline">Download CSV</span>
+            <span className="hidden sm:inline">📥 Export CSV</span>
             <span className="sm:hidden">CSV</span>
           </button>
         </div>
       </div>
 
-      {/* Stats row (IMPROVEMENT 3: correct counts) */}
+      {/* Stats row */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         {[
-          { label: 'Total Invoices', val: invoices.length,                         color: '#D4AF37' },
-          { label: 'Paid',           val: paidInvoices.length,                     color: '#10B981' },
-          { label: 'Pending',        val: pendingOrders,                            color: '#F59E0B' },
-          { label: 'Total Revenue',  val: `${CUR}${fmt(totalRevenue)}`,            color: '#3B82F6' },
+          { label: 'Total Invoices', val: invoices.length,              color: '#FF7A20', emoji: '🧾' },
+          { label: 'Paid',           val: paidInvoices.length,          color: '#34d399', emoji: '💰' },
+          { label: 'Pending',        val: pendingOrders,                 color: '#fbbf24', emoji: '⏳' },
+          { label: 'Total Revenue',  val: `${CUR}${fmt(totalRevenue)}`, color: '#60a5fa', emoji: '📊' },
         ].map(s => (
           <motion.div key={s.label} whileHover={{ y: -2 }}
-            className="bg-[#0F0F0F] border border-white/5 rounded-xl p-4">
-            <p className="text-[#555] text-xs uppercase tracking-wide mb-1">{s.label}</p>
+            className="inv-card p-4"
+            style={{ borderLeft: `3px solid ${s.color}` }}>
+            <p className="text-2xl mb-0.5">{s.emoji}</p>
             <p className="font-black text-xl" style={{ color: s.color }}>{s.val}</p>
+            <p className="text-xs font-bold mt-0.5" style={{ color: '#7a6a55' }}>{s.label}</p>
           </motion.div>
         ))}
       </div>
@@ -338,16 +360,15 @@ const InvoicesTab = () => {
       {/* Invoice list */}
       {loading ? (
         <div className="space-y-3">
-          {[...Array(4)].map((_,i) => (
-            <div key={i} className="h-20 rounded-xl bg-white/3 animate-pulse"
-              style={{ animationDelay: `${i*80}ms` }} />
+          {[...Array(4)].map((_, i) => (
+            <div key={i} className="h-20 rounded-2xl bg-white/3 animate-pulse"
+              style={{ animationDelay: `${i * 80}ms` }} />
           ))}
         </div>
       ) : filtered.length === 0 ? (
-        <div className="bg-[#0F0F0F] border border-white/5 rounded-xl p-12 text-center">
-          <FileText className="w-12 h-12 text-[#A3A3A3]/30 mx-auto mb-3" />
-          {/* IMPROVEMENT 5: improved empty state */}
-          <p className="text-[#A3A3A3]">
+        <div className="inv-card p-12 text-center">
+          <div className="text-5xl mb-3">🧾</div>
+          <p className="font-bold" style={{ color: '#7a6a55' }}>
             {invoices.length === 0
               ? 'No paid invoices yet. Invoices appear automatically when orders are marked as paid.'
               : 'No invoices match your search.'}
@@ -361,34 +382,35 @@ const InvoicesTab = () => {
                 initial={{ opacity: 0, y: 8 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: i * 0.03 }}
-                className="bg-[#0F0F0F] border border-white/5 rounded-xl overflow-hidden hover:border-white/10 transition-colors"
+                className="inv-card"
               >
-                {/* Main row */}
+                {/* Top accent bar */}
+                <div style={{ height: 2, background: inv.paymentStatus === 'paid' ? 'linear-gradient(90deg,#34d399,transparent)' : 'linear-gradient(90deg,#fbbf24,transparent)' }} />
+
                 <div className="flex items-center justify-between px-5 py-4 gap-4">
-                  {/* Left: invoice info */}
+                  {/* Left */}
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-3 flex-wrap">
-                      <span className="text-[#D4AF37] font-bold text-sm">
+                      <span className="font-black text-sm inv-title" style={{ color: '#FF7A20' }}>
                         {inv.invoiceNumber || `ORD-${String(inv.orderNumber||'').padStart(4,'0')}`}
                       </span>
-                      <span className="text-[#555] text-xs">Order #{String(inv.orderNumber||'').padStart(3,'0')}</span>
+                      <span className="text-xs font-bold" style={{ color: '#4a3f35' }}>
+                        Order #{String(inv.orderNumber||'').padStart(3,'0')}
+                      </span>
                       <StatusBadge status={inv.paymentStatus} />
                     </div>
                     <div className="flex items-center gap-3 mt-1 flex-wrap">
                       {inv.customerName && (
-                        <span className="text-white text-sm">{inv.customerName}</span>
+                        <span className="text-white text-sm font-semibold">👤 {inv.customerName}</span>
                       )}
                       {inv.customerPhone && (
-                        <span className="text-[#555] text-xs">{inv.customerPhone}</span>
+                        <span className="text-xs font-bold" style={{ color: '#4a3f35' }}>📞 {inv.customerPhone}</span>
                       )}
-                      <span className="text-[#555] text-xs">{formatDate(inv.createdAt)}</span>
+                      <span className="text-xs font-bold" style={{ color: '#4a3f35' }}>📅 {formatDate(inv.createdAt)}</span>
                     </div>
-
-                    {/* IMPROVEMENT 4: Delivery address (only for delivery orders) */}
                     {inv?.orderType === 'delivery' && (
-                      <div className="mt-1 text-xs text-[#A3A3A3]">
-                        <span className="text-[#555]">Address: </span>
-                        {inv?.deliveryAddress || 'N/A'}
+                      <div className="mt-1 text-xs font-semibold" style={{ color: '#7a6a55' }}>
+                        🛵 {inv?.deliveryAddress || 'N/A'}
                       </div>
                     )}
                   </div>
@@ -397,17 +419,17 @@ const InvoicesTab = () => {
                   <div className="flex items-center gap-4 flex-shrink-0">
                     <div className="text-right hidden sm:block">
                       {inv.gstAmount > 0 && (
-                        <p className="text-[#555] text-xs">GST: {CUR}{fmt(inv.gstAmount)}</p>
+                        <p className="text-xs font-bold" style={{ color: '#4a3f35' }}>GST: {CUR}{fmt(inv.gstAmount)}</p>
                       )}
                       {inv.serviceChargeAmount > 0 && (
-                        <p className="text-[#555] text-xs">SC: {CUR}{fmt(inv.serviceChargeAmount)}</p>
+                        <p className="text-xs font-bold" style={{ color: '#4a3f35' }}>SC: {CUR}{fmt(inv.serviceChargeAmount)}</p>
                       )}
-                      <p className="text-[#D4AF37] font-black text-base">{CUR}{fmt(inv.totalAmount)}</p>
+                      <p className="font-black text-base" style={{ color: '#FF7A20' }}>💵 {CUR}{fmt(inv.totalAmount)}</p>
                     </div>
                     <div className="flex gap-2">
                       <button
                         onClick={() => setViewingInvoice(inv)}
-                        className="flex items-center gap-1.5 px-3 py-2 bg-[#D4AF37]/10 hover:bg-[#D4AF37]/20 border border-[#D4AF37]/20 text-[#D4AF37] rounded-lg text-xs font-semibold transition-all"
+                        className="inv-btn inv-btn-gold"
                       >
                         <Eye className="w-3.5 h-3.5" />
                         <span className="hidden sm:inline">View</span>
@@ -415,7 +437,7 @@ const InvoicesTab = () => {
                       {inv.customerPhone && (
                         <button
                           onClick={() => handleSendWA(inv)}
-                          className="flex items-center gap-1.5 px-3 py-2 bg-green-500/10 hover:bg-green-500/20 border border-green-500/20 text-green-400 rounded-lg text-xs font-semibold transition-all"
+                          className="inv-btn inv-btn-green"
                           title="Send Invoice via WhatsApp"
                         >
                           <MessageSquare className="w-3.5 h-3.5" />
@@ -428,24 +450,24 @@ const InvoicesTab = () => {
 
                 {/* Items summary */}
                 {inv.items?.length > 0 && (
-                  <div className="px-5 pb-3 border-t border-white/5 pt-2">
+                  <div className="px-5 pb-3 pt-2" style={{ borderTop: '1px solid rgba(255,255,255,0.04)' }}>
                     <div className="flex flex-wrap gap-2">
                       {inv.items.slice(0, 4).map((item, j) => (
-                        <span key={j} className="text-xs px-2 py-0.5 rounded-full bg-white/5 text-[#A3A3A3]">
-                          {item.name} ×{item.quantity}
+                        <span key={j} className="text-xs px-2.5 py-1 rounded-full font-bold"
+                          style={{ background: 'rgba(255,140,0,0.08)', color: '#7a6a55', border: '1px solid rgba(255,140,0,0.15)' }}>
+                          🍴 {item.name} ×{item.quantity}
                         </span>
                       ))}
                       {inv.items.length > 4 && (
-                        <span className="text-xs text-[#555]">+{inv.items.length - 4} more</span>
+                        <span className="text-xs font-bold" style={{ color: '#4a3f35' }}>+{inv.items.length - 4} more</span>
                       )}
                     </div>
-                    {/* Mobile total */}
                     <div className="flex items-center justify-between mt-2 sm:hidden">
-                      <span className="text-[#555] text-xs">
+                      <span className="text-xs font-bold" style={{ color: '#4a3f35' }}>
                         {inv.gstAmount > 0 ? `GST: ${CUR}${fmt(inv.gstAmount)}` : ''}
                         {inv.serviceChargeAmount > 0 ? ` · SC: ${CUR}${fmt(inv.serviceChargeAmount)}` : ''}
                       </span>
-                      <span className="text-[#D4AF37] font-black">{CUR}{fmt(inv.totalAmount)}</span>
+                      <span className="font-black" style={{ color: '#FF7A20' }}>{CUR}{fmt(inv.totalAmount)}</span>
                     </div>
                   </div>
                 )}
@@ -454,6 +476,15 @@ const InvoicesTab = () => {
           </AnimatePresence>
         </div>
       )}
+
+      {/* Footer */}
+      <div className="flex items-center justify-center gap-2 py-2">
+        <span>☕</span>
+        <p className="text-xs font-bold" style={{ color: '#7a6a55' }}>
+          {filtered.length} invoice{filtered.length !== 1 ? 's' : ''} · Real-time sync active
+        </p>
+        <span className="inline-block w-1.5 h-1.5 rounded-full animate-pulse" style={{ background: '#34d399' }} />
+      </div>
     </div>
   );
 };

@@ -9,6 +9,8 @@
  *   - Search bar + category filter
  *   - Low Stock alert banner + red row highlight
  *   - Ingredient mapping tab per menu item (optional linkage)
+ *
+ * UI UPGRADE: Café-vibe premium aesthetic. Zero logic changes.
  */
 
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
@@ -33,19 +35,71 @@ import {
 import RecipeManager from './RecipeManager';
 import { useTheme } from '../../hooks/useTheme';
 
-// ─── constants ───────────────────────────────────────────────────────────────
+// ── Inject café-vibe CSS once ─────────────────────────────────────────────────
+if (typeof document !== 'undefined' && !document.getElementById('inv-mgmt-css')) {
+  const el = document.createElement('style');
+  el.id = 'inv-mgmt-css';
+  el.textContent = `
+    @import url('https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800;900&family=Fredoka+One&display=swap');
+    .imv { font-family: 'Nunito', system-ui, sans-serif; }
+    .imv-title { font-family: 'Fredoka One', system-ui, sans-serif !important; }
+    .imv-card {
+      background: #141008;
+      border: 1.5px solid rgba(255,255,255,0.07);
+      border-radius: 16px;
+      transition: border-color 200ms;
+    }
+    .imv-card:hover { border-color: rgba(255,140,0,0.18); }
+    .imv-input {
+      background: #1c1509; border: 1.5px solid rgba(255,255,255,0.08); border-radius: 12px;
+      color: #fff8ee; padding: 10px 14px; font-size: 14px; font-weight: 600;
+      font-family: 'Nunito', system-ui, sans-serif;
+      outline: none; width: 100%; transition: border-color 180ms, box-shadow 180ms;
+    }
+    .imv-input:focus { border-color: rgba(255,140,0,0.55); box-shadow: 0 0 0 3px rgba(255,140,0,0.1); }
+    .imv-input::placeholder { color: #3d3020; }
+    .imv-select {
+      background: #1c1509; border: 1.5px solid rgba(255,255,255,0.08); border-radius: 9px;
+      color: #fff8ee; padding: 10px 14px; font-size: 14px; font-weight: 600;
+      font-family: 'Nunito', system-ui, sans-serif;
+      outline: none; width: 100%; cursor: pointer; transition: border-color 160ms;
+    }
+    .imv-select:focus { border-color: rgba(255,140,0,0.5); }
+    .imv-select option { background: #1c1509; }
+    .imv-btn {
+      display: inline-flex; align-items: center; gap: 5px;
+      font-family: 'Nunito', system-ui, sans-serif;
+      font-weight: 800; font-size: 13px;
+      padding: 8px 16px; border-radius: 12px;
+      border: 1.5px solid transparent;
+      cursor: pointer; transition: all 180ms; white-space: nowrap;
+    }
+    .imv-btn:hover { transform: translateY(-1px); filter: brightness(1.1); }
+    .imv-btn:active { transform: scale(0.96); }
+    .imv-btn-orange { background: linear-gradient(135deg,#FF7A20,#E55A00); color:#fff; box-shadow: 0 3px 12px rgba(255,120,0,0.3); }
+    .imv-btn-ghost  { background: rgba(255,255,255,0.05); color: #7a6a55; border-color: rgba(255,255,255,0.08); }
+    .imv-btn-ghost:hover { background: rgba(255,255,255,0.09); color: #fff; }
+    .imv-btn-red    { background: rgba(220,50,50,0.12); color: #ff7070; border-color: rgba(220,50,50,0.22); }
+    .imv-btn-red:hover { background: rgba(220,50,50,0.22); }
+    .imv-row { border-bottom: 1px solid rgba(255,255,255,0.04); transition: background 150ms; }
+    .imv-row:hover { background: rgba(255,140,0,0.03); }
+    @keyframes imvIn { from { opacity:0; transform:translateY(6px); } to { opacity:1; transform:translateY(0); } }
+    .imv-in { animation: imvIn 250ms ease forwards; }
+  `;
+  document.head.appendChild(el);
+}
 
+// ─── constants ────────────────────────────────────────────────────────────────
 const EMPTY_FORM = {
   itemName:          '',
   category:          '',
   quantity:          '',
   unit:              'pcs',
   lowStockThreshold: '',
-  costPerUnit:       '',   // ₹ cost per unit — used for profit calculation
+  costPerUnit:       '',
 };
 
-// ─── helpers ─────────────────────────────────────────────────────────────────
-
+// ─── helpers ──────────────────────────────────────────────────────────────────
 const isLow = (item) =>
   typeof item.quantity === 'number' &&
   typeof item.lowStockThreshold === 'number' &&
@@ -57,31 +111,26 @@ const fmtDate = (ts) => {
   return d.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
 };
 
-// ─── InventoryForm (add / edit modal) ────────────────────────────────────────
-
+// ─── InventoryForm ────────────────────────────────────────────────────────────
 const InventoryForm = ({ initial, onSave, onClose, saving, T }) => {
   const [form, setForm] = useState(initial || EMPTY_FORM);
-
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
 
   const handleSubmit = (e) => {
     e.preventDefault();
-    if (!form.itemName.trim())          { toast.error('Item name is required');         return; }
-    if (!form.category.trim())          { toast.error('Category is required');           return; }
-    if (form.quantity === '')           { toast.error('Quantity is required');           return; }
+    if (!form.itemName.trim())          { toast.error('Item name is required');          return; }
+    if (!form.category.trim())          { toast.error('Category is required');            return; }
+    if (form.quantity === '')           { toast.error('Quantity is required');            return; }
     if (form.lowStockThreshold === '')  { toast.error('Low stock threshold is required'); return; }
     onSave(form);
   };
-
-  const inputCls = `w-full ${T.input} rounded-sm h-11 px-4 transition-all text-sm`;
-  const labelCls = ''; // moved inline
 
   return (
     <motion.div
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
-      className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4"
+      className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4 imv"
       onClick={onClose}
     >
       <motion.div
@@ -90,141 +139,75 @@ const InventoryForm = ({ initial, onSave, onClose, saving, T }) => {
         exit={{    scale: 0.93, opacity: 0, y: 10 }}
         transition={{ type: 'spring', stiffness: 300, damping: 26 }}
         onClick={e => e.stopPropagation()}
-        className={`w-full max-w-lg ${T.card} rounded-xl shadow-2xl overflow-hidden`}
+        className="w-full max-w-lg rounded-2xl shadow-2xl overflow-hidden"
+        style={{ background: 'linear-gradient(180deg,#1e1408 0%,#150f06 100%)', border: '1.5px solid rgba(255,140,0,0.18)' }}
       >
         {/* Header */}
-        <div className={`flex items-center justify-between px-6 py-4 border-b ${T.borderMd} bg-[#0F0F0F]`}>
+        <div className="flex items-center justify-between px-6 py-4" style={{ borderBottom: '1px solid rgba(255,140,0,0.1)' }}>
           <div className="flex items-center gap-3">
-            <div className="w-8 h-8 rounded-lg bg-[#D4AF37]/10 flex items-center justify-center">
-              <Boxes className="w-4 h-4 text-[#D4AF37]" />
+            <div className="w-9 h-9 rounded-xl flex items-center justify-center text-lg"
+              style={{ background: 'rgba(255,140,0,0.1)', border: '1.5px solid rgba(255,140,0,0.2)' }}>
+              📦
             </div>
-            <h3 className={`${T.heading} font-semibold`} style={{ fontFamily: 'Playfair Display, serif' }}>
-              {initial ? 'Edit Item' : 'Add Inventory Item'}
+            <h3 className="font-black text-white imv-title text-lg">
+              {initial ? '✏️ Edit Item' : '➕ Add Inventory Item'}
             </h3>
           </div>
-          <button onClick={onClose} className={`p-1.5 text-[#A3A3A3] hover:${T.heading} hover:bg-white/10 rounded-lg transition-all`}>
+          <button onClick={onClose} className="p-1.5 rounded-xl transition-all" style={{ color: '#7a6a55' }}
+            onMouseEnter={e => e.currentTarget.style.color = '#fff'}
+            onMouseLeave={e => e.currentTarget.style.color = '#7a6a55'}>
             <X className="w-5 h-5" />
           </button>
         </div>
 
         {/* Form */}
         <form onSubmit={handleSubmit} className="p-6 space-y-4">
-          {/* Item Name */}
           <div>
-            <label className={`block ${T.label} text-sm font-medium mb-1.5`}>Item Name</label>
-            <input
-              type="text"
-              value={form.itemName}
-              onChange={e => set('itemName', e.target.value)}
-              placeholder="e.g., Coffee Powder"
-              className={`w-full ${T.input} rounded-sm h-11 px-4 text-sm transition-all`}
-              data-testid="inv-item-name"
-              autoFocus
-            />
+            <label className="block text-xs font-black uppercase tracking-widest mb-1.5" style={{ color: '#FF7A20' }}>Item Name</label>
+            <input type="text" value={form.itemName} onChange={e => set('itemName', e.target.value)}
+              placeholder="e.g., Coffee Powder" className="imv-input" data-testid="inv-item-name" autoFocus />
           </div>
-
-          {/* Category */}
           <div>
-            <label className={`block ${T.label} text-sm font-medium mb-1.5`}>Category</label>
-            <input
-              type="text"
-              value={form.category}
-              onChange={e => set('category', e.target.value)}
-              placeholder="e.g., Beverages, Dairy, Dry Goods"
-              className={`w-full ${T.input} rounded-sm h-11 px-4 text-sm transition-all`}
-              data-testid="inv-category"
-            />
+            <label className="block text-xs font-black uppercase tracking-widest mb-1.5" style={{ color: '#FF7A20' }}>Category</label>
+            <input type="text" value={form.category} onChange={e => set('category', e.target.value)}
+              placeholder="e.g., Beverages, Dairy, Dry Goods" className="imv-input" data-testid="inv-category" />
           </div>
-
-          {/* Quantity + Unit row */}
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className={`block ${T.label} text-sm font-medium mb-1.5`}>Current Quantity</label>
-              <input
-                type="number"
-                min="0"
-                step="any"
-                value={form.quantity}
-                onChange={e => set('quantity', e.target.value)}
-                placeholder="0"
-                className={`w-full ${T.input} rounded-sm h-11 px-4 text-sm transition-all`}
-                data-testid="inv-quantity"
-              />
+              <label className="block text-xs font-black uppercase tracking-widest mb-1.5" style={{ color: '#FF7A20' }}>Quantity</label>
+              <input type="number" min="0" step="any" value={form.quantity} onChange={e => set('quantity', e.target.value)}
+                placeholder="0" className="imv-input" data-testid="inv-quantity" />
             </div>
             <div>
-              <label className={`block ${T.label} text-sm font-medium mb-1.5`}>Unit</label>
-              <select
-                value={form.unit}
-                onChange={e => set('unit', e.target.value)}
-                className={`w-full ${T.innerCard} border ${T.borderMd} text-white focus:border-[#D4AF37] focus:ring-1 focus:ring-[#D4AF37] rounded-sm h-11 px-4 transition-all text-sm`}
-                data-testid="inv-unit"
-              >
-                {UNITS.map(u => (
-                  <option key={u} value={u} className={T.option}>{u}</option>
-                ))}
+              <label className="block text-xs font-black uppercase tracking-widest mb-1.5" style={{ color: '#FF7A20' }}>Unit</label>
+              <select value={form.unit} onChange={e => set('unit', e.target.value)}
+                className="imv-select" data-testid="inv-unit">
+                {UNITS.map(u => <option key={u} value={u}>{u}</option>)}
               </select>
             </div>
           </div>
-
-          {/* Low Stock Threshold */}
           <div>
-            <label className={`block ${T.label} text-sm font-medium mb-1.5`}>
-              Low Stock Alert Threshold
-              <span className={`${T.muted} font-normal ml-1 text-xs`}>
-                (alert shown when quantity ≤ this value)
-              </span>
+            <label className="block text-xs font-black uppercase tracking-widest mb-1.5" style={{ color: '#FF7A20' }}>
+              Low Stock Threshold
+              <span className="font-normal ml-1 normal-case" style={{ color: '#7a6a55' }}>(alert when qty ≤ this)</span>
             </label>
-            <input
-              type="number"
-              min="0"
-              step="any"
-              value={form.lowStockThreshold}
+            <input type="number" min="0" step="any" value={form.lowStockThreshold}
               onChange={e => set('lowStockThreshold', e.target.value)}
-              placeholder="e.g., 500"
-              className={`w-full ${T.input} rounded-sm h-11 px-4 text-sm transition-all`}
-              data-testid="inv-threshold"
-            />
+              placeholder="e.g., 500" className="imv-input" data-testid="inv-threshold" />
           </div>
-
-          {/* Cost Per Unit — for profit calculation */}
           <div>
-            <label className={`block ${T.label} text-sm font-medium mb-1.5`}>
+            <label className="block text-xs font-black uppercase tracking-widest mb-1.5" style={{ color: '#FF7A20' }}>
               Cost Per Unit (₹)
-              <span className={`${T.muted} font-normal ml-1 text-xs`}>
-                (used to calculate COGS and net profit)
-              </span>
+              <span className="font-normal ml-1 normal-case" style={{ color: '#7a6a55' }}>(for COGS & profit calc)</span>
             </label>
-            <input
-              type="number"
-              min="0"
-              step="0.01"
-              value={form.costPerUnit}
+            <input type="number" min="0" step="0.01" value={form.costPerUnit}
               onChange={e => set('costPerUnit', e.target.value)}
-              placeholder="e.g., 5.50"
-              className={`w-full ${T.input} rounded-sm h-11 px-4 text-sm transition-all`}
-              data-testid="inv-cost"
-            />
+              placeholder="e.g., 5.50" className="imv-input" data-testid="inv-cost" />
           </div>
-
-          {/* Actions */}
           <div className="flex gap-3 pt-2">
-            <button
-              type="button"
-              onClick={onClose}
-              className={`flex-1 py-2.5 border ${T.borderMd} text-[#A3A3A3] hover:text-white hover:border-white/20 rounded-sm text-sm font-medium transition-all`}
-            >
-              Cancel
-            </button>
-            <button
-              type="submit"
-              disabled={saving}
-              className="flex-1 py-2.5 bg-[#D4AF37] hover:bg-[#C5A059] text-black font-bold rounded-sm text-sm transition-all disabled:opacity-50 flex items-center justify-center gap-2"
-              data-testid="inv-save-btn"
-            >
-              {saving
-                ? <><RefreshCw className="w-4 h-4 animate-spin" /> Saving…</>
-                : <><Save className="w-4 h-4" /> {initial ? 'Update Item' : 'Add Item'}</>
-              }
+            <button type="button" onClick={onClose} className="imv-btn imv-btn-ghost flex-1 justify-center">Cancel</button>
+            <button type="submit" disabled={saving} className="imv-btn imv-btn-orange flex-1 justify-center disabled:opacity-50" data-testid="inv-save-btn">
+              {saving ? <><RefreshCw className="w-4 h-4 animate-spin" /> Saving…</> : <><Save className="w-4 h-4" /> {initial ? 'Update Item' : 'Add Item'}</>}
             </button>
           </div>
         </form>
@@ -233,9 +216,8 @@ const InventoryForm = ({ initial, onSave, onClose, saving, T }) => {
   );
 };
 
-// ─── QuickQtyEditor — inline quantity adjust cell ────────────────────────────
-
-const QuickQtyEditor = ({ item, T }) => {
+// ─── QuickQtyEditor ───────────────────────────────────────────────────────────
+const QuickQtyEditor = ({ item }) => {
   const [editing, setEditing] = useState(false);
   const [val,     setVal    ] = useState(String(item.quantity ?? 0));
   const [saving,  setSaving ] = useState(false);
@@ -248,26 +230,22 @@ const QuickQtyEditor = ({ item, T }) => {
     const { error } = await updateStockQuantity(item.id, n);
     setSaving(false);
     if (error) { toast.error('Failed to update stock'); }
-    else        { toast.success(`${item.itemName} updated to ${n} ${item.unit}`); }
+    else        { toast.success(`${item.itemName} updated to ${n} ${item.unit} ✓`); }
     setEditing(false);
   };
 
   if (editing) {
     return (
       <div className="flex items-center gap-1.5">
-        <input
-          type="number"
-          min="0"
-          step="any"
-          value={val}
+        <input type="number" min="0" step="any" value={val}
           onChange={e => setVal(e.target.value)}
           onKeyDown={e => { if (e.key === 'Enter') commit(); if (e.key === 'Escape') setEditing(false); }}
           onBlur={commit}
-          className={`w-20 bg-black/40 border border-[#D4AF37]/50 ${T.heading} rounded px-2 py-1 text-sm focus:outline-none focus:border-[#D4AF37]`}
-          autoFocus
-        />
-        <span className={`${T.muted} text-xs`}>{item.unit}</span>
-        {saving && <RefreshCw className="w-3 h-3 text-[#D4AF37] animate-spin" />}
+          className="w-20 rounded-lg px-2 py-1 text-sm font-bold outline-none"
+          style={{ background: 'rgba(255,140,0,0.1)', border: '1.5px solid rgba(255,140,0,0.5)', color: '#FF7A20' }}
+          autoFocus />
+        <span className="text-xs font-bold" style={{ color: '#7a6a55' }}>{item.unit}</span>
+        {saving && <RefreshCw className="w-3 h-3 animate-spin" style={{ color: '#FF7A20' }} />}
       </div>
     );
   }
@@ -275,9 +253,8 @@ const QuickQtyEditor = ({ item, T }) => {
   return (
     <button
       onClick={() => { setVal(String(item.quantity ?? 0)); setEditing(true); }}
-      className={`text-left font-semibold text-sm hover:underline underline-offset-2 transition-colors ${
-        isLow(item) ? 'text-red-400' : 'text-white'
-      }`}
+      className="text-left font-black text-sm hover:underline underline-offset-2 transition-colors"
+      style={{ color: isLow(item) ? '#f87171' : '#fff' }}
       title="Click to edit quantity"
     >
       {item.quantity ?? 0} {item.unit}
@@ -285,8 +262,7 @@ const QuickQtyEditor = ({ item, T }) => {
   );
 };
 
-// ─── Main component ──────────────────────────────────────────────────────────
-
+// ─── Main component ───────────────────────────────────────────────────────────
 const InventoryManagement = () => {
   const { user } = useAuth();
   const cafeId = user?.cafeId;
@@ -295,15 +271,14 @@ const InventoryManagement = () => {
   const [inventory,  setInventory ] = useState([]);
   const [invLoading, setInvLoading] = useState(true);
   const [showForm,   setShowForm  ] = useState(false);
-  const [editTarget, setEditTarget] = useState(null);   // item being edited
+  const [editTarget, setEditTarget] = useState(null);
   const [formSaving, setFormSaving ] = useState(false);
-  const [deleteId,   setDeleteId  ] = useState(null);   // confirm-delete modal
+  const [deleteId,   setDeleteId  ] = useState(null);
   const [deleting,   setDeleting  ] = useState(false);
   const [search,     setSearch    ] = useState('');
   const [catFilter,  setCatFilter ] = useState('all');
   const [showRecipeManager, setShowRecipeManager] = useState(false);
 
-  // ── real-time listener ──────────────────────────────────────────────────
   useEffect(() => {
     if (!cafeId) { setInvLoading(false); return; }
     const unsub = subscribeToInventory(cafeId, (items) => {
@@ -313,7 +288,6 @@ const InventoryManagement = () => {
     return () => unsub();
   }, [cafeId]);
 
-  // ── derived data ────────────────────────────────────────────────────────
   const categories = useMemo(() => {
     const cats = new Set(inventory.map(i => i.category).filter(Boolean));
     return ['all', ...Array.from(cats).sort()];
@@ -331,7 +305,6 @@ const InventoryManagement = () => {
     });
   }, [inventory, catFilter, search]);
 
-  // ── CRUD handlers ───────────────────────────────────────────────────────
   const handleSave = async (formData) => {
     setFormSaving(true);
     let result;
@@ -348,56 +321,47 @@ const InventoryManagement = () => {
     setEditTarget(null);
   };
 
-  const handleEdit = (item) => {
-    setEditTarget(item);
-    setShowForm(true);
-  };
-
+  const handleEdit   = (item) => { setEditTarget(item); setShowForm(true); };
   const handleDelete = async () => {
     if (!deleteId) return;
     setDeleting(true);
     const { error } = await deleteInventoryItem(deleteId);
     setDeleting(false);
     if (error) { toast.error('Delete failed'); }
-    else        { toast.success('Item deleted'); }
+    else        { toast.success('Item deleted 🗑️'); }
     setDeleteId(null);
   };
-
   const openAddForm = () => { setEditTarget(null); setShowForm(true); };
 
-  // ── render ──────────────────────────────────────────────────────────────
   return (
-    <div className="space-y-5">
+    <div className="imv space-y-5">
 
-      {/* ── Recipe Manager Modal ── */}
       <AnimatePresence>
-        {showRecipeManager && (
-          <RecipeManager onClose={() => setShowRecipeManager(false)} />
-        )}
+        {showRecipeManager && <RecipeManager onClose={() => setShowRecipeManager(false)} />}
       </AnimatePresence>
 
-      {/* ── Low Stock Alert Banner ─────────────────────────────────────── */}
+      {/* ── Low Stock Alert ───────────────────────────────────────────────── */}
       <AnimatePresence>
         {lowStockItems.length > 0 && (
           <motion.div
             initial={{ opacity: 0, y: -10 }}
             animate={{ opacity: 1, y: 0   }}
             exit={{    opacity: 0, y: -10  }}
-            className="bg-red-500/10 border border-red-500/25 rounded-sm p-4"
+            className="rounded-2xl p-4"
+            style={{ background: 'rgba(220,50,50,0.08)', border: '1.5px solid rgba(220,50,50,0.22)' }}
             data-testid="low-stock-banner"
           >
             <div className="flex items-start gap-3">
-              <AlertTriangle className="w-5 h-5 text-red-400 flex-shrink-0 mt-0.5" />
+              <span className="text-xl flex-shrink-0 mt-0.5">⚠️</span>
               <div className="flex-1 min-w-0">
-                <p className="text-red-400 font-semibold text-sm mb-2">
-                  ⚠ Low Stock Warning — {lowStockItems.length} item{lowStockItems.length !== 1 ? 's' : ''} below threshold
+                <p className="font-black text-sm mb-2" style={{ color: '#f87171' }}>
+                  Low Stock Warning — {lowStockItems.length} item{lowStockItems.length !== 1 ? 's' : ''} below threshold
                 </p>
                 <div className="flex flex-wrap gap-2">
                   {lowStockItems.map(item => (
-                    <span
-                      key={item.id}
-                      className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-red-500/15 border border-red-500/25 rounded text-red-300 text-xs font-medium"
-                    >
+                    <span key={item.id}
+                      className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl text-xs font-black"
+                      style={{ background: 'rgba(220,50,50,0.12)', color: '#f87171', border: '1px solid rgba(220,50,50,0.25)' }}>
                       <span className="w-1.5 h-1.5 rounded-full bg-red-400 animate-pulse flex-shrink-0" />
                       {item.itemName} — {item.quantity} {item.unit}
                     </span>
@@ -409,131 +373,108 @@ const InventoryManagement = () => {
         )}
       </AnimatePresence>
 
-      {/* ── Header row ─────────────────────────────────────────────────── */}
+      {/* ── Header ────────────────────────────────────────────────────────── */}
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
-        <div>
-          <h2 className={`text-2xl font-bold ${T.heading}`} style={{ fontFamily: 'Playfair Display, serif' }}>
-            Inventory Management
-          </h2>
-          <p className={`${T.muted} text-sm mt-0.5`}>
-            {inventory.length} item{inventory.length !== 1 ? 's' : ''} tracked
-            {lowStockItems.length > 0 && (
-              <span className="text-red-400 ml-2">
-                · {lowStockItems.length} low stock
-              </span>
-            )}
-          </p>
+        <div className="flex items-center gap-3">
+          <div className="w-11 h-11 rounded-2xl flex items-center justify-center text-xl flex-shrink-0"
+            style={{ background: 'rgba(255,140,0,0.1)', border: '1.5px solid rgba(255,140,0,0.2)' }}>
+            📦
+          </div>
+          <div>
+            <h2 className="text-2xl font-black text-white imv-title">Inventory</h2>
+            <p className="text-xs font-bold mt-0.5" style={{ color: '#7a6a55' }}>
+              {inventory.length} item{inventory.length !== 1 ? 's' : ''} tracked
+              {lowStockItems.length > 0 && (
+                <span className="ml-2" style={{ color: '#f87171' }}>· {lowStockItems.length} low stock ⚠️</span>
+              )}
+            </p>
+          </div>
         </div>
         <div className="flex items-center gap-2 flex-wrap">
-          <button
-            onClick={() => setShowRecipeManager(true)}
-            className={`flex items-center gap-2 px-4 py-2.5 ${T.subCard} hover:bg-white/10 border ${T.borderMd} ${T.heading} font-semibold rounded-sm text-sm transition-all`}
-          >
-            <FlaskConical className="w-4 h-4 text-[#D4AF37]" />
-            Manage Recipes
+          <button onClick={() => setShowRecipeManager(true)}
+            className="imv-btn imv-btn-ghost">
+            <FlaskConical className="w-4 h-4" style={{ color: '#FF7A20' }} />
+            🧪 Manage Recipes
           </button>
-          <button
-            onClick={openAddForm}
-            data-testid="add-inventory-btn"
-            className="flex items-center gap-2 px-5 py-2.5 bg-[#D4AF37] hover:bg-[#C5A059] text-black font-bold rounded-sm text-sm transition-all whitespace-nowrap"
-          >
+          <button onClick={openAddForm} data-testid="add-inventory-btn" className="imv-btn imv-btn-orange">
             <Plus className="w-4 h-4" />
-            Add Item
+            ➕ Add Item
           </button>
         </div>
       </div>
 
-      {/* ── Search + Category filter ───────────────────────────────────── */}
+      {/* ── Search + Filter ───────────────────────────────────────────────── */}
       <div className="flex flex-col sm:flex-row gap-3">
         <div className="relative flex-1">
-          <Search className={`absolute left-4 top-1/2 -translate-y-1/2 ${T.muted} w-4 h-4`} />
-          <input
-            type="text"
-            value={search}
-            onChange={e => setSearch(e.target.value)}
+          <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm">🔍</span>
+          <input type="text" value={search} onChange={e => setSearch(e.target.value)}
             placeholder="Search items or categories…"
             data-testid="inv-search"
-            className={`w-full ${T.card} text-white placeholder:text-neutral-600 focus:border-[#D4AF37] focus:ring-1 focus:ring-[#D4AF37] rounded-sm h-10 pl-11 pr-4 text-sm transition-all`}
-          />
+            className="imv-input"
+            style={{ paddingLeft: '2.2rem' }} />
         </div>
         <div className="flex items-center gap-2">
-          <Filter className={`w-4 h-4 ${T.muted} flex-shrink-0`} />
-          <select
-            value={catFilter}
-            onChange={e => setCatFilter(e.target.value)}
+          <span className="text-sm">🗂️</span>
+          <select value={catFilter} onChange={e => setCatFilter(e.target.value)}
             data-testid="inv-cat-filter"
-            className={`${T.card} text-white focus:border-[#D4AF37] rounded-sm h-10 px-3 text-sm transition-all`}
-          >
+            className="imv-select" style={{ width: 'auto', minWidth: 140 }}>
             {categories.map(c => (
-              <option key={c} value={c} className={T.option}>
-                {c === 'all' ? 'All Categories' : c}
-              </option>
+              <option key={c} value={c}>{c === 'all' ? 'All Categories' : c}</option>
             ))}
           </select>
         </div>
       </div>
 
-      {/* ── Stats row ──────────────────────────────────────────────────── */}
+      {/* ── Stats row ─────────────────────────────────────────────────────── */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
         {[
-          { label: 'Total Items',    value: inventory.length,         color: '#D4AF37', icon: Boxes        },
-          { label: 'Categories',     value: categories.length - 1,    color: '#3B82F6', icon: Filter       },
-          { label: 'Low Stock',      value: lowStockItems.length,     color: '#EF4444', icon: AlertTriangle },
-          { label: 'Stock OK',       value: inventory.length - lowStockItems.length, color: '#10B981', icon: CheckCircle2 },
-        ].map(stat => {
-          const Icon = stat.icon;
-          return (
-            <div
-              key={stat.label}
-              className={`${T.card} rounded-sm p-4 flex items-center gap-3`}
-              style={{ borderLeft: `3px solid ${stat.color}` }}
-            >
-              <div
-                className="w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0"
-                style={{ backgroundColor: stat.color + '18' }}
-              >
-                <Icon className="w-4 h-4" style={{ color: stat.color }} />
-              </div>
-              <div>
-                <p className={`text-xl font-bold ${T.heading} leading-none`}>{stat.value}</p>
-                <p className={`${T.muted} text-xs mt-0.5`}>{stat.label}</p>
-              </div>
+          { label: 'Total Items',  value: inventory.length,                      color: '#FF7A20', emoji: '📦' },
+          { label: 'Categories',   value: categories.length - 1,                 color: '#60a5fa', emoji: '🗂️' },
+          { label: 'Low Stock',    value: lowStockItems.length,                  color: '#f87171', emoji: '⚠️' },
+          { label: 'Stock OK',     value: inventory.length - lowStockItems.length, color: '#34d399', emoji: '✅' },
+        ].map(stat => (
+          <div key={stat.label} className="imv-card p-4 flex items-center gap-3"
+            style={{ borderLeft: `3px solid ${stat.color}` }}>
+            <div className="w-9 h-9 rounded-xl flex items-center justify-center text-lg flex-shrink-0"
+              style={{ background: stat.color + '18' }}>
+              {stat.emoji}
             </div>
-          );
-        })}
+            <div>
+              <p className="text-xl font-black text-white leading-none">{stat.value}</p>
+              <p className="text-xs font-bold mt-0.5" style={{ color: '#7a6a55' }}>{stat.label}</p>
+            </div>
+          </div>
+        ))}
       </div>
 
-      {/* ── Inventory Table ─────────────────────────────────────────────── */}
+      {/* ── Table ─────────────────────────────────────────────────────────── */}
       {invLoading ? (
-        <div className="flex items-center justify-center py-16">
-          <RefreshCw className="w-7 h-7 text-[#D4AF37] animate-spin" />
+        <div className="flex flex-col items-center justify-center py-16 gap-3">
+          <div className="text-4xl animate-bounce">📦</div>
+          <p className="text-sm font-bold" style={{ color: '#7a6a55' }}>Loading inventory…</p>
         </div>
       ) : inventory.length === 0 ? (
-        <div className={`${T.card} rounded-sm p-14 text-center`}>
-          <Package className={`w-14 h-14 ${T.muted} mx-auto mb-4`} />
-          <p className={`${T.heading} font-semibold text-lg mb-1`}>No inventory items yet</p>
-          <p className={`${T.muted} text-sm mb-6`}>Start tracking your ingredients and supplies.</p>
-          <button
-            onClick={openAddForm}
-            className="inline-flex items-center gap-2 px-6 py-2.5 bg-[#D4AF37] hover:bg-[#C5A059] text-black font-bold rounded-sm text-sm transition-all"
-          >
-            <Plus className="w-4 h-4" />
-            Add Your First Item
+        <div className="imv-card p-14 text-center">
+          <div className="text-5xl mb-4">📦</div>
+          <p className="font-black text-lg text-white mb-1">No inventory items yet</p>
+          <p className="text-sm mb-6 font-bold" style={{ color: '#7a6a55' }}>Start tracking your ingredients and supplies.</p>
+          <button onClick={openAddForm} className="imv-btn imv-btn-orange mx-auto">
+            <Plus className="w-4 h-4" />Add Your First Item
           </button>
         </div>
       ) : filtered.length === 0 ? (
-        <div className={`${T.card} rounded-sm p-10 text-center`}>
-          <Search className={`w-10 h-10 ${T.muted} mx-auto mb-3`} />
-          <p className={`${T.muted}`}>No items match your search or filter.</p>
+        <div className="imv-card p-10 text-center">
+          <div className="text-4xl mb-3">🔍</div>
+          <p className="font-bold" style={{ color: '#7a6a55' }}>No items match your search or filter.</p>
         </div>
       ) : (
-        <div className={`${T.card} rounded-sm overflow-hidden`}>
+        <div className="imv-card overflow-hidden">
           <div className="overflow-x-auto">
             <table className="w-full">
               <thead>
-                <tr className={`border-b ${T.borderMd} ${T.innerCard}`}>
-                  {['Item Name', 'Category', 'Stock Quantity', 'Threshold', 'Status', 'Last Updated', 'Actions'].map(h => (
-                    <th key={h} className="text-left px-4 py-3.5 text-[#D4AF37] font-semibold text-xs uppercase tracking-wide whitespace-nowrap">
+                <tr style={{ borderBottom: '1px solid rgba(255,140,0,0.1)', background: 'rgba(255,140,0,0.04)' }}>
+                  {['🍴 Item Name', '🗂️ Category', '📊 Stock', '⚠️ Threshold', '🟢 Status', '📅 Updated', '⚙️ Actions'].map(h => (
+                    <th key={h} className="text-left px-4 py-3.5 text-xs font-black uppercase tracking-wide whitespace-nowrap" style={{ color: '#FF7A20' }}>
                       {h}
                     </th>
                   ))}
@@ -550,77 +491,58 @@ const InventoryManagement = () => {
                         initial={{ opacity: 0 }}
                         animate={{ opacity: 1 }}
                         exit={{    opacity: 0 }}
-                        className={`border-b ${T.border} transition-colors ${
-                          low
-                            ? 'bg-red-500/5 hover:bg-red-500/8'
-                            : idx % 2 === 0 ? 'hover:bg-white/3' : 'bg-white/[0.015] hover:bg-white/3'
-                        }`}
+                        className="imv-row"
+                        style={{ background: low ? 'rgba(220,50,50,0.04)' : 'transparent' }}
                         data-testid={`inv-row-${item.id}`}
                       >
-                        {/* Item Name */}
                         <td className="px-4 py-3.5">
                           <div className="flex items-center gap-2">
-                            {low && (
-                              <span className="w-1.5 h-1.5 rounded-full bg-red-400 animate-pulse flex-shrink-0" />
-                            )}
-                            <span className={`${T.label} font-medium text-sm`}>{item.itemName}</span>
+                            {low && <span className="w-1.5 h-1.5 rounded-full bg-red-400 animate-pulse flex-shrink-0" />}
+                            <span className="font-bold text-sm text-white">{item.itemName}</span>
                           </div>
                         </td>
-
-                        {/* Category */}
                         <td className="px-4 py-3.5">
-                          <span className={`px-2 py-0.5 ${T.subCard} border ${T.borderMd} rounded ${T.muted} text-xs`}>
+                          <span className="px-2.5 py-1 rounded-xl text-xs font-black"
+                            style={{ background: 'rgba(255,140,0,0.08)', color: '#7a6a55', border: '1px solid rgba(255,140,0,0.15)' }}>
                             {item.category || '—'}
                           </span>
                         </td>
-
-                        {/* Stock Quantity — inline editable */}
                         <td className="px-4 py-3.5">
-                          <QuickQtyEditor T={T} item={item} />
+                          <QuickQtyEditor item={item} />
                         </td>
-
-                        {/* Threshold */}
-                        <td className={`px-4 py-3.5 ${T.muted} text-sm`}>
+                        <td className="px-4 py-3.5 text-sm font-bold" style={{ color: '#7a6a55' }}>
                           {item.lowStockThreshold} {item.unit}
                         </td>
-
-                        {/* Status badge */}
                         <td className="px-4 py-3.5">
                           {low ? (
-                            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-red-500/15 border border-red-500/25 rounded text-red-400 text-xs font-bold">
-                              <AlertTriangle className="w-3 h-3" />
-                              Low Stock
+                            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-black"
+                              style={{ background: 'rgba(220,50,50,0.12)', color: '#f87171', border: '1px solid rgba(220,50,50,0.25)' }}>
+                              ⚠️ Low Stock
                             </span>
                           ) : (
-                            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-emerald-500/10 border border-emerald-500/20 rounded text-emerald-400 text-xs font-semibold">
-                              <CheckCircle2 className="w-3 h-3" />
-                              Stock OK
+                            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-black"
+                              style={{ background: 'rgba(16,185,129,0.1)', color: '#34d399', border: '1px solid rgba(16,185,129,0.2)' }}>
+                              ✅ Stock OK
                             </span>
                           )}
                         </td>
-
-                        {/* Last Updated */}
-                        <td className={`px-4 py-3.5 ${T.muted} text-xs whitespace-nowrap`}>
+                        <td className="px-4 py-3.5 text-xs font-bold whitespace-nowrap" style={{ color: '#4a3f35' }}>
                           {fmtDate(item.lastUpdated || item.createdAt)}
                         </td>
-
-                        {/* Actions */}
                         <td className="px-4 py-3.5">
                           <div className="flex items-center gap-1.5">
-                            <button
-                              onClick={() => handleEdit(item)}
-                              data-testid={`edit-inv-${item.id}`}
-                              className={`p-1.5 ${T.muted} hover:text-[#D4AF37] hover:bg-[#D4AF37]/10 rounded transition-all`}
-                              title="Edit item"
-                            >
+                            <button onClick={() => handleEdit(item)} data-testid={`edit-inv-${item.id}`}
+                              className="p-1.5 rounded-lg transition-all" style={{ color: '#7a6a55' }}
+                              onMouseEnter={e => e.currentTarget.style.color = '#FF7A20'}
+                              onMouseLeave={e => e.currentTarget.style.color = '#7a6a55'}
+                              title="Edit item">
                               <Pencil className="w-3.5 h-3.5" />
                             </button>
-                            <button
-                              onClick={() => setDeleteId(item.id)}
-                              data-testid={`delete-inv-${item.id}`}
-                              className={`p-1.5 ${T.muted} hover:text-red-400 hover:bg-red-500/10 rounded transition-all`}
-                              title="Delete item"
-                            >
+                            <button onClick={() => setDeleteId(item.id)} data-testid={`delete-inv-${item.id}`}
+                              className="p-1.5 rounded-lg transition-all" style={{ color: '#7a6a55' }}
+                              onMouseEnter={e => e.currentTarget.style.color = '#f87171'}
+                              onMouseLeave={e => e.currentTarget.style.color = '#7a6a55'}
+                              title="Delete item">
                               <Trash2 className="w-3.5 h-3.5" />
                             </button>
                           </div>
@@ -632,30 +554,28 @@ const InventoryManagement = () => {
               </tbody>
             </table>
           </div>
-
-          <div className={`px-4 py-3 border-t ${T.border} ${T.muted} text-xs flex items-center gap-2`}>
-            <span className="w-1.5 h-1.5 rounded-full bg-[#10B981] animate-pulse" />
-            Showing {filtered.length} of {inventory.length} items · Real-time updates active
+          <div className="px-4 py-3 flex items-center gap-2" style={{ borderTop: '1px solid rgba(255,255,255,0.04)' }}>
+            <span className="w-1.5 h-1.5 rounded-full bg-green-400 animate-pulse" />
+            <span className="text-xs font-bold" style={{ color: '#4a3f35' }}>
+              Showing {filtered.length} of {inventory.length} items · Real-time updates active ☕
+            </span>
           </div>
         </div>
       )}
 
-      {/* ── Add / Edit Modal ────────────────────────────────────────────── */}
+      {/* ── Add/Edit Modal ─────────────────────────────────────────────────── */}
       <AnimatePresence>
         {showForm && (
           <InventoryForm
             T={T}
-            initial={editTarget
-              ? {
-                  itemName:          editTarget.itemName,
-                  category:          editTarget.category,
-                  quantity:          String(editTarget.quantity ?? ''),
-                  unit:              editTarget.unit || 'pcs',
-                  lowStockThreshold: String(editTarget.lowStockThreshold ?? ''),
-                  costPerUnit:       String(editTarget.costPerUnit ?? ''),
-                }
-              : undefined
-            }
+            initial={editTarget ? {
+              itemName:          editTarget.itemName,
+              category:          editTarget.category,
+              quantity:          String(editTarget.quantity ?? ''),
+              unit:              editTarget.unit || 'pcs',
+              lowStockThreshold: String(editTarget.lowStockThreshold ?? ''),
+              costPerUnit:       String(editTarget.costPerUnit ?? ''),
+            } : undefined}
             onSave={handleSave}
             onClose={() => { setShowForm(false); setEditTarget(null); }}
             saving={formSaving}
@@ -663,46 +583,34 @@ const InventoryManagement = () => {
         )}
       </AnimatePresence>
 
-      {/* ── Delete Confirm Modal ────────────────────────────────────────── */}
+      {/* ── Delete Confirm ─────────────────────────────────────────────────── */}
       <AnimatePresence>
         {deleteId && (
           <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4"
+            initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4 imv"
             onClick={() => setDeleteId(null)}
           >
             <motion.div
-              initial={{ scale: 0.92, y: 16 }}
-              animate={{ scale: 1,    y: 0  }}
-              exit={{    scale: 0.92, y: 8  }}
+              initial={{ scale: 0.92, y: 16 }} animate={{ scale: 1, y: 0 }} exit={{ scale: 0.92, y: 8 }}
               onClick={e => e.stopPropagation()}
-              className={`${T.card} rounded-xl p-6 w-full max-w-sm shadow-2xl`}
+              className="w-full max-w-sm rounded-2xl p-6 shadow-2xl"
+              style={{ background: 'linear-gradient(180deg,#1e1408 0%,#150f06 100%)', border: '1.5px solid rgba(220,50,50,0.25)' }}
             >
               <div className="flex items-center gap-3 mb-4">
-                <div className="w-10 h-10 rounded-full bg-red-500/10 flex items-center justify-center">
-                  <Trash2 className="w-5 h-5 text-red-400" />
-                </div>
+                <div className="w-10 h-10 rounded-xl flex items-center justify-center text-xl"
+                  style={{ background: 'rgba(220,50,50,0.1)' }}>🗑️</div>
                 <div>
-                  <p className={`${T.heading} font-semibold`}>Delete Item?</p>
-                  <p className={`${T.muted} text-xs`}>This cannot be undone.</p>
+                  <p className="font-black text-white">Delete Item?</p>
+                  <p className="text-xs font-bold" style={{ color: '#7a6a55' }}>This cannot be undone.</p>
                 </div>
               </div>
               <div className="flex gap-3">
-                <button
-                  onClick={() => setDeleteId(null)}
-                  className={`flex-1 py-2.5 border ${T.borderMd} text-[#A3A3A3] hover:text-white rounded-sm text-sm transition-all`}
-                >
-                  Cancel
-                </button>
-                <button
-                  onClick={handleDelete}
-                  disabled={deleting}
-                  className={`flex-1 py-2.5 bg-red-500 hover:bg-red-600 ${T.heading} font-bold rounded-sm text-sm transition-all disabled:opacity-50 flex items-center justify-center gap-2`}
-                >
-                  {deleting ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
-                  {deleting ? 'Deleting…' : 'Delete'}
+                <button onClick={() => setDeleteId(null)} className="imv-btn imv-btn-ghost flex-1 justify-center">Cancel</button>
+                <button onClick={handleDelete} disabled={deleting}
+                  className="imv-btn flex-1 justify-center disabled:opacity-50"
+                  style={{ background: '#dc2626', color: '#fff', border: 'none' }}>
+                  {deleting ? <><RefreshCw className="w-4 h-4 animate-spin" />Deleting…</> : <>🗑️ Delete</>}
                 </button>
               </div>
             </motion.div>

@@ -4,6 +4,8 @@
  * Complete loyalty system for SmartCafé OS.
  * Firestore collection: loyaltyCustomers
  *
+ * UI UPGRADE: Café-vibe premium aesthetic. Zero logic changes.
+ *
  * Features:
  *  - Search by phone or name
  *  - Add new customer (visits = 1, discount = 10%)
@@ -11,13 +13,8 @@
  *  - Send loyalty reward via WhatsApp
  *
  * Discount ladder:
- *  Visit 1  → 10%
- *  Visit 2  → 15%
- *  Visit 3  → 20%
- *  Visit 4  → 25%
- *  Visit ≥5 → 30%
- *
- * Add-only — zero changes to any existing system.
+ *  Visit 1  → 10%   Visit 2  → 15%   Visit 3  → 20%
+ *  Visit 4  → 25%   Visit ≥5 → 30%
  */
 
 import React, { useState, useMemo } from 'react';
@@ -35,32 +32,72 @@ import {
 } from 'lucide-react';
 import GoogleReviewSettings from './GoogleReviewSettings';
 
+// ── Inject café-vibe CSS once ─────────────────────────────────────────────────
+if (typeof document !== 'undefined' && !document.getElementById('loy-cafe-css')) {
+  const el = document.createElement('style');
+  el.id = 'loy-cafe-css';
+  el.textContent = `
+    @import url('https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800;900&family=Fredoka+One&display=swap');
+    .loy { font-family: 'Nunito', system-ui, sans-serif; }
+    .loy-title { font-family: 'Fredoka One', system-ui, sans-serif !important; }
+    .loy-card {
+      background: #141008;
+      border: 1.5px solid rgba(255,255,255,0.07);
+      border-radius: 16px;
+      overflow: hidden;
+      transition: border-color 200ms;
+    }
+    .loy-card:hover { border-color: rgba(255,140,0,0.2); }
+    .loy-input {
+      width: 100%; background: #1c1509;
+      border: 1.5px solid rgba(255,255,255,0.08); border-radius: 12px;
+      color: #fff8ee; padding: 10px 14px; font-size: 14px; font-weight: 600;
+      font-family: 'Nunito', system-ui, sans-serif;
+      outline: none; transition: border-color 180ms, box-shadow 180ms;
+    }
+    .loy-input:focus { border-color: rgba(255,140,0,0.55); box-shadow: 0 0 0 3px rgba(255,140,0,0.1); }
+    .loy-input::placeholder { color: #3d3020; }
+    .loy-btn {
+      display: inline-flex; align-items: center; gap: 5px;
+      font-family: 'Nunito', system-ui, sans-serif;
+      font-weight: 800; font-size: 12px;
+      padding: 7px 13px; border-radius: 10px;
+      border: 1.5px solid transparent;
+      cursor: pointer; transition: all 180ms; white-space: nowrap;
+    }
+    .loy-btn:hover { transform: translateY(-1px); filter: brightness(1.1); }
+    .loy-btn:active { transform: scale(0.96); }
+    .loy-btn-orange { background: linear-gradient(135deg,#FF7A20,#E55A00); color:#fff; box-shadow: 0 3px 12px rgba(255,120,0,0.3); }
+    .loy-btn-ghost  { background: rgba(255,255,255,0.05); color: #7a6a55; border-color: rgba(255,255,255,0.08); }
+    .loy-btn-ghost:hover  { background: rgba(255,255,255,0.09); color: #fff; }
+    .loy-btn-green  { background: rgba(37,211,102,0.1); color: #25D366; border-color: rgba(37,211,102,0.25); }
+    .loy-btn-green:hover  { background: rgba(37,211,102,0.18); }
+    .loy-btn-red    { background: rgba(220,50,50,0.12); color: #f87171; border-color: rgba(220,50,50,0.22); }
+    .loy-btn-red:hover    { background: rgba(220,50,50,0.22); }
+    .loy-btn-gold   { background: rgba(212,175,55,0.12); color: #fbbf24; border-color: rgba(212,175,55,0.25); }
+    .loy-btn-gold:hover   { background: rgba(212,175,55,0.22); }
+    @keyframes loyIn { from { opacity:0; transform:translateY(8px); } to { opacity:1; transform:translateY(0); } }
+    .loy-in { animation: loyIn 280ms ease forwards; }
+  `;
+  document.head.appendChild(el);
+}
+
 // ── Discount ladder ────────────────────────────────────────────────────────────
 const discountForVisits = (visits) => {
   if (visits <= 1) return 10;
   if (visits === 2) return 15;
   if (visits === 3) return 20;
   if (visits === 4) return 25;
-  return 30; // visits >= 5
+  return 30;
 };
-
-// ── Styling helpers ────────────────────────────────────────────────────────────
-const inputCls =
-  'w-full bg-black/20 border border-white/10 text-white placeholder:text-neutral-600 ' +
-  'focus:border-[#D4AF37] focus:ring-1 focus:ring-[#D4AF37] rounded-sm h-11 px-4 transition-all text-sm';
-
-const labelCls = 'block text-white text-sm font-medium mb-1.5';
 
 // ── WhatsApp message ───────────────────────────────────────────────────────────
 const buildWAMessage = (customer) => {
   const disc = customer.currentDiscount;
   const isFree = disc >= 30;
-  // ── Expiry text — shown if expiryDate is set on the customer doc ──────────
   const expiryText = (() => {
     if (!customer.expiryDate) return null;
-    const d = customer.expiryDate?.toDate
-      ? customer.expiryDate.toDate()
-      : new Date(customer.expiryDate);
+    const d = customer.expiryDate?.toDate ? customer.expiryDate.toDate() : new Date(customer.expiryDate);
     return d.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
   })();
   return (
@@ -79,93 +116,62 @@ const LoyaltyDashboard = () => {
   const { user } = useAuth();
   const cafeId = user?.cafeId;
 
-  // ── Firestore ────────────────────────────────────────────────────────────────
   const { data: customers, loading } = useCollection(
     'loyaltyCustomers',
     cafeId ? [where('cafeId', '==', cafeId)] : []
   );
 
-  // ── Local state ──────────────────────────────────────────────────────────────
   const [search,       setSearch      ] = useState('');
   const [showAddForm,  setShowAddForm  ] = useState(false);
   const [saving,       setSaving       ] = useState(false);
-  const [markingId,    setMarkingId    ] = useState(null); // id of customer being marked
+  const [markingId,    setMarkingId    ] = useState(null);
 
-  const [newName,       setNewName      ] = useState('');
-  const [newPhone,      setNewPhone     ] = useState('');
-  const [validityDays,  setValidityDays ] = useState(''); // optional validity in days
-  const [customDiscount, setCustomDiscount] = useState(''); // optional manual discount override
+  const [newName,        setNewName       ] = useState('');
+  const [newPhone,       setNewPhone      ] = useState('');
+  const [validityDays,   setValidityDays  ] = useState('');
+  const [customDiscount, setCustomDiscount] = useState('');
 
-  // ── Inline edit state (per-customer accordion) ───────────────────────────────
   const [editingCustomerId, setEditingCustomerId] = useState(null);
   const [editDiscount,      setEditDiscount     ] = useState('');
   const [editValidity,      setEditValidity     ] = useState('');
 
-  // ── Expandable card state — add-only, zero effect on data or logic ───────────
   const [expandedCustomerId, setExpandedCustomerId] = useState(null);
   const toggleCard = (id) => setExpandedCustomerId(prev => prev === id ? null : id);
 
-  // ── Derived / filtered list ──────────────────────────────────────────────────
   const filtered = useMemo(() => {
     if (!customers) return [];
     const q = search.trim().toLowerCase();
     if (!q) return customers;
-    return customers.filter(
-      c =>
-        c.name?.toLowerCase().includes(q) ||
-        c.phone?.includes(q)
-    );
+    return customers.filter(c => c.name?.toLowerCase().includes(q) || c.phone?.includes(q));
   }, [customers, search]);
 
-  // ── Add new customer ─────────────────────────────────────────────────────────
+  // ── Add new customer ──────────────────────────────────────────────────────
   const handleAddCustomer = async (e) => {
     e.preventDefault();
-    // ── DEBUG: confirm db is a valid Firestore instance ──────────────────────
     console.log('[Loyalty] DB instance:', db);
     console.log('[Loyalty] cafeId:', cafeId);
-
-    if (!newName.trim() || !newPhone.trim()) {
-      toast.error('Name and phone are required');
-      return;
-    }
-    // Duplicate check
+    if (!newName.trim() || !newPhone.trim()) { toast.error('Name and phone are required'); return; }
     const already = customers?.find(c => c.phone === newPhone.trim());
-    if (already) {
-      toast.error('A customer with this phone number already exists');
-      return;
-    }
+    if (already) { toast.error('A customer with this phone number already exists'); return; }
     setSaving(true);
     try {
       console.log('[Loyalty] Attempting addDoc to loyaltyCustomers…');
-      // ── Expiry calculation (add-only — safe if validityDays is empty) ─────
       const days = Number(validityDays) || 0;
       const expiryDate = days > 0
         ? (() => { const d = new Date(); d.setDate(d.getDate() + days); return d; })()
         : null;
-
-      // ── Custom discount override — falls back to default 10% if empty ────
       const discountToUse = customDiscount ? Number(customDiscount) : 10;
-
       const ref = await addDoc(collection(db, 'loyaltyCustomers'), {
-        cafeId,
-        name:            newName.trim(),
-        phone:           newPhone.trim(),
-        visits:          1,
-        currentDiscount: discountToUse,
-        validityDays:    days,
-        expiryDate:      expiryDate,
-        createdAt:       serverTimestamp(),
-        lastVisit:       serverTimestamp(),
+        cafeId, name: newName.trim(), phone: newPhone.trim(),
+        visits: 1, currentDiscount: discountToUse,
+        validityDays: days, expiryDate,
+        createdAt: serverTimestamp(), lastVisit: serverTimestamp(),
       });
       console.log('[Loyalty] ✅ Customer saved, docId:', ref.id);
       toast.success(`${newName.trim()} added to loyalty program ✓`);
-      setNewName('');
-      setNewPhone('');
-      setValidityDays('');
-      setCustomDiscount('');
+      setNewName(''); setNewPhone(''); setValidityDays(''); setCustomDiscount('');
       setShowAddForm(false);
     } catch (err) {
-      // ── Verbose error so the exact failure reason is visible in console ──
       console.error('[Loyalty] ❌ addDoc failed:', err.code, err.message, err);
       toast.error(`Failed to add customer: ${err.message || 'Unknown error'}`);
     } finally {
@@ -173,33 +179,26 @@ const LoyaltyDashboard = () => {
     }
   };
 
-  // ── Mark visit + upgrade discount ────────────────────────────────────────────
+  // ── Mark visit ────────────────────────────────────────────────────────────
   const handleMarkVisit = async (customer) => {
     setMarkingId(customer.id);
     try {
       const newVisits   = (customer.visits || 0) + 1;
       const newDiscount = discountForVisits(newVisits);
       console.log('[Loyalty] Marking visit for', customer.name, '→ visits:', newVisits, 'discount:', newDiscount);
-      // ── Custom discount override — empty = use ladder; set = use manual value ─
       const discountToUse = customDiscount ? Number(customDiscount) : newDiscount;
-
-      // ── Expiry: prefer form input, fall back to customer's existing validityDays
       const daysToUse = Number(validityDays) || Number(customer.validityDays) || 0;
       const newExpiry = daysToUse > 0
         ? (() => { const d = new Date(); d.setDate(d.getDate() + daysToUse); return d; })()
         : null;
-
       await updateDoc(doc(db, 'loyaltyCustomers', customer.id), {
-        visits:          newVisits,
-        currentDiscount: discountToUse,
-        lastVisit:       serverTimestamp(),
-        validityDays:    daysToUse,
+        visits: newVisits, currentDiscount: discountToUse,
+        lastVisit: serverTimestamp(), validityDays: daysToUse,
         ...(newExpiry !== null && { expiryDate: newExpiry }),
       });
-      const msg =
-        newDiscount >= 30
-          ? `🎁 ${customer.name} unlocked a FREE ITEM! (${newVisits} visits)`
-          : `✓ Visit ${newVisits} marked — ${customer.name} now gets ${newDiscount}% OFF`;
+      const msg = newDiscount >= 30
+        ? `🎁 ${customer.name} unlocked a FREE ITEM! (${newVisits} visits)`
+        : `✓ Visit ${newVisits} marked — ${customer.name} now gets ${newDiscount}% OFF`;
       toast.success(msg);
     } catch (err) {
       console.error('[LoyaltyDashboard] mark visit error:', err);
@@ -209,21 +208,15 @@ const LoyaltyDashboard = () => {
     }
   };
 
-  // ── Undo visit (decrement visits + roll back discount) ──────────────────────
+  // ── Undo visit ────────────────────────────────────────────────────────────
   const handleUndoVisit = async (customer) => {
-    if ((customer.visits || 1) <= 1) {
-      toast.error('Cannot reduce below 1 visit');
-      return;
-    }
+    if ((customer.visits || 1) <= 1) { toast.error('Cannot reduce below 1 visit'); return; }
     setMarkingId(customer.id);
     try {
       const newVisits   = customer.visits - 1;
       const newDiscount = discountForVisits(newVisits);
       console.log('[Loyalty] Undoing visit for', customer.name, '→ visits:', newVisits);
-      await updateDoc(doc(db, 'loyaltyCustomers', customer.id), {
-        visits:          newVisits,
-        currentDiscount: newDiscount,
-      });
+      await updateDoc(doc(db, 'loyaltyCustomers', customer.id), { visits: newVisits, currentDiscount: newDiscount });
       toast.success(`↩ Visit undone — ${customer.name} now at visit ${newVisits} (${newDiscount}% OFF)`);
     } catch (err) {
       console.error('[Loyalty] ❌ undoVisit failed:', err.code, err.message, err);
@@ -233,7 +226,7 @@ const LoyaltyDashboard = () => {
     }
   };
 
-  // ── Delete customer (hard delete) ────────────────────────────────────────────
+  // ── Delete customer ───────────────────────────────────────────────────────
   const handleDeleteCustomer = async (customer) => {
     if (!window.confirm(`Delete ${customer.name} permanently from the loyalty program?`)) return;
     try {
@@ -246,224 +239,163 @@ const LoyaltyDashboard = () => {
     }
   };
 
-  // ── Save inline edit (discount + validity override) ─────────────────────────
-  // Does NOT affect mark visit logic — only manually overrides stored values.
+  // ── Save inline edit ──────────────────────────────────────────────────────
   const handleSaveEdit = async (customer) => {
     try {
-      const newDisc  = editDiscount ? Number(editDiscount) : customer.currentDiscount;
-      const newDays  = editValidity ? Number(editValidity) : (customer.validityDays || 0);
-      const expiry   = newDays > 0
+      const newDisc = editDiscount ? Number(editDiscount) : customer.currentDiscount;
+      const newDays = editValidity ? Number(editValidity) : (customer.validityDays || 0);
+      const expiry  = newDays > 0
         ? (() => { const d = new Date(); d.setDate(d.getDate() + newDays); return d; })()
         : null;
-
-      console.log('[Loyalty] Saving edit for', customer.name,
-        '→ discount:', newDisc, 'validityDays:', newDays);
-
+      console.log('[Loyalty] Saving edit for', customer.name, '→ discount:', newDisc, 'validityDays:', newDays);
       await updateDoc(doc(db, 'loyaltyCustomers', customer.id), {
-        currentDiscount: newDisc,
-        validityDays:    newDays,
+        currentDiscount: newDisc, validityDays: newDays,
         ...(expiry !== null && { expiryDate: expiry }),
       });
-
       toast.success(`${customer.name} updated ✓ — ${newDisc}% OFF${newDays ? `, valid ${newDays}d` : ''}`);
-      setEditingCustomerId(null);
-      setEditDiscount('');
-      setEditValidity('');
+      setEditingCustomerId(null); setEditDiscount(''); setEditValidity('');
     } catch (err) {
       console.error('[Loyalty] ❌ saveEdit failed:', err.code, err.message, err);
       toast.error(`Update failed: ${err.message || 'Unknown error'}`);
     }
   };
 
-  // ── Send WhatsApp ─────────────────────────────────────────────────────────────
+  // ── Send WhatsApp ─────────────────────────────────────────────────────────
   const handleSendWA = (customer) => {
-    if (!customer.phone) {
-      toast.error('No phone number for this customer');
-      return;
-    }
-    // Normalise: strip non-digits, add country code if 10 digits
+    if (!customer.phone) { toast.error('No phone number for this customer'); return; }
     const digits = customer.phone.replace(/\D/g, '');
     const waNum  = digits.length === 10 ? `91${digits}` : digits;
     const msg    = buildWAMessage(customer);
     window.open(`https://wa.me/${waNum}?text=${encodeURIComponent(msg)}`, '_blank');
   };
 
-  // ── Stats bar ─────────────────────────────────────────────────────────────────
-  const totalCustomers  = customers?.length || 0;
-  const totalVisits     = customers?.reduce((s, c) => s + (c.visits || 0), 0) || 0;
-  const loyalCustomers  = customers?.filter(c => (c.visits || 0) >= 3).length || 0;
-  const repeatedVisits  = customers?.reduce((s, c) => s + ((c.visits || 0) > 1 ? (c.visits - 1) : 0), 0) || 0;
+  const totalCustomers = customers?.length || 0;
+  const totalVisits    = customers?.reduce((s, c) => s + (c.visits || 0), 0) || 0;
+  const loyalCustomers = customers?.filter(c => (c.visits || 0) >= 3).length || 0;
+  const repeatedVisits = customers?.reduce((s, c) => s + ((c.visits || 0) > 1 ? (c.visits - 1) : 0), 0) || 0;
 
-  // ── Render ───────────────────────────────────────────────────────────────────
   return (
-    <div className="space-y-6">
+    <div className="loy space-y-5">
 
-      {/* ── Stats row ──────────────────────────────────────────────────────────── */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+      {/* ── Stats row ─────────────────────────────────────────────────────── */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         {[
-          { label: 'Total Members',    value: totalCustomers,  icon: User,    color: '#D4AF37' },
-          { label: 'Total Visits',     value: totalVisits,     icon: Star,    color: '#3B82F6' },
-          { label: 'Loyal (3+)',       value: loyalCustomers,  icon: Award,   color: '#10B981' },
-          { label: 'Repeated Visits',  value: repeatedVisits,  icon: Repeat,  color: '#A855F7' },
-        ].map(({ label, value, icon: Icon, color }) => (
-          <div key={label} className="bg-[#0F0F0F] border border-white/5 rounded-sm p-4 flex items-center gap-4">
-            <div className="w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0"
-              style={{ backgroundColor: color + '18' }}>
-              <Icon className="w-5 h-5" style={{ color }} />
+          { label: 'Total Members',   value: totalCustomers,  emoji: '👥', color: '#FF7A20' },
+          { label: 'Total Visits',    value: totalVisits,     emoji: '⭐', color: '#60a5fa' },
+          { label: 'Loyal (3+)',      value: loyalCustomers,  emoji: '🏆', color: '#34d399' },
+          { label: 'Repeat Visits',   value: repeatedVisits,  emoji: '🔄', color: '#a78bfa' },
+        ].map(({ label, value, emoji, color }) => (
+          <div key={label} className="loy-card p-4 flex items-center gap-3"
+            style={{ borderLeft: `3px solid ${color}` }}>
+            <div className="w-10 h-10 rounded-xl flex items-center justify-center text-xl flex-shrink-0"
+              style={{ background: color + '18' }}>
+              {emoji}
             </div>
             <div>
-              <p className="text-2xl font-bold text-white">{value}</p>
-              <p className="text-[#A3A3A3] text-xs mt-0.5">{label}</p>
+              <p className="text-2xl font-black text-white">{value}</p>
+              <p className="text-xs font-bold mt-0.5" style={{ color: '#7a6a55' }}>{label}</p>
             </div>
           </div>
         ))}
       </div>
 
-      {/* ── Search + Add button ────────────────────────────────────────────────── */}
+      {/* ── Search + Add ───────────────────────────────────────────────────── */}
       <div className="flex flex-col sm:flex-row gap-3">
         <div className="relative flex-1">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[#A3A3A3]" />
-          <input
-            type="text"
-            value={search}
-            onChange={e => setSearch(e.target.value)}
+          <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm">🔍</span>
+          <input type="text" value={search} onChange={e => setSearch(e.target.value)}
             placeholder="Search by name or phone…"
-            className="w-full bg-[#0F0F0F] border border-white/10 text-white placeholder:text-neutral-600 focus:border-[#D4AF37] focus:ring-1 focus:ring-[#D4AF37] rounded-sm h-11 pl-9 pr-4 transition-all text-sm"
-          />
+            className="loy-input" style={{ paddingLeft: '2.2rem' }} />
         </div>
-        <button
-          onClick={() => setShowAddForm(v => !v)}
-          className="flex items-center gap-2 px-5 py-2.5 bg-[#D4AF37] hover:bg-[#C5A059] text-black font-bold rounded-sm text-sm transition-all"
-          data-testid="add-loyalty-customer-btn"
-        >
+        <button onClick={() => setShowAddForm(v => !v)}
+          className="loy-btn loy-btn-orange"
+          data-testid="add-loyalty-customer-btn">
           <UserPlus className="w-4 h-4" />
-          Add Customer
+          ➕ Add Customer
         </button>
       </div>
 
-      {/* ── Add customer form ──────────────────────────────────────────────────── */}
+      {/* ── Add customer form ──────────────────────────────────────────────── */}
       <AnimatePresence>
         {showAddForm && (
           <motion.div
             initial={{ opacity: 0, y: -10 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -10 }}
-            className="bg-[#0F0F0F] border border-[#D4AF37]/30 rounded-sm p-6"
+            className="loy-card p-6"
+            style={{ border: '1.5px solid rgba(255,140,0,0.22)' }}
           >
-            <h3 className="text-white font-semibold mb-4" style={{ fontFamily: 'Playfair Display, serif' }}>
-              Add New Loyalty Customer
-            </h3>
+            <div className="flex items-center gap-2 mb-4">
+              <span className="text-xl">👤</span>
+              <h3 className="text-white font-black loy-title text-lg">Add New Loyalty Customer</h3>
+            </div>
             <form onSubmit={handleAddCustomer} className="space-y-4">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
-                  <label className={labelCls}>Customer Name</label>
-                  <input
-                    type="text"
-                    value={newName}
-                    onChange={e => setNewName(e.target.value)}
-                    placeholder="e.g. Priya Sharma"
-                    className={inputCls}
-                    disabled={saving}
-                    data-testid="loyalty-name-input"
-                  />
+                  <label className="block text-xs font-black uppercase tracking-widest mb-1.5" style={{ color: '#FF7A20' }}>Customer Name</label>
+                  <input type="text" value={newName} onChange={e => setNewName(e.target.value)}
+                    placeholder="e.g. Priya Sharma" className="loy-input" disabled={saving} data-testid="loyalty-name-input" />
                 </div>
                 <div>
-                  <label className={labelCls}>Phone Number</label>
-                  <input
-                    type="tel"
-                    value={newPhone}
-                    onChange={e => setNewPhone(e.target.value)}
-                    placeholder="e.g. 9876543210"
-                    className={inputCls}
-                    disabled={saving}
-                    data-testid="loyalty-phone-input"
-                  />
+                  <label className="block text-xs font-black uppercase tracking-widest mb-1.5" style={{ color: '#FF7A20' }}>Phone Number</label>
+                  <input type="tel" value={newPhone} onChange={e => setNewPhone(e.target.value)}
+                    placeholder="e.g. 9876543210" className="loy-input" disabled={saving} data-testid="loyalty-phone-input" />
                 </div>
               </div>
-
-              {/* ── Validity (days) — add-only field ─────────────────────── */}
               <div>
-                <label className={labelCls}>
-                  Validity (days)
-                  <span className="text-[#A3A3A3] font-normal ml-1">(optional — e.g. 30 for 1 month)</span>
+                <label className="block text-xs font-black uppercase tracking-widest mb-1.5" style={{ color: '#FF7A20' }}>
+                  Validity (days) <span className="font-normal normal-case" style={{ color: '#7a6a55' }}>(optional)</span>
                 </label>
-                <input
-                  type="number"
-                  min="0"
-                  value={validityDays}
-                  onChange={e => setValidityDays(e.target.value)}
-                  placeholder="e.g. 30"
-                  className={inputCls}
-                  disabled={saving}
-                  data-testid="loyalty-validity-input"
-                />
+                <input type="number" min="0" value={validityDays} onChange={e => setValidityDays(e.target.value)}
+                  placeholder="e.g. 30" className="loy-input" disabled={saving} data-testid="loyalty-validity-input" />
               </div>
-
-              {/* ── Custom discount override — add-only field ────────────── */}
               <div>
-                <label className={labelCls}>
-                  Custom Discount (%)
-                  <span className="text-[#A3A3A3] font-normal ml-1">(optional — overrides default 10%)</span>
+                <label className="block text-xs font-black uppercase tracking-widest mb-1.5" style={{ color: '#FF7A20' }}>
+                  Custom Discount (%) <span className="font-normal normal-case" style={{ color: '#7a6a55' }}>(optional — overrides default 10%)</span>
                 </label>
-                <input
-                  type="number"
-                  min="0"
-                  max="100"
-                  value={customDiscount}
-                  onChange={e => setCustomDiscount(e.target.value)}
-                  placeholder="e.g. 20"
-                  className={inputCls}
-                  disabled={saving}
-                  data-testid="loyalty-discount-input"
-                />
+                <input type="number" min="0" max="100" value={customDiscount} onChange={e => setCustomDiscount(e.target.value)}
+                  placeholder="e.g. 20" className="loy-input" disabled={saving} data-testid="loyalty-discount-input" />
               </div>
-              <p className="text-[#A3A3A3] text-xs">
-                First visit will be recorded automatically. Customer starts with <strong className="text-[#D4AF37]">10% OFF</strong>.
+              <p className="text-xs font-bold" style={{ color: '#7a6a55' }}>
+                First visit will be recorded automatically. Customer starts with <span style={{ color: '#FF7A20' }}>10% OFF</span>.
               </p>
               <div className="flex gap-3">
-                <button
-                  type="submit"
-                  disabled={saving}
-                  className="flex items-center gap-2 px-6 py-2.5 bg-[#D4AF37] hover:bg-[#C5A059] text-black font-bold rounded-sm text-sm transition-all disabled:opacity-50"
-                  data-testid="loyalty-submit-btn"
-                >
-                  {saving ? <><RefreshCw className="w-4 h-4 animate-spin" /> Adding…</> : <><UserPlus className="w-4 h-4" /> Add Customer</>}
+                <button type="submit" disabled={saving} className="loy-btn loy-btn-orange disabled:opacity-50" data-testid="loyalty-submit-btn">
+                  {saving ? <><RefreshCw className="w-4 h-4 animate-spin" />Adding…</> : <><UserPlus className="w-4 h-4" />Add Customer</>}
                 </button>
-                <button
-                  type="button"
-                  onClick={() => setShowAddForm(false)}
-                  className="px-5 py-2.5 border border-white/10 text-[#A3A3A3] hover:text-white rounded-sm text-sm transition-all"
-                >
-                  Cancel
-                </button>
+                <button type="button" onClick={() => setShowAddForm(false)} className="loy-btn loy-btn-ghost">Cancel</button>
               </div>
             </form>
           </motion.div>
         )}
       </AnimatePresence>
 
-      {/* ── Discount ladder info ───────────────────────────────────────────────── */}
+      {/* ── Discount ladder ────────────────────────────────────────────────── */}
       <div className="flex gap-2 flex-wrap">
         {[
-          { visits: 1, label: '1 visit',  disc: '10%' },
-          { visits: 2, label: '2 visits', disc: '15%' },
-          { visits: 3, label: '3 visits', disc: '20%' },
-          { visits: 4, label: '4 visits', disc: '25%' },
-          { visits: 5, label: '5+ visits',disc: '30% / Free Item' },
+          { label: '1 visit',   disc: '10%' },
+          { label: '2 visits',  disc: '15%' },
+          { label: '3 visits',  disc: '20%' },
+          { label: '4 visits',  disc: '25%' },
+          { label: '5+ visits', disc: '30% / Free Item 🎁' },
         ].map(({ label, disc }) => (
-          <span key={label} className="text-xs px-3 py-1 rounded-full border border-[#D4AF37]/20 text-[#A3A3A3]">
-            {label} → <span className="text-[#D4AF37] font-semibold">{disc}</span>
+          <span key={label} className="text-xs px-3 py-1.5 rounded-xl font-black"
+            style={{ background: 'rgba(255,140,0,0.07)', color: '#7a6a55', border: '1px solid rgba(255,140,0,0.15)' }}>
+            {label} → <span style={{ color: '#FF7A20' }}>{disc}</span>
           </span>
         ))}
       </div>
 
-      {/* ── Customer list ──────────────────────────────────────────────────────── */}
+      {/* ── Customer list ──────────────────────────────────────────────────── */}
       {loading ? (
-        <div className="text-center text-[#A3A3A3] py-12">Loading customers…</div>
+        <div className="flex flex-col items-center justify-center py-12 gap-2">
+          <div className="text-4xl animate-bounce">⭐</div>
+          <p className="text-sm font-bold" style={{ color: '#7a6a55' }}>Loading customers…</p>
+        </div>
       ) : filtered.length === 0 ? (
-        <div className="bg-[#0F0F0F] border border-white/5 rounded-sm p-12 text-center">
-          <Gift className="w-12 h-12 text-[#A3A3A3] mx-auto mb-3" />
-          <p className="text-[#A3A3A3]">
+        <div className="loy-card p-12 text-center">
+          <div className="text-5xl mb-3">🎁</div>
+          <p className="font-bold" style={{ color: '#7a6a55' }}>
             {search ? 'No customers match your search.' : 'No loyalty customers yet. Add your first one!'}
           </p>
         </div>
@@ -482,86 +414,80 @@ const LoyaltyDashboard = () => {
                 layout
                 initial={{ opacity: 0, y: 8 }}
                 animate={{ opacity: 1, y: 0 }}
-                className="bg-[#0F0F0F] border border-white/5 rounded-sm hover:border-white/10 transition-colors overflow-hidden"
+                className="loy-card"
                 data-testid={`loyalty-customer-${customer.id}`}
               >
-                {/* ── Always-visible header — click to expand / collapse ─────── */}
+                {/* Top accent bar */}
+                <div style={{ height: 2, background: isFree ? 'linear-gradient(90deg,#34d399,transparent)' : 'linear-gradient(90deg,#FF7A20,transparent)' }} />
+
+                {/* Always-visible header */}
                 <button
                   onClick={() => toggleCard(customer.id)}
                   className="w-full flex items-center gap-3 px-4 py-3 text-left"
                   aria-expanded={isOpen}
                   data-testid={`loyalty-toggle-${customer.id}`}
                 >
-                  {/* Avatar */}
-                  <div className="w-9 h-9 rounded-full bg-[#D4AF37]/10 flex items-center justify-center flex-shrink-0">
-                    <User className="w-4 h-4 text-[#D4AF37]" />
+                  <div className="w-9 h-9 rounded-xl flex items-center justify-center text-lg flex-shrink-0"
+                    style={{ background: 'rgba(255,140,0,0.1)', border: '1.5px solid rgba(255,140,0,0.18)' }}>
+                    👤
                   </div>
-
-                  {/* Name + phone */}
                   <div className="min-w-0 flex-1">
-                    <p className="text-white font-semibold text-sm truncate">{customer.name}</p>
+                    <p className="text-white font-black text-sm truncate">{customer.name}</p>
                     <div className="flex items-center gap-1.5 mt-0.5">
-                      <Phone className="w-3 h-3 text-[#A3A3A3] flex-shrink-0" />
-                      <p className="text-[#A3A3A3] text-xs truncate">{customer.phone}</p>
+                      <span className="text-xs">📞</span>
+                      <p className="text-xs font-bold truncate" style={{ color: '#7a6a55' }}>{customer.phone}</p>
                     </div>
                   </div>
 
-                  {/* Visit count badge */}
-                  <div className="flex items-center gap-1.5 bg-white/5 rounded-sm px-2.5 py-1 flex-shrink-0">
-                    <TrendingUp className="w-3 h-3 text-[#A3A3A3]" />
-                    <span className="text-white text-xs font-semibold">{visits}</span>
-                    <span className="text-[#A3A3A3] text-xs hidden sm:inline">visit{visits !== 1 ? 's' : ''}</span>
+                  {/* Visit count */}
+                  <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-xl flex-shrink-0"
+                    style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.07)' }}>
+                    <span className="text-xs">☕</span>
+                    <span className="text-white text-xs font-black">{visits}</span>
+                    <span className="text-xs font-bold hidden sm:inline" style={{ color: '#7a6a55' }}>visit{visits !== 1 ? 's' : ''}</span>
                   </div>
 
-                  {/* Discount / free item badge */}
-                  <div
-                    className="flex items-center gap-1.5 rounded-sm px-2.5 py-1 flex-shrink-0"
+                  {/* Discount badge */}
+                  <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-xl flex-shrink-0"
                     style={{
-                      backgroundColor: isFree ? '#10B98118' : '#D4AF3718',
-                      border:          isFree ? '1px solid #10B98140' : '1px solid #D4AF3740',
-                    }}
-                  >
-                    <Star className="w-3 h-3" style={{ color: isFree ? '#10B981' : '#D4AF37' }} />
-                    <span className="text-xs font-bold" style={{ color: isFree ? '#10B981' : '#D4AF37' }}>
-                      {isFree ? 'Free' : `${disc}%`}
+                      background: isFree ? 'rgba(16,185,129,0.12)' : 'rgba(255,140,0,0.1)',
+                      border: isFree ? '1px solid rgba(16,185,129,0.3)' : '1px solid rgba(255,140,0,0.25)',
+                    }}>
+                    <span className="text-xs">{isFree ? '🎁' : '⭐'}</span>
+                    <span className="text-xs font-black" style={{ color: isFree ? '#34d399' : '#FF7A20' }}>
+                      {isFree ? 'Free!' : `${disc}%`}
                     </span>
                   </div>
 
-                  {/* Expand chevron */}
                   <ChevronDown
-                    className="w-4 h-4 text-[#A3A3A3] flex-shrink-0 transition-transform duration-300"
-                    style={{ transform: isOpen ? 'rotate(180deg)' : 'rotate(0deg)' }}
+                    className="w-4 h-4 flex-shrink-0 transition-transform duration-300"
+                    style={{ color: '#7a6a55', transform: isOpen ? 'rotate(180deg)' : 'rotate(0deg)' }}
                   />
                 </button>
 
-                {/* ── Collapsible body — all existing content, shown on expand ─ */}
+                {/* Collapsible body */}
                 <motion.div
                   initial={false}
                   animate={{ height: isOpen ? 'auto' : 0, opacity: isOpen ? 1 : 0 }}
                   transition={{ duration: 0.25, ease: 'easeInOut' }}
                   style={{ overflow: 'hidden' }}
                 >
-                  <div className="px-4 pb-4 pt-1 space-y-3 border-t border-white/5">
+                  <div className="px-4 pb-4 pt-2 space-y-3" style={{ borderTop: '1px solid rgba(255,140,0,0.08)' }}>
 
-                    {/* Valid till — shown only when expiryDate is set ─────────── */}
+                    {/* Expiry date */}
                     {customer.expiryDate && (() => {
                       const exp = customer.expiryDate?.toDate
-                        ? customer.expiryDate.toDate()        // Firestore Timestamp
-                        : new Date(customer.expiryDate);      // plain Date/string
+                        ? customer.expiryDate.toDate()
+                        : new Date(customer.expiryDate);
                       const isExpired = exp < new Date();
                       return (
-                        <div
-                          className="inline-flex items-center gap-1.5 rounded-sm px-3 py-1.5"
+                        <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl"
                           style={{
-                            backgroundColor: isExpired ? 'rgba(239,68,68,0.08)' : 'rgba(255,255,255,0.04)',
-                            border:          isExpired ? '1px solid rgba(239,68,68,0.25)' : '1px solid rgba(255,255,255,0.08)',
-                          }}
-                        >
-                          <Calendar className="w-3.5 h-3.5" style={{ color: isExpired ? '#EF4444' : '#A3A3A3' }} />
-                          <span
-                            className="text-xs font-medium"
-                            style={{ color: isExpired ? '#EF4444' : '#A3A3A3' }}
-                          >
+                            background: isExpired ? 'rgba(220,50,50,0.08)' : 'rgba(255,255,255,0.04)',
+                            border: isExpired ? '1px solid rgba(220,50,50,0.25)' : '1px solid rgba(255,255,255,0.08)',
+                          }}>
+                          <span className="text-xs">📅</span>
+                          <span className="text-xs font-bold" style={{ color: isExpired ? '#f87171' : '#7a6a55' }}>
                             {isExpired ? 'Expired ' : 'Valid till '}
                             {exp.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}
                           </span>
@@ -569,136 +495,86 @@ const LoyaltyDashboard = () => {
                       );
                     })()}
 
-                    {/* Action buttons — ALL existing, 100% unchanged ─────────── */}
+                    {/* Action buttons */}
                     <div className="flex gap-2 flex-wrap">
-                      <button
-                        onClick={() => handleMarkVisit(customer)}
-                        disabled={marking}
-                        className="flex items-center gap-1.5 px-4 py-2 bg-[#D4AF37] hover:bg-[#C5A059] text-black font-bold rounded-sm text-xs transition-all disabled:opacity-50"
-                        data-testid={`mark-visit-${customer.id}`}
-                      >
-                        {marking
-                          ? <RefreshCw className="w-3.5 h-3.5 animate-spin" />
-                          : <Star className="w-3.5 h-3.5" />}
+                      <button onClick={() => handleMarkVisit(customer)} disabled={marking}
+                        className="loy-btn loy-btn-orange disabled:opacity-50"
+                        data-testid={`mark-visit-${customer.id}`}>
+                        {marking ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <span>☕</span>}
                         {marking ? 'Marking…' : 'Mark Visit'}
                       </button>
-                      <button
-                        onClick={() => handleSendWA(customer)}
-                        className="flex items-center gap-1.5 px-4 py-2 bg-green-500/10 hover:bg-green-500/20 border border-green-500/20 text-green-400 font-bold rounded-sm text-xs transition-all"
-                        data-testid={`wa-loyalty-${customer.id}`}
-                      >
-                        <MessageSquare className="w-3.5 h-3.5" />
-                        WhatsApp
+                      <button onClick={() => handleSendWA(customer)}
+                        className="loy-btn loy-btn-green"
+                        data-testid={`wa-loyalty-${customer.id}`}>
+                        <MessageSquare className="w-3.5 h-3.5" />WhatsApp
                       </button>
-                      {/* ── Undo visit ───────────────────────────────────────── */}
-                      <button
-                        onClick={() => handleUndoVisit(customer)}
+                      <button onClick={() => handleUndoVisit(customer)}
                         disabled={marking || (customer.visits || 1) <= 1}
-                        className="flex items-center gap-1.5 px-4 py-2 bg-white/5 hover:bg-white/10 border border-white/10 text-[#A3A3A3] hover:text-white font-bold rounded-sm text-xs transition-all disabled:opacity-30 disabled:cursor-not-allowed"
-                        data-testid={`undo-visit-${customer.id}`}
-                        title="Undo last visit"
-                      >
-                        <Undo2 className="w-3.5 h-3.5" />
-                        Undo
+                        className="loy-btn loy-btn-ghost disabled:opacity-30 disabled:cursor-not-allowed"
+                        data-testid={`undo-visit-${customer.id}`} title="Undo last visit">
+                        <Undo2 className="w-3.5 h-3.5" />Undo
                       </button>
-                      {/* ── Delete customer ──────────────────────────────────── */}
-                      <button
-                        onClick={() => handleDeleteCustomer(customer)}
-                        className="flex items-center gap-1.5 px-4 py-2 bg-red-500/10 hover:bg-red-500/20 border border-red-500/20 text-red-400 font-bold rounded-sm text-xs transition-all"
-                        data-testid={`delete-loyalty-${customer.id}`}
-                        title="Delete customer permanently"
-                      >
-                        <Trash2 className="w-3.5 h-3.5" />
-                        Delete
+                      <button onClick={() => handleDeleteCustomer(customer)}
+                        className="loy-btn loy-btn-red"
+                        data-testid={`delete-loyalty-${customer.id}`}>
+                        <Trash2 className="w-3.5 h-3.5" />Delete
                       </button>
-                      {/* ── Edit card ────────────────────────────────────────── */}
                       <button
                         onClick={() => {
                           if (editingCustomerId === customer.id) {
-                            // toggle off
-                            setEditingCustomerId(null);
-                            setEditDiscount('');
-                            setEditValidity('');
+                            setEditingCustomerId(null); setEditDiscount(''); setEditValidity('');
                           } else {
                             setEditingCustomerId(customer.id);
                             setEditDiscount(String(customer.currentDiscount || ''));
                             setEditValidity(String(customer.validityDays    || ''));
                           }
                         }}
-                        className={`flex items-center gap-1.5 px-4 py-2 border font-bold rounded-sm text-xs transition-all ${
-                          editingCustomerId === customer.id
-                            ? 'bg-[#D4AF37]/20 border-[#D4AF37]/40 text-[#D4AF37]'
-                            : 'bg-white/5 hover:bg-white/10 border-white/10 text-[#A3A3A3] hover:text-white'
-                        }`}
-                        data-testid={`edit-loyalty-${customer.id}`}
-                        title="Edit discount / validity"
-                      >
+                        className={`loy-btn ${editingCustomerId === customer.id ? 'loy-btn-gold' : 'loy-btn-ghost'}`}
+                        data-testid={`edit-loyalty-${customer.id}`}>
                         <Pencil className="w-3.5 h-3.5" />
                         {editingCustomerId === customer.id ? 'Cancel' : 'Edit'}
                       </button>
                     </div>
 
-                    {/* ── Inline edit panel (accordion — only for this customer) ─ */}
+                    {/* Inline edit panel */}
                     {editingCustomerId === customer.id && (
-                      <div
-                        className="mt-3 pt-3 border-t border-white/10 space-y-3"
-                        data-testid={`edit-panel-${customer.id}`}
-                      >
-                        <p className="text-[#A3A3A3] text-xs font-medium uppercase tracking-widest">
-                          Edit Loyalty Card
+                      <div className="mt-2 pt-3 space-y-3" style={{ borderTop: '1px solid rgba(255,140,0,0.1)' }}
+                        data-testid={`edit-panel-${customer.id}`}>
+                        <p className="text-xs font-black uppercase tracking-widest" style={{ color: '#FF7A20' }}>
+                          ✏️ Edit Loyalty Card
                         </p>
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                           <div>
-                            <label className="block text-[#A3A3A3] text-xs mb-1">
-                              Discount (%)
-                            </label>
-                            <input
-                              type="number"
-                              min="0"
-                              max="100"
-                              value={editDiscount}
+                            <label className="block text-xs font-bold mb-1" style={{ color: '#7a6a55' }}>Discount (%)</label>
+                            <input type="number" min="0" max="100" value={editDiscount}
                               onChange={e => setEditDiscount(e.target.value)}
                               placeholder={`Current: ${customer.currentDiscount || 10}%`}
-                              className="w-full bg-black/20 border border-white/10 text-white placeholder:text-neutral-600 focus:border-[#D4AF37] focus:ring-1 focus:ring-[#D4AF37] rounded-sm h-9 px-3 text-sm transition-all"
-                              data-testid={`edit-discount-${customer.id}`}
-                            />
+                              className="loy-input" style={{ padding: '8px 12px', fontSize: 13 }}
+                              data-testid={`edit-discount-${customer.id}`} />
                           </div>
                           <div>
-                            <label className="block text-[#A3A3A3] text-xs mb-1">
-                              Validity (days)
-                            </label>
-                            <input
-                              type="number"
-                              min="0"
-                              value={editValidity}
+                            <label className="block text-xs font-bold mb-1" style={{ color: '#7a6a55' }}>Validity (days)</label>
+                            <input type="number" min="0" value={editValidity}
                               onChange={e => setEditValidity(e.target.value)}
                               placeholder={`Current: ${customer.validityDays || 0}d`}
-                              className="w-full bg-black/20 border border-white/10 text-white placeholder:text-neutral-600 focus:border-[#D4AF37] focus:ring-1 focus:ring-[#D4AF37] rounded-sm h-9 px-3 text-sm transition-all"
-                              data-testid={`edit-validity-${customer.id}`}
-                            />
+                              className="loy-input" style={{ padding: '8px 12px', fontSize: 13 }}
+                              data-testid={`edit-validity-${customer.id}`} />
                           </div>
                         </div>
                         <div className="flex gap-2">
-                          <button
-                            onClick={() => handleSaveEdit(customer)}
-                            className="flex items-center gap-1.5 px-5 py-2 bg-[#D4AF37] hover:bg-[#C5A059] text-black font-bold rounded-sm text-xs transition-all"
-                            data-testid={`save-edit-${customer.id}`}
-                          >
-                            <Check className="w-3.5 h-3.5" />
-                            Save Changes
+                          <button onClick={() => handleSaveEdit(customer)}
+                            className="loy-btn loy-btn-orange"
+                            data-testid={`save-edit-${customer.id}`}>
+                            <Check className="w-3.5 h-3.5" />Save Changes
                           </button>
-                          <button
-                            onClick={() => handleSendWA(customer)}
-                            className="flex items-center gap-1.5 px-5 py-2 bg-green-500/10 hover:bg-green-500/20 border border-green-500/20 text-green-400 font-bold rounded-sm text-xs transition-all"
-                            data-testid={`resend-wa-${customer.id}`}
-                          >
-                            <MessageSquare className="w-3.5 h-3.5" />
-                            Resend WhatsApp
+                          <button onClick={() => handleSendWA(customer)}
+                            className="loy-btn loy-btn-green"
+                            data-testid={`resend-wa-${customer.id}`}>
+                            <MessageSquare className="w-3.5 h-3.5" />Resend WhatsApp
                           </button>
                         </div>
                       </div>
                     )}
-
                   </div>
                 </motion.div>
               </motion.div>
@@ -707,9 +583,17 @@ const LoyaltyDashboard = () => {
         </div>
       )}
 
-      {/* ── Google Review Link setting — feeds OrderTracking promo button ── */}
-      <GoogleReviewSettings />
+      {/* Footer */}
+      <div className="flex items-center justify-center gap-2 py-2">
+        <span>⭐</span>
+        <p className="text-xs font-bold" style={{ color: '#7a6a55' }}>
+          {totalCustomers} member{totalCustomers !== 1 ? 's' : ''} · {totalVisits} total visits
+        </p>
+        <span className="inline-block w-1.5 h-1.5 rounded-full animate-pulse" style={{ background: '#34d399' }} />
+      </div>
 
+      {/* ── Google Review Link setting ──────────────────────────────────────── */}
+      <GoogleReviewSettings />
     </div>
   );
 };
