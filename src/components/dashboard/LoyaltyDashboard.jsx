@@ -41,22 +41,24 @@ if (typeof document !== 'undefined' && !document.getElementById('loy-cafe-css'))
     .loy { font-family: 'DM Sans', system-ui, sans-serif; }
     .loy-title { font-family: 'Sora', system-ui, sans-serif !important; }
     .loy-card {
-      background: #0f1a12;
+      background: #111314;
       border: 1.5px solid rgba(255,255,255,0.07);
       border-radius: 16px;
       overflow: hidden;
       transition: border-color 200ms;
     }
-    .loy-card:hover { border-color: rgba(74,197,110,0.22); }
+    .loy-card:hover { border-color: rgba(62,201,110,0.18);
+      box-shadow: 0 0 18px rgba(62,201,110,0.06); }
     .loy-input {
-      width: 100%; background: #131f16;
+      width: 100%; background: #161a18;
       border: 1.5px solid rgba(255,255,255,0.08); border-radius: 12px;
-      color: #edfaf0; padding: 10px 14px; font-size: 14px; font-weight: 500;
+      color: #e8ede9; padding: 10px 14px; font-size: 14px; font-weight: 500;
       font-family: 'DM Sans', system-ui, sans-serif;
       outline: none; transition: border-color 180ms, box-shadow 180ms;
     }
-    .loy-input:focus { border-color: rgba(74,197,110,0.55); box-shadow: 0 0 0 3px rgba(74,197,110,0.1); }
-    .loy-input::placeholder { color: #2d4a33; }
+    .loy-input:focus { border-color: rgba(62,201,110,0.5);
+      box-shadow: 0 0 0 3px rgba(62,201,110,0.08); }
+    .loy-input::placeholder { color: #3a4040; }
     .loy-btn {
       display: inline-flex; align-items: center; gap: 5px;
       font-family: 'DM Sans', system-ui, sans-serif;
@@ -67,8 +69,8 @@ if (typeof document !== 'undefined' && !document.getElementById('loy-cafe-css'))
     }
     .loy-btn:hover { transform: translateY(-1px); filter: brightness(1.1); }
     .loy-btn:active { transform: scale(0.96); }
-    .loy-btn-orange { background: linear-gradient(135deg,#3ec96e,#27a854); color:#fff; box-shadow: 0 3px 12px rgba(62,201,110,0.28); }
-    .loy-btn-ghost  { background: rgba(255,255,255,0.05); color: #5a7a60; border-color: rgba(255,255,255,0.08); }
+    .loy-btn-orange { background: linear-gradient(135deg,#3ec96e,#27a854); color:#fff; box-shadow: 0 2px 14px rgba(62,201,110,0.35); }
+    .loy-btn-ghost  { background: rgba(255,255,255,0.05); color: #5e6b60; border-color: rgba(255,255,255,0.08); }
     .loy-btn-ghost:hover  { background: rgba(255,255,255,0.09); color: #fff; }
     .loy-btn-green  { background: rgba(37,211,102,0.1); color: #25D366; border-color: rgba(37,211,102,0.25); }
     .loy-btn-green:hover  { background: rgba(37,211,102,0.18); }
@@ -293,7 +295,7 @@ const LoyaltyDashboard = () => {
             </div>
             <div>
               <p className="text-2xl font-black text-white">{value}</p>
-              <p className="text-xs font-bold mt-0.5" style={{ color: '#5a7a60' }}>{label}</p>
+              <p className="text-xs font-bold mt-0.5" style={{ color: '#606870' }}>{label}</p>
             </div>
           </div>
         ))}
@@ -323,7 +325,7 @@ const LoyaltyDashboard = () => {
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -10 }}
             className="loy-card p-6"
-            style={{ border: '1.5px solid rgba(62,201,110,0.22)' }}
+            style={{ border: '1.5px solid rgba(255,255,255,0.1)' }}
           >
             <div className="flex items-center gap-2 mb-4">
               <span className="text-xl">👤</span>
@@ -344,19 +346,19 @@ const LoyaltyDashboard = () => {
               </div>
               <div>
                 <label className="block text-xs font-black uppercase tracking-widest mb-1.5" style={{ color: '#3ec96e' }}>
-                  Validity (days) <span className="font-normal normal-case" style={{ color: '#5a7a60' }}>(optional)</span>
+                  Validity (days) <span className="font-normal normal-case" style={{ color: '#606870' }}>(optional)</span>
                 </label>
                 <input type="number" min="0" value={validityDays} onChange={e => setValidityDays(e.target.value)}
                   placeholder="e.g. 30" className="loy-input" disabled={saving} data-testid="loyalty-validity-input" />
               </div>
               <div>
                 <label className="block text-xs font-black uppercase tracking-widest mb-1.5" style={{ color: '#3ec96e' }}>
-                  Custom Discount (%) <span className="font-normal normal-case" style={{ color: '#5a7a60' }}>(optional — overrides default 10%)</span>
+                  Custom Discount (%) <span className="font-normal normal-case" style={{ color: '#606870' }}>(optional — overrides default 10%)</span>
                 </label>
                 <input type="number" min="0" max="100" value={customDiscount} onChange={e => setCustomDiscount(e.target.value)}
                   placeholder="e.g. 20" className="loy-input" disabled={saving} data-testid="loyalty-discount-input" />
               </div>
-              <p className="text-xs font-bold" style={{ color: '#5a7a60' }}>
+              <p className="text-xs font-bold" style={{ color: '#606870' }}>
                 First visit will be recorded automatically. Customer starts with <span style={{ color: '#3ec96e' }}>10% OFF</span>.
               </p>
               <div className="flex gap-3">
@@ -380,7 +382,7 @@ const LoyaltyDashboard = () => {
           { label: '5+ visits', disc: '30% / Free Item 🎁' },
         ].map(({ label, disc }) => (
           <span key={label} className="text-xs px-3 py-1.5 rounded-xl font-black"
-            style={{ background: 'rgba(62,201,110,0.07)', color: '#5a7a60', border: '1px solid rgba(62,201,110,0.15)' }}>
+            style={{ background: 'rgba(62,201,110,0.07)', color: '#606870', border: '1px solid rgba(62,201,110,0.15)' }}>
             {label} → <span style={{ color: '#3ec96e' }}>{disc}</span>
           </span>
         ))}
@@ -390,12 +392,12 @@ const LoyaltyDashboard = () => {
       {loading ? (
         <div className="flex flex-col items-center justify-center py-12 gap-2">
           <div className="text-4xl animate-bounce">⭐</div>
-          <p className="text-sm font-bold" style={{ color: '#5a7a60' }}>Loading customers…</p>
+          <p className="text-sm font-bold" style={{ color: '#606870' }}>Loading customers…</p>
         </div>
       ) : filtered.length === 0 ? (
         <div className="loy-card p-12 text-center">
           <div className="text-5xl mb-3">🎁</div>
-          <p className="font-bold" style={{ color: '#5a7a60' }}>
+          <p className="font-bold" style={{ color: '#606870' }}>
             {search ? 'No customers match your search.' : 'No loyalty customers yet. Add your first one!'}
           </p>
         </div>
@@ -428,14 +430,14 @@ const LoyaltyDashboard = () => {
                   data-testid={`loyalty-toggle-${customer.id}`}
                 >
                   <div className="w-9 h-9 rounded-xl flex items-center justify-center text-lg flex-shrink-0"
-                    style={{ background: 'rgba(62,201,110,0.1)', border: '1.5px solid rgba(62,201,110,0.18)' }}>
+                    style={{ background: 'rgba(255,255,255,0.06)', border: '1.5px solid rgba(255,255,255,0.1)' }}>
                     👤
                   </div>
                   <div className="min-w-0 flex-1">
                     <p className="text-white font-black text-sm truncate">{customer.name}</p>
                     <div className="flex items-center gap-1.5 mt-0.5">
                       <span className="text-xs">📞</span>
-                      <p className="text-xs font-bold truncate" style={{ color: '#5a7a60' }}>{customer.phone}</p>
+                      <p className="text-xs font-bold truncate" style={{ color: '#606870' }}>{customer.phone}</p>
                     </div>
                   </div>
 
@@ -444,14 +446,14 @@ const LoyaltyDashboard = () => {
                     style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.07)' }}>
                     <span className="text-xs">☕</span>
                     <span className="text-white text-xs font-black">{visits}</span>
-                    <span className="text-xs font-bold hidden sm:inline" style={{ color: '#5a7a60' }}>visit{visits !== 1 ? 's' : ''}</span>
+                    <span className="text-xs font-bold hidden sm:inline" style={{ color: '#606870' }}>visit{visits !== 1 ? 's' : ''}</span>
                   </div>
 
                   {/* Discount badge */}
                   <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-xl flex-shrink-0"
                     style={{
-                      background: isFree ? 'rgba(16,185,129,0.12)' : 'rgba(62,201,110,0.1)',
-                      border: isFree ? '1px solid rgba(16,185,129,0.3)' : '1px solid rgba(62,201,110,0.25)',
+                      background: isFree ? 'rgba(16,185,129,0.12)' : 'rgba(255,255,255,0.06)',
+                      border: isFree ? '1px solid rgba(16,185,129,0.3)' : '1px solid rgba(255,255,255,0.1)',
                     }}>
                     <span className="text-xs">{isFree ? '🎁' : '⭐'}</span>
                     <span className="text-xs font-black" style={{ color: isFree ? '#34d399' : '#3ec96e' }}>
@@ -461,7 +463,7 @@ const LoyaltyDashboard = () => {
 
                   <ChevronDown
                     className="w-4 h-4 flex-shrink-0 transition-transform duration-300"
-                    style={{ color: '#5a7a60', transform: isOpen ? 'rotate(180deg)' : 'rotate(0deg)' }}
+                    style={{ color: '#606870', transform: isOpen ? 'rotate(180deg)' : 'rotate(0deg)' }}
                   />
                 </button>
 
@@ -472,7 +474,7 @@ const LoyaltyDashboard = () => {
                   transition={{ duration: 0.25, ease: 'easeInOut' }}
                   style={{ overflow: 'hidden' }}
                 >
-                  <div className="px-4 pb-4 pt-2 space-y-3" style={{ borderTop: '1px solid rgba(62,201,110,0.08)' }}>
+                  <div className="px-4 pb-4 pt-2 space-y-3" style={{ borderTop: '1px solid rgba(255,255,255,0.06)' }}>
 
                     {/* Expiry date */}
                     {customer.expiryDate && (() => {
@@ -487,7 +489,7 @@ const LoyaltyDashboard = () => {
                             border: isExpired ? '1px solid rgba(220,50,50,0.25)' : '1px solid rgba(255,255,255,0.08)',
                           }}>
                           <span className="text-xs">📅</span>
-                          <span className="text-xs font-bold" style={{ color: isExpired ? '#f87171' : '#5a7a60' }}>
+                          <span className="text-xs font-bold" style={{ color: isExpired ? '#f87171' : '#606870' }}>
                             {isExpired ? 'Expired ' : 'Valid till '}
                             {exp.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}
                           </span>
@@ -538,14 +540,14 @@ const LoyaltyDashboard = () => {
 
                     {/* Inline edit panel */}
                     {editingCustomerId === customer.id && (
-                      <div className="mt-2 pt-3 space-y-3" style={{ borderTop: '1px solid rgba(62,201,110,0.1)' }}
+                      <div className="mt-2 pt-3 space-y-3" style={{ borderTop: '1px solid rgba(255,255,255,0.07)' }}
                         data-testid={`edit-panel-${customer.id}`}>
                         <p className="text-xs font-black uppercase tracking-widest" style={{ color: '#3ec96e' }}>
                           ✏️ Edit Loyalty Card
                         </p>
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                           <div>
-                            <label className="block text-xs font-bold mb-1" style={{ color: '#5a7a60' }}>Discount (%)</label>
+                            <label className="block text-xs font-bold mb-1" style={{ color: '#606870' }}>Discount (%)</label>
                             <input type="number" min="0" max="100" value={editDiscount}
                               onChange={e => setEditDiscount(e.target.value)}
                               placeholder={`Current: ${customer.currentDiscount || 10}%`}
@@ -553,7 +555,7 @@ const LoyaltyDashboard = () => {
                               data-testid={`edit-discount-${customer.id}`} />
                           </div>
                           <div>
-                            <label className="block text-xs font-bold mb-1" style={{ color: '#5a7a60' }}>Validity (days)</label>
+                            <label className="block text-xs font-bold mb-1" style={{ color: '#606870' }}>Validity (days)</label>
                             <input type="number" min="0" value={editValidity}
                               onChange={e => setEditValidity(e.target.value)}
                               placeholder={`Current: ${customer.validityDays || 0}d`}
@@ -586,7 +588,7 @@ const LoyaltyDashboard = () => {
       {/* Footer */}
       <div className="flex items-center justify-center gap-2 py-2">
         <span>⭐</span>
-        <p className="text-xs font-bold" style={{ color: '#5a7a60' }}>
+        <p className="text-xs font-bold" style={{ color: '#606870' }}>
           {totalCustomers} member{totalCustomers !== 1 ? 's' : ''} · {totalVisits} total visits
         </p>
         <span className="inline-block w-1.5 h-1.5 rounded-full animate-pulse" style={{ background: '#34d399' }} />
