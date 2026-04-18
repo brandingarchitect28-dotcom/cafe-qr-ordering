@@ -33,14 +33,68 @@ import StaffManagement     from '../components/dashboard/StaffManagement';
 import Settings            from '../components/dashboard/Settings';
 import CafeDisabled        from './CafeDisabled';
 
+// ── Inject café-vibe dashboard CSS once ───────────────────────────────────────
+if (typeof document !== 'undefined' && !document.getElementById('dash-cafe-css')) {
+  const el = document.createElement('style');
+  el.id = 'dash-cafe-css';
+  el.textContent = `
+    @import url('https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800;900&family=Fredoka+One&display=swap');
+    .dash { font-family: 'Nunito', system-ui, sans-serif; }
+    .dash-title { font-family: 'Fredoka One', system-ui, sans-serif !important; }
+    .dash-nav-item {
+      width: 100%;
+      display: flex; align-items: center; gap: 10px;
+      padding: 10px 16px; border-radius: 12px;
+      font-family: 'Nunito', system-ui, sans-serif;
+      font-weight: 700; font-size: 14px;
+      cursor: pointer; transition: all 160ms;
+      border: none; background: transparent;
+      color: #7a6a55; text-align: left;
+    }
+    .dash-nav-item:hover { background: rgba(255,140,0,0.07); color: #fff; }
+    .dash-nav-item.active {
+      background: linear-gradient(135deg,#FF7A20,#E55A00);
+      color: #fff; font-weight: 800;
+      box-shadow: 0 3px 14px rgba(255,120,0,0.32);
+    }
+    .dash-nav-item.active .dash-nav-emoji { filter: brightness(1.2); }
+    .dash-sidebar {
+      background: #0a0702;
+      border-right: 1.5px solid rgba(255,140,0,0.1);
+    }
+  `;
+  document.head.appendChild(el);
+}
+
+// ── Nav item emoji map ─────────────────────────────────────────────────────────
+const NAV_EMOJI = {
+  overview:  '🏠',
+  orders:    '🧾',
+  invoices:  '📄',
+  menu:      '🍽️',
+  offers:    '🎁',
+  analytics: '📊',
+  advanced:  '📈',
+  marketing: '💬',
+  askai:     '🤖',
+  kitchen:   '👨‍🍳',
+  inventory: '📦',
+  ai:        '✨',
+  aimenu:    '🪄',
+  qr:        '📱',
+  staff:     '👥',
+  loyalty:   '⭐',
+  settings:  '⚙️',
+};
+
 // ─── Locked feature placeholder ───────────────────────────────────────────────
 const LockedFeature = ({ label, icon: Icon }) => {
   const { T } = useTheme();
   return (
-    <div className={`${T.card} rounded-xl p-16 text-center`}>
-      <Icon className="w-12 h-12 mx-auto mb-4" style={{ color: 'rgba(212,175,55,0.3)' }} />
-      <p className={`${T.heading} font-semibold text-lg mb-2`}>{label}</p>
-      <p className={`${T.muted} text-sm`}>
+    <div className="dash rounded-2xl p-16 text-center" style={{ background: '#141008', border: '1.5px solid rgba(255,255,255,0.07)' }}>
+      <div className="text-5xl mb-4">🔒</div>
+      <p className="font-black text-lg text-white mb-2">{label}</p>
+      <p className="text-sm font-semibold" style={{ color: '#7a6a55' }}>
         This feature is not enabled for your account.
         Contact your administrator to unlock it.
       </p>
@@ -96,153 +150,140 @@ const Dashboard = () => {
     { id: 'settings',  label: 'Settings',    icon: SettingsIcon    },
   ];
 
-  const sidebarBg = isLight ? 'bg-white'      : 'bg-[#050505]';
-  const headerBg  = isLight ? 'bg-white/90'   : 'bg-[#050505]/80';
-  const pageBg    = isLight ? 'bg-[#F5F5F5]'  : 'bg-[#050505]';
+  const pageBg = isLight ? 'bg-[#F5F5F5]' : 'bg-[#050505]';
 
   if (cafe && cafe.isActive === false) {
     return <CafeDisabled isAdmin={true} />;
   }
 
   return (
-    <div className={`min-h-screen ${pageBg}`} style={{ fontFamily: 'Manrope, sans-serif' }}>
+    <div className={`min-h-screen ${pageBg} dash`} style={{ fontFamily: "'Nunito', system-ui, sans-serif" }}>
 
       <GlobalOrderPopup order={newOrder} onClose={clearNewOrder} />
 
-      {/* ── Overlay — shown on ALL screen sizes when sidebar is open ─────── */}
+      {/* ── Overlay ────────────────────────────────────────────────────────── */}
       {sidebarOpen && (
         <div
-          className="fixed inset-0 bg-black/60 backdrop-blur-sm z-40"
+          className="fixed inset-0 bg-black/70 backdrop-blur-sm z-40"
           onClick={() => setSidebarOpen(false)}
         />
       )}
 
-      {/* ── Sidebar ──────────────────────────────────────────────────────── */}
-      {/*
-        FIX — sidebar minimize in landscape / all screen sizes:
-
-        ROOT CAUSE of the landscape bug:
-          The aside had the Tailwind class "lg:translate-x-0" which forces
-          translateX(0) — fully visible — at ≥1024 px wide. This breakpoint
-          covers landscape tablets, landscape phones, laptops and desktops.
-          Because CSS specificity beats inline React state-driven classes,
-          the sidebar was ALWAYS visible at lg+ regardless of sidebarOpen,
-          and the X button appeared to do nothing.
-
-        FIX:
-          Removed "lg:translate-x-0" entirely.
-          Sidebar visibility is now controlled ONLY by sidebarOpen state:
-            open  → translate-x-0     (visible)
-            closed → -translate-x-full (hidden off-screen left)
-          This works identically on every screen width and orientation.
-
-        Also removed "lg:ml-64" from the main content wrapper below — that
-        class was a permanent 256px left margin at lg+ to compensate for the
-        always-visible sidebar. Since the sidebar is now overlay-only (toggle-
-        driven), the margin is not needed and would create a blank gap when
-        the sidebar is closed on large screens.
-      */}
+      {/* ── Sidebar ────────────────────────────────────────────────────────── */}
       <aside
-        className={`fixed top-0 left-0 h-screen w-64 ${sidebarBg} border-r border-white/5 flex flex-col p-4 z-50 transform transition-transform ${
-          // FIX: sidebar visibility controlled purely by state — no lg: override
+        className={`fixed top-0 left-0 h-screen w-64 dash-sidebar flex flex-col p-4 z-50 transform transition-transform ${
           sidebarOpen ? 'translate-x-0' : '-translate-x-full'
         }`}
       >
-        {/* Branding + close — X is always visible (was lg:hidden, now removed) */}
-        <div className="flex items-center justify-between mb-8">
-          <h1
-            className="text-xl font-bold text-[#D4AF37]"
-            style={{ fontFamily: 'Playfair Display, serif' }}
-          >
-            BRANDING ARCHITECT
-          </h1>
-          {/* FIX: removed lg:hidden — close button visible in ALL orientations */}
+        {/* Brand */}
+        <div className="flex items-center justify-between mb-6">
+          <div className="flex items-center gap-2.5">
+            <div className="w-9 h-9 rounded-xl flex items-center justify-center text-lg flex-shrink-0"
+              style={{ background: 'rgba(255,140,0,0.12)', border: '1.5px solid rgba(255,140,0,0.22)' }}>
+              ☕
+            </div>
+            <div>
+              <h1 className="text-sm font-black dash-title" style={{ color: '#FF7A20', lineHeight: 1.1 }}>
+                SmartCafé OS
+              </h1>
+              <p className="text-xs font-bold" style={{ color: '#4a3f35' }}>Branding Architect</p>
+            </div>
+          </div>
           <button
-            className="text-[#A3A3A3] hover:text-white transition-colors"
+            className="transition-colors p-1.5 rounded-xl hover:bg-white/5"
+            style={{ color: '#7a6a55' }}
             onClick={() => setSidebarOpen(false)}
             aria-label="Close sidebar"
+            onMouseEnter={e => e.currentTarget.style.color = '#fff'}
+            onMouseLeave={e => e.currentTarget.style.color = '#7a6a55'}
           >
-            <X className="w-6 h-6" />
+            <X className="w-5 h-5" />
           </button>
         </div>
 
-        {/* Nav items */}
+        {/* Divider */}
+        <div className="mb-4" style={{ height: 1, background: 'rgba(255,140,0,0.1)' }} />
+
+        {/* Nav */}
         <nav
-          className="flex-1 space-y-1 overflow-y-auto overscroll-contain"
+          className="flex-1 space-y-0.5 overflow-y-auto overscroll-contain"
           style={{ WebkitOverflowScrolling: 'touch' }}
         >
           {menuItems.map((item) => {
-            const Icon     = item.icon;
             const isActive = activeTab === item.id;
+            const emoji    = NAV_EMOJI[item.id] || '·';
             return (
               <button
                 key={item.id}
                 data-testid={`nav-${item.id}`}
-                onClick={() => {
-                  setActiveTab(item.id);
-                  setSidebarOpen(false);
-                }}
-                className={`w-full flex items-center gap-3 px-4 py-3 rounded-sm transition-all text-sm ${
-                  isActive
-                    ? 'bg-[#D4AF37] text-black font-semibold'
-                    : 'text-[#A3A3A3] hover:text-white hover:bg-white/5'
-                }`}
+                onClick={() => { setActiveTab(item.id); setSidebarOpen(false); }}
+                className={`dash-nav-item${isActive ? ' active' : ''}`}
               >
-                <Icon className="w-5 h-5 flex-shrink-0" />
+                <span className="dash-nav-emoji text-base w-5 text-center flex-shrink-0">{emoji}</span>
                 {item.label}
               </button>
             );
           })}
         </nav>
 
-        {/* Bottom: user + logout */}
-        <div className="border-t border-white/5 pt-4 flex-shrink-0">
-          <div className="px-4 py-3 mb-2">
-            <p className="text-[#A3A3A3] text-sm">Logged in as</p>
-            <p className="text-white font-semibold truncate">{user?.email}</p>
+        {/* Divider */}
+        <div className="my-3" style={{ height: 1, background: 'rgba(255,140,0,0.08)' }} />
+
+        {/* User + logout */}
+        <div className="flex-shrink-0 space-y-1">
+          <div className="px-4 py-2 rounded-xl" style={{ background: 'rgba(255,140,0,0.05)' }}>
+            <p className="text-xs font-bold" style={{ color: '#4a3f35' }}>Logged in as</p>
+            <p className="text-white text-sm font-black truncate">{user?.email}</p>
           </div>
           <button
             data-testid="logout-btn"
             onClick={handleLogout}
-            className="w-full flex items-center gap-3 px-4 py-3 text-red-400 hover:text-red-300 hover:bg-red-500/10 rounded-sm transition-all"
+            className="dash-nav-item"
+            style={{ color: '#f87171' }}
+            onMouseEnter={e => { e.currentTarget.style.background = 'rgba(220,50,50,0.1)'; e.currentTarget.style.color = '#f87171'; }}
+            onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = '#f87171'; }}
           >
-            <LogOut className="w-5 h-5" />
+            <span className="text-base w-5 text-center flex-shrink-0">🚪</span>
             Logout
           </button>
         </div>
       </aside>
 
-      {/* ── Main content ──────────────────────────────────────────────────── */}
-      {/* FIX: removed lg:ml-64 — sidebar is now overlay-only (toggle-driven),
-          so a permanent left margin is not needed and would leave a blank gap */}
+      {/* ── Main content ────────────────────────────────────────────────────── */}
       <div>
 
         {/* Sticky header */}
         <header
-          className={`sticky top-0 z-30 h-16 border-b border-white/5 ${headerBg} backdrop-blur-md px-6 flex items-center justify-between`}
+          className="sticky top-0 z-30 h-16 px-5 flex items-center justify-between"
+          style={{
+            background: 'rgba(5,5,5,0.88)',
+            backdropFilter: 'blur(16px)',
+            borderBottom: '1px solid rgba(255,140,0,0.1)',
+          }}
         >
-          {/* FIX: removed lg:hidden — hamburger visible in ALL orientations */}
           <button
-            className="text-[#D4AF37] hover:opacity-80 transition-opacity"
+            className="transition-opacity hover:opacity-70"
+            style={{ color: '#FF7A20' }}
             onClick={() => setSidebarOpen(prev => !prev)}
             aria-label="Toggle sidebar"
           >
             <MenuIcon className="w-6 h-6" />
           </button>
 
-          <h2
-            className="text-2xl font-bold text-white"
-            style={{ fontFamily: 'Playfair Display, serif' }}
-          >
-            {menuItems.find(item => item.id === activeTab)?.label}
-          </h2>
+          {/* Active tab title */}
+          <div className="flex items-center gap-2">
+            <span className="text-lg">{NAV_EMOJI[activeTab] || '·'}</span>
+            <h2 className="text-xl font-black text-white dash-title">
+              {menuItems.find(item => item.id === activeTab)?.label}
+            </h2>
+          </div>
 
-          {/* Spacer keeps title centred — width matches hamburger button */}
+          {/* Spacer */}
           <div className="w-6" />
         </header>
 
         {/* Page content */}
-        <main className="p-6">
+        <main className="p-5">
           {activeTab === 'overview'   && <Overview />}
           {activeTab === 'orders'     && <OrdersManagement />}
           {activeTab === 'invoices'   && <InvoicesTab />}
