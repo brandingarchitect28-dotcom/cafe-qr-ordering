@@ -1,73 +1,124 @@
-import React, { useState, useMemo, useCallback, useEffect } from 'react';
+import React, { useState, useMemo } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
 import { useCollection, useDocument } from '../../hooks/useFirestore';
-import { where, doc, updateDoc, deleteDoc, collection, addDoc, serverTimestamp, getDoc } from 'firebase/firestore';
+import { where, addDoc, collection, doc, updateDoc, deleteDoc } from 'firebase/firestore';
 import { db } from '../../lib/firebase';
-import { AlertCircle, Search, Plus, Edit2, Trash2, Tag, Percent, X, CheckCircle, XCircle, Copy, ToggleLeft, ToggleRight, Gift, Zap } from 'lucide-react';
+import { Plus, Edit, Trash2, X, Package, Percent, Gift, Check, ChevronDown } from 'lucide-react';
 import { toast } from 'sonner';
+import MediaUpload from '../MediaUpload';
+import { useTheme } from '../../hooks/useTheme';
 import { motion, AnimatePresence } from 'framer-motion';
 
-// ─── Inject food-theme CSS once ───────────────────────────────────────────────
-if (typeof document !== 'undefined' && !document.getElementById('omof-food-css')) {
+// ─── Inject premium food-theme CSS once ───────────────────────────────────────
+if (typeof document !== 'undefined' && !document.getElementById('ofm2-food-css')) {
   const el = document.createElement('style');
-  el.id = 'omof-food-css';
+  el.id = 'ofm2-food-css';
   el.textContent = `
     @import url('https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800;900&family=Fredoka+One&display=swap');
 
-    .omof { font-family: 'Nunito', system-ui, sans-serif; }
-    .omof-title { font-family: 'Fredoka One', system-ui, sans-serif !important; letter-spacing: 0.01em; }
+    .ofm2 { font-family: 'Nunito', system-ui, sans-serif; }
+    .ofm2-title { font-family: 'Fredoka One', system-ui, sans-serif !important; letter-spacing: 0.01em; }
 
-    .omof-card {
+    /* ── Main cards ── */
+    .ofm2-card {
+      background: linear-gradient(160deg, #1a1208 0%, #130e05 100%);
+      border: 1.5px solid rgba(255,140,0,0.14);
+      border-radius: 16px;
+      overflow: hidden;
+      transition: border-color 220ms, box-shadow 220ms, transform 200ms;
+      position: relative;
+    }
+    .ofm2-card::before {
+      content: '';
+      position: absolute; top: 0; left: 0; right: 0; height: 2px;
+      background: linear-gradient(90deg, #FF7A20, #FFBE0B, #FF7A20);
+      opacity: 0; transition: opacity 200ms;
+    }
+    .ofm2-card:hover { border-color: rgba(255,140,0,0.32); box-shadow: 0 10px 36px rgba(0,0,0,0.6); transform: translateY(-3px); }
+    .ofm2-card:hover::before { opacity: 1; }
+
+    /* ── Flat utility card ── */
+    .ofm2-flat {
       background: #141008;
       border: 1.5px solid rgba(255,255,255,0.07);
-      border-radius: 16px;
-      transition: border-color 200ms, box-shadow 200ms, transform 180ms;
-    }
-    .omof-card:hover {
-      border-color: rgba(255,140,0,0.25);
-      box-shadow: 0 6px 24px rgba(0,0,0,0.45);
-      transform: translateY(-1px);
+      border-radius: 14px;
     }
 
-    .omof-btn {
-      display: inline-flex; align-items: center; gap: 5px;
+    /* ── Inner section boxes ── */
+    .ofm2-section {
+      background: rgba(255,140,0,0.04);
+      border: 1.5px solid rgba(255,140,0,0.12);
+      border-radius: 13px;
+      padding: 16px;
+    }
+
+    /* ── Sub-card (item rows etc.) ── */
+    .ofm2-subcard {
+      background: rgba(255,255,255,0.03);
+      border: 1.5px solid rgba(255,255,255,0.07);
+      border-radius: 10px;
+    }
+
+    /* ── Buttons ── */
+    .ofm2-btn {
+      display: inline-flex; align-items: center; gap: 6px;
       font-family: 'Nunito', system-ui, sans-serif;
       font-weight: 800; font-size: 12px;
       padding: 7px 14px; border-radius: 10px;
       border: 1.5px solid transparent;
-      cursor: pointer; transition: all 180ms;
-      white-space: nowrap;
+      cursor: pointer; transition: all 180ms; white-space: nowrap;
     }
-    .omof-btn:hover  { transform: translateY(-1px); filter: brightness(1.1); }
-    .omof-btn:active { transform: scale(0.96); }
+    .ofm2-btn:hover  { transform: translateY(-1px); filter: brightness(1.10); }
+    .ofm2-btn:active { transform: scale(0.96); }
 
-    .omof-btn-orange { background: linear-gradient(135deg,#FF7A20,#E55A00); color:#fff; box-shadow: 0 3px 12px rgba(255,120,0,0.3); }
-    .omof-btn-orange:hover { box-shadow: 0 5px 18px rgba(255,120,0,0.45); }
-    .omof-btn-ghost  { background: rgba(255,255,255,0.05); color: #7a6a55; border-color: rgba(255,255,255,0.08); }
-    .omof-btn-ghost:hover  { background: rgba(255,255,255,0.09); color: #fff; }
-    .omof-btn-red    { background: rgba(220,50,50,0.12); color: #ff7070; border-color: rgba(220,50,50,0.22); }
-    .omof-btn-red:hover    { background: rgba(220,50,50,0.22); }
-    .omof-btn-green  { background: rgba(16,185,129,0.12); color: #34d399; border-color: rgba(16,185,129,0.22); }
-    .omof-btn-green:hover  { background: rgba(16,185,129,0.22); }
-    .omof-btn-yellow { background: rgba(255,190,11,0.12); color: #fbbf24; border-color: rgba(255,190,11,0.22); }
-    .omof-btn-yellow:hover { background: rgba(255,190,11,0.22); }
+    .ofm2-btn-orange { background: linear-gradient(135deg,#FF7A20,#E55A00); color:#fff; box-shadow: 0 3px 12px rgba(255,120,0,0.30); }
+    .ofm2-btn-orange:hover { box-shadow: 0 5px 18px rgba(255,120,0,0.45); }
+    .ofm2-btn-ghost  { background: rgba(255,255,255,0.05); color: #7a6a55; border-color: rgba(255,255,255,0.08); }
+    .ofm2-btn-ghost:hover  { background: rgba(255,255,255,0.09); color: #fff; }
+    .ofm2-btn-red    { background: rgba(220,50,50,0.12); color: #ff7070; border-color: rgba(220,50,50,0.22); }
+    .ofm2-btn-red:hover    { background: rgba(220,50,50,0.22); }
+    .ofm2-btn-green  { background: rgba(16,185,129,0.12); color: #34d399; border-color: rgba(16,185,129,0.22); }
+    .ofm2-btn-green:hover  { background: rgba(16,185,129,0.22); }
+    .ofm2-btn-yellow { background: rgba(255,190,11,0.12); color: #fbbf24; border-color: rgba(255,190,11,0.22); }
+    .ofm2-btn-yellow:hover { background: rgba(255,190,11,0.22); }
 
-    .omof-input {
-      background: #1c1509; border: 1.5px solid rgba(255,255,255,0.08); border-radius: 12px;
+    /* ── Inputs ── */
+    .ofm2-input {
+      background: #1c1509; border: 1.5px solid rgba(255,255,255,0.08); border-radius: 11px;
       color: #fff8ee; padding: 10px 14px; font-size: 14px; font-weight: 600;
       font-family: 'Nunito', system-ui, sans-serif;
       outline: none; width: 100%; transition: border-color 180ms, box-shadow 180ms;
     }
-    .omof-input:focus { border-color: rgba(255,140,0,0.55); box-shadow: 0 0 0 3px rgba(255,140,0,0.1); }
-    .omof-input::placeholder { color: #3d3020; }
+    .ofm2-input:focus { border-color: rgba(255,140,0,0.55); box-shadow: 0 0 0 3px rgba(255,140,0,0.10); }
+    .ofm2-input::placeholder { color: #3d3020; }
+    .ofm2-input:disabled { opacity: 0.5; cursor: not-allowed; }
 
-    .omof-label {
-      display: block; font-size: 12px; font-weight: 800; margin-bottom: 6px;
-      color: #a08060; text-transform: uppercase; letter-spacing: 0.06em;
+    /* ── Select ── */
+    .ofm2-select {
+      background: #1c1509; border: 1.5px solid rgba(255,255,255,0.08); border-radius: 11px;
+      color: #fff8ee; padding: 10px 14px; font-size: 14px; font-weight: 600;
+      font-family: 'Nunito', system-ui, sans-serif;
+      outline: none; width: 100%; cursor: pointer; transition: border-color 180ms;
+    }
+    .ofm2-select:focus { border-color: rgba(255,140,0,0.55); }
+    .ofm2-select option { background: #1c1509; }
+
+    /* ── Labels ── */
+    .ofm2-label {
+      display: block; font-size: 11px; font-weight: 900; margin-bottom: 6px;
+      color: #a08060; text-transform: uppercase; letter-spacing: 0.07em;
       font-family: 'Nunito', system-ui, sans-serif;
     }
 
-    .omof-badge {
+    /* ── Section heading ── */
+    .ofm2-sec {
+      font-size: 11px; font-weight: 900; text-transform: uppercase; letter-spacing: 0.08em;
+      color: #FF7A20; display: flex; align-items: center; gap: 5px;
+      font-family: 'Nunito', system-ui, sans-serif;
+    }
+
+    /* ── Badges ── */
+    .ofm2-badge {
       display: inline-flex; align-items: center; gap: 4px;
       padding: 3px 10px; border-radius: 20px;
       font-size: 11px; font-weight: 800;
@@ -75,674 +126,1141 @@ if (typeof document !== 'undefined' && !document.getElementById('omof-food-css')
       font-family: 'Nunito', system-ui, sans-serif;
     }
 
-    .omof-tab {
-      padding: 6px 16px; border-radius: 22px; font-size: 13px; font-weight: 800;
-      cursor: pointer; transition: all 180ms; border: 1.5px solid transparent;
-      font-family: 'Nunito', system-ui, sans-serif;
+    /* ── Stat cards ── */
+    .ofm2-stat {
+      background: #141008;
+      border: 1.5px solid rgba(255,255,255,0.07);
+      border-radius: 13px;
+      padding: 14px 16px;
+      display: flex; align-items: center; gap: 12px;
+      transition: border-color 200ms, box-shadow 200ms;
     }
-    .omof-tab-on  { background: linear-gradient(135deg,#FF7A20,#E55A00); color: #fff; box-shadow: 0 3px 14px rgba(255,120,0,0.35); }
-    .omof-tab-off { background: rgba(255,255,255,0.04); color: #7a6a55; border-color: rgba(255,255,255,0.07); }
-    .omof-tab-off:hover { background: rgba(255,140,0,0.08); color: #FF7A20; border-color: rgba(255,140,0,0.2); }
+    .ofm2-stat:hover { border-color: rgba(255,140,0,0.22); box-shadow: 0 4px 18px rgba(0,0,0,0.4); }
 
-    .omof-scroll::-webkit-scrollbar { width: 4px; height: 4px; }
-    .omof-scroll::-webkit-scrollbar-track { background: transparent; }
-    .omof-scroll::-webkit-scrollbar-thumb { background: rgba(255,140,0,0.25); border-radius: 4px; }
-
-    .omof-sheet {
+    /* ── Bottom sheet ── */
+    .ofm2-sheet {
       background: linear-gradient(180deg, #1e1408 0%, #150f06 100%);
       border: 1.5px solid rgba(255,140,0,0.18);
       box-shadow: 0 -20px 60px rgba(255,120,0,0.14);
     }
-    .omof-sheet-grip { width: 36px; height: 4px; border-radius: 4px; background: rgba(255,140,0,0.28); }
+    .ofm2-sheet-grip { width:36px; height:4px; border-radius:4px; background:rgba(255,140,0,0.28); }
 
-    .omof-coupon-card {
-      background: linear-gradient(135deg, #1e1408 0%, #1a1005 100%);
-      border: 1.5px solid rgba(255,140,0,0.18);
-      border-radius: 16px;
-      position: relative;
-      overflow: hidden;
-      transition: border-color 200ms, box-shadow 200ms, transform 180ms;
+    /* ── Toggle ── */
+    .ofm2-toggle-track {
+      width:40px; height:22px; border-radius:11px;
+      display:flex; align-items:center; padding:2px;
+      cursor:pointer; transition:background 200ms; flex-shrink:0;
     }
-    .omof-coupon-card::before {
-      content: '';
-      position: absolute; top: 0; left: 0; right: 0;
-      height: 3px;
-      background: linear-gradient(90deg, #FF7A20, #FFBE0B, #FF7A20);
-    }
-    .omof-coupon-card:hover {
-      border-color: rgba(255,140,0,0.35);
-      box-shadow: 0 8px 30px rgba(255,120,0,0.15);
-      transform: translateY(-2px);
-    }
-    .omof-coupon-card-disabled {
-      opacity: 0.55;
-      filter: grayscale(0.4);
-    }
-    .omof-coupon-card-disabled::before {
-      background: #3a3a3a;
+    .ofm2-toggle-thumb {
+      width:18px; height:18px; border-radius:50%; background:#fff;
+      transition:transform 200ms; box-shadow:0 1px 4px rgba(0,0,0,0.35);
     }
 
-    .omof-coupon-hole-left {
-      position: absolute; left: -8px; top: 50%; transform: translateY(-50%);
-      width: 16px; height: 16px; border-radius: 50%;
-      background: #0D0A07;
-      border: 1.5px solid rgba(255,140,0,0.18);
+    /* ── Menu item picker grid buttons ── */
+    .ofm2-picker-item {
+      padding: 10px 12px; border-radius: 10px;
+      border: 1.5px solid rgba(255,255,255,0.08);
+      background: rgba(255,255,255,0.03);
+      text-align: left; cursor: pointer;
+      transition: all 180ms; font-family: 'Nunito', system-ui, sans-serif;
     }
-    .omof-coupon-hole-right {
-      position: absolute; right: -8px; top: 50%; transform: translateY(-50%);
-      width: 16px; height: 16px; border-radius: 50%;
-      background: #0D0A07;
-      border: 1.5px solid rgba(255,140,0,0.18);
-    }
-    .omof-coupon-dashes {
-      position: absolute; top: 50%; left: 16px; right: 16px;
-      height: 1px;
-      background: repeating-linear-gradient(90deg, rgba(255,140,0,0.2) 0px, rgba(255,140,0,0.2) 6px, transparent 6px, transparent 12px);
-      transform: translateY(-50%);
-      pointer-events: none;
-    }
+    .ofm2-picker-item:hover { border-color: rgba(255,140,0,0.3); background: rgba(255,140,0,0.06); }
+    .ofm2-picker-item-selected { border-color: rgba(255,140,0,0.45) !important; background: rgba(255,140,0,0.10) !important; }
 
-    @keyframes omofIn { from { opacity:0; transform:translateY(8px); } to { opacity:1; transform:translateY(0); } }
-    .omof-in { animation: omofIn 280ms ease forwards; }
-
-    .omof-ordnum { font-family: 'Fredoka One', system-ui, sans-serif; color: #FF7A20; }
-    .omof-sec { font-size: 11px; font-weight: 900; text-transform: uppercase; letter-spacing: 0.08em; color: #FF7A20; display: flex; align-items: center; gap: 5px; font-family: 'Nunito', system-ui, sans-serif; }
-
-    .omof-toggle-track {
-      width: 40px; height: 22px; border-radius: 11px;
-      display: flex; align-items: center;
-      padding: 2px; cursor: pointer; transition: background 200ms;
+    /* ── Offer type selector buttons ── */
+    .ofm2-type-btn {
+      padding: 16px; border-radius: 13px;
+      border: 1.5px solid rgba(255,255,255,0.08);
+      background: rgba(255,255,255,0.03);
+      text-align: left; cursor: pointer;
+      transition: all 200ms; font-family: 'Nunito', system-ui, sans-serif;
     }
-    .omof-toggle-thumb {
-      width: 18px; height: 18px; border-radius: 50%; background: #fff;
-      transition: transform 200ms; box-shadow: 0 1px 4px rgba(0,0,0,0.3);
+    .ofm2-type-btn:hover { border-color: rgba(255,140,0,0.28); background: rgba(255,140,0,0.06); transform: translateY(-1px); }
+    .ofm2-type-btn-active { border-color: rgba(255,140,0,0.50) !important; background: rgba(255,140,0,0.12) !important; box-shadow: 0 0 0 3px rgba(255,140,0,0.08); }
+
+    /* ── Scrollbar ── */
+    .ofm2-scroll::-webkit-scrollbar { width:4px; height:4px; }
+    .ofm2-scroll::-webkit-scrollbar-track { background:transparent; }
+    .ofm2-scroll::-webkit-scrollbar-thumb { background:rgba(255,140,0,0.25); border-radius:4px; }
+
+    /* ── Entrance anim ── */
+    @keyframes ofm2In { from { opacity:0; transform:translateY(10px); } to { opacity:1; transform:translateY(0); } }
+    .ofm2-in { animation: ofm2In 260ms ease forwards; }
+
+    /* ── Size picker highlight ── */
+    .ofm2-size-btn {
+      padding: 9px 18px; border-radius: 10px;
+      border: 1.5px solid rgba(255,140,0,0.35);
+      background: rgba(255,140,0,0.08);
+      color: #FF7A20; font-weight: 800; font-size: 13px;
+      cursor: pointer; transition: all 180ms;
+      font-family: 'Nunito', system-ui, sans-serif;
     }
+    .ofm2-size-btn:hover { background: rgba(255,140,0,0.20); transform: translateY(-1px); }
   `;
   document.head.appendChild(el);
 }
 
-// ─── helpers ──────────────────────────────────────────────────────────────────
-const DISCOUNT_TYPES = {
-  percentage: { emoji: '📊', label: 'Percentage Off',  color: '#fbbf24' },
-  flat:       { emoji: '💰', label: 'Flat Amount Off', color: '#34d399' },
-  bogo:       { emoji: '🎁', label: 'Buy 1 Get 1',     color: '#60a5fa' },
-  freeitem:   { emoji: '🆓', label: 'Free Item',       color: '#a78bfa' },
+// ─── OFFER_TYPES — UNCHANGED ──────────────────────────────────────────────────
+const OFFER_TYPES = [
+  { id: 'combo',       label: 'Combo Deal',  icon: Package, description: 'Bundle items at special price', emoji: '🍱' },
+  { id: 'discount',    label: 'Discount',     icon: Percent, description: 'Percentage or flat discount',   emoji: '🏷️' },
+  { id: 'buy_x_get_y', label: 'Buy X Get Y', icon: Gift,    description: 'Buy items, get free items',     emoji: '🎁' },
+];
+
+// ─── getSizeOptions — UNCHANGED ───────────────────────────────────────────────
+const getSizeOptions = (item) => {
+  if (!item?.sizePricing?.enabled) return [];
+  const sp = item.sizePricing;
+  return [
+    sp.small  != null && sp.small  !== '' && { key: 'small',  label: 'Small',  price: parseFloat(sp.small)  },
+    sp.medium != null && sp.medium !== '' && { key: 'medium', label: 'Medium', price: parseFloat(sp.medium) },
+    sp.large  != null && sp.large  !== '' && { key: 'large',  label: 'Large',  price: parseFloat(sp.large)  },
+  ].filter(Boolean);
 };
 
-const fmtN = n => (parseFloat(n) || 0).toFixed(2);
+// ─── itemKey — UNCHANGED ──────────────────────────────────────────────────────
+const itemKey = (itemId, sizeKey) => sizeKey ? `${itemId}_${sizeKey}` : itemId;
 
-const EMPTY_FORM = {
-  title: '', code: '', discountType: 'percentage', discountValue: '',
-  minOrderAmount: '', maxDiscountAmount: '', usageLimit: '',
-  validFrom: '', validUntil: '', isActive: true, description: '',
-  applicableItems: [], termsConditions: '',
-};
-
-// ─── Offer Form Modal ─────────────────────────────────────────────────────────
-const OfferFormModal = ({ offer, cafeId, cafeCurrency, onClose, onSaved }) => {
-  const isEdit = !!offer?.id;
-  const [form, setForm] = useState(() => {
-    if (!offer) return { ...EMPTY_FORM };
-    return {
-      title:             offer.title             || '',
-      code:              offer.code              || '',
-      discountType:      offer.discountType      || 'percentage',
-      discountValue:     offer.discountValue     || '',
-      minOrderAmount:    offer.minOrderAmount    || '',
-      maxDiscountAmount: offer.maxDiscountAmount || '',
-      usageLimit:        offer.usageLimit        || '',
-      validFrom:         offer.validFrom         || '',
-      validUntil:        offer.validUntil        || '',
-      isActive:          offer.isActive !== false,
-      description:       offer.description       || '',
-      applicableItems:   offer.applicableItems   || [],
-      termsConditions:   offer.termsConditions   || '',
-    };
-  });
-  const [saving, setSaving] = useState(false);
-
-  const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
-
-  const handleSave = async () => {
-    if (!form.title.trim())         { toast.error('🏷️ Offer title is required'); return; }
-    if (!form.code.trim())          { toast.error('🎫 Coupon code is required'); return; }
-    if (!form.discountValue)        { toast.error('💸 Discount value is required'); return; }
-    if (form.discountType === 'percentage' && (parseFloat(form.discountValue) <= 0 || parseFloat(form.discountValue) > 100)) {
-      toast.error('📊 Percentage must be between 1–100'); return;
-    }
-
-    setSaving(true);
-    try {
-      const payload = {
-        title:             form.title.trim(),
-        code:              form.code.trim().toUpperCase(),
-        discountType:      form.discountType,
-        discountValue:     parseFloat(form.discountValue) || 0,
-        minOrderAmount:    parseFloat(form.minOrderAmount) || 0,
-        maxDiscountAmount: parseFloat(form.maxDiscountAmount) || 0,
-        usageLimit:        parseInt(form.usageLimit) || 0,
-        validFrom:         form.validFrom   || null,
-        validUntil:        form.validUntil  || null,
-        isActive:          form.isActive,
-        description:       form.description.trim(),
-        applicableItems:   form.applicableItems,
-        termsConditions:   form.termsConditions.trim(),
-        cafeId,
-        updatedAt: serverTimestamp(),
-      };
-
-      if (isEdit) {
-        await updateDoc(doc(db, 'offers', offer.id), payload);
-        toast.success('🎉 Offer updated!');
-      } else {
-        await addDoc(collection(db, 'offers'), { ...payload, usageCount: 0, createdAt: serverTimestamp() });
-        toast.success('🎊 New offer created!');
-      }
-      onSaved?.();
-      onClose();
-    } catch (err) {
-      console.error('[OfferForm] Save failed:', err);
-      toast.error('Failed to save offer');
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  const CUR = cafeCurrency || '₹';
-  const dtCfg = DISCOUNT_TYPES[form.discountType] || DISCOUNT_TYPES.percentage;
-
-  return (
-    <AnimatePresence>
-      <motion.div className="fixed inset-0 z-[80] flex items-end sm:items-center justify-center" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
-        <motion.div className="absolute inset-0 bg-black/80 backdrop-blur-md" onClick={onClose} />
-        <motion.div
-          className="relative w-full sm:max-w-xl rounded-t-3xl sm:rounded-2xl overflow-hidden flex flex-col omof-sheet omof-scroll"
-          style={{ maxHeight: '92vh' }}
-          initial={{ y: '100%' }} animate={{ y: 0 }} exit={{ y: '100%' }}
-          transition={{ type: 'spring', damping: 26, stiffness: 300 }}
-          onClick={e => e.stopPropagation()}
-        >
-          <div className="flex justify-center pt-3 pb-1 sm:hidden flex-shrink-0"><div className="omof-sheet-grip mx-auto" /></div>
-
-          {/* Header */}
-          <div className="flex items-center justify-between px-5 py-4 flex-shrink-0" style={{ borderBottom: '1px solid rgba(255,140,0,0.12)' }}>
-            <div>
-              <h3 className="omof-title text-white font-bold text-lg flex items-center gap-2">
-                {isEdit ? '✏️ Edit Offer' : '🎁 Create New Offer'}
-              </h3>
-              <p className="text-xs mt-0.5" style={{ color: '#7a6a55' }}>{isEdit ? `Editing: ${offer.title}` : 'Set up a discount or coupon for your customers'}</p>
-            </div>
-            <button onClick={onClose} className="w-8 h-8 rounded-full flex items-center justify-center transition-all" style={{ background: 'rgba(255,140,0,0.1)', border: '1px solid rgba(255,140,0,0.2)' }}>
-              <X className="w-4 h-4" style={{ color: '#FF7A20' }} />
-            </button>
-          </div>
-
-          {/* Form body */}
-          <div className="flex-1 overflow-y-auto omof-scroll px-5 py-4 space-y-5 pb-6">
-
-            {/* Title + Code */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div>
-                <label className="omof-label">🏷️ Offer Title</label>
-                <input className="omof-input" placeholder="e.g. Weekend Special 20% Off" value={form.title} onChange={e => set('title', e.target.value)} />
-              </div>
-              <div>
-                <label className="omof-label">🎫 Coupon Code</label>
-                <input className="omof-input uppercase" placeholder="e.g. SAVE20" value={form.code} onChange={e => set('code', e.target.value.toUpperCase())} />
-              </div>
-            </div>
-
-            {/* Description */}
-            <div>
-              <label className="omof-label">📝 Description (optional)</label>
-              <textarea className="omof-input" rows={2} placeholder="Short description shown to customers…" value={form.description} onChange={e => set('description', e.target.value)} style={{ resize: 'none' }} />
-            </div>
-
-            {/* Discount Type */}
-            <div>
-              <label className="omof-label">🎯 Discount Type</label>
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-                {Object.entries(DISCOUNT_TYPES).map(([k, cfg]) => (
-                  <button key={k} onClick={() => set('discountType', k)}
-                    className="flex flex-col items-center gap-1 p-3 rounded-xl font-bold text-xs transition-all"
-                    style={{
-                      background: form.discountType === k ? `${cfg.color}22` : 'rgba(255,255,255,0.03)',
-                      border: `1.5px solid ${form.discountType === k ? cfg.color+'55' : 'rgba(255,255,255,0.07)'}`,
-                      color: form.discountType === k ? cfg.color : '#7a6a55',
-                    }}
-                  >
-                    <span className="text-xl">{cfg.emoji}</span>
-                    <span style={{ fontSize: 10 }}>{cfg.label}</span>
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {/* Discount Value */}
-            {form.discountType !== 'bogo' && form.discountType !== 'freeitem' && (
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div>
-                  <label className="omof-label">{form.discountType === 'percentage' ? '📊 Discount %' : `💰 Discount Amount (${CUR})`}</label>
-                  <div className="relative">
-                    <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-sm font-black" style={{ color: dtCfg.color }}>
-                      {form.discountType === 'percentage' ? '%' : CUR}
-                    </span>
-                    <input type="number" min="0" className="omof-input" style={{ paddingLeft: '2rem' }}
-                      placeholder={form.discountType === 'percentage' ? '20' : '50'}
-                      value={form.discountValue} onChange={e => set('discountValue', e.target.value)} />
-                  </div>
-                </div>
-                {form.discountType === 'percentage' && (
-                  <div>
-                    <label className="omof-label">🔒 Max Discount Cap ({CUR}) <span style={{ color: '#4a3f35', textTransform: 'none', fontSize: 10 }}>optional</span></label>
-                    <div className="relative">
-                      <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-sm font-bold" style={{ color: '#7a6a55' }}>{CUR}</span>
-                      <input type="number" min="0" className="omof-input" style={{ paddingLeft: '1.8rem' }}
-                        placeholder="100" value={form.maxDiscountAmount} onChange={e => set('maxDiscountAmount', e.target.value)} />
-                    </div>
-                  </div>
-                )}
-              </div>
-            )}
-
-            {/* Min Order + Usage Limit */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div>
-                <label className="omof-label">🛒 Min Order Amount ({CUR}) <span style={{ color: '#4a3f35', textTransform: 'none', fontSize: 10 }}>optional</span></label>
-                <div className="relative">
-                  <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-sm font-bold" style={{ color: '#7a6a55' }}>{CUR}</span>
-                  <input type="number" min="0" className="omof-input" style={{ paddingLeft: '1.8rem' }}
-                    placeholder="200" value={form.minOrderAmount} onChange={e => set('minOrderAmount', e.target.value)} />
-                </div>
-              </div>
-              <div>
-                <label className="omof-label">🔢 Usage Limit <span style={{ color: '#4a3f35', textTransform: 'none', fontSize: 10 }}>0 = unlimited</span></label>
-                <input type="number" min="0" className="omof-input"
-                  placeholder="0 = unlimited" value={form.usageLimit} onChange={e => set('usageLimit', e.target.value)} />
-              </div>
-            </div>
-
-            {/* Validity */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div>
-                <label className="omof-label">📅 Valid From <span style={{ color: '#4a3f35', textTransform: 'none', fontSize: 10 }}>optional</span></label>
-                <input type="date" className="omof-input" style={{ colorScheme: 'dark' }} value={form.validFrom} onChange={e => set('validFrom', e.target.value)} />
-              </div>
-              <div>
-                <label className="omof-label">📅 Valid Until <span style={{ color: '#4a3f35', textTransform: 'none', fontSize: 10 }}>optional</span></label>
-                <input type="date" className="omof-input" style={{ colorScheme: 'dark' }} value={form.validUntil} onChange={e => set('validUntil', e.target.value)} />
-              </div>
-            </div>
-
-            {/* Terms */}
-            <div>
-              <label className="omof-label">📜 Terms & Conditions <span style={{ color: '#4a3f35', textTransform: 'none', fontSize: 10 }}>optional</span></label>
-              <textarea className="omof-input" rows={2} placeholder="e.g. Valid on dine-in only. Not combinable with other offers." value={form.termsConditions} onChange={e => set('termsConditions', e.target.value)} style={{ resize: 'none' }} />
-            </div>
-
-            {/* Active toggle */}
-            <div className="flex items-center justify-between p-4 rounded-xl" style={{ background: 'rgba(255,255,255,0.03)', border: '1.5px solid rgba(255,255,255,0.07)' }}>
-              <div>
-                <p className="text-white font-bold text-sm">⚡ Activate Offer</p>
-                <p className="text-xs mt-0.5" style={{ color: '#7a6a55' }}>Customers can use this coupon right away</p>
-              </div>
-              <button onClick={() => set('isActive', !form.isActive)} className="omof-toggle-track" style={{ background: form.isActive ? '#FF7A20' : '#2a2018' }}>
-                <div className="omof-toggle-thumb" style={{ transform: form.isActive ? 'translateX(18px)' : 'translateX(0)' }} />
-              </button>
-            </div>
-          </div>
-
-          {/* Footer */}
-          <div className="px-5 py-4 flex-shrink-0 flex gap-3" style={{ borderTop: '1px solid rgba(255,140,0,0.12)', background: 'rgba(0,0,0,0.25)' }}>
-            <button onClick={onClose} className="omof-btn omof-btn-ghost flex-1 justify-center py-3">✗ Cancel</button>
-            <motion.button whileHover={{ scale: 1.01 }} whileTap={{ scale: 0.97 }} onClick={handleSave} disabled={saving}
-              className="omof-btn omof-btn-orange flex-1 justify-center py-3 disabled:opacity-60"
-              style={{ fontSize: 14 }}
-            >
-              {saving ? <>⏳ Saving…</> : isEdit ? <>💾 Update Offer</> : <>🚀 Launch Offer</>}
-            </motion.button>
-          </div>
-        </motion.div>
-      </motion.div>
-    </AnimatePresence>
-  );
-};
-
-// ─── Delete Confirm Modal ─────────────────────────────────────────────────────
-const DeleteConfirmModal = ({ offer, onClose, onConfirm, deleting }) => (
-  <AnimatePresence>
-    <motion.div className="fixed inset-0 z-[90] flex items-center justify-center" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
-      <motion.div className="absolute inset-0 bg-black/80 backdrop-blur-md" onClick={onClose} />
-      <motion.div className="relative w-full max-w-sm mx-4 rounded-2xl overflow-hidden omof-sheet p-6 space-y-4" initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.9, opacity: 0 }} onClick={e => e.stopPropagation()}>
-        <div className="text-center">
-          <div className="text-5xl mb-3">🗑️</div>
-          <h3 className="omof-title text-white font-bold text-xl">Delete this offer?</h3>
-          <p className="text-sm mt-2" style={{ color: '#7a6a55' }}>
-            <span className="font-black" style={{ color: '#FF7A20' }}>{offer?.title}</span>
-            {' '}will be permanently removed and customers won't be able to use the coupon code anymore.
-          </p>
-        </div>
-        <div className="flex gap-3">
-          <button onClick={onClose} className="omof-btn omof-btn-ghost flex-1 justify-center py-3">✗ Keep it</button>
-          <button onClick={onConfirm} disabled={deleting} className="omof-btn omof-btn-red flex-1 justify-center py-3 disabled:opacity-60">
-            {deleting ? '⏳ Deleting…' : '🗑️ Yes, Delete'}
-          </button>
-        </div>
-      </motion.div>
-    </motion.div>
-  </AnimatePresence>
-);
-
-// ─── Coupon Card ──────────────────────────────────────────────────────────────
-const CouponCard = ({ offer, cafeCurrency, onEdit, onDelete, onToggle, idx }) => {
-  const CUR = cafeCurrency || '₹';
-  const dtCfg = DISCOUNT_TYPES[offer.discountType] || DISCOUNT_TYPES.percentage;
-  const isActive = offer.isActive !== false;
-
-  const discountLabel = () => {
-    if (offer.discountType === 'percentage') return `${offer.discountValue}% OFF`;
-    if (offer.discountType === 'flat')       return `${CUR}${fmtN(offer.discountValue)} OFF`;
-    if (offer.discountType === 'bogo')       return 'BUY 1 GET 1';
-    if (offer.discountType === 'freeitem')   return 'FREE ITEM';
-    return `${offer.discountValue} OFF`;
-  };
-
-  const isExpired = offer.validUntil && new Date(offer.validUntil) < new Date();
-  const isNotStarted = offer.validFrom && new Date(offer.validFrom) > new Date();
-
-  const statusBadge = () => {
-    if (!isActive)     return { emoji: '⏸️', label: 'Paused',    bg: 'rgba(100,100,100,0.15)', color: '#888', bd: 'rgba(100,100,100,0.25)' };
-    if (isExpired)     return { emoji: '⌛', label: 'Expired',   bg: 'rgba(220,50,50,0.12)',   color: '#f87171', bd: 'rgba(220,50,50,0.22)' };
-    if (isNotStarted)  return { emoji: '🕐', label: 'Scheduled', bg: 'rgba(59,130,246,0.12)',  color: '#60a5fa', bd: 'rgba(59,130,246,0.22)' };
-    return { emoji: '✅', label: 'Live',     bg: 'rgba(16,185,129,0.12)', color: '#34d399', bd: 'rgba(16,185,129,0.22)' };
-  };
-  const sb = statusBadge();
-
-  const copyCode = e => {
-    e.stopPropagation();
-    navigator.clipboard.writeText(offer.code).then(() => toast.success(`📋 Copied: ${offer.code}`)).catch(() => toast.error('Failed to copy'));
-  };
-
-  return (
-    <motion.div
-      initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: idx * 0.04 }}
-      className={`omof-coupon-card ${!isActive || isExpired ? 'omof-coupon-card-disabled' : ''}`}
-    >
-      {/* Coupon perforated divider */}
-      <div className="omof-coupon-hole-left" />
-      <div className="omof-coupon-hole-right" />
-
-      <div className="flex items-stretch">
-        {/* Left — discount badge */}
-        <div className="flex flex-col items-center justify-center px-5 py-4 flex-shrink-0 min-w-[90px]" style={{ borderRight: '1.5px dashed rgba(255,140,0,0.2)' }}>
-          <span className="text-3xl mb-1">{dtCfg.emoji}</span>
-          <span className="omof-title font-black text-center leading-tight" style={{ color: dtCfg.color, fontSize: 13 }}>{discountLabel()}</span>
-        </div>
-
-        {/* Right — details */}
-        <div className="flex-1 p-4 min-w-0">
-          <div className="flex items-start justify-between gap-2">
-            <div className="min-w-0">
-              <h4 className="text-white font-black text-base truncate" style={{ fontFamily: "'Nunito', system-ui, sans-serif" }}>{offer.title}</h4>
-              {offer.description && <p className="text-xs mt-0.5 truncate" style={{ color: '#7a6a55' }}>{offer.description}</p>}
-            </div>
-            <span className="omof-badge flex-shrink-0" style={{ background: sb.bg, color: sb.color, borderColor: sb.bd }}>{sb.emoji} {sb.label}</span>
-          </div>
-
-          {/* Code row */}
-          <div className="flex items-center gap-2 mt-2.5 flex-wrap">
-            <div className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg" style={{ background: 'rgba(255,140,0,0.1)', border: '1.5px dashed rgba(255,140,0,0.3)' }}>
-              <span className="text-sm">🎫</span>
-              <span className="font-black tracking-widest text-sm" style={{ color: '#FF7A20', fontFamily: "'Fredoka One', system-ui, sans-serif" }}>{offer.code}</span>
-            </div>
-            <button onClick={copyCode} className="omof-btn omof-btn-ghost" style={{ padding: '5px 10px', fontSize: 11 }}>
-              <Copy className="w-3 h-3" />📋 Copy
-            </button>
-          </div>
-
-          {/* Meta info */}
-          <div className="flex flex-wrap gap-2 mt-2.5 text-xs" style={{ color: '#7a6a55' }}>
-            {offer.minOrderAmount > 0 && <span>🛒 Min {CUR}{fmtN(offer.minOrderAmount)}</span>}
-            {offer.usageLimit > 0 && <span>🔢 {offer.usageCount || 0}/{offer.usageLimit} used</span>}
-            {offer.usageLimit === 0 && <span>♾️ Unlimited uses</span>}
-            {offer.validFrom  && <span>📅 From {new Date(offer.validFrom).toLocaleDateString()}</span>}
-            {offer.validUntil && <span>📅 Until {new Date(offer.validUntil).toLocaleDateString()}</span>}
-            {offer.maxDiscountAmount > 0 && offer.discountType === 'percentage' && <span>🔒 Max {CUR}{fmtN(offer.maxDiscountAmount)}</span>}
-          </div>
-
-          {/* Actions */}
-          <div className="flex gap-2 mt-3 flex-wrap">
-            <button onClick={() => onToggle(offer)} className={`omof-btn ${isActive ? 'omof-btn-yellow' : 'omof-btn-green'}`} style={{ padding: '5px 10px', fontSize: 11 }}>
-              {isActive ? '⏸️ Pause' : '▶️ Activate'}
-            </button>
-            <button onClick={() => onEdit(offer)} className="omof-btn omof-btn-ghost" style={{ padding: '5px 10px', fontSize: 11 }}>
-              <Edit2 className="w-3 h-3" />✏️ Edit
-            </button>
-            <button onClick={() => onDelete(offer)} className="omof-btn omof-btn-red" style={{ padding: '5px 10px', fontSize: 11 }}>
-              <Trash2 className="w-3 h-3" />🗑️ Delete
-            </button>
-          </div>
-        </div>
-      </div>
-    </motion.div>
-  );
-};
+// ─── fmtP — UNCHANGED ────────────────────────────────────────────────────────
+const fmtP = (n) => (parseFloat(n) || 0).toFixed(2);
 
 // ─── Main Component ───────────────────────────────────────────────────────────
 const OffersManagement = () => {
-  const { user } = useAuth();
-  const cafeId = user?.cafeId;
+  const { user }  = useAuth();
+  const cafeId    = user?.cafeId;
   const { data: cafe } = useDocument('cafes', cafeId);
-  const cafeCurrency = cafe?.currencySymbol || '₹';
+  const { T, isLight } = useTheme();                   // UNCHANGED — useTheme kept
+  const CUR = cafe?.currencySymbol || '₹';
 
-  const [searchQuery,  setSearchQuery ] = useState('');
-  const [statusFilter, setStatusFilter] = useState('all');
-  const [typeFilter,   setTypeFilter  ] = useState('all');
-  const [showForm,     setShowForm    ] = useState(false);
-  const [editingOffer, setEditingOffer] = useState(null);
-  const [deletingOffer,setDeletingOffer] = useState(null);
-  const [deleting,     setDeleting    ] = useState(false);
-  const [toggling,     setToggling    ] = useState(null);
+  // ── State — ALL UNCHANGED ─────────────────────────────────────────────────
+  const [showForm,      setShowForm     ] = useState(false);
+  const [editingOffer,  setEditingOffer ] = useState(null);
+  const [uploading,     setUploading    ] = useState(false);
+  const [pendingSizeItem, setPendingSizeItem] = useState(null);
 
-  const { data: offers, loading, error } = useCollection('offers', cafeId ? [where('cafeId', '==', cafeId)] : []);
+  const [formData, setFormData] = useState({
+    title:          '',
+    description:    '',
+    type:           'combo',
+    items:          [],
+    comboPrice:     '',
+    discountAmount: '',
+    discountType:   'percentage',
+    buyQuantity:    1,
+    getQuantity:    1,
+    getItemId:      '',
+    getItemName:    '',
+    getItemPrice:   0,
+    getItemSize:    null,
+    getItemSizeKey: null,
+    bannerImage:    '',
+    active:         true,
+  });
 
-  useEffect(() => {
-    if (error) { console.error('[Offers] Firestore error:', error); toast.error('Error loading offers: ' + error); }
-  }, [error]);
+  const { data: offers,    loading } = useCollection('offers',    cafeId ? [where('cafeId', '==', cafeId)] : []);
+  const { data: menuItems          } = useCollection('menuItems', cafeId ? [where('cafeId', '==', cafeId)] : []);
 
-  const sortedOffers = useMemo(() => {
-    if (!offers?.length) return [];
-    return [...offers].sort((a, b) => (b.createdAt?.toDate?.() || new Date(0)) - (a.createdAt?.toDate?.() || new Date(0)));
-  }, [offers]);
+  // ── originalPrice — UNCHANGED ─────────────────────────────────────────────
+  const originalPrice = useMemo(() =>
+    formData.items.reduce((sum, i) => sum + (i.itemPrice * i.quantity), 0),
+  [formData.items]);
 
-  const filteredOffers = useMemo(() => {
-    let f = sortedOffers;
-
-    if (searchQuery.trim()) {
-      const q = searchQuery.toLowerCase();
-      f = f.filter(o => o.title?.toLowerCase().includes(q) || o.code?.toLowerCase().includes(q) || o.description?.toLowerCase().includes(q));
+  // ── savings — UNCHANGED ───────────────────────────────────────────────────
+  const savings = useMemo(() => {
+    if (formData.type === 'combo' && formData.comboPrice) {
+      return originalPrice - parseFloat(formData.comboPrice);
     }
-
-    if (typeFilter !== 'all') f = f.filter(o => o.discountType === typeFilter);
-
-    if (statusFilter !== 'all') {
-      const now = new Date();
-      f = f.filter(o => {
-        const isActive  = o.isActive !== false;
-        const isExpired = o.validUntil && new Date(o.validUntil) < now;
-        if (statusFilter === 'active')    return isActive && !isExpired;
-        if (statusFilter === 'paused')    return !isActive;
-        if (statusFilter === 'expired')   return isExpired;
-        if (statusFilter === 'scheduled') return isActive && o.validFrom && new Date(o.validFrom) > now;
-        return true;
-      });
+    if (formData.type === 'discount' && formData.discountAmount) {
+      if (formData.discountType === 'percentage') {
+        return originalPrice * (parseFloat(formData.discountAmount) / 100);
+      }
+      return parseFloat(formData.discountAmount);
     }
+    return 0;
+  }, [formData, originalPrice]);
 
-    return f;
-  }, [sortedOffers, searchQuery, statusFilter, typeFilter]);
+  // ── handleBannerChange — UNCHANGED ────────────────────────────────────────
+  const handleBannerChange = (url) => setFormData(prev => ({ ...prev, bannerImage: url }));
 
-  const handleEdit = useCallback(offer => { setEditingOffer(offer); setShowForm(true); }, []);
-  const handleDelete = useCallback(offer => setDeletingOffer(offer), []);
-
-  const handleToggle = useCallback(async offer => {
-    setToggling(offer.id);
-    try {
-      await updateDoc(doc(db, 'offers', offer.id), { isActive: !offer.isActive, updatedAt: serverTimestamp() });
-      toast.success(offer.isActive ? '⏸️ Offer paused' : '▶️ Offer activated!');
-    } catch (err) {
-      console.error('[Offers] Toggle failed:', err);
-      toast.error('Failed to update offer');
-    } finally { setToggling(null); }
-  }, []);
-
-  const handleConfirmDelete = async () => {
-    if (!deletingOffer) return;
-    setDeleting(true);
-    try {
-      await deleteDoc(doc(db, 'offers', deletingOffer.id));
-      toast.success('🗑️ Offer deleted');
-      setDeletingOffer(null);
-    } catch (err) {
-      console.error('[Offers] Delete failed:', err);
-      toast.error('Failed to delete offer');
-    } finally { setDeleting(false); }
+  // ── addItemToOffer — UNCHANGED ────────────────────────────────────────────
+  const addItemToOffer = (menuItem, forFreeSlot = false) => {
+    const sizeOptions = getSizeOptions(menuItem);
+    if (sizeOptions.length > 0) {
+      setPendingSizeItem({ item: menuItem, forFreeSlot });
+      return;
+    }
+    if (forFreeSlot) {
+      setFormData(prev => ({
+        ...prev,
+        getItemId:      menuItem.id,
+        getItemName:    menuItem.name,
+        getItemPrice:   parseFloat(menuItem.price) || 0,
+        getItemSize:    null,
+        getItemSizeKey: null,
+      }));
+      return;
+    }
+    _addOfferItem(menuItem, null, null, parseFloat(menuItem.price) || 0);
   };
 
-  const openCreate = () => { setEditingOffer(null); setShowForm(true); };
+  // ── confirmSizeSelection — UNCHANGED ─────────────────────────────────────
+  const confirmSizeSelection = (sizeOpt) => {
+    if (!pendingSizeItem) return;
+    const { item, forFreeSlot } = pendingSizeItem;
+    setPendingSizeItem(null);
+    if (forFreeSlot) {
+      setFormData(prev => ({
+        ...prev,
+        getItemId:      item.id,
+        getItemName:    item.name,
+        getItemPrice:   sizeOpt.price,
+        getItemSize:    sizeOpt.label,
+        getItemSizeKey: sizeOpt.key,
+      }));
+      return;
+    }
+    _addOfferItem(item, sizeOpt.label, sizeOpt.key, sizeOpt.price);
+  };
 
-  // Stats
+  // ── _addOfferItem — UNCHANGED ─────────────────────────────────────────────
+  const _addOfferItem = (menuItem, sizeLabel, sizeKey, resolvedPrice) => {
+    const key = itemKey(menuItem.id, sizeKey);
+    setFormData(prev => {
+      const existing = prev.items.find(i => itemKey(i.itemId, i.selectedSizeKey) === key);
+      if (existing) {
+        return {
+          ...prev,
+          items: prev.items.map(i =>
+            itemKey(i.itemId, i.selectedSizeKey) === key
+              ? { ...i, quantity: i.quantity + 1 }
+              : i
+          ),
+        };
+      }
+      return {
+        ...prev,
+        items: [...prev.items, {
+          itemId:          menuItem.id,
+          itemName:        menuItem.name,
+          itemPrice:       resolvedPrice,
+          quantity:        1,
+          selectedSize:    sizeLabel,
+          selectedSizeKey: sizeKey,
+          hasSizes:        !!sizeKey,
+        }],
+      };
+    });
+  };
+
+  // ── removeItemFromOffer — UNCHANGED ──────────────────────────────────────
+  const removeItemFromOffer = (itemId, sizeKey) => {
+    const key = itemKey(itemId, sizeKey);
+    setFormData(prev => ({
+      ...prev,
+      items: prev.items.filter(i => itemKey(i.itemId, i.selectedSizeKey) !== key),
+    }));
+  };
+
+  // ── updateItemQuantity — UNCHANGED ────────────────────────────────────────
+  const updateItemQuantity = (itemId, sizeKey, quantity) => {
+    if (quantity < 1) { removeItemFromOffer(itemId, sizeKey); return; }
+    const key = itemKey(itemId, sizeKey);
+    setFormData(prev => ({
+      ...prev,
+      items: prev.items.map(i =>
+        itemKey(i.itemId, i.selectedSizeKey) === key ? { ...i, quantity } : i
+      ),
+    }));
+  };
+
+  // ── handleSubmit — UNCHANGED ──────────────────────────────────────────────
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    if (!cafeId) { toast.error('Cafe ID not found'); return; }
+    if (formData.items.length === 0) { toast.error('Please add at least one menu item to the offer'); return; }
+    try {
+      const offerData = {
+        cafeId,
+        title:        formData.title,
+        description:  formData.description,
+        type:         formData.type,
+        items:        formData.items,
+        bannerImage:  formData.bannerImage,
+        active:       formData.active,
+        originalPrice,
+      };
+      if (formData.type === 'combo') {
+        offerData.comboPrice = parseFloat(formData.comboPrice) || originalPrice;
+        offerData.savings    = savings;
+      } else if (formData.type === 'discount') {
+        offerData.discountAmount = parseFloat(formData.discountAmount) || 0;
+        offerData.discountType   = formData.discountType;
+        offerData.savings        = savings;
+      } else if (formData.type === 'buy_x_get_y') {
+        offerData.buyQuantity   = parseInt(formData.buyQuantity)  || 1;
+        offerData.getQuantity   = parseInt(formData.getQuantity)  || 1;
+        offerData.getItemId      = formData.getItemId;
+        offerData.getItemName    = formData.getItemName;
+        offerData.getItemPrice   = formData.getItemPrice;
+        offerData.getItemSize    = formData.getItemSize    || null;
+        offerData.getItemSizeKey = formData.getItemSizeKey || null;
+      }
+      if (editingOffer) {
+        await updateDoc(doc(db, 'offers', editingOffer.id), offerData);
+        toast.success('🎉 Offer updated!');
+      } else {
+        await addDoc(collection(db, 'offers'), offerData);
+        toast.success('🚀 Offer created!');
+      }
+      resetForm();
+    } catch (error) {
+      console.error('Error saving offer:', error);
+      toast.error('Failed to save offer');
+    }
+  };
+
+  // ── handleEdit — UNCHANGED ────────────────────────────────────────────────
+  const handleEdit = (offer) => {
+    setEditingOffer(offer);
+    setFormData({
+      title:          offer.title          || '',
+      description:    offer.description    || '',
+      type:           offer.type           || 'combo',
+      items:          offer.items          || [],
+      comboPrice:     offer.comboPrice?.toString()     || '',
+      discountAmount: offer.discountAmount?.toString() || '',
+      discountType:   offer.discountType   || 'percentage',
+      buyQuantity:    offer.buyQuantity    || 1,
+      getQuantity:    offer.getQuantity    || 1,
+      getItemId:      offer.getItemId      || '',
+      getItemName:    offer.getItemName    || '',
+      getItemPrice:   offer.getItemPrice   || 0,
+      getItemSize:    offer.getItemSize    || null,
+      getItemSizeKey: offer.getItemSizeKey || null,
+      bannerImage:    offer.bannerImage    || '',
+      active:         offer.active !== false,
+    });
+    setShowForm(true);
+  };
+
+  // ── handleDelete — UNCHANGED ──────────────────────────────────────────────
+  const handleDelete = async (id) => {
+    if (!window.confirm('Are you sure you want to delete this offer?')) return;
+    try {
+      await deleteDoc(doc(db, 'offers', id));
+      toast.success('🗑️ Offer deleted');
+    } catch (error) {
+      toast.error('Failed to delete offer');
+    }
+  };
+
+  // ── toggleActive — UNCHANGED ──────────────────────────────────────────────
+  const toggleActive = async (id, currentStatus) => {
+    try {
+      await updateDoc(doc(db, 'offers', id), { active: !currentStatus });
+      toast.success('Offer status updated');
+    } catch (error) {
+      toast.error('Failed to update offer');
+    }
+  };
+
+  // ── resetForm — UNCHANGED ─────────────────────────────────────────────────
+  const resetForm = () => {
+    setFormData({
+      title: '', description: '', type: 'combo', items: [],
+      comboPrice: '', discountAmount: '', discountType: 'percentage',
+      buyQuantity: 1, getQuantity: 1,
+      getItemId: '', getItemName: '', getItemPrice: 0,
+      getItemSize: null, getItemSizeKey: null,
+      bannerImage: '', active: true,
+    });
+    setEditingOffer(null);
+    setShowForm(false);
+    setPendingSizeItem(null);
+  };
+
+  // ── helpers — UNCHANGED ───────────────────────────────────────────────────
+  const getOfferTypeLabel = (type) => OFFER_TYPES.find(t => t.id === type)?.label || type;
+  const getOfferTypeIcon  = (type) => OFFER_TYPES.find(t => t.id === type)?.icon  || Package;
+  const getOfferTypeEmoji = (type) => OFFER_TYPES.find(t => t.id === type)?.emoji || '🏷️';
+
+  // ── stats (visual-only) ───────────────────────────────────────────────────
   const stats = useMemo(() => {
-    const now = new Date();
-    const total   = sortedOffers.length;
-    const live    = sortedOffers.filter(o => o.isActive !== false && !(o.validUntil && new Date(o.validUntil) < now)).length;
-    const paused  = sortedOffers.filter(o => o.isActive === false).length;
-    const expired = sortedOffers.filter(o => o.validUntil && new Date(o.validUntil) < now).length;
-    const totalRedemptions = sortedOffers.reduce((s, o) => s + (o.usageCount || 0), 0);
-    return { total, live, paused, expired, totalRedemptions };
-  }, [sortedOffers]);
+    const all    = offers || [];
+    const total  = all.length;
+    const active = all.filter(o => o.active).length;
+    const combos = all.filter(o => o.type === 'combo').length;
+    const bogo   = all.filter(o => o.type === 'buy_x_get_y').length;
+    return { total, active, combos, bogo };
+  }, [offers]);
 
+  // ─── Render ───────────────────────────────────────────────────────────────
   return (
-    <div className="omof space-y-5 relative">
+    <div className="ofm2 space-y-5 relative">
 
-      {/* Modals */}
-      {showForm && (
-        <OfferFormModal
-          offer={editingOffer}
-          cafeId={cafeId}
-          cafeCurrency={cafeCurrency}
-          onClose={() => { setShowForm(false); setEditingOffer(null); }}
-          onSaved={() => {}}
-        />
-      )}
-      {deletingOffer && (
-        <DeleteConfirmModal
-          offer={deletingOffer}
-          onClose={() => setDeletingOffer(null)}
-          onConfirm={handleConfirmDelete}
-          deleting={deleting}
-        />
-      )}
-
-      {/* ── Header ───────────────────────────────────────────── */}
+      {/* ── Header ─────────────────────────────────────────────────────────── */}
       <div className="flex flex-wrap justify-between items-center gap-3">
         <div className="flex items-center gap-3">
-          <div className="text-4xl">🎁</div>
+          <div className="text-4xl">🏷️</div>
           <div>
-            <h2 className="omof-title text-2xl font-black text-white">Offers & Coupons</h2>
+            <h2 className="ofm2-title text-2xl font-black text-white">Offers & Deals</h2>
             <p className="text-xs mt-0.5 flex items-center gap-1.5" style={{ color: '#7a6a55' }}>
               <span className="inline-block w-1.5 h-1.5 rounded-full animate-pulse" style={{ background: '#34d399' }} />
-              Manage discounts &amp; promo codes
+              {offers?.length ?? 0} offer{(offers?.length ?? 0) !== 1 ? 's' : ''} · delight your customers
             </p>
           </div>
         </div>
-        <button onClick={openCreate} data-testid="create-offer-btn" className="omof-btn omof-btn-orange" style={{ padding: '10px 18px', fontSize: 13, borderRadius: 12 }}>
+        <motion.button
+          whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.96 }}
+          data-testid="add-offer-btn"
+          onClick={() => setShowForm(true)}
+          className="ofm2-btn ofm2-btn-orange"
+          style={{ padding: '10px 18px', fontSize: 13, borderRadius: 12 }}
+        >
           <Plus className="w-4 h-4" />🎊 Create Offer
-        </button>
+        </motion.button>
       </div>
 
-      {/* ── Stats row ─────────────────────────────────────────── */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-        {[
-          { emoji: '🗂️', label: 'Total Offers',   value: stats.total,           color: '#FF7A20' },
-          { emoji: '✅', label: 'Live Now',        value: stats.live,            color: '#34d399' },
-          { emoji: '⏸️', label: 'Paused',         value: stats.paused,          color: '#fbbf24' },
-          { emoji: '🎫', label: 'Redemptions',     value: stats.totalRedemptions,color: '#a78bfa' },
-        ].map((s, i) => (
-          <div key={i} className="omof-card p-4 flex items-center gap-3">
-            <div className="text-2xl">{s.emoji}</div>
-            <div>
-              <p className="omof-title font-black text-2xl" style={{ color: s.color }}>{s.value}</p>
-              <p className="text-xs font-bold" style={{ color: '#7a6a55' }}>{s.label}</p>
+      {/* ── Stats row (visual-only, no logic) ──────────────────────────────── */}
+      {offers && offers.length > 0 && (
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+          {[
+            { emoji: '🏷️', label: 'Total Offers',  value: stats.total,  color: '#FF7A20' },
+            { emoji: '✅', label: 'Active Now',     value: stats.active, color: '#34d399' },
+            { emoji: '🍱', label: 'Combo Deals',    value: stats.combos, color: '#fbbf24' },
+            { emoji: '🎁', label: 'Buy X Get Y',    value: stats.bogo,   color: '#a78bfa' },
+          ].map((s, i) => (
+            <motion.div
+              key={i}
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: i * 0.06 }}
+              className="ofm2-stat"
+            >
+              <div className="text-2xl">{s.emoji}</div>
+              <div>
+                <p className="ofm2-title font-black text-2xl" style={{ color: s.color }}>{s.value}</p>
+                <p className="text-xs font-bold" style={{ color: '#7a6a55' }}>{s.label}</p>
+              </div>
+            </motion.div>
+          ))}
+        </div>
+      )}
+
+      {/* ── Form panel ─────────────────────────────────────────────────────── */}
+      <AnimatePresence>
+        {showForm && (
+          <motion.div
+            initial={{ opacity: 0, y: 14 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: 10 }}
+            transition={{ type: 'spring', damping: 24, stiffness: 280 }}
+            className="ofm2-sheet rounded-2xl overflow-hidden"
+          >
+            {/* Form header */}
+            <div
+              className="flex items-center justify-between px-6 py-5 flex-shrink-0"
+              style={{ borderBottom: '1px solid rgba(255,140,0,0.14)' }}
+            >
+              <div className="flex items-center gap-3">
+                <span className="text-3xl">{editingOffer ? '✏️' : '🎊'}</span>
+                <div>
+                  <h3 className="ofm2-title text-white font-bold text-xl">
+                    {editingOffer ? 'Edit Offer' : 'Create New Offer'}
+                  </h3>
+                  <p className="text-xs mt-0.5" style={{ color: '#7a6a55' }}>
+                    {editingOffer ? `Editing: ${editingOffer.title}` : 'Set up a new deal for your customers 🚀'}
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={resetForm}
+                className="w-8 h-8 rounded-full flex items-center justify-center transition-all"
+                style={{ background: 'rgba(255,140,0,0.1)', border: '1px solid rgba(255,140,0,0.2)' }}
+              >
+                <X className="w-4 h-4" style={{ color: '#FF7A20' }} />
+              </button>
             </div>
-          </div>
-        ))}
-      </div>
 
-      {/* ── Search ───────────────────────────────────────────── */}
-      <div className="relative">
-        <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-base">🔍</span>
-        <input type="text" data-testid="offer-search" value={searchQuery} onChange={e => setSearchQuery(e.target.value)}
-          className="omof-input" style={{ paddingLeft: '2.4rem', height: '44px' }}
-          placeholder="Search offers by title, code, or description…" />
-      </div>
+            {/* ── Form body ─────────────────────────────────────────────────── */}
+            <form onSubmit={handleSubmit} className="px-6 py-5 space-y-6 ofm2-scroll overflow-y-auto" style={{ maxHeight: '82vh' }}>
 
-      {/* ── Filters ───────────────────────────────────────────── */}
-      <div className="flex flex-wrap gap-2 items-center">
-        <span className="text-xs font-black uppercase tracking-wider" style={{ color: '#4a3f35' }}>Status:</span>
-        {[['all','🍽️ All'],['active','✅ Live'],['paused','⏸️ Paused'],['expired','⌛ Expired'],['scheduled','🕐 Scheduled']].map(([k,l]) => (
-          <button key={k} data-testid={`status-filter-${k}`} onClick={() => setStatusFilter(k)} className={`omof-tab ${statusFilter===k?'omof-tab-on':'omof-tab-off'}`}>{l}</button>
-        ))}
-      </div>
-      <div className="flex flex-wrap gap-2 items-center">
-        <span className="text-xs font-black uppercase tracking-wider" style={{ color: '#4a3f35' }}>Type:</span>
-        <button onClick={() => setTypeFilter('all')} className={`omof-tab ${typeFilter==='all'?'omof-tab-on':'omof-tab-off'}`}>🎯 All Types</button>
-        {Object.entries(DISCOUNT_TYPES).map(([k, cfg]) => (
-          <button key={k} data-testid={`type-filter-${k}`} onClick={() => setTypeFilter(k)} className={`omof-tab ${typeFilter===k?'omof-tab-on':'omof-tab-off'}`}>{cfg.emoji} {cfg.label}</button>
-        ))}
-      </div>
+              {/* ── Offer Type ── */}
+              <div>
+                <label className="ofm2-label">🎯 Offer Type</label>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                  {OFFER_TYPES.map((type) => {
+                    const Icon = type.icon;
+                    const isActive = formData.type === type.id;
+                    return (
+                      <button
+                        key={type.id}
+                        type="button"
+                        onClick={() => setFormData(prev => ({ ...prev, type: type.id }))}
+                        className={`ofm2-type-btn${isActive ? ' ofm2-type-btn-active' : ''}`}
+                      >
+                        <div className="flex items-center gap-2.5 mb-2">
+                          <span className="text-2xl">{type.emoji}</span>
+                          <Icon className="w-4 h-4" style={{ color: isActive ? '#FF7A20' : '#7a6a55' }} />
+                          <span className="font-black text-sm" style={{ color: isActive ? '#FF7A20' : '#fff8ee' }}>
+                            {type.label}
+                          </span>
+                        </div>
+                        <p className="text-xs" style={{ color: '#7a6a55' }}>{type.description}</p>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
 
-      {/* ── Content ───────────────────────────────────────────── */}
+              {/* ── Basic Info ── */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="ofm2-label">🏷️ Offer Title</label>
+                  <input
+                    type="text"
+                    data-testid="offer-title"
+                    value={formData.title}
+                    onChange={(e) => setFormData(prev => ({ ...prev, title: e.target.value }))}
+                    className="ofm2-input"
+                    placeholder="e.g., Breakfast Combo Deal"
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="ofm2-label">📝 Description</label>
+                  <input
+                    type="text"
+                    data-testid="offer-description"
+                    value={formData.description}
+                    onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
+                    className="ofm2-input"
+                    placeholder="Coffee + Sandwich at special price"
+                    required
+                  />
+                </div>
+              </div>
+
+              {/* ── Menu Item Picker ── */}
+              <div>
+                <label className="ofm2-label">
+                  🍽️ {formData.type === 'buy_x_get_y' ? 'Items Customer Must Buy' : 'Select Menu Items'}
+                </label>
+                <p className="text-xs mb-3" style={{ color: '#7a6a55' }}>
+                  {formData.type === 'buy_x_get_y'
+                    ? 'Tap to add. Items with sizes will ask for size. 📏'
+                    : 'Tap to add items. Items with S/M/L sizes will ask for size. 📏'}
+                </p>
+
+                {/* ── Inline size picker for bought items ── */}
+                <AnimatePresence>
+                  {pendingSizeItem && !pendingSizeItem.forFreeSlot && (
+                    <motion.div
+                      initial={{ opacity: 0, y: -6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -6 }}
+                      className="mb-3 p-4 rounded-xl"
+                      style={{ background: 'rgba(255,140,0,0.07)', border: '1.5px solid rgba(255,140,0,0.3)' }}
+                    >
+                      <div className="flex items-center justify-between mb-3">
+                        <p className="text-white text-sm font-black">
+                          📏 Select size for:{' '}
+                          <span style={{ color: '#FF7A20' }}>{pendingSizeItem.item.name}</span>
+                        </p>
+                        <button
+                          type="button"
+                          onClick={() => setPendingSizeItem(null)}
+                          className="w-6 h-6 rounded-full flex items-center justify-center"
+                          style={{ background: 'rgba(255,140,0,0.1)', border: '1px solid rgba(255,140,0,0.2)' }}
+                        >
+                          <X className="w-3.5 h-3.5" style={{ color: '#FF7A20' }} />
+                        </button>
+                      </div>
+                      <div className="flex flex-wrap gap-2">
+                        {getSizeOptions(pendingSizeItem.item).map(sz => (
+                          <button
+                            key={sz.key}
+                            type="button"
+                            onClick={() => confirmSizeSelection(sz)}
+                            className="ofm2-size-btn"
+                          >
+                            {sz.key === 'small' ? '☕' : sz.key === 'medium' ? '🥤' : '🧋'} {sz.label} — {CUR}{fmtP(sz.price)}
+                          </button>
+                        ))}
+                      </div>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+
+                {/* Item grid */}
+                <div
+                  className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2 max-h-48 overflow-y-auto p-2 ofm2-scroll rounded-xl"
+                  style={{ background: '#1c1509', border: '1.5px solid rgba(255,255,255,0.07)' }}
+                >
+                  {menuItems?.map((item) => {
+                    const hasSizes   = getSizeOptions(item).length > 0;
+                    const isSelected = formData.items.some(i => i.itemId === item.id);
+                    return (
+                      <button
+                        key={item.id}
+                        type="button"
+                        onClick={() => addItemToOffer(item, false)}
+                        className={`ofm2-picker-item${isSelected ? ' ofm2-picker-item-selected' : ''}`}
+                      >
+                        <div className="flex items-center justify-between gap-1 mb-1">
+                          <span className="text-sm font-bold truncate" style={{ color: isSelected ? '#FF7A20' : '#fff8ee' }}>
+                            {item.name}
+                          </span>
+                          {isSelected && <Check className="w-3.5 h-3.5 flex-shrink-0" style={{ color: '#FF7A20' }} />}
+                        </div>
+                        {hasSizes ? (
+                          <span className="text-xs flex items-center gap-1" style={{ color: '#7a6a55' }}>
+                            <ChevronDown className="w-3 h-3" />📏 Sizes available
+                          </span>
+                        ) : (
+                          <span className="text-sm font-black" style={{ color: '#FF7A20' }}>{CUR}{fmtP(item.price)}</span>
+                        )}
+                      </button>
+                    );
+                  })}
+                  {(!menuItems || menuItems.length === 0) && (
+                    <p className="col-span-full text-center py-6 text-sm" style={{ color: '#7a6a55' }}>
+                      🍽️ No menu items available yet
+                    </p>
+                  )}
+                </div>
+              </div>
+
+              {/* ── Selected Items list ── */}
+              <AnimatePresence>
+                {formData.items.length > 0 && (
+                  <motion.div initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}>
+                    <label className="ofm2-label">🧺 Selected Items ({formData.items.length})</label>
+                    <div className="ofm2-section space-y-2">
+                      {formData.items.map((item) => {
+                        const key = itemKey(item.itemId, item.selectedSizeKey);
+                        return (
+                          <div
+                            key={key}
+                            className="ofm2-subcard flex items-center justify-between p-3"
+                          >
+                            <div className="min-w-0 flex-1">
+                              <div className="flex items-center gap-2 flex-wrap">
+                                <span className="font-black text-sm" style={{ color: '#fff8ee' }}>{item.itemName}</span>
+                                {item.selectedSize && (
+                                  <span
+                                    className="text-xs px-2 py-0.5 rounded-lg font-bold"
+                                    style={{ background: 'rgba(255,140,0,0.15)', color: '#FF7A20', border: '1px solid rgba(255,140,0,0.3)' }}
+                                  >
+                                    {item.selectedSize === 'Small' ? '☕' : item.selectedSize === 'Medium' ? '🥤' : '🧋'} {item.selectedSize}
+                                  </span>
+                                )}
+                                <span className="text-xs" style={{ color: '#7a6a55' }}>{CUR}{fmtP(item.itemPrice)} each</span>
+                              </div>
+                            </div>
+                            <div className="flex items-center gap-3 flex-shrink-0">
+                              {/* Qty controls */}
+                              <div className="flex items-center gap-2">
+                                <button
+                                  type="button"
+                                  onClick={() => updateItemQuantity(item.itemId, item.selectedSizeKey, item.quantity - 1)}
+                                  className="w-7 h-7 rounded-full flex items-center justify-center font-black text-white transition-all"
+                                  style={{ background: 'rgba(255,255,255,0.08)', border: '1.5px solid rgba(255,255,255,0.12)' }}
+                                >−</button>
+                                <span className="font-black text-sm text-white w-5 text-center">{item.quantity}</span>
+                                <button
+                                  type="button"
+                                  onClick={() => updateItemQuantity(item.itemId, item.selectedSizeKey, item.quantity + 1)}
+                                  className="w-7 h-7 rounded-full flex items-center justify-center font-black text-black transition-all"
+                                  style={{ background: '#FF7A20' }}
+                                >+</button>
+                              </div>
+                              <button
+                                type="button"
+                                onClick={() => removeItemFromOffer(item.itemId, item.selectedSizeKey)}
+                                className="ofm2-btn ofm2-btn-red"
+                                style={{ padding: '4px 8px', fontSize: 11 }}
+                              >
+                                <X className="w-3 h-3" />
+                              </button>
+                            </div>
+                          </div>
+                        );
+                      })}
+                      {/* Original price total */}
+                      <div
+                        className="flex justify-between items-center pt-3 mt-1"
+                        style={{ borderTop: '1px solid rgba(255,140,0,0.12)' }}
+                      >
+                        <span className="text-sm font-bold" style={{ color: '#7a6a55' }}>🧮 Original Price</span>
+                        <span className="ofm2-title font-black text-lg" style={{ color: '#FF7A20' }}>{CUR}{fmtP(originalPrice)}</span>
+                      </div>
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+
+              {/* ── Type-specific fields ── */}
+
+              {/* Combo Price */}
+              {formData.type === 'combo' && formData.items.length > 0 && (
+                <div>
+                  <label className="ofm2-label">💰 Combo Price</label>
+                  <div className="flex items-center gap-4">
+                    <div className="relative w-44">
+                      <span className="absolute left-3.5 top-1/2 -translate-y-1/2 font-black text-sm" style={{ color: '#FF7A20' }}>{CUR}</span>
+                      <input
+                        type="number"
+                        value={formData.comboPrice}
+                        onChange={(e) => setFormData(prev => ({ ...prev, comboPrice: e.target.value }))}
+                        className="ofm2-input"
+                        style={{ paddingLeft: '1.8rem' }}
+                        placeholder="0.00"
+                        min="0"
+                        step="0.01"
+                      />
+                    </div>
+                    {savings > 0 && (
+                      <motion.div
+                        initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }}
+                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl font-black text-sm"
+                        style={{ background: 'rgba(16,185,129,0.14)', color: '#34d399', border: '1.5px solid rgba(16,185,129,0.25)' }}
+                      >
+                        🎉 Customer saves {CUR}{fmtP(savings)}!
+                      </motion.div>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* Discount fields */}
+              {formData.type === 'discount' && (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="ofm2-label">📊 Discount Type</label>
+                    <select
+                      value={formData.discountType}
+                      onChange={(e) => setFormData(prev => ({ ...prev, discountType: e.target.value }))}
+                      className="ofm2-select"
+                    >
+                      <option value="percentage">📊 Percentage (%)</option>
+                      <option value="flat">💰 Flat Amount ({CUR})</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="ofm2-label">
+                      {formData.discountType === 'percentage' ? '📊 Discount (%)' : `💰 Discount Amount (${CUR})`}
+                    </label>
+                    <div className="relative">
+                      <span className="absolute left-3.5 top-1/2 -translate-y-1/2 font-black text-sm" style={{ color: '#FF7A20' }}>
+                        {formData.discountType === 'percentage' ? '%' : CUR}
+                      </span>
+                      <input
+                        type="number"
+                        value={formData.discountAmount}
+                        onChange={(e) => setFormData(prev => ({ ...prev, discountAmount: e.target.value }))}
+                        className="ofm2-input"
+                        style={{ paddingLeft: '1.8rem' }}
+                        placeholder={formData.discountType === 'percentage' ? '10' : '50'}
+                        min="0"
+                        max={formData.discountType === 'percentage' ? '100' : undefined}
+                      />
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Buy X Get Y fields */}
+              {formData.type === 'buy_x_get_y' && (
+                <div className="space-y-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <label className="ofm2-label">🛒 Buy Quantity</label>
+                      <input
+                        type="number"
+                        value={formData.buyQuantity}
+                        onChange={(e) => setFormData(prev => ({ ...prev, buyQuantity: e.target.value }))}
+                        className="ofm2-input"
+                        min="1"
+                      />
+                    </div>
+                    <div>
+                      <label className="ofm2-label">🎁 Get Free Quantity</label>
+                      <input
+                        type="number"
+                        value={formData.getQuantity}
+                        onChange={(e) => setFormData(prev => ({ ...prev, getQuantity: e.target.value }))}
+                        className="ofm2-input"
+                        min="1"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Free item picker */}
+                  <div>
+                    <label className="ofm2-label">🎁 Get Free Item</label>
+                    <p className="text-xs mb-2" style={{ color: '#7a6a55' }}>Select the item the customer receives for free.</p>
+
+                    {/* Current free item */}
+                    {formData.getItemId && (
+                      <div
+                        className="mb-2 flex items-center gap-3 p-3 rounded-xl"
+                        style={{ background: 'rgba(255,140,0,0.07)', border: '1.5px solid rgba(255,140,0,0.28)' }}
+                      >
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span className="text-white font-black text-sm">🎁 {formData.getItemName}</span>
+                            {formData.getItemSize && (
+                              <span className="text-xs px-2 py-0.5 rounded-lg font-bold" style={{ background: 'rgba(255,140,0,0.15)', color: '#FF7A20', border: '1px solid rgba(255,140,0,0.3)' }}>
+                                {formData.getItemSize}
+                              </span>
+                            )}
+                            <span className="text-xs" style={{ color: '#7a6a55' }}>({CUR}{fmtP(formData.getItemPrice)} — given free)</span>
+                          </div>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => setFormData(prev => ({
+                            ...prev,
+                            getItemId: '', getItemName: '', getItemPrice: 0,
+                            getItemSize: null, getItemSizeKey: null,
+                          }))}
+                          className="ofm2-btn ofm2-btn-red"
+                          style={{ padding: '4px 8px', fontSize: 11 }}
+                        >
+                          <X className="w-3 h-3" />
+                        </button>
+                      </div>
+                    )}
+
+                    {/* Inline size picker for free item */}
+                    <AnimatePresence>
+                      {pendingSizeItem && pendingSizeItem.forFreeSlot && (
+                        <motion.div
+                          initial={{ opacity: 0, y: -6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -6 }}
+                          className="mb-2 p-4 rounded-xl"
+                          style={{ background: 'rgba(255,140,0,0.07)', border: '1.5px solid rgba(255,140,0,0.3)' }}
+                        >
+                          <div className="flex items-center justify-between mb-3">
+                            <p className="text-white text-sm font-black">
+                              📏 Select size for free item:{' '}
+                              <span style={{ color: '#FF7A20' }}>{pendingSizeItem.item.name}</span>
+                            </p>
+                            <button
+                              type="button"
+                              onClick={() => setPendingSizeItem(null)}
+                              className="w-6 h-6 rounded-full flex items-center justify-center"
+                              style={{ background: 'rgba(255,140,0,0.1)', border: '1px solid rgba(255,140,0,0.2)' }}
+                            >
+                              <X className="w-3.5 h-3.5" style={{ color: '#FF7A20' }} />
+                            </button>
+                          </div>
+                          <div className="flex flex-wrap gap-2">
+                            {getSizeOptions(pendingSizeItem.item).map(sz => (
+                              <button
+                                key={sz.key}
+                                type="button"
+                                onClick={() => confirmSizeSelection(sz)}
+                                className="ofm2-size-btn"
+                              >
+                                {sz.key === 'small' ? '☕' : sz.key === 'medium' ? '🥤' : '🧋'} {sz.label} — {CUR}{fmtP(sz.price)}
+                              </button>
+                            ))}
+                          </div>
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
+
+                    {/* Free item grid */}
+                    {!formData.getItemId && (
+                      <div
+                        className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2 max-h-40 overflow-y-auto p-2 ofm2-scroll rounded-xl"
+                        style={{ background: '#1c1509', border: '1.5px solid rgba(255,255,255,0.07)' }}
+                      >
+                        {menuItems?.map(item => {
+                          const hasSizes = getSizeOptions(item).length > 0;
+                          return (
+                            <button
+                              key={item.id}
+                              type="button"
+                              onClick={() => addItemToOffer(item, true)}
+                              className="ofm2-picker-item"
+                            >
+                              <p className="text-sm font-bold truncate" style={{ color: '#fff8ee' }}>{item.name}</p>
+                              {hasSizes ? (
+                                <span className="text-xs flex items-center gap-1 mt-0.5" style={{ color: '#7a6a55' }}>
+                                  <ChevronDown className="w-3 h-3" />📏 Sizes available
+                                </span>
+                              ) : (
+                                <span className="text-sm font-black mt-0.5 block" style={{ color: '#FF7A20' }}>{CUR}{fmtP(item.price)}</span>
+                              )}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* ── Banner Image ── */}
+              <div>
+                <label className="ofm2-label">🖼️ Banner Image / GIF / Video (Optional)</label>
+                <div className="rounded-xl overflow-hidden" style={{ border: '1.5px solid rgba(255,140,0,0.14)', background: 'rgba(255,140,0,0.03)' }}>
+                  <MediaUpload
+                    label=""
+                    value={formData.bannerImage}
+                    onChange={handleBannerChange}
+                    storagePath={`offers/${cafeId}`}
+                    maxSizeMB={20}
+                    disabled={uploading}
+                  />
+                </div>
+              </div>
+
+              {/* ── Active Toggle ── */}
+              <div
+                className="flex items-center justify-between px-4 py-3 rounded-xl"
+                style={{ background: 'rgba(255,255,255,0.03)', border: '1.5px solid rgba(255,255,255,0.07)' }}
+              >
+                <div>
+                  <p className="text-white font-black text-sm">⚡ Active Offer</p>
+                  <p className="text-xs mt-0.5" style={{ color: '#7a6a55' }}>Visible to customers right now</p>
+                </div>
+                {/* The original used a checkbox — we keep it but also add a toggle visual */}
+                <div className="flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    data-testid="offer-active"
+                    checked={formData.active}
+                    onChange={(e) => setFormData(prev => ({ ...prev, active: e.target.checked }))}
+                    className="sr-only"
+                    id="ofm2-active-toggle"
+                  />
+                  <label
+                    htmlFor="ofm2-active-toggle"
+                    className="ofm2-toggle-track"
+                    style={{ background: formData.active ? '#FF7A20' : '#2a2018', cursor: 'pointer' }}
+                  >
+                    <div className="ofm2-toggle-thumb" style={{ transform: formData.active ? 'translateX(18px)' : 'translateX(0)' }} />
+                  </label>
+                </div>
+              </div>
+
+              {/* ── Submit / Cancel ── */}
+              <div className="flex gap-3 pt-1 pb-4">
+                <motion.button
+                  type="submit"
+                  data-testid="save-offer-btn"
+                  disabled={uploading || formData.items.length === 0}
+                  whileHover={{ scale: 1.01 }} whileTap={{ scale: 0.97 }}
+                  className="ofm2-btn ofm2-btn-orange flex-1 justify-center disabled:opacity-50 disabled:cursor-not-allowed"
+                  style={{ padding: '12px 20px', fontSize: 14, borderRadius: 12 }}
+                >
+                  {uploading
+                    ? '⏳ Uploading…'
+                    : editingOffer
+                      ? '💾 Update Offer'
+                      : '🚀 Create Offer'
+                  }
+                </motion.button>
+                <button
+                  type="button"
+                  onClick={resetForm}
+                  className="ofm2-btn ofm2-btn-ghost"
+                  style={{ padding: '12px 20px', fontSize: 14, borderRadius: 12 }}
+                >
+                  ✗ Cancel
+                </button>
+              </div>
+
+            </form>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* ── Offers List ────────────────────────────────────────────────────── */}
       {loading ? (
         <div className="flex flex-col items-center justify-center py-16 gap-3">
-          <div className="text-5xl animate-bounce">🎁</div>
+          <div className="text-5xl animate-bounce">🏷️</div>
           <p className="text-sm font-bold" style={{ color: '#7a6a55' }}>Loading your offers…</p>
         </div>
-      ) : filteredOffers.length === 0 ? (
-        <div className="omof-card flex flex-col items-center justify-center py-16 gap-3 text-center">
-          <div className="text-6xl mb-1">{sortedOffers.length === 0 ? '🎊' : '🫙'}</div>
-          <p className="omof-title font-black text-white text-lg">
-            {sortedOffers.length === 0 ? 'No offers yet!' : 'No offers match your filters'}
-          </p>
-          <p className="text-sm" style={{ color: '#7a6a55' }}>
-            {sortedOffers.length === 0 ? 'Create your first promo code to delight your customers 🚀' : 'Try adjusting your search or filters'}
-          </p>
-          {sortedOffers.length === 0 && (
-            <button onClick={openCreate} className="omof-btn omof-btn-orange mt-2" style={{ borderRadius: 12, padding: '10px 20px' }}>
-              <Plus className="w-4 h-4" />🎊 Create First Offer
-            </button>
-          )}
+
+      ) : offers && offers.length > 0 ? (
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+          {offers.map((offer, idx) => {
+            const TypeIcon = getOfferTypeIcon(offer.type);
+            const typeEmoji = getOfferTypeEmoji(offer.type);
+            return (
+              <motion.div
+                key={offer.id}
+                data-testid={`offer-${offer.id}`}
+                initial={{ opacity: 0, y: 12 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: idx * 0.05 }}
+                className="ofm2-card"
+              >
+                {/* Banner image */}
+                {offer.bannerImage && (
+                  <div className="overflow-hidden" style={{ aspectRatio: '16/7' }}>
+                    <img
+                      src={offer.bannerImage}
+                      alt={offer.title}
+                      className="w-full h-full object-cover transition-transform duration-300"
+                      style={{ transition: 'transform 350ms' }}
+                      onMouseEnter={e => e.currentTarget.style.transform = 'scale(1.04)'}
+                      onMouseLeave={e => e.currentTarget.style.transform = 'scale(1)'}
+                    />
+                  </div>
+                )}
+
+                {/* No banner placeholder */}
+                {!offer.bannerImage && (
+                  <div
+                    className="flex items-center justify-center"
+                    style={{ aspectRatio: '16/5', background: 'linear-gradient(135deg, #1a1208, #0f0a04)', fontSize: 40 }}
+                  >
+                    {typeEmoji}
+                  </div>
+                )}
+
+                <div className="p-5 space-y-3">
+                  {/* Title row */}
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-2 mb-1 flex-wrap">
+                        <span className="text-lg">{typeEmoji}</span>
+                        <TypeIcon className="w-4 h-4" style={{ color: '#FF7A20' }} />
+                        <span className="ofm2-sec text-xs">{getOfferTypeLabel(offer.type)}</span>
+                      </div>
+                      <h3 className="ofm2-title font-black text-white text-lg leading-tight">{offer.title}</h3>
+                    </div>
+                    <span
+                      className="ofm2-badge flex-shrink-0"
+                      style={offer.active
+                        ? { background: 'rgba(16,185,129,0.12)', color: '#34d399', borderColor: 'rgba(16,185,129,0.22)' }
+                        : { background: 'rgba(100,100,100,0.12)', color: '#888', borderColor: 'rgba(100,100,100,0.22)' }
+                      }
+                    >
+                      {offer.active ? '✅ Active' : '⏸️ Inactive'}
+                    </span>
+                  </div>
+
+                  {/* Description */}
+                  {offer.description && (
+                    <p className="text-sm" style={{ color: '#7a6a55' }}>{offer.description}</p>
+                  )}
+
+                  {/* Items included */}
+                  {offer.items && offer.items.length > 0 && (
+                    <div className="ofm2-section space-y-2">
+                      <p className="ofm2-sec text-xs mb-2">🧺 Includes</p>
+                      <div className="flex flex-wrap gap-2">
+                        {offer.items.map((item, i) => (
+                          <span
+                            key={i}
+                            className="ofm2-badge"
+                            style={{ background: 'rgba(255,140,0,0.10)', color: '#FF7A20', borderColor: 'rgba(255,140,0,0.22)' }}
+                          >
+                            🍽️ {item.itemName}
+                            {item.selectedSize && (
+                              <span style={{ color: '#fbbf24' }}> ({item.selectedSize})</span>
+                            )}
+                            {' '}×{item.quantity}
+                            <span style={{ color: '#7a6a55', fontSize: 10 }}> {CUR}{fmtP(item.itemPrice)}</span>
+                          </span>
+                        ))}
+                      </div>
+
+                      {/* Combo price display */}
+                      {offer.type === 'combo' && offer.comboPrice && (
+                        <div className="flex items-center gap-3 pt-2" style={{ borderTop: '1px solid rgba(255,140,0,0.12)' }}>
+                          <span className="text-sm line-through" style={{ color: '#4a3f35' }}>{CUR}{fmtP(offer.originalPrice)}</span>
+                          <span className="ofm2-title font-black text-xl" style={{ color: '#FF7A20' }}>{CUR}{fmtP(offer.comboPrice)}</span>
+                          {offer.savings > 0 && (
+                            <span className="ofm2-badge" style={{ background: 'rgba(16,185,129,0.12)', color: '#34d399', borderColor: 'rgba(16,185,129,0.22)' }}>
+                              🎉 Save {CUR}{fmtP(offer.savings)}
+                            </span>
+                          )}
+                        </div>
+                      )}
+
+                      {/* Discount display */}
+                      {offer.type === 'discount' && (
+                        <div className="pt-2" style={{ borderTop: '1px solid rgba(255,140,0,0.12)' }}>
+                          <span className="ofm2-title font-black text-lg" style={{ color: '#FF7A20' }}>
+                            🏷️ {offer.discountType === 'percentage'
+                              ? `${offer.discountAmount}% OFF`
+                              : `${CUR}${fmtP(offer.discountAmount)} OFF`}
+                          </span>
+                        </div>
+                      )}
+
+                      {/* BOGO display */}
+                      {offer.type === 'buy_x_get_y' && offer.getItemName && (
+                        <div className="pt-2" style={{ borderTop: '1px solid rgba(255,140,0,0.12)' }}>
+                          <span className="ofm2-title font-black text-base" style={{ color: '#FF7A20' }}>
+                            🎁 Buy {offer.buyQuantity}, Get {offer.getQuantity}{' '}
+                            {offer.getItemName}
+                            {offer.getItemSize ? ` (${offer.getItemSize})` : ''} FREE!
+                          </span>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Action buttons */}
+                  <div className="flex gap-2 pt-1">
+                    <button
+                      data-testid={`edit-offer-${offer.id}`}
+                      onClick={() => handleEdit(offer)}
+                      className="ofm2-btn ofm2-btn-ghost flex-1 justify-center"
+                      style={{ padding: '8px 12px', fontSize: 12, borderRadius: 10 }}
+                    >
+                      <Edit className="w-3.5 h-3.5" />✏️ Edit
+                    </button>
+                    <button
+                      data-testid={`toggle-offer-${offer.id}`}
+                      onClick={() => toggleActive(offer.id, offer.active)}
+                      className={`ofm2-btn ${offer.active ? 'ofm2-btn-yellow' : 'ofm2-btn-green'}`}
+                      style={{ padding: '8px 12px', fontSize: 12, borderRadius: 10 }}
+                    >
+                      {offer.active ? '⏸️ Pause' : '▶️ Activate'}
+                    </button>
+                    <button
+                      data-testid={`delete-offer-${offer.id}`}
+                      onClick={() => handleDelete(offer.id)}
+                      className="ofm2-btn ofm2-btn-red"
+                      style={{ padding: '8px 12px', fontSize: 12, borderRadius: 10 }}
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                </div>
+              </motion.div>
+            );
+          })}
         </div>
+
       ) : (
-        <div className="space-y-3">
-          {filteredOffers.map((offer, idx) => (
-            <CouponCard
-              key={offer.id}
-              offer={offer}
-              cafeCurrency={cafeCurrency}
-              onEdit={handleEdit}
-              onDelete={handleDelete}
-              onToggle={handleToggle}
-              idx={idx}
-            />
-          ))}
-          <div className="flex items-center justify-center gap-2 py-2">
-            <span>🎁</span>
-            <p className="text-xs font-bold" style={{ color: '#7a6a55' }}>
-              {filteredOffers.length} offer{filteredOffers.length !== 1 ? 's' : ''} · {stats.live} live now
-            </p>
-            <span className="inline-block w-1.5 h-1.5 rounded-full animate-pulse" style={{ background: '#34d399' }} />
-          </div>
-        </div>
+        /* Empty state */
+        <motion.div
+          initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}
+          className="ofm2-flat flex flex-col items-center justify-center py-20 gap-3 text-center"
+        >
+          <div className="text-7xl mb-2">🏷️</div>
+          <p className="ofm2-title font-black text-white text-xl">No offers yet!</p>
+          <p className="text-sm" style={{ color: '#7a6a55' }}>
+            Create your first combo, discount, or Buy X Get Y deal 🚀
+          </p>
+          <motion.button
+            whileHover={{ scale: 1.03 }} whileTap={{ scale: 0.96 }}
+            onClick={() => setShowForm(true)}
+            className="ofm2-btn ofm2-btn-orange mt-3"
+            style={{ borderRadius: 12, padding: '12px 24px', fontSize: 14 }}
+          >
+            <Plus className="w-4 h-4" />🎊 Create First Offer
+          </motion.button>
+        </motion.div>
       )}
     </div>
   );
