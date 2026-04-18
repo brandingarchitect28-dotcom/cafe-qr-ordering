@@ -1344,163 +1344,130 @@ const CafeOrderingPremium = () => {
 
   // ── Guards ────────────────────────────────────────────────────────────────
   if (loading) {
-    // ── Skeleton shimmer keyframe injected once ──────────────────────────────
-    const skeletonStyle = `
+    const skeletonCSS = `
       @keyframes _skShimmer {
-        0%   { background-position: -400px 0; }
-        100% { background-position:  400px 0; }
+        0%   { background-position: -600px 0; }
+        100% { background-position:  600px 0; }
       }
       ._sk {
         background: linear-gradient(90deg,
           rgba(255,255,255,0.04) 25%,
-          rgba(255,255,255,0.10) 50%,
+          rgba(255,255,255,0.11) 50%,
           rgba(255,255,255,0.04) 75%
         );
-        background-size: 800px 100%;
+        background-size: 1200px 100%;
         animation: _skShimmer 1.6s infinite linear;
         border-radius: 10px;
       }
     `;
-    // Reusable shimmer block
-    const Sk = ({ w = '100%', h = 14, r = 10, style = {} }) => (
-      <div className="_sk" style={{ width: w, height: h, borderRadius: r, flexShrink: 0, ...style }} />
+    const Sk = ({ w = '100%', h = 14, r = 10, mb = 0, style: sx = {} }) => (
+      <div className="_sk" style={{ width: w, height: h, borderRadius: r, marginBottom: mb, flexShrink: 0, ...sx }} />
     );
-
     return (
-      <div className="min-h-screen" style={{ background: T.bg, fontFamily: 'Manrope, sans-serif' }}>
-        <style>{skeletonStyle}</style>
+      <div className="min-h-screen" style={{ background: T.bg, fontFamily: 'Manrope, sans-serif', overflowX: 'hidden' }}>
+        <style>{skeletonCSS}</style>
 
-        {/* ── Hero skeleton ── */}
-        <div className="relative overflow-hidden px-6 pt-12 pb-8 text-center"
-          style={{ background: isLight ? `${primary}10` : `${primary}0A` }}>
-          {/* Logo circle */}
-          <div className="_sk mx-auto mb-4" style={{ width: 80, height: 80, borderRadius: 18 }} />
-          {/* Cafe name */}
-          <div className="_sk mx-auto mb-2" style={{ width: 160, height: 22, borderRadius: 8 }} />
-          {/* Tagline */}
-          <div className="_sk mx-auto" style={{ width: 110, height: 13, borderRadius: 6 }} />
+        {/* Hero */}
+        <div style={{ background: isLight ? `${primary}12` : `${primary}0C`, padding: '48px 24px 32px', textAlign: 'center' }}>
+          <Sk w={80} h={80} r={18} mb={16} style={{ margin: '0 auto 16px' }} />
+          <Sk w={160} h={22} r={8} mb={8} style={{ margin: '0 auto 8px' }} />
+          <Sk w={110} h={13} r={6} style={{ margin: '0 auto' }} />
         </div>
 
-        {/* ── Sticky bar skeleton ── */}
-        <div className="sticky top-0 z-30 px-4 py-3"
-          style={{ background: T.sticky, backdropFilter: 'blur(20px)', borderBottom: `1px solid ${T.borderLight}` }}>
-          <div className="flex items-center gap-3 max-w-2xl mx-auto">
-            {/* Search bar */}
-            <div className="_sk flex-1" style={{ height: 42, borderRadius: 12 }} />
-            {/* Cart button */}
-            <div className="_sk flex-shrink-0" style={{ width: 52, height: 42, borderRadius: 12 }} />
+        {/* Sticky bar */}
+        <div style={{ background: T.sticky, backdropFilter: 'blur(20px)', borderBottom: `1px solid ${T.borderLight}`, padding: '12px 16px', position: 'sticky', top: 0, zIndex: 30 }}>
+          <div style={{ display: 'flex', gap: 12, maxWidth: 672, margin: '0 auto' }}>
+            <Sk h={42} r={12} />
+            <Sk w={52} h={42} r={12} />
           </div>
-          {/* Category pills */}
-          <div className="flex gap-2 mt-3 overflow-hidden max-w-2xl mx-auto">
-            {[60, 90, 70, 80, 68, 75].map((w, i) => (
-              <div key={i} className="_sk flex-shrink-0" style={{ width: w, height: 30, borderRadius: 999 }} />
-            ))}
+          <div style={{ display: 'flex', gap: 8, marginTop: 12, overflow: 'hidden', maxWidth: 672, margin: '12px auto 0' }}>
+            {[60,90,70,80,68,72].map((w,i) => <Sk key={i} w={w} h={30} r={999} />)}
           </div>
-          {/* Veg filter pills */}
-          <div className="flex gap-2 mt-2 max-w-2xl mx-auto">
-            {[78, 58, 76].map((w, i) => (
-              <div key={i} className="_sk flex-shrink-0" style={{ width: w, height: 28, borderRadius: 999 }} />
-            ))}
+          <div style={{ display: 'flex', gap: 8, marginTop: 8, maxWidth: 672, margin: '8px auto 0' }}>
+            {[78,58,76].map((w,i) => <Sk key={i} w={w} h={28} r={999} />)}
           </div>
         </div>
 
-        <div className="max-w-2xl mx-auto px-4 pt-6 pb-32 space-y-8">
+        <div style={{ maxWidth: 672, margin: '0 auto', padding: '24px 16px 120px', display: 'flex', flexDirection: 'column', gap: 32 }}>
 
-          {/* ── Special Offers row skeleton ── */}
-          <section>
-            <div className="flex items-center gap-2 mb-4">
-              <div className="_sk" style={{ width: 18, height: 18, borderRadius: 6 }} />
-              <div className="_sk" style={{ width: 130, height: 18, borderRadius: 6 }} />
+          {/* Special Offers */}
+          <div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 16 }}>
+              <Sk w={18} h={18} r={6} />
+              <Sk w={130} h={18} r={6} />
             </div>
-            <div className="flex gap-3 overflow-hidden">
-              {[0, 1, 2].map(i => (
-                <div key={i} className="_sk flex-shrink-0"
-                  style={{ width: 200, height: 120, borderRadius: 18 }} />
-              ))}
+            <div style={{ display: 'flex', gap: 12, overflow: 'hidden' }}>
+              {[0,1,2].map(i => <Sk key={i} w={200} h={120} r={18} />)}
             </div>
-          </section>
+          </div>
 
-          {/* ── Newly Arrived row skeleton ── */}
-          <section>
-            <div className="flex items-center gap-2 mb-3">
-              <div className="_sk" style={{ width: 18, height: 18, borderRadius: 6 }} />
-              <div className="_sk" style={{ width: 120, height: 18, borderRadius: 6 }} />
+          {/* Newly Arrived */}
+          <div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
+              <Sk w={18} h={18} r={6} />
+              <Sk w={120} h={18} r={6} />
             </div>
-            <div className="flex gap-3 overflow-hidden">
-              {[0, 1, 2, 3].map(i => (
-                <div key={i} className="flex-shrink-0" style={{ width: 160 }}>
-                  <div className="_sk" style={{ width: 160, height: 160, borderRadius: 18, marginBottom: 8 }} />
-                  <div className="_sk" style={{ width: 100, height: 11, borderRadius: 6, marginBottom: 5 }} />
-                  <div className="_sk" style={{ width: 60, height: 10, borderRadius: 6 }} />
+            <div style={{ display: 'flex', gap: 12, overflow: 'hidden' }}>
+              {[0,1,2,3].map(i => (
+                <div key={i} style={{ flexShrink: 0, width: 160 }}>
+                  <Sk w={160} h={160} r={18} mb={8} />
+                  <Sk w={100} h={11} r={6} mb={5} />
+                  <Sk w={60} h={10} r={6} />
                 </div>
               ))}
             </div>
-          </section>
+          </div>
 
-          {/* ── Best Sellers row skeleton ── */}
-          <section>
-            <div className="flex items-center gap-2 mb-3">
-              <div className="_sk" style={{ width: 18, height: 18, borderRadius: 6 }} />
-              <div className="_sk" style={{ width: 105, height: 18, borderRadius: 6 }} />
+          {/* Best Sellers */}
+          <div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
+              <Sk w={18} h={18} r={6} />
+              <Sk w={105} h={18} r={6} />
             </div>
-            <div className="flex gap-3 overflow-hidden">
-              {[0, 1, 2, 3].map(i => (
-                <div key={i} className="flex-shrink-0" style={{ width: 160 }}>
-                  <div className="_sk" style={{ width: 160, height: 160, borderRadius: 18, marginBottom: 8 }} />
-                  <div className="_sk" style={{ width: 110, height: 11, borderRadius: 6, marginBottom: 5 }} />
-                  <div className="_sk" style={{ width: 65, height: 10, borderRadius: 6 }} />
+            <div style={{ display: 'flex', gap: 12, overflow: 'hidden' }}>
+              {[0,1,2,3].map(i => (
+                <div key={i} style={{ flexShrink: 0, width: 160 }}>
+                  <Sk w={160} h={160} r={18} mb={8} />
+                  <Sk w={110} h={11} r={6} mb={5} />
+                  <Sk w={65} h={10} r={6} />
                 </div>
               ))}
             </div>
-          </section>
+          </div>
 
-          {/* ── Menu section heading ── */}
-          <section>
-            <div className="_sk mb-4" style={{ width: 100, height: 20, borderRadius: 8 }} />
-            {/* 2-col grid of card skeletons */}
-            <div className="grid grid-cols-2 gap-3">
+          {/* Menu grid */}
+          <div>
+            <Sk w={100} h={20} r={8} mb={16} />
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
               {[0,1,2,3,4,5].map(i => (
-                <div key={i} style={{
-                  borderRadius: 24,
-                  overflow: 'hidden',
-                  border: `1px solid ${T.border}`,
-                  background: T.bgCard,
-                }}>
-                  {/* Image area */}
-                  <div className="_sk" style={{ width: '100%', aspectRatio: '4/3', borderRadius: 0 }} />
-                  {/* Card body */}
+                <div key={i} style={{ borderRadius: 24, overflow: 'hidden', border: `1px solid ${T.border}`, background: T.bgCard }}>
+                  <Sk w="100%" h={0} r={0} style={{ paddingBottom: '75%', height: 0 }} />
                   <div style={{ padding: '14px 14px 16px' }}>
-                    {/* Badge strip */}
-                    <div className="flex gap-1 mb-2">
-                      <div className="_sk" style={{ width: 44, height: 18, borderRadius: 999 }} />
-                      <div className="_sk" style={{ width: 38, height: 18, borderRadius: 999 }} />
+                    <div style={{ display: 'flex', gap: 6, marginBottom: 8 }}>
+                      <Sk w={44} h={18} r={999} />
+                      <Sk w={38} h={18} r={999} />
                     </div>
-                    {/* Name + price */}
-                    <div className="flex justify-between items-start gap-2 mb-3">
-                      <div className="_sk" style={{ flex: 1, height: 14, borderRadius: 6 }} />
-                      <div className="_sk flex-shrink-0" style={{ width: 46, height: 14, borderRadius: 6 }} />
+                    <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, marginBottom: 12 }}>
+                      <Sk h={14} r={6} />
+                      <Sk w={46} h={14} r={6} />
                     </div>
-                    {/* Size buttons */}
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                      <div className="_sk" style={{ width: '100%', height: 32, borderRadius: 12 }} />
-                      <div className="_sk" style={{ width: '100%', height: 32, borderRadius: 12 }} />
-                      <div className="_sk" style={{ width: '100%', height: 32, borderRadius: 12 }} />
+                      <Sk h={32} r={12} />
+                      <Sk h={32} r={12} />
+                      <Sk h={32} r={12} />
                     </div>
                   </div>
                 </div>
               ))}
             </div>
-          </section>
+          </div>
         </div>
 
-        {/* ── Floating food emoji ── purely decorative vibe ── */}
+        {/* Floating coffee vibe */}
         <motion.div
           animate={{ y: [0, -10, 0] }}
           transition={{ duration: 2, repeat: Infinity, ease: 'easeInOut' }}
-          style={{
-            position: 'fixed', bottom: 32, left: '50%', transform: 'translateX(-50%)',
-            fontSize: 28, opacity: 0.5, pointerEvents: 'none',
-          }}
+          style={{ position: 'fixed', bottom: 28, left: '50%', transform: 'translateX(-50%)', fontSize: 26, opacity: 0.45, pointerEvents: 'none' }}
         >
           ☕
         </motion.div>
