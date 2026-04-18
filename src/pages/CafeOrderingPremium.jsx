@@ -1343,20 +1343,170 @@ const CafeOrderingPremium = () => {
   };
 
   // ── Guards ────────────────────────────────────────────────────────────────
-  if (loading) return (
-    <div className="min-h-screen flex flex-col items-center justify-center gap-4 cop" style={{ background: T.bg }}>
-      <motion.div
-        animate={{ rotate: 360 }}
-        transition={{ duration: 1.2, repeat: Infinity, ease: 'linear' }}
-        className="text-5xl"
-      >
-        ☕
-      </motion.div>
-      <p className="text-sm font-black" style={{ color: primary, fontFamily: "'Nunito', sans-serif", letterSpacing: '0.08em' }}>
-        Brewing your menu…
-      </p>
-    </div>
-  );
+  if (loading) {
+    // ── Skeleton shimmer keyframe injected once ──────────────────────────────
+    const skeletonStyle = `
+      @keyframes _skShimmer {
+        0%   { background-position: -400px 0; }
+        100% { background-position:  400px 0; }
+      }
+      ._sk {
+        background: linear-gradient(90deg,
+          rgba(255,255,255,0.04) 25%,
+          rgba(255,255,255,0.10) 50%,
+          rgba(255,255,255,0.04) 75%
+        );
+        background-size: 800px 100%;
+        animation: _skShimmer 1.6s infinite linear;
+        border-radius: 10px;
+      }
+    `;
+    // Reusable shimmer block
+    const Sk = ({ w = '100%', h = 14, r = 10, style = {} }) => (
+      <div className="_sk" style={{ width: w, height: h, borderRadius: r, flexShrink: 0, ...style }} />
+    );
+
+    return (
+      <div className="min-h-screen" style={{ background: T.bg, fontFamily: 'Manrope, sans-serif' }}>
+        <style>{skeletonStyle}</style>
+
+        {/* ── Hero skeleton ── */}
+        <div className="relative overflow-hidden px-6 pt-12 pb-8 text-center"
+          style={{ background: isLight ? `${primary}10` : `${primary}0A` }}>
+          {/* Logo circle */}
+          <div className="_sk mx-auto mb-4" style={{ width: 80, height: 80, borderRadius: 18 }} />
+          {/* Cafe name */}
+          <div className="_sk mx-auto mb-2" style={{ width: 160, height: 22, borderRadius: 8 }} />
+          {/* Tagline */}
+          <div className="_sk mx-auto" style={{ width: 110, height: 13, borderRadius: 6 }} />
+        </div>
+
+        {/* ── Sticky bar skeleton ── */}
+        <div className="sticky top-0 z-30 px-4 py-3"
+          style={{ background: T.sticky, backdropFilter: 'blur(20px)', borderBottom: `1px solid ${T.borderLight}` }}>
+          <div className="flex items-center gap-3 max-w-2xl mx-auto">
+            {/* Search bar */}
+            <div className="_sk flex-1" style={{ height: 42, borderRadius: 12 }} />
+            {/* Cart button */}
+            <div className="_sk flex-shrink-0" style={{ width: 52, height: 42, borderRadius: 12 }} />
+          </div>
+          {/* Category pills */}
+          <div className="flex gap-2 mt-3 overflow-hidden max-w-2xl mx-auto">
+            {[60, 90, 70, 80, 68, 75].map((w, i) => (
+              <div key={i} className="_sk flex-shrink-0" style={{ width: w, height: 30, borderRadius: 999 }} />
+            ))}
+          </div>
+          {/* Veg filter pills */}
+          <div className="flex gap-2 mt-2 max-w-2xl mx-auto">
+            {[78, 58, 76].map((w, i) => (
+              <div key={i} className="_sk flex-shrink-0" style={{ width: w, height: 28, borderRadius: 999 }} />
+            ))}
+          </div>
+        </div>
+
+        <div className="max-w-2xl mx-auto px-4 pt-6 pb-32 space-y-8">
+
+          {/* ── Special Offers row skeleton ── */}
+          <section>
+            <div className="flex items-center gap-2 mb-4">
+              <div className="_sk" style={{ width: 18, height: 18, borderRadius: 6 }} />
+              <div className="_sk" style={{ width: 130, height: 18, borderRadius: 6 }} />
+            </div>
+            <div className="flex gap-3 overflow-hidden">
+              {[0, 1, 2].map(i => (
+                <div key={i} className="_sk flex-shrink-0"
+                  style={{ width: 200, height: 120, borderRadius: 18 }} />
+              ))}
+            </div>
+          </section>
+
+          {/* ── Newly Arrived row skeleton ── */}
+          <section>
+            <div className="flex items-center gap-2 mb-3">
+              <div className="_sk" style={{ width: 18, height: 18, borderRadius: 6 }} />
+              <div className="_sk" style={{ width: 120, height: 18, borderRadius: 6 }} />
+            </div>
+            <div className="flex gap-3 overflow-hidden">
+              {[0, 1, 2, 3].map(i => (
+                <div key={i} className="flex-shrink-0" style={{ width: 160 }}>
+                  <div className="_sk" style={{ width: 160, height: 160, borderRadius: 18, marginBottom: 8 }} />
+                  <div className="_sk" style={{ width: 100, height: 11, borderRadius: 6, marginBottom: 5 }} />
+                  <div className="_sk" style={{ width: 60, height: 10, borderRadius: 6 }} />
+                </div>
+              ))}
+            </div>
+          </section>
+
+          {/* ── Best Sellers row skeleton ── */}
+          <section>
+            <div className="flex items-center gap-2 mb-3">
+              <div className="_sk" style={{ width: 18, height: 18, borderRadius: 6 }} />
+              <div className="_sk" style={{ width: 105, height: 18, borderRadius: 6 }} />
+            </div>
+            <div className="flex gap-3 overflow-hidden">
+              {[0, 1, 2, 3].map(i => (
+                <div key={i} className="flex-shrink-0" style={{ width: 160 }}>
+                  <div className="_sk" style={{ width: 160, height: 160, borderRadius: 18, marginBottom: 8 }} />
+                  <div className="_sk" style={{ width: 110, height: 11, borderRadius: 6, marginBottom: 5 }} />
+                  <div className="_sk" style={{ width: 65, height: 10, borderRadius: 6 }} />
+                </div>
+              ))}
+            </div>
+          </section>
+
+          {/* ── Menu section heading ── */}
+          <section>
+            <div className="_sk mb-4" style={{ width: 100, height: 20, borderRadius: 8 }} />
+            {/* 2-col grid of card skeletons */}
+            <div className="grid grid-cols-2 gap-3">
+              {[0,1,2,3,4,5].map(i => (
+                <div key={i} style={{
+                  borderRadius: 24,
+                  overflow: 'hidden',
+                  border: `1px solid ${T.border}`,
+                  background: T.bgCard,
+                }}>
+                  {/* Image area */}
+                  <div className="_sk" style={{ width: '100%', aspectRatio: '4/3', borderRadius: 0 }} />
+                  {/* Card body */}
+                  <div style={{ padding: '14px 14px 16px' }}>
+                    {/* Badge strip */}
+                    <div className="flex gap-1 mb-2">
+                      <div className="_sk" style={{ width: 44, height: 18, borderRadius: 999 }} />
+                      <div className="_sk" style={{ width: 38, height: 18, borderRadius: 999 }} />
+                    </div>
+                    {/* Name + price */}
+                    <div className="flex justify-between items-start gap-2 mb-3">
+                      <div className="_sk" style={{ flex: 1, height: 14, borderRadius: 6 }} />
+                      <div className="_sk flex-shrink-0" style={{ width: 46, height: 14, borderRadius: 6 }} />
+                    </div>
+                    {/* Size buttons */}
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                      <div className="_sk" style={{ width: '100%', height: 32, borderRadius: 12 }} />
+                      <div className="_sk" style={{ width: '100%', height: 32, borderRadius: 12 }} />
+                      <div className="_sk" style={{ width: '100%', height: 32, borderRadius: 12 }} />
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </section>
+        </div>
+
+        {/* ── Floating food emoji ── purely decorative vibe ── */}
+        <motion.div
+          animate={{ y: [0, -10, 0] }}
+          transition={{ duration: 2, repeat: Infinity, ease: 'easeInOut' }}
+          style={{
+            position: 'fixed', bottom: 32, left: '50%', transform: 'translateX(-50%)',
+            fontSize: 28, opacity: 0.5, pointerEvents: 'none',
+          }}
+        >
+          ☕
+        </motion.div>
+      </div>
+    );
+  }
 
   if (cafeNotFound || !cafe) return (
     <div className="min-h-screen flex items-center justify-center text-center p-8 cop" style={{ background: T.bg }}>
