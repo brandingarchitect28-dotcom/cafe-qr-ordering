@@ -1,5 +1,5 @@
 /**
- * CafeOrderingPremium.jsx
+ * CafeOrderingPremium.jsx  ← v4-CHEF-LOADING (replace your existing file with this)
  * Route: /cafe/:cafeId  (loaded when cafe.planType === 'premium')
  *
  * ══════════════════════════════════════════════════════════
