@@ -1344,133 +1344,102 @@ const CafeOrderingPremium = () => {
 
   // ── Guards ────────────────────────────────────────────────────────────────
   if (loading) {
-    const skeletonCSS = `
-      @keyframes _skShimmer {
-        0%   { background-position: -600px 0; }
-        100% { background-position:  600px 0; }
-      }
-      ._sk {
-        background: linear-gradient(90deg,
-          rgba(255,255,255,0.04) 25%,
-          rgba(255,255,255,0.11) 50%,
-          rgba(255,255,255,0.04) 75%
-        );
-        background-size: 1200px 100%;
-        animation: _skShimmer 1.6s infinite linear;
-        border-radius: 10px;
-      }
-    `;
-    const Sk = ({ w = '100%', h = 14, r = 10, mb = 0, style: sx = {} }) => (
-      <div className="_sk" style={{ width: w, height: h, borderRadius: r, marginBottom: mb, flexShrink: 0, ...sx }} />
-    );
+    const loadingMsgs = ['Sharpening the knives…', 'Firing up the grill…', 'Chef is plating up…', 'Sprinkling the magic…', 'Almost on the table…'];
+    const msgIdx = Math.floor(Date.now() / 1000) % loadingMsgs.length;
+    const floatingFoods = ['🍕','🍔','☕','🍜','🧁','🥗','🍣','🌮','🍰','🥐'];
+    const loadBg = '#050505';
+    const loadPrimary = '#D4AF37';
     return (
-      <div className="min-h-screen" style={{ background: T.bg, fontFamily: 'Manrope, sans-serif', overflowX: 'hidden' }}>
-        <style>{skeletonCSS}</style>
+      <div style={{ minHeight: '100vh', background: loadBg, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', overflow: 'hidden', position: 'relative', fontFamily: 'Manrope, sans-serif' }}>
 
-        {/* Hero */}
-        <div style={{ background: isLight ? `${primary}12` : `${primary}0C`, padding: '48px 24px 32px', textAlign: 'center' }}>
-          <Sk w={80} h={80} r={18} mb={16} style={{ margin: '0 auto 16px' }} />
-          <Sk w={160} h={22} r={8} mb={8} style={{ margin: '0 auto 8px' }} />
-          <Sk w={110} h={13} r={6} style={{ margin: '0 auto' }} />
-        </div>
-
-        {/* Sticky bar */}
-        <div style={{ background: T.sticky, backdropFilter: 'blur(20px)', borderBottom: `1px solid ${T.borderLight}`, padding: '12px 16px', position: 'sticky', top: 0, zIndex: 30 }}>
-          <div style={{ display: 'flex', gap: 12, maxWidth: 672, margin: '0 auto' }}>
-            <Sk h={42} r={12} />
-            <Sk w={52} h={42} r={12} />
-          </div>
-          <div style={{ display: 'flex', gap: 8, marginTop: 12, overflow: 'hidden', maxWidth: 672, margin: '12px auto 0' }}>
-            {[60,90,70,80,68,72].map((w,i) => <Sk key={i} w={w} h={30} r={999} />)}
-          </div>
-          <div style={{ display: 'flex', gap: 8, marginTop: 8, maxWidth: 672, margin: '8px auto 0' }}>
-            {[78,58,76].map((w,i) => <Sk key={i} w={w} h={28} r={999} />)}
-          </div>
-        </div>
-
-        <div style={{ maxWidth: 672, margin: '0 auto', padding: '24px 16px 120px', display: 'flex', flexDirection: 'column', gap: 32 }}>
-
-          {/* Special Offers */}
-          <div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 16 }}>
-              <Sk w={18} h={18} r={6} />
-              <Sk w={130} h={18} r={6} />
-            </div>
-            <div style={{ display: 'flex', gap: 12, overflow: 'hidden' }}>
-              {[0,1,2].map(i => <Sk key={i} w={200} h={120} r={18} />)}
-            </div>
-          </div>
-
-          {/* Newly Arrived */}
-          <div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
-              <Sk w={18} h={18} r={6} />
-              <Sk w={120} h={18} r={6} />
-            </div>
-            <div style={{ display: 'flex', gap: 12, overflow: 'hidden' }}>
-              {[0,1,2,3].map(i => (
-                <div key={i} style={{ flexShrink: 0, width: 160 }}>
-                  <Sk w={160} h={160} r={18} mb={8} />
-                  <Sk w={100} h={11} r={6} mb={5} />
-                  <Sk w={60} h={10} r={6} />
-                </div>
-              ))}
-            </div>
-          </div>
-
-          {/* Best Sellers */}
-          <div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
-              <Sk w={18} h={18} r={6} />
-              <Sk w={105} h={18} r={6} />
-            </div>
-            <div style={{ display: 'flex', gap: 12, overflow: 'hidden' }}>
-              {[0,1,2,3].map(i => (
-                <div key={i} style={{ flexShrink: 0, width: 160 }}>
-                  <Sk w={160} h={160} r={18} mb={8} />
-                  <Sk w={110} h={11} r={6} mb={5} />
-                  <Sk w={65} h={10} r={6} />
-                </div>
-              ))}
-            </div>
-          </div>
-
-          {/* Menu grid */}
-          <div>
-            <Sk w={100} h={20} r={8} mb={16} />
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-              {[0,1,2,3,4,5].map(i => (
-                <div key={i} style={{ borderRadius: 24, overflow: 'hidden', border: `1px solid ${T.border}`, background: T.bgCard }}>
-                  <Sk w="100%" h={0} r={0} style={{ paddingBottom: '75%', height: 0 }} />
-                  <div style={{ padding: '14px 14px 16px' }}>
-                    <div style={{ display: 'flex', gap: 6, marginBottom: 8 }}>
-                      <Sk w={44} h={18} r={999} />
-                      <Sk w={38} h={18} r={999} />
-                    </div>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, marginBottom: 12 }}>
-                      <Sk h={14} r={6} />
-                      <Sk w={46} h={14} r={6} />
-                    </div>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                      <Sk h={32} r={12} />
-                      <Sk h={32} r={12} />
-                      <Sk h={32} r={12} />
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
-
-        {/* Floating coffee vibe */}
+        {/* Ambient glow blobs */}
         <motion.div
-          animate={{ y: [0, -10, 0] }}
-          transition={{ duration: 2, repeat: Infinity, ease: 'easeInOut' }}
-          style={{ position: 'fixed', bottom: 28, left: '50%', transform: 'translateX(-50%)', fontSize: 26, opacity: 0.45, pointerEvents: 'none' }}
+          animate={{ scale: [1, 1.3, 1], opacity: [0.08, 0.18, 0.08] }}
+          transition={{ duration: 4, repeat: Infinity, ease: 'easeInOut' }}
+          style={{ position: 'absolute', top: '20%', left: '50%', transform: 'translateX(-50%)', width: 320, height: 320, borderRadius: '50%', background: loadPrimary, filter: 'blur(80px)', pointerEvents: 'none' }}
+        />
+        <motion.div
+          animate={{ scale: [1.2, 1, 1.2], opacity: [0.05, 0.12, 0.05] }}
+          transition={{ duration: 6, repeat: Infinity, ease: 'easeInOut', delay: 2 }}
+          style={{ position: 'absolute', bottom: '15%', right: '10%', width: 200, height: 200, borderRadius: '50%', background: '#ff6b35', filter: 'blur(60px)', pointerEvents: 'none' }}
+        />
+
+        {/* Floating food emojis */}
+        {['🍕','🍔','☕','🍜','🧁','🥗','🍣','🌮','🍰','🥐'].map((food, i) => (
+          <motion.div
+            key={i}
+            animate={{ opacity: [0, 0.4, 0.4, 0], y: [0, -80, -160, -220] }}
+            transition={{ duration: 4 + i * 0.4, repeat: Infinity, delay: i * 0.7, ease: 'easeOut' }}
+            style={{ position: 'absolute', left: `${8 + (i * 9) % 84}%`, bottom: `${8 + (i * 13) % 28}%`, fontSize: 18 + (i % 3) * 6, pointerEvents: 'none', filter: 'drop-shadow(0 2px 8px rgba(212,175,55,0.3))' }}
+          >
+            {food}
+          </motion.div>
+        ))}
+
+        {/* Main card */}
+        <motion.div
+          initial={{ opacity: 0, y: 30, scale: 0.92 }}
+          animate={{ opacity: 1, y: 0, scale: 1 }}
+          transition={{ duration: 0.6, ease: [0.22, 1, 0.36, 1] }}
+          style={{ position: 'relative', zIndex: 10, background: 'linear-gradient(160deg, rgba(30,20,8,0.97) 0%, rgba(12,10,4,0.99) 100%)', border: '1px solid rgba(212,175,55,0.25)', borderRadius: 32, padding: '40px 36px 36px', maxWidth: 320, width: '88vw', textAlign: 'center', boxShadow: '0 24px 80px rgba(0,0,0,0.6), 0 0 0 1px rgba(212,175,55,0.1)' }}
         >
-          ☕
+          {/* Chef + plate */}
+          <div style={{ position: 'relative', width: 110, height: 110, margin: '0 auto 24px' }}>
+            <motion.div
+              animate={{ scale: [1, 1.05, 1] }}
+              transition={{ duration: 2, repeat: Infinity, ease: 'easeInOut' }}
+              style={{ position: 'absolute', bottom: 0, left: '50%', transform: 'translateX(-50%)', width: 88, height: 88, borderRadius: '50%', background: 'radial-gradient(circle at 35% 35%, rgba(212,175,55,0.18), rgba(212,175,55,0.05))', border: '2px solid rgba(212,175,55,0.35)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+            >
+              <motion.div animate={{ rotate: [0, 360] }} transition={{ duration: 8, repeat: Infinity, ease: 'linear' }} style={{ fontSize: 30 }}>
+                🍽️
+              </motion.div>
+            </motion.div>
+            <motion.div
+              animate={{ y: [0, -9, 0], rotate: [-5, 5, -5] }}
+              transition={{ duration: 1.8, repeat: Infinity, ease: 'easeInOut' }}
+              style={{ position: 'absolute', top: 0, left: '50%', transform: 'translateX(-50%)', fontSize: 38, lineHeight: 1 }}
+            >
+              👨‍🍳
+            </motion.div>
+          </div>
+
+          <h2 style={{ color: '#ffffff', fontWeight: 900, fontSize: 22, marginBottom: 6, fontFamily: 'Playfair Display, serif', letterSpacing: '-0.01em' }}>
+            Hold tight!
+          </h2>
+          <p style={{ color: '#D4AF37', fontWeight: 700, fontSize: 13, marginBottom: 26, opacity: 0.9 }}>
+            Chef is preparing your menu…
+          </p>
+
+          {/* Bouncing dots */}
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 7 }}>
+            {[0, 1, 2, 3].map(i => (
+              <motion.div
+                key={i}
+                animate={{ scale: [1, 1.7, 1], opacity: [0.3, 1, 0.3] }}
+                transition={{ duration: 1.1, repeat: Infinity, delay: i * 0.18, ease: 'easeInOut' }}
+                style={{ width: 7, height: 7, borderRadius: '50%', background: '#D4AF37' }}
+              />
+            ))}
+          </div>
+
+          {/* Shimmer bar */}
+          <div style={{ marginTop: 22, height: 3, background: 'rgba(255,255,255,0.06)', borderRadius: 99, overflow: 'hidden' }}>
+            <motion.div
+              animate={{ x: ['-100%', '200%'] }}
+              transition={{ duration: 1.5, repeat: Infinity, ease: 'easeInOut' }}
+              style={{ height: '100%', width: '40%', background: 'linear-gradient(90deg, transparent, #D4AF37, transparent)', borderRadius: 99 }}
+            />
+          </div>
         </motion.div>
+
+        <motion.p
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ delay: 0.9 }}
+          style={{ marginTop: 28, color: 'rgba(255,255,255,0.18)', fontSize: 11, fontWeight: 600, letterSpacing: '0.14em', textTransform: 'uppercase', zIndex: 10, position: 'relative' }}
+        >
+          Crafting your experience
+        </motion.p>
       </div>
     );
   }
