@@ -47,8 +47,8 @@ if (typeof document !== 'undefined' && !document.getElementById('loy-cafe-css'))
       overflow: hidden;
       transition: border-color 200ms;
     }
-    .loy-card:hover { border-color: rgba(212,160,23,0.18);
-      box-shadow: 0 0 18px rgba(212,160,23,0.06); }
+    .loy-card:hover { border-color: rgba(168,176,184,0.18);
+      box-shadow: 0 0 18px rgba(168,176,184,0.06); }
     .loy-input {
       width: 100%; background: #161a18;
       border: 1.5px solid rgba(255,255,255,0.08); border-radius: 12px;
@@ -56,8 +56,8 @@ if (typeof document !== 'undefined' && !document.getElementById('loy-cafe-css'))
       font-family: 'DM Sans', system-ui, sans-serif;
       outline: none; transition: border-color 180ms, box-shadow 180ms;
     }
-    .loy-input:focus { border-color: rgba(212,160,23,0.5);
-      box-shadow: 0 0 0 3px rgba(212,160,23,0.08); }
+    .loy-input:focus { border-color: rgba(168,176,184,0.5);
+      box-shadow: 0 0 0 3px rgba(168,176,184,0.08); }
     .loy-input::placeholder { color: #3a4040; }
     .loy-btn {
       display: inline-flex; align-items: center; gap: 5px;
@@ -69,7 +69,7 @@ if (typeof document !== 'undefined' && !document.getElementById('loy-cafe-css'))
     }
     .loy-btn:hover { transform: translateY(-1px); filter: brightness(1.1); }
     .loy-btn:active { transform: scale(0.96); }
-    .loy-btn-orange { background: linear-gradient(135deg,#D4A017,#B8860B); color:#fff; box-shadow: 0 2px 14px rgba(212,160,23,0.35); }
+    .loy-btn-orange { background: linear-gradient(135deg,#A8B0B8,#8A9299); color:#fff; box-shadow: 0 2px 14px rgba(168,176,184,0.35); }
     .loy-btn-ghost  { background: rgba(255,255,255,0.05); color: #5e6b60; border-color: rgba(255,255,255,0.08); }
     .loy-btn-ghost:hover  { background: rgba(255,255,255,0.09); color: #fff; }
     .loy-btn-green  { background: rgba(37,211,102,0.1); color: #25D366; border-color: rgba(37,211,102,0.25); }
@@ -282,7 +282,7 @@ const LoyaltyDashboard = () => {
       {/* ── Stats row ─────────────────────────────────────────────────────── */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         {[
-          { label: 'Total Members',   value: totalCustomers,  emoji: '👥', color: '#D4A017' },
+          { label: 'Total Members',   value: totalCustomers,  emoji: '👥', color: '#A8B0B8' },
           { label: 'Total Visits',    value: totalVisits,     emoji: '⭐', color: '#60a5fa' },
           { label: 'Loyal (3+)',      value: loyalCustomers,  emoji: '🏆', color: '#34d399' },
           { label: 'Repeat Visits',   value: repeatedVisits,  emoji: '🔄', color: '#a78bfa' },
@@ -334,32 +334,32 @@ const LoyaltyDashboard = () => {
             <form onSubmit={handleAddCustomer} className="space-y-4">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-xs font-black uppercase tracking-widest mb-1.5" style={{ color: '#D4A017' }}>Customer Name</label>
+                  <label className="block text-xs font-black uppercase tracking-widest mb-1.5" style={{ color: '#A8B0B8' }}>Customer Name</label>
                   <input type="text" value={newName} onChange={e => setNewName(e.target.value)}
                     placeholder="e.g. Priya Sharma" className="loy-input" disabled={saving} data-testid="loyalty-name-input" />
                 </div>
                 <div>
-                  <label className="block text-xs font-black uppercase tracking-widest mb-1.5" style={{ color: '#D4A017' }}>Phone Number</label>
+                  <label className="block text-xs font-black uppercase tracking-widest mb-1.5" style={{ color: '#A8B0B8' }}>Phone Number</label>
                   <input type="tel" value={newPhone} onChange={e => setNewPhone(e.target.value)}
                     placeholder="e.g. 9876543210" className="loy-input" disabled={saving} data-testid="loyalty-phone-input" />
                 </div>
               </div>
               <div>
-                <label className="block text-xs font-black uppercase tracking-widest mb-1.5" style={{ color: '#D4A017' }}>
+                <label className="block text-xs font-black uppercase tracking-widest mb-1.5" style={{ color: '#A8B0B8' }}>
                   Validity (days) <span className="font-normal normal-case" style={{ color: '#606870' }}>(optional)</span>
                 </label>
                 <input type="number" min="0" value={validityDays} onChange={e => setValidityDays(e.target.value)}
                   placeholder="e.g. 30" className="loy-input" disabled={saving} data-testid="loyalty-validity-input" />
               </div>
               <div>
-                <label className="block text-xs font-black uppercase tracking-widest mb-1.5" style={{ color: '#D4A017' }}>
+                <label className="block text-xs font-black uppercase tracking-widest mb-1.5" style={{ color: '#A8B0B8' }}>
                   Custom Discount (%) <span className="font-normal normal-case" style={{ color: '#606870' }}>(optional — overrides default 10%)</span>
                 </label>
                 <input type="number" min="0" max="100" value={customDiscount} onChange={e => setCustomDiscount(e.target.value)}
                   placeholder="e.g. 20" className="loy-input" disabled={saving} data-testid="loyalty-discount-input" />
               </div>
               <p className="text-xs font-bold" style={{ color: '#606870' }}>
-                First visit will be recorded automatically. Customer starts with <span style={{ color: '#D4A017' }}>10% OFF</span>.
+                First visit will be recorded automatically. Customer starts with <span style={{ color: '#A8B0B8' }}>10% OFF</span>.
               </p>
               <div className="flex gap-3">
                 <button type="submit" disabled={saving} className="loy-btn loy-btn-orange disabled:opacity-50" data-testid="loyalty-submit-btn">
@@ -382,8 +382,8 @@ const LoyaltyDashboard = () => {
           { label: '5+ visits', disc: '30% / Free Item 🎁' },
         ].map(({ label, disc }) => (
           <span key={label} className="text-xs px-3 py-1.5 rounded-xl font-black"
-            style={{ background: 'rgba(212,160,23,0.07)', color: '#606870', border: '1px solid rgba(212,160,23,0.15)' }}>
-            {label} → <span style={{ color: '#D4A017' }}>{disc}</span>
+            style={{ background: 'rgba(168,176,184,0.07)', color: '#606870', border: '1px solid rgba(168,176,184,0.15)' }}>
+            {label} → <span style={{ color: '#A8B0B8' }}>{disc}</span>
           </span>
         ))}
       </div>
@@ -420,7 +420,7 @@ const LoyaltyDashboard = () => {
                 data-testid={`loyalty-customer-${customer.id}`}
               >
                 {/* Top accent bar */}
-                <div style={{ height: 2, background: isFree ? 'linear-gradient(90deg,#34d399,transparent)' : 'linear-gradient(90deg,#D4A017,transparent)' }} />
+                <div style={{ height: 2, background: isFree ? 'linear-gradient(90deg,#34d399,transparent)' : 'linear-gradient(90deg,#A8B0B8,transparent)' }} />
 
                 {/* Always-visible header */}
                 <button
@@ -456,7 +456,7 @@ const LoyaltyDashboard = () => {
                       border: isFree ? '1px solid rgba(16,185,129,0.3)' : '1px solid rgba(255,255,255,0.1)',
                     }}>
                     <span className="text-xs">{isFree ? '🎁' : '⭐'}</span>
-                    <span className="text-xs font-black" style={{ color: isFree ? '#34d399' : '#D4A017' }}>
+                    <span className="text-xs font-black" style={{ color: isFree ? '#34d399' : '#A8B0B8' }}>
                       {isFree ? 'Free!' : `${disc}%`}
                     </span>
                   </div>
@@ -542,7 +542,7 @@ const LoyaltyDashboard = () => {
                     {editingCustomerId === customer.id && (
                       <div className="mt-2 pt-3 space-y-3" style={{ borderTop: '1px solid rgba(255,255,255,0.07)' }}
                         data-testid={`edit-panel-${customer.id}`}>
-                        <p className="text-xs font-black uppercase tracking-widest" style={{ color: '#D4A017' }}>
+                        <p className="text-xs font-black uppercase tracking-widest" style={{ color: '#A8B0B8' }}>
                           ✏️ Edit Loyalty Card
                         </p>
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
