@@ -606,7 +606,7 @@ const MenuCard = React.memo(({
         )}
 
         {/* Show Food Details */}
-        {(item.ingredients || item.calories || item.protein || item.carbs || item.fats) && (
+        {!!(item.ingredients || item.calories || item.protein || item.carbs || item.fats) && (
           <button
             onClick={() => onShowDetails?.(item)}
             className="w-full text-[10px] mt-1.5 py-1 text-center opacity-50 hover:opacity-90 transition-opacity font-bold"
