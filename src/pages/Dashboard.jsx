@@ -40,31 +40,84 @@ if (typeof document !== 'undefined' && !document.getElementById('dash-cafe-css')
     @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700;800&family=Playfair+Display:wght@600;700;800;900&display=swap');
     .dash { font-family: 'DM Sans', system-ui, sans-serif; }
     .dash-title { font-family: 'Playfair Display', serif !important; }
+
+    /* TASK 2: Improved nav item — slightly larger, better weight, cleaner rendering */
     .dash-nav-item {
       width: 100%;
       display: flex; align-items: center; gap: 10px;
-      padding: 10px 16px; border-radius: 12px;
+      padding: 10px 14px; border-radius: 10px;
       font-family: 'DM Sans', system-ui, sans-serif;
-      font-weight: 700; font-size: 14px;
+      font-weight: 600; font-size: 13.5px;
       cursor: pointer; transition: all 160ms;
       border: none; background: transparent;
-      color: #7a6a55; text-align: left;
+      color: #8a7a65; text-align: left;
+      letter-spacing: 0.01em;
+      -webkit-font-smoothing: antialiased;
     }
-    .dash-nav-item:hover { background: rgba(201,162,39,0.07); color: #fff; }
+    .dash-nav-item:hover { background: rgba(201,162,39,0.07); color: #e5d5b5; }
     .dash-nav-item.active {
       background: linear-gradient(135deg,#C9A227,#A67C00);
-      color: #fff; font-weight: 800;
+      color: #fff; font-weight: 700;
       box-shadow: 0 3px 14px rgba(201,162,39,0.32);
     }
-    .dash-nav-item.active .dash-nav-emoji { filter: brightness(1.2); }
+    .dash-nav-item.active .dash-nav-icon { opacity: 1; }
+    .dash-nav-icon { opacity: 0.55; flex-shrink: 0; transition: opacity 160ms; }
+    .dash-nav-item:hover .dash-nav-icon  { opacity: 0.85; }
+    .dash-nav-item.active .dash-nav-icon { opacity: 1; }
+
+    /* TASK 5 & 6: Sidebar scroll + sticky footer */
     .dash-sidebar {
       background: #0a0702;
       border-right: 1.5px solid rgba(201,162,39,0.1);
+    }
+    .dash-nav-scroll {
+      flex: 1;
+      overflow-y: auto;
+      overflow-x: hidden;
+      overscroll-behavior: contain;
+      -webkit-overflow-scrolling: touch;
+      /* leave room for sticky footer — handled by flex column */
+    }
+    .dash-nav-scroll::-webkit-scrollbar { width: 3px; }
+    .dash-nav-scroll::-webkit-scrollbar-track { background: transparent; }
+    .dash-nav-scroll::-webkit-scrollbar-thumb { background: rgba(201,162,39,0.18); border-radius: 3px; }
+
+    /* TASK 1: Branding header */
+    .dash-brand-label {
+      font-family: 'DM Sans', system-ui, sans-serif;
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: #C9A227;
+      -webkit-font-smoothing: antialiased;
     }
   `;
   document.head.appendChild(el);
 }
 
+// TASK 4: Lucide icons mapped per nav id — replaces all emojis
+const NAV_ICON = {
+  overview:  LayoutDashboard,
+  orders:    ShoppingBag,
+  invoices:  FileText,
+  menu:      MenuIcon,
+  offers:    Gift,
+  analytics: BarChart3,
+  advanced:  TrendingUp,
+  marketing: MessageSquare,
+  askai:     Bot,
+  kitchen:   ChefHat,
+  inventory: Package,
+  ai:        Sparkles,
+  aimenu:    Sparkles,
+  qr:        QrCode,
+  staff:     Users,
+  loyalty:   Heart,
+  settings:  SettingsIcon,
+};
+
+// Keep NAV_EMOJI for the header label emoji (used in <header> activeTab display only)
 const NAV_EMOJI = {
   overview:  '🏠', orders:    '🧾', invoices:  '📄', menu:      '🍽️',
   offers:    '🎁', analytics: '📊', advanced:  '📈', marketing: '💬',
@@ -135,51 +188,75 @@ const Dashboard = () => {
       {sidebarOpen && (
         <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-40" onClick={() => setSidebarOpen(false)} />
       )}
-      <aside className={`fixed top-0 left-0 h-screen w-64 dash-sidebar flex flex-col p-4 z-50 transform transition-transform ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'}`}>
-        <div className="flex items-center justify-between mb-6">
-          <div className="flex items-center gap-2.5">
-            <div className="w-9 h-9 rounded-xl flex items-center justify-center text-lg flex-shrink-0"
-              style={{ background: 'rgba(201,162,39,0.12)', border: '1.5px solid rgba(201,162,39,0.22)' }}>☕</div>
-            <div>
-              <h1 className="text-sm font-black dash-title" style={{ color: '#C9A227', lineHeight: 1.1 }}>SmartCafé OS</h1>
-              <p className="text-xs font-bold" style={{ color: '#4a3f35' }}>Branding Architect</p>
-            </div>
+
+      {/* ── Sidebar ── */}
+      <aside className={`fixed top-0 left-0 h-screen w-64 dash-sidebar flex flex-col z-50 transform transition-transform ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'}`}>
+
+        {/* ── TASK 1: Branding header — "BRANDING ARCHITECT" only, all caps, bold ── */}
+        <div className="flex items-center justify-between px-4 pt-5 pb-4 flex-shrink-0">
+          <div className="flex flex-col gap-0.5">
+            <span className="dash-brand-label">Branding Architect</span>
+            <span className="text-xs font-500" style={{ color: '#3a3028', fontSize: '10px', letterSpacing: '0.04em' }}>SmartCafé OS</span>
           </div>
-          <button className="transition-colors p-1.5 rounded-xl hover:bg-white/5" style={{ color: '#7a6a55' }}
-            onClick={() => setSidebarOpen(false)} aria-label="Close sidebar"
+          <button
+            className="transition-colors p-1.5 rounded-xl hover:bg-white/5"
+            style={{ color: '#7a6a55' }}
+            onClick={() => setSidebarOpen(false)}
+            aria-label="Close sidebar"
             onMouseEnter={e => e.currentTarget.style.color = '#fff'}
-            onMouseLeave={e => e.currentTarget.style.color = '#7a6a55'}>
-            <X className="w-5 h-5" />
+            onMouseLeave={e => e.currentTarget.style.color = '#7a6a55'}
+          >
+            <X className="w-4 h-4" />
           </button>
         </div>
-        <div className="mb-4" style={{ height: 1, background: 'rgba(201,162,39,0.1)' }} />
-        <nav className="flex-1 space-y-0.5 overflow-y-auto overscroll-contain" style={{ WebkitOverflowScrolling: 'touch' }}>
+
+        <div className="mx-4 flex-shrink-0" style={{ height: 1, background: 'rgba(201,162,39,0.1)' }} />
+
+        {/*
+          TASK 5 & 6: Nav scroll container is flex-1 with overflow-y auto.
+          Footer is flex-shrink-0 OUTSIDE the scroll container,
+          so it always stays visible at the bottom regardless of scroll position.
+        */}
+        <nav className="dash-nav-scroll px-3 py-2 space-y-0.5">
           {menuItems.map((item) => {
             const isActive = activeTab === item.id;
-            const emoji    = NAV_EMOJI[item.id] || '·';
+            // TASK 3 & 4: Use Lucide icon component — no emojis in nav
+            const IconComponent = NAV_ICON[item.id] || LayoutDashboard;
             return (
-              <button key={item.id} data-testid={`nav-${item.id}`}
+              <button
+                key={item.id}
+                data-testid={`nav-${item.id}`}
                 onClick={() => { setActiveTab(item.id); setSidebarOpen(false); }}
-                className={`dash-nav-item${isActive ? ' active' : ''}`}>
-                <span className="dash-nav-emoji text-base w-5 text-center flex-shrink-0">{emoji}</span>
+                className={`dash-nav-item${isActive ? ' active' : ''}`}
+              >
+                <IconComponent className="dash-nav-icon w-4 h-4" strokeWidth={isActive ? 2.2 : 1.8} />
                 {item.label}
               </button>
             );
           })}
         </nav>
-        <div className="my-3" style={{ height: 1, background: 'rgba(201,162,39,0.08)' }} />
-        <div className="flex-shrink-0 space-y-1">
-          <div className="px-4 py-2 rounded-xl" style={{ background: 'rgba(201,162,39,0.05)' }}>
-            <p className="text-xs font-bold" style={{ color: '#4a3f35' }}>Logged in as</p>
-            <p className="text-white text-sm font-black truncate">{user?.email}</p>
+
+        {/* TASK 5: Sticky footer — always visible, outside scroll area */}
+        <div className="flex-shrink-0 px-3 pb-4 pt-2" style={{ borderTop: '1px solid rgba(201,162,39,0.08)' }}>
+          <div className="px-3 py-2 rounded-xl mb-1" style={{ background: 'rgba(201,162,39,0.05)' }}>
+            <p className="text-xs font-semibold" style={{ color: '#4a3f35', letterSpacing: '0.02em' }}>Logged in as</p>
+            <p className="text-white text-sm font-bold truncate" style={{ letterSpacing: '0.01em' }}>{user?.email}</p>
           </div>
-          <button data-testid="logout-btn" onClick={handleLogout} className="dash-nav-item" style={{ color: '#f87171' }}
+          <button
+            data-testid="logout-btn"
+            onClick={handleLogout}
+            className="dash-nav-item"
+            style={{ color: '#f87171' }}
             onMouseEnter={e => { e.currentTarget.style.background = 'rgba(220,50,50,0.1)'; e.currentTarget.style.color = '#f87171'; }}
-            onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = '#f87171'; }}>
-            <span className="text-base w-5 text-center flex-shrink-0">🚪</span>Logout
+            onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = '#f87171'; }}
+          >
+            <LogOut className="dash-nav-icon w-4 h-4" strokeWidth={1.8} style={{ opacity: 0.7 }} />
+            Logout
           </button>
         </div>
       </aside>
+
+      {/* ── Main content — UNCHANGED ── */}
       <div>
         <header className="sticky top-0 z-30 h-16 px-5 flex items-center justify-between"
           style={{ background: 'rgba(5,5,5,0.88)', backdropFilter: 'blur(16px)', borderBottom: '1px solid rgba(201,162,39,0.1)' }}>
