@@ -47,7 +47,7 @@ if (typeof document !== 'undefined' && !document.getElementById('inv-cafe-css'))
       overflow: hidden;
       transition: border-color 200ms;
     }
-    .inv-card:hover { border-color: rgba(255,140,0,0.22); }
+    .inv-card:hover { border-color: rgba(201,162,39,0.22); }
     .inv-btn {
       display: inline-flex; align-items: center; gap: 5px;
       font-family: 'DM Sans', system-ui, sans-serif;
@@ -69,7 +69,7 @@ if (typeof document !== 'undefined' && !document.getElementById('inv-cafe-css'))
       font-family: 'DM Sans', system-ui, sans-serif;
       outline: none; width: 100%; transition: border-color 180ms, box-shadow 180ms;
     }
-    .inv-input:focus { border-color: rgba(255,140,0,0.55); box-shadow: 0 0 0 3px rgba(255,140,0,0.1); }
+    .inv-input:focus { border-color: rgba(201,162,39,0.55); box-shadow: 0 0 0 3px rgba(201,162,39,0.1); }
     .inv-input::placeholder { color: #3d3020; }
     @keyframes invIn { from { opacity:0; transform:translateY(8px); } to { opacity:1; transform:translateY(0); } }
     .inv-in { animation: invIn 280ms ease forwards; }
@@ -291,7 +291,7 @@ const InvoicesTab = () => {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div className="flex items-center gap-3">
           <div className="w-11 h-11 rounded-2xl flex items-center justify-center text-xl flex-shrink-0"
-            style={{ background: 'rgba(255,140,0,0.1)', border: '1.5px solid rgba(255,140,0,0.2)' }}>
+            style={{ background: 'rgba(201,162,39,0.1)', border: '1.5px solid rgba(201,162,39,0.2)' }}>
             🧾
           </div>
           <div>
@@ -321,7 +321,7 @@ const InvoicesTab = () => {
             <button key={s} onClick={() => setStatusFilter(s)}
               className="px-4 h-10 rounded-xl text-sm font-black capitalize transition-all"
               style={statusFilter === s
-                ? { background: 'linear-gradient(135deg,#FF7A20,#E55A00)', color: '#fff', boxShadow: '0 3px 12px rgba(255,120,0,0.3)' }
+                ? { background: 'linear-gradient(135deg,#C9A227,#A67C00)', color: '#fff', boxShadow: '0 3px 12px rgba(201,162,39,0.3)' }
                 : { background: 'rgba(255,255,255,0.04)', color: '#7a6a55', border: '1.5px solid rgba(255,255,255,0.07)' }
               }>
               {s === 'all' ? '📋 All' : s === 'paid' ? '💰 Paid' : '⏳ Pending'}
@@ -342,7 +342,7 @@ const InvoicesTab = () => {
       {/* Stats row */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         {[
-          { label: 'Total Invoices', val: invoices.length,              color: '#FF7A20', emoji: '🧾' },
+          { label: 'Total Invoices', val: invoices.length,              color: '#C9A227', emoji: '🧾' },
           { label: 'Paid',           val: paidInvoices.length,          color: '#34d399', emoji: '💰' },
           { label: 'Pending',        val: pendingOrders,                 color: '#fbbf24', emoji: '⏳' },
           { label: 'Total Revenue',  val: `${CUR}${fmt(totalRevenue)}`, color: '#60a5fa', emoji: '📊' },
@@ -391,7 +391,7 @@ const InvoicesTab = () => {
                   {/* Left */}
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-3 flex-wrap">
-                      <span className="font-black text-sm inv-title" style={{ color: '#FF7A20' }}>
+                      <span className="font-black text-sm inv-title" style={{ color: '#C9A227' }}>
                         {inv.invoiceNumber || `ORD-${String(inv.orderNumber||'').padStart(4,'0')}`}
                       </span>
                       <span className="text-xs font-bold" style={{ color: '#4a3f35' }}>
@@ -424,7 +424,7 @@ const InvoicesTab = () => {
                       {inv.serviceChargeAmount > 0 && (
                         <p className="text-xs font-bold" style={{ color: '#4a3f35' }}>SC: {CUR}{fmt(inv.serviceChargeAmount)}</p>
                       )}
-                      <p className="font-black text-base" style={{ color: '#FF7A20' }}>💵 {CUR}{fmt(inv.totalAmount)}</p>
+                      <p className="font-black text-base" style={{ color: '#C9A227' }}>💵 {CUR}{fmt(inv.totalAmount)}</p>
                     </div>
                     <div className="flex gap-2">
                       <button
@@ -454,7 +454,7 @@ const InvoicesTab = () => {
                     <div className="flex flex-wrap gap-2">
                       {inv.items.slice(0, 4).map((item, j) => (
                         <span key={j} className="text-xs px-2.5 py-1 rounded-full font-bold"
-                          style={{ background: 'rgba(255,140,0,0.08)', color: '#7a6a55', border: '1px solid rgba(255,140,0,0.15)' }}>
+                          style={{ background: 'rgba(201,162,39,0.08)', color: '#7a6a55', border: '1px solid rgba(201,162,39,0.15)' }}>
                           🍴 {item.name} ×{item.quantity}
                         </span>
                       ))}
@@ -467,7 +467,7 @@ const InvoicesTab = () => {
                         {inv.gstAmount > 0 ? `GST: ${CUR}${fmt(inv.gstAmount)}` : ''}
                         {inv.serviceChargeAmount > 0 ? ` · SC: ${CUR}${fmt(inv.serviceChargeAmount)}` : ''}
                       </span>
-                      <span className="font-black" style={{ color: '#FF7A20' }}>{CUR}{fmt(inv.totalAmount)}</span>
+                      <span className="font-black" style={{ color: '#C9A227' }}>{CUR}{fmt(inv.totalAmount)}</span>
                     </div>
                   </div>
                 )}
