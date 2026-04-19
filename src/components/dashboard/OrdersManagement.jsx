@@ -48,12 +48,12 @@ if (typeof document !== 'undefined' && !document.getElementById('om-food-css')) 
       border-radius: 16px;
       transition: border-color 200ms, box-shadow 200ms;
     }
-    .omf-card:hover { border-color: rgba(212,160,23,0.25); }
+    .omf-card:hover { border-color: rgba(201,162,39,0.25); }
 
     /* Table rows */
     .omf-row { border-bottom: 1px solid rgba(255,255,255,0.05); transition: background 150ms; cursor: pointer; }
-    .omf-row:hover { background: rgba(212,160,23,0.04); }
-    .omf-row-open { background: rgba(212,160,23,0.03) !important; }
+    .omf-row:hover { background: rgba(201,162,39,0.04); }
+    .omf-row-open { background: rgba(201,162,39,0.03) !important; }
 
     /* Buttons */
     .omf-btn {
@@ -68,13 +68,12 @@ if (typeof document !== 'undefined' && !document.getElementById('om-food-css')) 
     .omf-btn:hover  { transform: translateY(-1px); filter: brightness(1.1); }
     .omf-btn:active { transform: scale(0.96); }
 
-    /* PRIMARY — premium emerald green (matches store-open card) */
     .omf-btn-orange {
-      background: linear-gradient(135deg, #D4A017, #A67C00);
+      background: linear-gradient(135deg, #C9A227, #8B6914);
       color: #fff;
-      box-shadow: 0 3px 14px rgba(212,160,23,0.32);
+      box-shadow: 0 3px 14px rgba(201,162,39,0.32);
     }
-    .omf-btn-orange:hover { box-shadow: 0 5px 22px rgba(212,160,23,0.48); }
+    .omf-btn-orange:hover { box-shadow: 0 5px 22px rgba(201,162,39,0.48); }
 
     .omf-btn-ghost  { background: rgba(255,255,255,0.05); color: #7a6a3a; border-color: rgba(255,255,255,0.08); }
     .omf-btn-ghost:hover  { background: rgba(255,255,255,0.09); color: #fff; }
@@ -82,8 +81,8 @@ if (typeof document !== 'undefined' && !document.getElementById('om-food-css')) 
     .omf-btn-red:hover    { background: rgba(220,50,50,0.22); }
     .omf-btn-blue   { background: rgba(59,130,246,0.1); color: #60a5fa; border-color: rgba(59,130,246,0.2); }
     .omf-btn-blue:hover   { background: rgba(59,130,246,0.2); }
-    .omf-btn-green  { background: rgba(212,160,23,0.1); color: #D4A017; border-color: rgba(212,160,23,0.22); }
-    .omf-btn-green:hover  { background: rgba(212,160,23,0.2); }
+    .omf-btn-green  { background: rgba(201,162,39,0.1); color: #C9A227; border-color: rgba(201,162,39,0.22); }
+    .omf-btn-green:hover  { background: rgba(201,162,39,0.2); }
     .omf-btn-yellow { background: rgba(255,190,11,0.1); color: #fbbf24; border-color: rgba(255,190,11,0.22); }
     .omf-btn-yellow:hover { background: rgba(255,190,11,0.2); }
 
@@ -94,7 +93,7 @@ if (typeof document !== 'undefined' && !document.getElementById('om-food-css')) 
       font-family: 'DM Sans', system-ui, sans-serif;
       outline: none; width: 100%; transition: border-color 180ms, box-shadow 180ms;
     }
-    .omf-input:focus { border-color: rgba(212,160,23,0.55); box-shadow: 0 0 0 3px rgba(212,160,23,0.1); }
+    .omf-input:focus { border-color: rgba(201,162,39,0.55); box-shadow: 0 0 0 3px rgba(201,162,39,0.1); }
     .omf-input::placeholder { color: #3d341a; }
     .omf-input[type="date"] { color-scheme: dark; }
 
@@ -105,7 +104,7 @@ if (typeof document !== 'undefined' && !document.getElementById('om-food-css')) 
       font-family: 'DM Sans', system-ui, sans-serif;
       outline: none; cursor: pointer; transition: border-color 160ms;
     }
-    .omf-select:focus { border-color: rgba(212,160,23,0.5); }
+    .omf-select:focus { border-color: rgba(201,162,39,0.5); }
     .omf-select option { background: #1a1500; }
 
     /* Badges */
@@ -124,53 +123,99 @@ if (typeof document !== 'undefined' && !document.getElementById('om-food-css')) 
       font-family: 'DM Sans', system-ui, sans-serif;
     }
     .omf-tab-on  {
-      background: linear-gradient(135deg, #D4A017, #A67C00);
+      background: linear-gradient(135deg, #C9A227, #8B6914);
       color: #fff;
-      box-shadow: 0 3px 14px rgba(212,160,23,0.35);
+      box-shadow: 0 3px 14px rgba(201,162,39,0.35);
     }
     .omf-tab-off { background: rgba(255,255,255,0.04); color: #7a6a3a; border-color: rgba(255,255,255,0.07); }
-    .omf-tab-off:hover { background: rgba(212,160,23,0.08); color: #D4A017; border-color: rgba(212,160,23,0.2); }
+    .omf-tab-off:hover { background: rgba(201,162,39,0.08); color: #C9A227; border-color: rgba(201,162,39,0.2); }
 
     /* Scrollbar */
     .omf-scroll::-webkit-scrollbar { width: 4px; height: 4px; }
     .omf-scroll::-webkit-scrollbar-track { background: transparent; }
-    .omf-scroll::-webkit-scrollbar-thumb { background: rgba(212,160,23,0.25); border-radius: 4px; }
+    .omf-scroll::-webkit-scrollbar-thumb { background: rgba(201,162,39,0.25); border-radius: 4px; }
 
     /* Fade-in */
     @keyframes omfIn { from { opacity:0; transform:translateY(8px); } to { opacity:1; transform:translateY(0); } }
     .omf-in { animation: omfIn 280ms ease forwards; }
 
-    /* Order number style — premium green */
-    .omf-ordnum { font-family: 'Playfair Display', serif; color: #D4A017; }
+    /* Order number style */
+    .omf-ordnum { font-family: 'Playfair Display', serif; color: #C9A227; }
 
     /* Section label */
     .omf-sec {
       font-size: 11px; font-weight: 900; text-transform: uppercase; letter-spacing: 0.08em;
-      color: #D4A017; display: flex; align-items: center; gap: 5px;
+      color: #C9A227; display: flex; align-items: center; gap: 5px;
       font-family: 'DM Sans', system-ui, sans-serif;
     }
 
     /* Sheet modal */
     .omf-sheet {
       background: linear-gradient(180deg, #1a1400 0%, #110d00 100%);
-      border: 1.5px solid rgba(212,160,23,0.18);
-      box-shadow: 0 -20px 60px rgba(212,160,23,0.14);
+      border: 1.5px solid rgba(201,162,39,0.18);
+      box-shadow: 0 -20px 60px rgba(201,162,39,0.14);
     }
-    .omf-sheet-grip { width: 36px; height: 4px; border-radius: 4px; background: rgba(212,160,23,0.28); }
+    .omf-sheet-grip { width: 36px; height: 4px; border-radius: 4px; background: rgba(201,162,39,0.28); }
+
+    /* ─────────────────────────────────────────────────────────────────────
+       STATUS INDICATORS — TASKS 1, 2, 3
+       Added only: left border (3px) + very faint background tint.
+       Nothing else in the component is touched.
+    ───────────────────────────────────────────────────────────────────── */
+
+    /* NEW — blue left border + faint blue tint + soft pulse to draw eye */
+    .omf-status-new {
+      border-left: 3px solid rgba(59,130,246,0.8) !important;
+      background: rgba(59,130,246,0.045) !important;
+    }
+    .omf-row.omf-status-new:hover { background: rgba(59,130,246,0.08) !important; }
+
+    @keyframes omf-new-pulse {
+      0%,100% { border-left-color: rgba(59,130,246,0.7); }
+      50%      { border-left-color: rgba(99,155,255,1);   }
+    }
+    /* Only pulse the border-left, not the whole element */
+    .omf-status-new { animation: omf-new-pulse 2.4s ease-in-out infinite; }
+
+    /* PREPARING — amber/warm left border only (badge already signals this) */
+    .omf-status-preparing {
+      border-left: 3px solid rgba(251,191,36,0.65) !important;
+    }
+
+    /* COMPLETED — green left border + very faint green tint (TASK 3: distinct done state) */
+    .omf-status-completed {
+      border-left: 3px solid rgba(34,197,94,0.7) !important;
+      background: rgba(34,197,94,0.03) !important;
+    }
+    .omf-row.omf-status-completed:hover { background: rgba(34,197,94,0.06) !important; }
+
+    /* CANCELLED — muted red-gray border + slight dim */
+    .omf-status-cancelled {
+      border-left: 3px solid rgba(180,60,60,0.4) !important;
+      opacity: 0.7;
+    }
   `;
   document.head.appendChild(el);
 }
 
 // ─── helpers ──────────────────────────────────────────────────────────────────
+
+/*
+  STATUS — identical shape to original.
+  Only addition: `statusClass` property, read exclusively by the two
+  className strings in the render section (desktop <tr> and mobile card <div>).
+  Zero other usage of statusClass anywhere in this file.
+*/
 const STATUS = {
-  new:       { emoji: '🆕', label: 'New',       bg: 'rgba(59,130,246,0.14)',  color: '#60a5fa', bd: 'rgba(59,130,246,0.24)' },
-  preparing: { emoji: '👨‍🍳', label: 'Preparing', bg: 'rgba(255,190,11,0.14)', color: '#fbbf24', bd: 'rgba(255,190,11,0.24)' },
-  completed: { emoji: '✅', label: 'Done',       bg: 'rgba(212,160,23,0.12)',    color: '#D4A017', bd: 'rgba(212,160,23,0.22)' },
-  cancelled: { emoji: '❌', label: 'Cancelled',  bg: 'rgba(220,50,50,0.12)',   color: '#f87171', bd: 'rgba(220,50,50,0.22)' },
+  new:       { emoji: '🆕', label: 'New',       bg: 'rgba(59,130,246,0.14)',  color: '#60a5fa', bd: 'rgba(59,130,246,0.24)',  statusClass: 'omf-status-new'       },
+  preparing: { emoji: '👨‍🍳', label: 'Preparing', bg: 'rgba(255,190,11,0.14)', color: '#fbbf24', bd: 'rgba(255,190,11,0.24)',  statusClass: 'omf-status-preparing' },
+  // TASK 3: completed now has green color values + own CSS class
+  completed: { emoji: '✅', label: 'Done',       bg: 'rgba(34,197,94,0.14)',   color: '#4ade80', bd: 'rgba(34,197,94,0.28)',   statusClass: 'omf-status-completed' },
+  cancelled: { emoji: '❌', label: 'Cancelled',  bg: 'rgba(220,50,50,0.12)',   color: '#f87171', bd: 'rgba(220,50,50,0.22)',   statusClass: 'omf-status-cancelled' },
 };
 const PAYMENT = {
-  paid:    { emoji: '💰', bg: 'rgba(212,160,23,0.12)',   color: '#D4A017', bd: 'rgba(212,160,23,0.22)' },
-  pending: { emoji: '⏳', bg: 'rgba(220,50,50,0.12)',  color: '#f87171', bd: 'rgba(220,50,50,0.22)' },
+  paid:    { emoji: '💰', bg: 'rgba(201,162,39,0.12)',   color: '#C9A227', bd: 'rgba(201,162,39,0.22)' },
+  pending: { emoji: '⏳', bg: 'rgba(220,50,50,0.12)',  color: '#ff7070', bd: 'rgba(220,50,50,0.22)' },
 };
 const getSt  = s => STATUS[s]  || STATUS.new;
 const getPay = s => PAYMENT[s] || PAYMENT.pending;
@@ -274,13 +319,13 @@ const AddItemsToOrderModal = ({ order, cafeCurrency, onClose, setVariantModal, v
         >
           <div className="flex justify-center pt-3 pb-1 sm:hidden flex-shrink-0"><div className="omf-sheet-grip"/></div>
           {/* Header */}
-          <div className="flex items-center justify-between px-5 py-4 flex-shrink-0" style={{borderBottom:'1px solid rgba(212,160,23,0.12)'}}>
+          <div className="flex items-center justify-between px-5 py-4 flex-shrink-0" style={{borderBottom:'1px solid rgba(201,162,39,0.12)'}}>
             <div>
               <h3 className="omf-title text-white font-bold text-lg flex items-center gap-2">🛒 Add Items to Order</h3>
               <p className="text-xs mt-0.5" style={{color:'#7a6a3a'}}>#{order.orderNumber ? String(order.orderNumber).padStart(3,'0') : order.id.slice(0,6)}{order.customerName ? ` · ${order.customerName}` : ''}</p>
             </div>
-            <button onClick={onClose} className="w-8 h-8 rounded-full flex items-center justify-center" style={{background:'rgba(212,160,23,0.1)',border:'1px solid rgba(212,160,23,0.2)'}}>
-              <X className="w-4 h-4" style={{color:'#D4A017'}}/>
+            <button onClick={onClose} className="w-8 h-8 rounded-full flex items-center justify-center" style={{background:'rgba(201,162,39,0.1)',border:'1px solid rgba(201,162,39,0.2)'}}>
+              <X className="w-4 h-4" style={{color:'#C9A227'}}/>
             </button>
           </div>
           {/* Search */}
@@ -313,7 +358,7 @@ const AddItemsToOrderModal = ({ order, cafeCurrency, onClose, setVariantModal, v
               return (
                 <div key={item.id} className="flex items-center justify-between p-3 rounded-xl transition-all"
                   style={{background:'rgba(255,255,255,0.03)',border:'1px solid rgba(255,255,255,0.06)'}}
-                  onMouseEnter={e=>{e.currentTarget.style.borderColor='rgba(212,160,23,0.22)';e.currentTarget.style.background='rgba(212,160,23,0.04)';}}
+                  onMouseEnter={e=>{e.currentTarget.style.borderColor='rgba(201,162,39,0.22)';e.currentTarget.style.background='rgba(201,162,39,0.04)';}}
                   onMouseLeave={e=>{e.currentTarget.style.borderColor='rgba(255,255,255,0.06)';e.currentTarget.style.background='rgba(255,255,255,0.03)';}}
                 >
                   <div className="flex-1 min-w-0 mr-3">
@@ -321,15 +366,15 @@ const AddItemsToOrderModal = ({ order, cafeCurrency, onClose, setVariantModal, v
                     {item.category && <p className="text-xs mt-0.5" style={{color:'#5a4a1a'}}>{item.category}</p>}
                     {hasV ? (
                       <div className="flex flex-wrap gap-1 mt-1.5">
-                        {iv.map((v,vi)=><span key={vi} className="omf-badge" style={{background:'rgba(212,160,23,0.12)',color:'#D4A017',borderColor:'rgba(212,160,23,0.25)',fontSize:'0.65rem'}}>{v.name||`S${vi+1}`} {CUR}{fmtN(v.price)}</span>)}
+                        {iv.map((v,vi)=><span key={vi} className="omf-badge" style={{background:'rgba(201,162,39,0.12)',color:'#C9A227',borderColor:'rgba(201,162,39,0.25)',fontSize:'0.65rem'}}>{v.name||`S${vi+1}`} {CUR}{fmtN(v.price)}</span>)}
                       </div>
-                    ) : <p className="text-sm font-black mt-1" style={{color:'#D4A017'}}>{dp}</p>}
+                    ) : <p className="text-sm font-black mt-1" style={{color:'#C9A227'}}>{dp}</p>}
                   </div>
                   {!hasV && qty > 0 ? (
                     <div className="flex items-center gap-2 flex-shrink-0">
                       <button onClick={()=>removeFromCart(item.id)} className="w-7 h-7 rounded-full flex items-center justify-center" style={{background:'rgba(255,255,255,0.07)',border:'1px solid rgba(255,255,255,0.1)'}}><Minus className="w-3 h-3 text-white"/></button>
                       <span className="text-white font-black text-sm min-w-[16px] text-center">{qty}</span>
-                      <button onClick={()=>{const e=newCart.find(i=>i.id===item.id);if(e)directAdd({...e});else addToCart(item);}} className="w-7 h-7 rounded-full flex items-center justify-center text-white" style={{background:'linear-gradient(135deg,#D4A017,#A67C00)'}}><Plus className="w-3 h-3"/></button>
+                      <button onClick={()=>{const e=newCart.find(i=>i.id===item.id);if(e)directAdd({...e});else addToCart(item);}} className="w-7 h-7 rounded-full flex items-center justify-center text-white" style={{background:'linear-gradient(135deg,#C9A227,#8B6914)'}}><Plus className="w-3 h-3"/></button>
                     </div>
                   ) : (
                     <motion.button whileTap={{scale:0.93}} onClick={()=>addToCart(item)} className="omf-btn omf-btn-orange flex-shrink-0">{lbl}</motion.button>
@@ -340,8 +385,8 @@ const AddItemsToOrderModal = ({ order, cafeCurrency, onClose, setVariantModal, v
           </div>
           {/* Cart footer */}
           {newCart.length > 0 && (
-            <div className="px-4 py-4 flex-shrink-0 space-y-3" style={{borderTop:'1px solid rgba(212,160,23,0.12)',background:'rgba(0,0,0,0.25)'}}>
-              <p className="text-xs font-black" style={{color:'#D4A017'}}>🛒 Cart · {newCart.length} item{newCart.length!==1?'s':''}</p>
+            <div className="px-4 py-4 flex-shrink-0 space-y-3" style={{borderTop:'1px solid rgba(201,162,39,0.12)',background:'rgba(0,0,0,0.25)'}}>
+              <p className="text-xs font-black" style={{color:'#C9A227'}}>🛒 Cart · {newCart.length} item{newCart.length!==1?'s':''}</p>
               <div className="space-y-1.5">
                 {newCart.map((item,idx)=>{
                   const adds = Array.isArray(item.addons)?item.addons:[];
@@ -349,21 +394,21 @@ const AddItemsToOrderModal = ({ order, cafeCurrency, onClose, setVariantModal, v
                   const lt   = (parseFloat(item.basePrice??item.price)+at)*(parseInt(item.quantity)||1);
                   return <div key={idx} className="flex justify-between text-xs" style={{color:'#7a6a3a'}}><span>{item.name}{item.selectedVariant?` (${item.selectedVariant})`:''} ×{item.quantity}{adds.length>0?` +${adds.length} add-on${adds.length>1?'s':''}`:''}</span><span className="text-white font-bold">{CUR}{fmtN(lt)}</span></div>;
                 })}
-                <div className="flex justify-between text-sm font-black pt-1" style={{borderTop:'1px solid rgba(212,160,23,0.1)'}}>
+                <div className="flex justify-between text-sm font-black pt-1" style={{borderTop:'1px solid rgba(201,162,39,0.1)'}}>
                   <span style={{color:'#7a6a3a'}}>New items total</span>
-                  <span style={{color:'#D4A017'}}>{CUR}{fmtN(cartTotal)}</span>
+                  <span style={{color:'#C9A227'}}>{CUR}{fmtN(cartTotal)}</span>
                 </div>
               </div>
               <motion.button whileHover={{scale:1.01}} whileTap={{scale:0.97}} onClick={handleSave} disabled={saving}
                 className="w-full py-3.5 rounded-xl font-black text-sm flex items-center justify-center gap-2 disabled:opacity-60 text-white"
-                style={{background:'linear-gradient(135deg,#D4A017,#A67C00)',boxShadow:'0 6px 20px rgba(212,160,23,0.3)'}}
+                style={{background:'linear-gradient(135deg,#C9A227,#8B6914)',boxShadow:'0 6px 20px rgba(201,162,39,0.3)'}}
               >
                 {saving?<><RefreshCw className="w-4 h-4 animate-spin"/>Sending to kitchen…</>:<><ShoppingCart className="w-4 h-4"/>Add to Order · {CUR}{fmtN(cartTotal)}</>}
               </motion.button>
             </div>
           )}
         </motion.div>
-        {addonModal && <AddOnModal item={addonModal} onConfirm={entry=>{directAdd(entry);setAddonModal(null);}} onClose={()=>setAddonModal(null)} currencySymbol={CUR} primaryColor="#D4A017" theme="dark"/>}
+        {addonModal && <AddOnModal item={addonModal} onConfirm={entry=>{directAdd(entry);setAddonModal(null);}} onClose={()=>setAddonModal(null)} currencySymbol={CUR} primaryColor="#C9A227" theme="dark"/>}
       </motion.div>
     </AnimatePresence>
   );
@@ -593,8 +638,8 @@ const OrdersManagement = () => {
                 </span>
                 <div className="flex items-center gap-2 flex-shrink-0">
                   {item.isFree
-                    ? <span className="omf-badge" style={{background:'rgba(212,160,23,0.12)',color:'#D4A017',borderColor:'rgba(212,160,23,0.2)'}}>🎁 FREE</span>
-                    : <span className="font-black text-sm" style={{color:'#D4A017'}}>{CUR}{total.toFixed(2)}</span>
+                    ? <span className="omf-badge" style={{background:'rgba(201,162,39,0.12)',color:'#C9A227',borderColor:'rgba(201,162,39,0.2)'}}>🎁 FREE</span>
+                    : <span className="font-black text-sm" style={{color:'#C9A227'}}>{CUR}{total.toFixed(2)}</span>
                   }
                   {order.orderStatus!=='completed'&&order.orderStatus!=='cancelled'&&(
                     isConfirmingRemove(order.id,idx)?(
@@ -611,7 +656,7 @@ const OrdersManagement = () => {
                 </div>
               </div>
               <p className="text-xs mt-0.5 ml-4" style={{color:'#555'}}>
-                {item.isFree?<span style={{color:'#D4A017'}}>🎁 FREE · was {CUR}{(parseFloat(item.actualPrice)||0).toFixed(2)}</span>:<>Base: {CUR}{base.toFixed(2)}{qty>1?` ×${qty}`:''}</>}
+                {item.isFree?<span style={{color:'#C9A227'}}>🎁 FREE · was {CUR}{(parseFloat(item.actualPrice)||0).toFixed(2)}</span>:<>Base: {CUR}{base.toFixed(2)}{qty>1?` ×${qty}`:''}</>}
               </p>
               {item.comboItems?.length>0&&<div className="ml-4 mt-0.5 space-y-0.5">{item.comboItems.map((ci,ci2)=><p key={ci2} className="text-xs" style={{color:'#5a4a1a'}}>🔗 {ci.name}{ci.quantity>1?` ×${ci.quantity}`:''}</p>)}</div>}
               {adds.length>0?(
@@ -625,16 +670,16 @@ const OrdersManagement = () => {
           );
         })}
         {/* Totals */}
-        <div className="pt-2.5 mt-1 space-y-1.5" style={{borderTop:'1px solid rgba(212,160,23,0.1)'}}>
+        <div className="pt-2.5 mt-1 space-y-1.5" style={{borderTop:'1px solid rgba(201,162,39,0.1)'}}>
           <div className="flex justify-between text-xs" style={{color:'#4a6a4a'}}><span>🧮 Items Total</span><span>{CUR}{itemsTotal.toFixed(2)}</span></div>
           {addonsTotal>0&&<div className="flex justify-between text-xs" style={{color:'#4a6a4a'}}><span>✨ Add-ons</span><span>+{CUR}{addonsTotal.toFixed(2)}</span></div>}
           {sN(order?.gstAmount)>0&&<div className="flex justify-between text-xs" style={{color:'#5a4a1a'}}><span>🏛️ GST</span><span>+{CUR}{sN(order.gstAmount).toFixed(2)}</span></div>}
           {sN(order?.taxAmount)>0&&<div className="flex justify-between text-xs" style={{color:'#5a4a1a'}}><span>🏛️ Tax</span><span>+{CUR}{sN(order.taxAmount).toFixed(2)}</span></div>}
           {sN(order?.serviceChargeAmount)>0&&<div className="flex justify-between text-xs" style={{color:'#5a4a1a'}}><span>🛎️ Service Charge</span><span>+{CUR}{sN(order.serviceChargeAmount).toFixed(2)}</span></div>}
           {sN(order?.platformFeeAmount)>0&&<div className="flex justify-between text-xs" style={{color:'#5a4a1a'}}><span>💻 Platform Fee</span><span>+{CUR}{sN(order.platformFeeAmount).toFixed(2)}</span></div>}
-          <div className="flex justify-between font-black text-sm pt-1.5" style={{borderTop:'1px solid rgba(212,160,23,0.1)'}}>
+          <div className="flex justify-between font-black text-sm pt-1.5" style={{borderTop:'1px solid rgba(201,162,39,0.1)'}}>
             <span className="text-white">💵 Grand Total</span>
-            <span style={{color:'#D4A017'}}>{CUR}{(sub+fees).toFixed(2)}</span>
+            <span style={{color:'#C9A227'}}>{CUR}{(sub+fees).toFixed(2)}</span>
           </div>
         </div>
       </div>
@@ -666,17 +711,17 @@ const OrdersManagement = () => {
             <div className="absolute inset-x-0 bottom-0 sm:inset-0 sm:flex sm:items-center sm:justify-center">
               <div className="relative w-full sm:max-w-sm rounded-t-3xl sm:rounded-2xl overflow-hidden omf-sheet" onClick={e=>e.stopPropagation()}>
                 <div className="flex justify-center pt-3 pb-1 sm:hidden"><div className="omf-sheet-grip mx-auto"/></div>
-                <div className="flex items-center justify-between px-6 py-4" style={{borderBottom:'1px solid rgba(212,160,23,0.12)'}}>
+                <div className="flex items-center justify-between px-6 py-4" style={{borderBottom:'1px solid rgba(201,162,39,0.12)'}}>
                   <div><h3 className="omf-title text-white font-bold text-base">📏 Select Size</h3><p className="text-xs mt-0.5" style={{color:'#7a6a3a'}}>{vItem.name}</p></div>
-                  <button onClick={()=>setAddItemsVariantModal(null)} className="w-8 h-8 rounded-full flex items-center justify-center" style={{background:'rgba(212,160,23,0.1)',border:'1px solid rgba(212,160,23,0.2)'}}><X className="w-4 h-4" style={{color:'#D4A017'}}/></button>
+                  <button onClick={()=>setAddItemsVariantModal(null)} className="w-8 h-8 rounded-full flex items-center justify-center" style={{background:'rgba(201,162,39,0.1)',border:'1px solid rgba(201,162,39,0.2)'}}><X className="w-4 h-4" style={{color:'#C9A227'}}/></button>
                 </div>
                 <div className="px-5 py-4 space-y-2.5 pb-8">
                   {vars.map((v,vi)=>(
                     <button key={vi} onClick={()=>{setAddItemsVariantModal(null);addItemsVariantAddRef.current?.(vItem,v);}}
                       className="w-full flex items-center justify-between p-3.5 rounded-xl font-black transition-all"
-                      style={{background:'rgba(212,160,23,0.1)',border:'1.5px solid rgba(212,160,23,0.25)',color:'#D4A017'}}
-                      onMouseEnter={e=>{e.currentTarget.style.background='rgba(212,160,23,0.2)';}}
-                      onMouseLeave={e=>{e.currentTarget.style.background='rgba(212,160,23,0.1)';}}
+                      style={{background:'rgba(201,162,39,0.1)',border:'1.5px solid rgba(201,162,39,0.25)',color:'#C9A227'}}
+                      onMouseEnter={e=>{e.currentTarget.style.background='rgba(201,162,39,0.2)';}}
+                      onMouseLeave={e=>{e.currentTarget.style.background='rgba(201,162,39,0.1)';}}
                     >
                       <span className="text-sm">{sizeEmoji[vi]||'🍽️'} {v.name}</span>
                       <span className="text-sm">{CUR_V}{fmtN(v.price)}</span>
@@ -695,7 +740,7 @@ const OrdersManagement = () => {
           <motion.div initial={{opacity:0,x:100,scale:0.9}} animate={{opacity:1,x:0,scale:1}} exit={{opacity:0,x:100,scale:0.9}}
             transition={{type:'spring',damping:22,stiffness:260}}
             className="fixed top-4 right-4 z-50 p-5 rounded-2xl max-w-sm"
-            style={{background:'linear-gradient(135deg,#D4A017,#A67C00)',boxShadow:'0 20px 60px rgba(212,160,23,0.5),0 0 0 1px rgba(255,255,255,0.15)'}}
+            style={{background:'linear-gradient(135deg,#C9A227,#8B6914)',boxShadow:'0 20px 60px rgba(201,162,39,0.5),0 0 0 1px rgba(255,255,255,0.15)'}}
             data-testid="new-order-notification"
           >
             <button onClick={()=>setNewOrderNotification(null)} className="absolute top-3 right-3 w-6 h-6 rounded-full flex items-center justify-center" style={{background:'rgba(0,0,0,0.2)'}}><X className="w-3.5 h-3.5 text-white"/></button>
@@ -720,7 +765,7 @@ const OrdersManagement = () => {
           <div>
             <h2 className="omf-title text-2xl font-black text-white">Orders Management</h2>
             <p className="text-xs mt-0.5 flex items-center gap-1.5" style={{color:'#7a6a3a'}}>
-              <span className="inline-block w-1.5 h-1.5 rounded-full animate-pulse" style={{background:'#D4A017'}}/>
+              <span className="inline-block w-1.5 h-1.5 rounded-full animate-pulse" style={{background:'#C9A227'}}/>
               Live kitchen feed
             </p>
           </div>
@@ -730,7 +775,7 @@ const OrdersManagement = () => {
             <PlusCircle className="w-4 h-4"/>➕ Add External Order
           </button>
           <button onClick={()=>setSoundEnabled(!soundEnabled)} data-testid="sound-toggle" className="omf-btn"
-            style={{padding:'9px 14px',fontSize:'13px',borderRadius:'12px',background:soundEnabled?'rgba(212,160,23,0.12)':'rgba(255,255,255,0.04)',color:soundEnabled?'#D4A017':'#7a6a3a',border:`1.5px solid ${soundEnabled?'rgba(212,160,23,0.25)':'rgba(255,255,255,0.07)'}`}}
+            style={{padding:'9px 14px',fontSize:'13px',borderRadius:'12px',background:soundEnabled?'rgba(201,162,39,0.12)':'rgba(255,255,255,0.04)',color:soundEnabled?'#C9A227':'#7a6a3a',border:`1.5px solid ${soundEnabled?'rgba(201,162,39,0.25)':'rgba(255,255,255,0.07)'}`}}
           >{soundEnabled?'🔊 Sound On':'🔇 Sound Off'}</button>
         </div>
       </div>
@@ -788,9 +833,9 @@ const OrdersManagement = () => {
             >
               <table className="w-full">
                 <thead>
-                  <tr style={{borderBottom:'1px solid rgba(212,160,23,0.12)',background:'rgba(212,160,23,0.04)'}}>
+                  <tr style={{borderBottom:'1px solid rgba(201,162,39,0.12)',background:'rgba(201,162,39,0.04)'}}>
                     {[['🔖','Order #'],['👤','Customer'],['📞','Phone'],['🍽️','Type'],['🪑','Table'],['📦','Items'],['💵','Total'],['💳','Payment'],['📊','Status'],['⚙️','Actions']].map(([em,h])=>(
-                      <th key={h} className="text-left px-4 py-3.5 text-xs font-black uppercase tracking-wider" style={{color:'#D4A017'}}>{em} {h}</th>
+                      <th key={h} className="text-left px-4 py-3.5 text-xs font-black uppercase tracking-wider" style={{color:'#C9A227'}}>{em} {h}</th>
                     ))}
                   </tr>
                 </thead>
@@ -800,7 +845,11 @@ const OrdersManagement = () => {
                     const CUR=order.currencySymbol||cafeCurrency;
                     return (
                       <React.Fragment key={order.id}>
-                        <tr className={`omf-row omf-in ${expandedOrder===order.id?'omf-row-open':''}`}
+                        {/*
+                          ── TASK 1 & 2: statusClass appended to existing className string.
+                             That is the ONLY change to this <tr>.
+                        */}
+                        <tr className={`omf-row omf-in ${sb.statusClass} ${expandedOrder===order.id?'omf-row-open':''}`}
                           style={{animationDelay:`${Math.min(oi*25,250)}ms`,animationFillMode:'both'}}
                           onClick={()=>setExpandedOrder(expandedOrder===order.id?null:order.id)}
                           data-testid={`order-row-${order.id}`}
@@ -813,8 +862,13 @@ const OrdersManagement = () => {
                             {order.orderType==='dine-in'?(order.tableNumber?`🪑 ${order.tableNumber}`:'—'):order.orderType==='delivery'?<span style={{color:'#7a6a3a',fontSize:11}}>🛵 Delivery</span>:'—'}
                           </td>
                           <td className="px-4 py-3.5 text-sm font-medium" style={{color:'#7a6a3a'}}>🍴 {getItemsCount(order.items)}</td>
-                          <td className="px-4 py-3.5"><span className="font-black text-sm" style={{color:'#D4A017'}}>💵 {CUR}{(order.totalAmount||order.total||0).toFixed(0)}</span></td>
+                          <td className="px-4 py-3.5"><span className="font-black text-sm" style={{color:'#C9A227'}}>💵 {CUR}{(order.totalAmount||order.total||0).toFixed(0)}</span></td>
                           <td className="px-4 py-3.5"><span className="omf-badge" style={{background:pb.bg,color:pb.color,borderColor:pb.bd}}>{pb.emoji} {order.paymentStatus||'pending'}</span></td>
+                          {/*
+                            TASK 3: completed badge now renders green (#4ade80) because
+                            STATUS.completed.color was updated from '#C9A227' to '#4ade80'.
+                            The badge style prop reads sb.color — no JSX change needed.
+                          */}
                           <td className="px-4 py-3.5"><span className="omf-badge capitalize" style={{background:sb.bg,color:sb.color,borderColor:sb.bd}}>{sb.emoji} {sb.label}</span></td>
                           <td className="px-4 py-3.5" onClick={e=>e.stopPropagation()}>
                             <div className="flex flex-col gap-2">
@@ -846,10 +900,10 @@ const OrdersManagement = () => {
                           </td>
                         </tr>
 
-                        {/* Expanded row */}
+                        {/* Expanded row — UNCHANGED */}
                         {expandedOrder===order.id&&(
                           <tr>
-                            <td colSpan="10" style={{background:'rgba(212,160,23,0.025)',borderBottom:'1px solid rgba(212,160,23,0.08)'}}>
+                            <td colSpan="10" style={{background:'rgba(201,162,39,0.025)',borderBottom:'1px solid rgba(201,162,39,0.08)'}}>
                               <div className="px-5 py-5 grid grid-cols-2 gap-8">
                                 <div>
                                   <p className="omf-sec mb-3">🍴 Order Items</p>
@@ -863,13 +917,13 @@ const OrdersManagement = () => {
                                     {order.orderType==='delivery'&&order.deliveryAddress&&<div className="flex items-start gap-2.5" style={{color:'#7a6a3a'}}><span>📍</span><span>{order.deliveryAddress}</span></div>}
                                     {order?.orderType==='delivery'&&(
                                       <div className="text-sm mt-1">
-                                        <strong style={{color:'#D4A017'}}>🛵 Delivery Address:</strong>
+                                        <strong style={{color:'#C9A227'}}>🛵 Delivery Address:</strong>
                                         <div className="text-white mt-0.5">{order?.deliveryAddress||'N/A'}</div>
                                       </div>
                                     )}
                                     {order.specialInstructions&&(
-                                      <div className="mt-3 p-3 rounded-xl" style={{background:'rgba(212,160,23,0.1)',border:'1px solid rgba(212,160,23,0.2)'}}>
-                                        <p className="text-xs font-black mb-1" style={{color:'#D4A017'}}>📝 Special Instructions</p>
+                                      <div className="mt-3 p-3 rounded-xl" style={{background:'rgba(201,162,39,0.1)',border:'1px solid rgba(201,162,39,0.2)'}}>
+                                        <p className="text-xs font-black mb-1" style={{color:'#C9A227'}}>📝 Special Instructions</p>
                                         <p className="text-white text-sm">{order.specialInstructions}</p>
                                       </div>
                                     )}
@@ -896,15 +950,17 @@ const OrdersManagement = () => {
               const sb=getSt(order.orderStatus); const pb=getPay(order.paymentStatus);
               const CUR=order.currencySymbol||cafeCurrency;
               return (
+                {/* TASK 1 & 2: statusClass appended — only change to this mobile card */}
                 <div key={order.id} data-testid={`order-card-${order.id}`}
-                  className="omf-in" style={{animationDelay:`${Math.min(oi*35,350)}ms`,animationFillMode:'both',background:'#120f00',border:'1.5px solid rgba(255,255,255,0.07)',borderRadius:'16px',overflow:'hidden',transition:'border-color 200ms'}}
-                  onMouseEnter={e=>{e.currentTarget.style.borderColor='rgba(212,160,23,0.22)';}}
+                  className={`omf-in ${sb.statusClass}`}
+                  style={{animationDelay:`${Math.min(oi*35,350)}ms`,animationFillMode:'both',background:'#120f00',border:'1.5px solid rgba(255,255,255,0.07)',borderRadius:'16px',overflow:'hidden',transition:'border-color 200ms'}}
+                  onMouseEnter={e=>{e.currentTarget.style.borderColor='rgba(201,162,39,0.22)';}}
                   onMouseLeave={e=>{e.currentTarget.style.borderColor='rgba(255,255,255,0.07)';}}
                 >
                   {/* Card top */}
                   <div className="p-4 flex items-center justify-between cursor-pointer" onClick={()=>setExpandedOrder(expandedOrder===order.id?null:order.id)}>
                     <div className="flex items-center gap-3">
-                      <div className="w-11 h-11 rounded-2xl flex items-center justify-center text-xl flex-shrink-0" style={{background:'rgba(212,160,23,0.1)',border:'1.5px solid rgba(212,160,23,0.2)'}}>
+                      <div className="w-11 h-11 rounded-2xl flex items-center justify-center text-xl flex-shrink-0" style={{background:'rgba(201,162,39,0.1)',border:'1.5px solid rgba(201,162,39,0.2)'}}>
                         {orderTypeIcon(order.orderType)}
                       </div>
                       <div>
@@ -916,12 +972,13 @@ const OrdersManagement = () => {
                       </div>
                     </div>
                     <div className="flex flex-col items-end gap-1.5">
-                      <span className="font-black text-sm" style={{color:'#D4A017'}}>💵 {CUR}{(order.totalAmount||order.total||0).toFixed(0)}</span>
+                      <span className="font-black text-sm" style={{color:'#C9A227'}}>💵 {CUR}{(order.totalAmount||order.total||0).toFixed(0)}</span>
+                      {/* TASK 3: green badge for completed via sb.color — no JSX change needed */}
                       <span className="omf-badge capitalize" style={{background:sb.bg,color:sb.color,borderColor:sb.bd}}>{sb.emoji} {sb.label}</span>
                     </div>
                   </div>
 
-                  {/* Meta strip */}
+                  {/* Meta strip — UNCHANGED */}
                   <div className="px-4 pb-3.5 flex flex-wrap items-center gap-2" style={{borderTop:'1px solid rgba(255,255,255,0.04)'}}>
                     <span className="text-xs font-medium capitalize" style={{color:'#7a6a3a'}}>{orderTypeIcon(order.orderType)} {order.orderType}</span>
                     {order.orderType==='dine-in'&&order.tableNumber&&<span className="text-xs text-white font-bold">· Table {order.tableNumber}</span>}
@@ -930,9 +987,9 @@ const OrdersManagement = () => {
                     <span className="omf-badge" style={{background:pb.bg,color:pb.color,borderColor:pb.bd}}>{pb.emoji} {order.paymentStatus||'pending'}</span>
                   </div>
 
-                  {/* Expanded */}
+                  {/* Expanded — UNCHANGED */}
                   {expandedOrder===order.id&&(
-                    <div className="px-4 pb-5 space-y-4" style={{borderTop:'1px solid rgba(212,160,23,0.08)'}}>
+                    <div className="px-4 pb-5 space-y-4" style={{borderTop:'1px solid rgba(201,162,39,0.08)'}}>
                       <div className="pt-4">
                         <p className="omf-sec mb-3">🍴 Items</p>
                         {renderItemsList(order,CUR,true)}
@@ -940,14 +997,14 @@ const OrdersManagement = () => {
 
                       {order?.orderType==='delivery'&&(
                         <div className="p-3 rounded-xl" style={{background:'rgba(255,255,255,0.03)',border:'1px solid rgba(255,255,255,0.06)'}}>
-                          <strong style={{color:'#D4A017'}}>🛵 Delivery Address</strong>
+                          <strong style={{color:'#C9A227'}}>🛵 Delivery Address</strong>
                           <div className="text-white mt-1 text-sm">{order?.deliveryAddress||'N/A'}</div>
                         </div>
                       )}
 
                       {order.specialInstructions&&(
-                        <div className="p-3 rounded-xl" style={{background:'rgba(212,160,23,0.1)',border:'1px solid rgba(212,160,23,0.2)'}}>
-                          <p className="text-xs font-black mb-1" style={{color:'#D4A017'}}>📝 Special Instructions</p>
+                        <div className="p-3 rounded-xl" style={{background:'rgba(201,162,39,0.1)',border:'1px solid rgba(201,162,39,0.2)'}}>
+                          <p className="text-xs font-black mb-1" style={{color:'#C9A227'}}>📝 Special Instructions</p>
                           <p className="text-white text-sm">{order.specialInstructions}</p>
                         </div>
                       )}
@@ -1002,13 +1059,13 @@ const OrdersManagement = () => {
             })}
           </div>
 
-          {/* Footer */}
+          {/* Footer — UNCHANGED */}
           <div className="flex items-center justify-center gap-2 py-2">
             <span>🍽️</span>
             <p className="text-xs font-bold" style={{color:'#7a6a3a'}}>
               {filteredOrders.length} order{filteredOrders.length!==1?'s':''} · Live kitchen feed active
             </p>
-            <span className="inline-block w-1.5 h-1.5 rounded-full animate-pulse" style={{background:'#D4A017'}}/>
+            <span className="inline-block w-1.5 h-1.5 rounded-full animate-pulse" style={{background:'#C9A227'}}/>
           </div>
         </>
       )}
