@@ -5,14 +5,17 @@
  * Rendered at Dashboard level so it appears on EVERY page.
  * Same visual style as the existing OrdersManagement notification popup.
  * Auto-dismisses after 8 seconds.
+ *
+ * ADDED: clicking the popup body navigates to the Orders tab.
+ *        The close (X) button still only dismisses — no navigation.
  */
 
 import React, { useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Bell, X } from 'lucide-react';
 
-const GlobalOrderPopup = ({ order, onClose }) => {
-  // Auto-dismiss after 8 seconds
+const GlobalOrderPopup = ({ order, onClose, onNavigateToOrders }) => {
+  // Auto-dismiss after 8 seconds — UNCHANGED
   useEffect(() => {
     if (!order) return;
     const t = setTimeout(onClose, 8000);
@@ -30,6 +33,11 @@ const GlobalOrderPopup = ({ order, onClose }) => {
     return `${total} item${total !== 1 ? 's' : ''}`;
   };
 
+  // Called when user clicks the popup body (not the X button)
+  const handlePopupClick = () => {
+    if (onNavigateToOrders) onNavigateToOrders();
+  };
+
   return (
     <AnimatePresence>
       {order && (
@@ -41,15 +49,19 @@ const GlobalOrderPopup = ({ order, onClose }) => {
           transition={{ type: 'spring', stiffness: 300, damping: 25 }}
           className="fixed top-4 right-4 z-[9999] bg-gradient-to-r from-[#D4AF37] to-[#B8962E] text-black p-6 rounded-lg shadow-2xl max-w-sm w-full"
           data-testid="global-order-notification"
+          // ── ADDED: click popup body → go to Orders tab ──
+          onClick={handlePopupClick}
+          style={{ cursor: 'pointer' }}
         >
-          {/* Close button */}
+          {/* Close button — stops propagation so it only dismisses, does NOT navigate */}
           <button
-            onClick={onClose}
+            onClick={(e) => { e.stopPropagation(); onClose(); }}
             className="absolute top-2 right-2 p-1 hover:bg-black/10 rounded transition-colors"
           >
             <X className="w-4 h-4" />
           </button>
 
+          {/* Everything below is 100% UNCHANGED */}
           <div className="flex items-start gap-4">
             <div className="bg-black/20 p-3 rounded-full flex-shrink-0">
               <Bell className="w-6 h-6 animate-bounce" />
