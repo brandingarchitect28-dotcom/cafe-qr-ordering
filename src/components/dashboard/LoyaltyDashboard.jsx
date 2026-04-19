@@ -32,57 +32,72 @@ import {
 } from 'lucide-react';
 import GoogleReviewSettings from './GoogleReviewSettings';
 
-// ── Inject café-vibe CSS once ─────────────────────────────────────────────────
+// ── Inject premium SaaS CSS once ──────────────────────────────────────────────
 if (typeof document !== 'undefined' && !document.getElementById('loy-cafe-css')) {
   const el = document.createElement('style');
   el.id = 'loy-cafe-css';
   el.textContent = `
-    @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Sora:wght@600;700;800&display=swap');
-    .loy { font-family: 'DM Sans', system-ui, sans-serif; }
-    .loy-title { font-family: 'Sora', system-ui, sans-serif !important; }
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+    .loy { font-family: 'Inter', system-ui, sans-serif; color: #e2e8f0; letter-spacing: -0.01em; }
+    .loy-title { font-family: 'Inter', system-ui, sans-serif !important; letter-spacing: -0.03em; font-weight: 600; }
     .loy-card {
-      background: #111314;
-      border: 1.5px solid rgba(255,255,255,0.07);
-      border-radius: 16px;
+      background: #131720;
+      border: 1px solid rgba(255,255,255,0.06);
+      border-radius: 12px;
       overflow: hidden;
-      transition: border-color 200ms;
+      transition: border-color 200ms ease, box-shadow 200ms ease;
     }
-    .loy-card:hover { border-color: rgba(168,176,184,0.18);
-      box-shadow: 0 0 18px rgba(168,176,184,0.06); }
+    .loy-card:hover { border-color: rgba(201,162,39,0.2); box-shadow: 0 4px 24px rgba(0,0,0,0.3); }
     .loy-input {
-      width: 100%; background: #161a18;
-      border: 1.5px solid rgba(255,255,255,0.08); border-radius: 12px;
-      color: #e8ede9; padding: 10px 14px; font-size: 14px; font-weight: 500;
-      font-family: 'DM Sans', system-ui, sans-serif;
-      outline: none; transition: border-color 180ms, box-shadow 180ms;
+      width: 100%; background: #0f1117;
+      border: 1px solid rgba(255,255,255,0.08); border-radius: 8px;
+      color: #e2e8f0; padding: 10px 14px; font-size: 14px; font-weight: 400;
+      font-family: 'Inter', system-ui, sans-serif; letter-spacing: -0.01em;
+      outline: none; transition: border-color 150ms ease, box-shadow 150ms ease;
     }
-    .loy-input:focus { border-color: rgba(168,176,184,0.5);
-      box-shadow: 0 0 0 3px rgba(168,176,184,0.08); }
-    .loy-input::placeholder { color: #3a4040; }
+    .loy-input:focus { border-color: rgba(201,162,39,0.45); box-shadow: 0 0 0 3px rgba(201,162,39,0.07); }
+    .loy-input::placeholder { color: #374151; }
     .loy-btn {
-      display: inline-flex; align-items: center; gap: 5px;
-      font-family: 'DM Sans', system-ui, sans-serif;
-      font-weight: 700; font-size: 12px;
-      padding: 7px 13px; border-radius: 10px;
-      border: 1.5px solid transparent;
-      cursor: pointer; transition: all 180ms; white-space: nowrap;
+      display: inline-flex; align-items: center; gap: 6px;
+      font-family: 'Inter', system-ui, sans-serif;
+      font-weight: 500; font-size: 13px; letter-spacing: -0.01em;
+      padding: 8px 14px; border-radius: 8px;
+      border: 1px solid transparent;
+      cursor: pointer; transition: all 150ms ease; white-space: nowrap;
     }
-    .loy-btn:hover { transform: translateY(-1px); filter: brightness(1.1); }
-    .loy-btn:active { transform: scale(0.96); }
-    .loy-btn-orange { background: linear-gradient(135deg,#A8B0B8,#8A9299); color:#fff; box-shadow: 0 2px 14px rgba(168,176,184,0.35); }
-    .loy-btn-ghost  { background: rgba(255,255,255,0.05); color: #5e6b60; border-color: rgba(255,255,255,0.08); }
-    .loy-btn-ghost:hover  { background: rgba(255,255,255,0.09); color: #fff; }
-    .loy-btn-green  { background: rgba(37,211,102,0.1); color: #25D366; border-color: rgba(37,211,102,0.25); }
-    .loy-btn-green:hover  { background: rgba(37,211,102,0.18); }
-    .loy-btn-red    { background: rgba(220,50,50,0.12); color: #f87171; border-color: rgba(220,50,50,0.22); }
-    .loy-btn-red:hover    { background: rgba(220,50,50,0.22); }
-    .loy-btn-gold   { background: rgba(212,175,55,0.12); color: #fbbf24; border-color: rgba(212,175,55,0.25); }
-    .loy-btn-gold:hover   { background: rgba(212,175,55,0.22); }
-    @keyframes loyIn { from { opacity:0; transform:translateY(8px); } to { opacity:1; transform:translateY(0); } }
-    .loy-in { animation: loyIn 280ms ease forwards; }
+    .loy-btn:hover { transform: translateY(-1px); box-shadow: 0 4px 12px rgba(0,0,0,0.3); }
+    .loy-btn:active { transform: scale(0.97); box-shadow: none; }
+    .loy-btn-orange { background: #C9A227; color: #0f1117; font-weight: 600; }
+    .loy-btn-orange:hover { background: #d4ac2e; }
+    .loy-btn-ghost  { background: transparent; color: #64748b; border-color: rgba(255,255,255,0.08); }
+    .loy-btn-ghost:hover  { background: rgba(255,255,255,0.05); color: #94a3b8; }
+    .loy-btn-green  { background: rgba(37,211,102,0.08); color: #22c55e; border-color: rgba(37,211,102,0.18); }
+    .loy-btn-green:hover  { background: rgba(37,211,102,0.14); }
+    .loy-btn-red    { background: rgba(220,38,38,0.08); color: #f87171; border-color: rgba(220,38,38,0.18); }
+    .loy-btn-red:hover    { background: rgba(220,38,38,0.14); }
+    .loy-btn-gold   { background: rgba(201,162,39,0.1); color: #C9A227; border-color: rgba(201,162,39,0.22); }
+    .loy-btn-gold:hover   { background: rgba(201,162,39,0.16); }
+    .loy-label { font-size: 11px; font-weight: 500; letter-spacing: 0.06em; text-transform: uppercase; color: #475569; }
+    .loy-stat-card { background: #131720; border: 1px solid rgba(255,255,255,0.06); border-radius: 12px; padding: 20px; transition: border-color 200ms ease, box-shadow 200ms ease; }
+    .loy-stat-card:hover { border-color: rgba(255,255,255,0.1); box-shadow: 0 4px 20px rgba(0,0,0,0.25); }
+    .loy-row-btn { width: 100%; display: flex; align-items: center; gap: 12px; padding: 14px 16px; text-align: left; background: transparent; border: none; cursor: pointer; transition: background 150ms ease; }
+    .loy-row-btn:hover { background: rgba(255,255,255,0.02); }
+    .loy-pill { display: inline-flex; align-items: center; gap: 5px; padding: 4px 10px; border-radius: 6px; font-size: 12px; font-weight: 500; }
+    .loy-ladder-pill { font-size: 12px; font-weight: 500; padding: 5px 11px; border-radius: 6px; background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.07); color: #64748b; letter-spacing: -0.01em; }
+    .loy-ladder-pill strong { color: #94a3b8; font-weight: 600; }
+    .loy-divider { border: none; border-top: 1px solid rgba(255,255,255,0.05); margin: 0; }
+    .loy-avatar { width: 36px; height: 36px; border-radius: 8px; background: #1e2535; border: 1px solid rgba(255,255,255,0.08); display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+    .loy-icon-wrap { width: 36px; height: 36px; border-radius: 8px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+    .loy-section-title { font-size: 11px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: #475569; }
+    .loy-empty { display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 56px 24px; gap: 10px; }
+    @keyframes loyFadeIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
+    .loy-in { animation: loyFadeIn 250ms ease forwards; }
+    @keyframes loySpinSlow { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+    .loy-spin { animation: loySpinSlow 1.2s linear infinite; }
   `;
   document.head.appendChild(el);
 }
+
 
 // ── Discount ladder ────────────────────────────────────────────────────────────
 const discountForVisits = (visits) => {
@@ -282,20 +297,19 @@ const LoyaltyDashboard = () => {
       {/* ── Stats row ─────────────────────────────────────────────────────── */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         {[
-          { label: 'Total Members',   value: totalCustomers,  emoji: '👥', color: '#A8B0B8' },
-          { label: 'Total Visits',    value: totalVisits,     emoji: '⭐', color: '#60a5fa' },
-          { label: 'Loyal (3+)',      value: loyalCustomers,  emoji: '🏆', color: '#34d399' },
-          { label: 'Repeat Visits',   value: repeatedVisits,  emoji: '🔄', color: '#a78bfa' },
-        ].map(({ label, value, emoji, color }) => (
-          <div key={label} className="loy-card p-4 flex items-center gap-3"
-            style={{ borderLeft: `3px solid ${color}` }}>
-            <div className="w-10 h-10 rounded-xl flex items-center justify-center text-xl flex-shrink-0"
-              style={{ background: color + '18' }}>
-              {emoji}
+          { label: 'Total Members',  value: totalCustomers, Icon: User,       color: '#C9A227' },
+          { label: 'Total Visits',   value: totalVisits,    Icon: TrendingUp, color: '#60a5fa' },
+          { label: 'Loyal (3+)',     value: loyalCustomers, Icon: Award,      color: '#34d399' },
+          { label: 'Repeat Visits',  value: repeatedVisits, Icon: Repeat,     color: '#a78bfa' },
+        ].map(({ label, value, Icon, color }) => (
+          <div key={label} className="loy-stat-card flex items-center gap-3"
+            style={{ borderLeft: `2px solid ${color}` }}>
+            <div className="loy-icon-wrap" style={{ background: color + '14' }}>
+              <Icon size={16} style={{ color }} />
             </div>
             <div>
-              <p className="text-2xl font-black text-white">{value}</p>
-              <p className="text-xs font-bold mt-0.5" style={{ color: '#606870' }}>{label}</p>
+              <p className="text-2xl font-semibold text-white" style={{ letterSpacing: '-0.03em' }}>{value}</p>
+              <p className="text-xs mt-0.5" style={{ color: '#475569' }}>{label}</p>
             </div>
           </div>
         ))}
@@ -304,16 +318,16 @@ const LoyaltyDashboard = () => {
       {/* ── Search + Add ───────────────────────────────────────────────────── */}
       <div className="flex flex-col sm:flex-row gap-3">
         <div className="relative flex-1">
-          <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm">🔍</span>
+          <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2" style={{ color: '#374151' }} />
           <input type="text" value={search} onChange={e => setSearch(e.target.value)}
             placeholder="Search by name or phone…"
-            className="loy-input" style={{ paddingLeft: '2.2rem' }} />
+            className="loy-input" style={{ paddingLeft: '2.25rem' }} />
         </div>
         <button onClick={() => setShowAddForm(v => !v)}
           className="loy-btn loy-btn-orange"
           data-testid="add-loyalty-customer-btn">
-          <UserPlus className="w-4 h-4" />
-          ➕ Add Customer
+          <UserPlus size={15} />
+          Add Customer
         </button>
       </div>
 
@@ -327,39 +341,44 @@ const LoyaltyDashboard = () => {
             className="loy-card p-6"
             style={{ border: '1.5px solid rgba(255,255,255,0.1)' }}
           >
-            <div className="flex items-center gap-2 mb-4">
-              <span className="text-xl">👤</span>
-              <h3 className="text-white font-black loy-title text-lg">Add New Loyalty Customer</h3>
+            <div className="flex items-center gap-2 mb-5">
+              <div className="loy-icon-wrap" style={{ background: 'rgba(201,162,39,0.1)' }}>
+                <UserPlus size={15} style={{ color: '#C9A227' }} />
+              </div>
+              <div>
+                <h3 className="text-white loy-title text-base">New Loyalty Customer</h3>
+                <p className="text-xs mt-0.5" style={{ color: '#475569' }}>Fill in the details below to enrol a customer</p>
+              </div>
             </div>
             <form onSubmit={handleAddCustomer} className="space-y-4">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-xs font-black uppercase tracking-widest mb-1.5" style={{ color: '#A8B0B8' }}>Customer Name</label>
+                  <label className="loy-label block mb-1.5">Customer Name</label>
                   <input type="text" value={newName} onChange={e => setNewName(e.target.value)}
                     placeholder="e.g. Priya Sharma" className="loy-input" disabled={saving} data-testid="loyalty-name-input" />
                 </div>
                 <div>
-                  <label className="block text-xs font-black uppercase tracking-widest mb-1.5" style={{ color: '#A8B0B8' }}>Phone Number</label>
+                  <label className="loy-label block mb-1.5">Phone Number</label>
                   <input type="tel" value={newPhone} onChange={e => setNewPhone(e.target.value)}
                     placeholder="e.g. 9876543210" className="loy-input" disabled={saving} data-testid="loyalty-phone-input" />
                 </div>
               </div>
               <div>
-                <label className="block text-xs font-black uppercase tracking-widest mb-1.5" style={{ color: '#A8B0B8' }}>
-                  Validity (days) <span className="font-normal normal-case" style={{ color: '#606870' }}>(optional)</span>
+                <label className="loy-label block mb-1.5">
+                  Validity (days) <span style={{ color: '#374151', textTransform: 'none', letterSpacing: 'normal', fontWeight: 400 }}>(optional)</span>
                 </label>
                 <input type="number" min="0" value={validityDays} onChange={e => setValidityDays(e.target.value)}
                   placeholder="e.g. 30" className="loy-input" disabled={saving} data-testid="loyalty-validity-input" />
               </div>
               <div>
-                <label className="block text-xs font-black uppercase tracking-widest mb-1.5" style={{ color: '#A8B0B8' }}>
-                  Custom Discount (%) <span className="font-normal normal-case" style={{ color: '#606870' }}>(optional — overrides default 10%)</span>
+                <label className="loy-label block mb-1.5">
+                  Custom Discount (%) <span style={{ color: '#374151', textTransform: 'none', letterSpacing: 'normal', fontWeight: 400 }}>(optional — overrides default 10%)</span>
                 </label>
                 <input type="number" min="0" max="100" value={customDiscount} onChange={e => setCustomDiscount(e.target.value)}
                   placeholder="e.g. 20" className="loy-input" disabled={saving} data-testid="loyalty-discount-input" />
               </div>
-              <p className="text-xs font-bold" style={{ color: '#606870' }}>
-                First visit will be recorded automatically. Customer starts with <span style={{ color: '#A8B0B8' }}>10% OFF</span>.
+              <p className="text-xs" style={{ color: '#475569' }}>
+                First visit is recorded automatically. Customer starts at <span style={{ color: '#94a3b8' }}>10% off</span>.
               </p>
               <div className="flex gap-3">
                 <button type="submit" disabled={saving} className="loy-btn loy-btn-orange disabled:opacity-50" data-testid="loyalty-submit-btn">
@@ -379,27 +398,31 @@ const LoyaltyDashboard = () => {
           { label: '2 visits',  disc: '15%' },
           { label: '3 visits',  disc: '20%' },
           { label: '4 visits',  disc: '25%' },
-          { label: '5+ visits', disc: '30% / Free Item 🎁' },
+          { label: '5+ visits', disc: '30% / Free Item' },
         ].map(({ label, disc }) => (
-          <span key={label} className="text-xs px-3 py-1.5 rounded-xl font-black"
-            style={{ background: 'rgba(168,176,184,0.07)', color: '#606870', border: '1px solid rgba(168,176,184,0.15)' }}>
-            {label} → <span style={{ color: '#A8B0B8' }}>{disc}</span>
+          <span key={label} className="loy-ladder-pill">
+            {label} <span style={{ color: '#475569' }}>→</span> <strong>{disc}</strong>
           </span>
         ))}
       </div>
 
       {/* ── Customer list ──────────────────────────────────────────────────── */}
       {loading ? (
-        <div className="flex flex-col items-center justify-center py-12 gap-2">
-          <div className="text-4xl animate-bounce">⭐</div>
-          <p className="text-sm font-bold" style={{ color: '#606870' }}>Loading customers…</p>
+        <div className="loy-empty">
+          <RefreshCw size={20} className="loy-spin" style={{ color: '#334155' }} />
+          <p className="text-sm" style={{ color: '#475569' }}>Loading customers…</p>
         </div>
       ) : filtered.length === 0 ? (
-        <div className="loy-card p-12 text-center">
-          <div className="text-5xl mb-3">🎁</div>
-          <p className="font-bold" style={{ color: '#606870' }}>
-            {search ? 'No customers match your search.' : 'No loyalty customers yet. Add your first one!'}
-          </p>
+        <div className="loy-card">
+          <div className="loy-empty">
+            <div className="loy-icon-wrap" style={{ background: 'rgba(255,255,255,0.04)', width: 44, height: 44 }}>
+              <User size={18} style={{ color: '#334155' }} />
+            </div>
+            <p className="text-sm font-medium" style={{ color: '#475569' }}>
+              {search ? 'No customers match your search.' : 'No loyalty customers yet.'}
+            </p>
+            {!search && <p className="text-xs" style={{ color: '#334155' }}>Add your first customer to get started.</p>}
+          </div>
         </div>
       ) : (
         <div className="space-y-2">
@@ -420,7 +443,7 @@ const LoyaltyDashboard = () => {
                 data-testid={`loyalty-customer-${customer.id}`}
               >
                 {/* Top accent bar */}
-                <div style={{ height: 2, background: isFree ? 'linear-gradient(90deg,#34d399,transparent)' : 'linear-gradient(90deg,#A8B0B8,transparent)' }} />
+                <div style={{ height: 2, background: isFree ? 'linear-gradient(90deg,#34d399,transparent)' : 'linear-gradient(90deg,#C9A227,transparent)' }} />
 
                 {/* Always-visible header */}
                 <button
@@ -429,35 +452,34 @@ const LoyaltyDashboard = () => {
                   aria-expanded={isOpen}
                   data-testid={`loyalty-toggle-${customer.id}`}
                 >
-                  <div className="w-9 h-9 rounded-xl flex items-center justify-center text-lg flex-shrink-0"
-                    style={{ background: 'rgba(255,255,255,0.06)', border: '1.5px solid rgba(255,255,255,0.1)' }}>
-                    👤
+                  <div className="loy-avatar">
+                    <User size={15} style={{ color: '#475569' }} />
                   </div>
                   <div className="min-w-0 flex-1">
-                    <p className="text-white font-black text-sm truncate">{customer.name}</p>
+                    <p className="text-white font-semibold text-sm truncate" style={{ letterSpacing: "-0.01em" }}>{customer.name}</p>
                     <div className="flex items-center gap-1.5 mt-0.5">
-                      <span className="text-xs">📞</span>
-                      <p className="text-xs font-bold truncate" style={{ color: '#606870' }}>{customer.phone}</p>
+                      <Phone size={11} style={{ color: '#374151' }} />
+                      <p className="text-xs truncate" style={{ color: '#475569' }}>{customer.phone}</p>
                     </div>
                   </div>
 
                   {/* Visit count */}
-                  <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-xl flex-shrink-0"
-                    style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.07)' }}>
-                    <span className="text-xs">☕</span>
-                    <span className="text-white text-xs font-black">{visits}</span>
-                    <span className="text-xs font-bold hidden sm:inline" style={{ color: '#606870' }}>visit{visits !== 1 ? 's' : ''}</span>
+                  <div className="loy-pill flex-shrink-0"
+                    style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.07)' }}>
+                    <TrendingUp size={11} style={{ color: '#475569' }} />
+                    <span className="text-white text-xs font-semibold">{visits}</span>
+                    <span className="text-xs hidden sm:inline" style={{ color: '#475569' }}>visit{visits !== 1 ? 's' : ''}</span>
                   </div>
 
                   {/* Discount badge */}
-                  <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-xl flex-shrink-0"
+                  <div className="loy-pill flex-shrink-0"
                     style={{
-                      background: isFree ? 'rgba(16,185,129,0.12)' : 'rgba(255,255,255,0.06)',
-                      border: isFree ? '1px solid rgba(16,185,129,0.3)' : '1px solid rgba(255,255,255,0.1)',
+                      background: isFree ? 'rgba(16,185,129,0.1)' : 'rgba(201,162,39,0.1)',
+                      border: isFree ? '1px solid rgba(16,185,129,0.22)' : '1px solid rgba(201,162,39,0.22)',
                     }}>
-                    <span className="text-xs">{isFree ? '🎁' : '⭐'}</span>
-                    <span className="text-xs font-black" style={{ color: isFree ? '#34d399' : '#A8B0B8' }}>
-                      {isFree ? 'Free!' : `${disc}%`}
+                    {isFree ? <Gift size={11} style={{ color: '#34d399' }} /> : <Star size={11} style={{ color: '#C9A227' }} />}
+                    <span className="text-xs font-semibold" style={{ color: isFree ? '#34d399' : '#C9A227' }}>
+                      {isFree ? 'Free' : `${disc}%`}
                     </span>
                   </div>
 
@@ -488,8 +510,8 @@ const LoyaltyDashboard = () => {
                             background: isExpired ? 'rgba(220,50,50,0.08)' : 'rgba(255,255,255,0.04)',
                             border: isExpired ? '1px solid rgba(220,50,50,0.25)' : '1px solid rgba(255,255,255,0.08)',
                           }}>
-                          <span className="text-xs">📅</span>
-                          <span className="text-xs font-bold" style={{ color: isExpired ? '#f87171' : '#606870' }}>
+                          <Calendar size={11} style={{ color: isExpired ? '#f87171' : '#374151' }} />
+                          <span className="text-xs" style={{ color: isExpired ? '#f87171' : '#475569' }}>
                             {isExpired ? 'Expired ' : 'Valid till '}
                             {exp.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}
                           </span>
@@ -502,7 +524,7 @@ const LoyaltyDashboard = () => {
                       <button onClick={() => handleMarkVisit(customer)} disabled={marking}
                         className="loy-btn loy-btn-orange disabled:opacity-50"
                         data-testid={`mark-visit-${customer.id}`}>
-                        {marking ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <span>☕</span>}
+                        {marking ? <RefreshCw size={13} className="animate-spin" /> : <TrendingUp size={13} />}
                         {marking ? 'Marking…' : 'Mark Visit'}
                       </button>
                       <button onClick={() => handleSendWA(customer)}
@@ -542,12 +564,12 @@ const LoyaltyDashboard = () => {
                     {editingCustomerId === customer.id && (
                       <div className="mt-2 pt-3 space-y-3" style={{ borderTop: '1px solid rgba(255,255,255,0.07)' }}
                         data-testid={`edit-panel-${customer.id}`}>
-                        <p className="text-xs font-black uppercase tracking-widest" style={{ color: '#A8B0B8' }}>
-                          ✏️ Edit Loyalty Card
+                        <p className="loy-section-title flex items-center gap-1.5">
+                          <Pencil size={11} /> Edit Loyalty Card
                         </p>
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                           <div>
-                            <label className="block text-xs font-bold mb-1" style={{ color: '#606870' }}>Discount (%)</label>
+                            <label className="loy-label block mb-1">Discount (%)</label>
                             <input type="number" min="0" max="100" value={editDiscount}
                               onChange={e => setEditDiscount(e.target.value)}
                               placeholder={`Current: ${customer.currentDiscount || 10}%`}
@@ -555,7 +577,7 @@ const LoyaltyDashboard = () => {
                               data-testid={`edit-discount-${customer.id}`} />
                           </div>
                           <div>
-                            <label className="block text-xs font-bold mb-1" style={{ color: '#606870' }}>Validity (days)</label>
+                            <label className="loy-label block mb-1">Validity (days)</label>
                             <input type="number" min="0" value={editValidity}
                               onChange={e => setEditValidity(e.target.value)}
                               placeholder={`Current: ${customer.validityDays || 0}d`}
@@ -586,12 +608,12 @@ const LoyaltyDashboard = () => {
       )}
 
       {/* Footer */}
-      <div className="flex items-center justify-center gap-2 py-2">
-        <span>⭐</span>
-        <p className="text-xs font-bold" style={{ color: '#606870' }}>
+      <div className="flex items-center justify-center gap-2 py-3">
+        <Star size={12} style={{ color: '#C9A227' }} />
+        <p className="text-xs" style={{ color: '#475569' }}>
           {totalCustomers} member{totalCustomers !== 1 ? 's' : ''} · {totalVisits} total visits
         </p>
-        <span className="inline-block w-1.5 h-1.5 rounded-full animate-pulse" style={{ background: '#34d399' }} />
+        <span className="inline-block w-1.5 h-1.5 rounded-full animate-pulse" style={{ background: '#C9A227' }} />
       </div>
 
       {/* ── Google Review Link setting ──────────────────────────────────────── */}
