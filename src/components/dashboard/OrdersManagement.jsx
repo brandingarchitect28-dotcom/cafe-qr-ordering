@@ -72,16 +72,16 @@ if (typeof document !== 'undefined' && !document.getElementById('om-food-css')) 
     .omf-btn:hover  { transform: translateY(-1px); }
     .omf-btn:active { transform: scale(0.98); }
 
-    /* PRIMARY: premium silver-grey */
+    /* PRIMARY: gold — used sparingly */
     .omf-btn-orange {
-      background: #C8CDD6;
-      color: #0B0F14;
-      font-weight: 700;
-      box-shadow: 0 1px 8px rgba(200,205,214,0.14);
+      background: #C9A227;
+      color: #000;
+      font-weight: 600;
+      box-shadow: 0 1px 8px rgba(201,162,39,0.2);
     }
     .omf-btn-orange:hover {
-      background: #D4D8E0;
-      box-shadow: 0 4px 16px rgba(200,205,214,0.22);
+      background: #D4AD35;
+      box-shadow: 0 4px 16px rgba(201,162,39,0.25);
     }
 
     /* Ghost: neutral, subtle */
@@ -113,8 +113,8 @@ if (typeof document !== 'undefined' && !document.getElementById('om-food-css')) 
       transition: border-color 150ms cubic-bezier(0.4,0,0.2,1), box-shadow 150ms cubic-bezier(0.4,0,0.2,1);
     }
     .omf-input:focus {
-      border-color: #C8CDD6;
-      box-shadow: 0 0 0 2px rgba(200,205,214,0.10);
+      border-color: #C9A227;
+      box-shadow: 0 0 0 2px rgba(201,162,39,0.12);
     }
     .omf-input::placeholder { color: #374151; }
     .omf-input[type="date"] { color-scheme: dark; }
@@ -133,7 +133,7 @@ if (typeof document !== 'undefined' && !document.getElementById('om-food-css')) 
       cursor: pointer;
       transition: border-color 150ms;
     }
-    .omf-select:focus { border-color: #C8CDD6; }
+    .omf-select:focus { border-color: #C9A227; }
     .omf-select option { background: #111827; }
 
     /* ── Badges: semantic, controlled ── */
@@ -156,11 +156,11 @@ if (typeof document !== 'undefined' && !document.getElementById('om-food-css')) 
       letter-spacing: -0.01em;
     }
     .omf-tab-on {
-      background: #C8CDD6;
-      color: #0B0F14;
-      border-color: #C8CDD6;
-      font-weight: 700;
-      box-shadow: 0 1px 10px rgba(200,205,214,0.16);
+      background: #C9A227;
+      color: #000;
+      border-color: #C9A227;
+      font-weight: 600;
+      box-shadow: 0 1px 8px rgba(201,162,39,0.2);
     }
     .omf-tab-off { background: transparent; color: #6B7280; }
     .omf-tab-off:hover { background: rgba(255,255,255,0.04); color: #D1D5DB; border-color: #374151; }
@@ -174,8 +174,8 @@ if (typeof document !== 'undefined' && !document.getElementById('om-food-css')) 
     @keyframes omfIn { from { opacity:0; transform:translateY(4px); } to { opacity:1; transform:translateY(0); } }
     .omf-in { animation: omfIn 200ms cubic-bezier(0.4,0,0.2,1) forwards; }
 
-    /* ── Order number: weight hierarchy, silver accent ── */
-    .omf-ordnum { font-family: 'Inter', system-ui, sans-serif; color: #C8CDD6; font-weight: 600; }
+    /* ── Order number: weight hierarchy, gold accent ── */
+    .omf-ordnum { font-family: 'Inter', system-ui, sans-serif; color: #C9A227; font-weight: 600; }
 
     /* ── Section label: subtle uppercase ── */
     .omf-sec {
@@ -362,15 +362,15 @@ const AddItemsToOrderModal = ({ order, cafeCurrency, onClose, setVariantModal, v
                     {item.category && <p className="text-xs mt-0.5" style={{color:'#4B5563'}}>{item.category}</p>}
                     {hasV ? (
                       <div className="flex flex-wrap gap-1 mt-1.5">
-                        {iv.map((v,vi)=><span key={vi} className="omf-badge" style={{background:'rgba(200,205,214,0.07)',color:'#C8CDD6',borderColor:'rgba(200,205,214,0.18)',fontSize:'0.65rem'}}>{v.name||`S${vi+1}`} {CUR}{fmtN(v.price)}</span>)}
+                        {iv.map((v,vi)=><span key={vi} className="omf-badge" style={{background:'rgba(201,162,39,0.08)',color:'#C9A227',borderColor:'rgba(201,162,39,0.2)',fontSize:'0.65rem'}}>{v.name||`S${vi+1}`} {CUR}{fmtN(v.price)}</span>)}
                       </div>
-                    ) : <p className="text-sm font-medium mt-1" style={{color:'#C8CDD6'}}>{dp}</p>}
+                    ) : <p className="text-sm font-medium mt-1" style={{color:'#C9A227'}}>{dp}</p>}
                   </div>
                   {!hasV && qty > 0 ? (
                     <div className="flex items-center gap-2 flex-shrink-0">
                       <button onClick={()=>removeFromCart(item.id)} className="w-7 h-7 rounded-full flex items-center justify-center" style={{background:'rgba(255,255,255,0.07)',border:'1px solid rgba(255,255,255,0.1)'}}><Minus className="w-3 h-3 text-white"/></button>
                       <span className="text-white font-black text-sm min-w-[16px] text-center">{qty}</span>
-                      <button onClick={()=>{const e=newCart.find(i=>i.id===item.id);if(e)directAdd({...e});else addToCart(item);}} className="w-7 h-7 rounded-full flex items-center justify-center" style={{background:'#C8CDD6'}}><Plus className="w-3 h-3" style={{color:'#0B0F14'}}/></button>
+                      <button onClick={()=>{const e=newCart.find(i=>i.id===item.id);if(e)directAdd({...e});else addToCart(item);}} className="w-7 h-7 rounded-full flex items-center justify-center text-white" style={{background:'#C9A227'}}><Plus className="w-3 h-3"/></button>
                     </div>
                   ) : (
                     <motion.button whileTap={{scale:0.93}} onClick={()=>addToCart(item)} className="omf-btn omf-btn-orange flex-shrink-0">{lbl}</motion.button>
@@ -392,19 +392,19 @@ const AddItemsToOrderModal = ({ order, cafeCurrency, onClose, setVariantModal, v
                 })}
                 <div className="flex justify-between text-sm font-black pt-1" style={{borderTop:'1px solid #1F2937'}}>
                   <span style={{color:'#6B7280'}}>New items total</span>
-                  <span style={{color:'#C8CDD6',fontWeight:600}}>{CUR}{fmtN(cartTotal)}</span>
+                  <span style={{color:'#C9A227',fontWeight:600}}>{CUR}{fmtN(cartTotal)}</span>
                 </div>
               </div>
               <motion.button whileHover={{scale:1.01}} whileTap={{scale:0.97}} onClick={handleSave} disabled={saving}
                 className="w-full py-3.5 rounded-xl font-black text-sm flex items-center justify-center gap-2 disabled:opacity-60 text-white"
-                style={{background:'#C8CDD6',boxShadow:'0 2px 12px rgba(200,205,214,0.18)',color:'#0B0F14'}}
+                style={{background:'#C9A227',boxShadow:'0 2px 12px rgba(201,162,39,0.2)'}}
               >
                 {saving?<><RefreshCw className="w-4 h-4 animate-spin"/>Sending to kitchen…</>:<><ShoppingCart className="w-4 h-4"/>Add to Order · {CUR}{fmtN(cartTotal)}</>}
               </motion.button>
             </div>
           )}
         </motion.div>
-        {addonModal && <AddOnModal item={addonModal} onConfirm={entry=>{directAdd(entry);setAddonModal(null);}} onClose={()=>setAddonModal(null)} currencySymbol={CUR} primaryColor="#C8CDD6" theme="dark"/>}
+        {addonModal && <AddOnModal item={addonModal} onConfirm={entry=>{directAdd(entry);setAddonModal(null);}} onClose={()=>setAddonModal(null)} currencySymbol={CUR} primaryColor="#C9A227" theme="dark"/>}
       </motion.div>
     </AnimatePresence>
   );
@@ -667,8 +667,8 @@ const OrdersManagement = () => {
         })}
         {/* Totals */}
         <div className="pt-2.5 mt-1 space-y-1.5" style={{borderTop:'1px solid #1F2937'}}>
-          <div className="flex justify-between text-xs" style={{color:'#4B6B7A'}}><span>🧮 Items Total</span><span>{CUR}{itemsTotal.toFixed(2)}</span></div>
-          {addonsTotal>0&&<div className="flex justify-between text-xs" style={{color:'#4B6B7A'}}><span>✨ Add-ons</span><span>+{CUR}{addonsTotal.toFixed(2)}</span></div>}
+          <div className="flex justify-between text-xs" style={{color:'#4a6a4a'}}><span>🧮 Items Total</span><span>{CUR}{itemsTotal.toFixed(2)}</span></div>
+          {addonsTotal>0&&<div className="flex justify-between text-xs" style={{color:'#4a6a4a'}}><span>✨ Add-ons</span><span>+{CUR}{addonsTotal.toFixed(2)}</span></div>}
           {sN(order?.gstAmount)>0&&<div className="flex justify-between text-xs" style={{color:'#4B5563'}}><span>🏛️ GST</span><span>+{CUR}{sN(order.gstAmount).toFixed(2)}</span></div>}
           {sN(order?.taxAmount)>0&&<div className="flex justify-between text-xs" style={{color:'#4B5563'}}><span>🏛️ Tax</span><span>+{CUR}{sN(order.taxAmount).toFixed(2)}</span></div>}
           {sN(order?.serviceChargeAmount)>0&&<div className="flex justify-between text-xs" style={{color:'#4B5563'}}><span>🛎️ Service Charge</span><span>+{CUR}{sN(order.serviceChargeAmount).toFixed(2)}</span></div>}
@@ -716,7 +716,7 @@ const OrdersManagement = () => {
                     <button key={vi} onClick={()=>{setAddItemsVariantModal(null);addItemsVariantAddRef.current?.(vItem,v);}}
                       className="w-full flex items-center justify-between p-3.5 rounded-xl font-black transition-all"
                       style={{background:'#1F2937',border:'1px solid #374151',color:'#D1D5DB'}}
-                      onMouseEnter={e=>{e.currentTarget.style.background='#374151';e.currentTarget.style.borderColor='#C8CDD6';}}
+                      onMouseEnter={e=>{e.currentTarget.style.background='#374151';e.currentTarget.style.borderColor='#C9A227';}}
                       onMouseLeave={e=>{e.currentTarget.style.background='#1F2937';e.currentTarget.style.borderColor='#374151';}}
                     >
                       <span className="text-sm">{sizeEmoji[vi]||'🍽️'} {v.name}</span>
@@ -736,14 +736,14 @@ const OrdersManagement = () => {
           <motion.div initial={{opacity:0,x:100,scale:0.9}} animate={{opacity:1,x:0,scale:1}} exit={{opacity:0,x:100,scale:0.9}}
             transition={{type:'spring',damping:22,stiffness:260}}
             className="fixed top-4 right-4 z-50 p-5 rounded-2xl max-w-sm"
-            style={{background:'#111827',border:'1px solid #C8CDD6',boxShadow:'0 24px 64px rgba(0,0,0,0.7)'}}
+            style={{background:'#111827',border:'1px solid #C9A227',boxShadow:'0 24px 64px rgba(0,0,0,0.7)'}}
             data-testid="new-order-notification"
           >
             <button onClick={()=>setNewOrderNotification(null)} className="absolute top-3 right-3 w-6 h-6 rounded-full flex items-center justify-center" style={{background:'rgba(0,0,0,0.2)'}}><X className="w-3.5 h-3.5 text-white"/></button>
             <div className="flex items-start gap-4">
               <div className="w-12 h-12 rounded-2xl flex items-center justify-center text-2xl flex-shrink-0" style={{background:'rgba(255,255,255,0.08)'}}><Bell className="w-5 h-5 text-white"/></div>
               <div>
-                <p className="font-medium text-xs uppercase tracking-widest mb-0.5" style={{color:"#C8CDD6"}}>New Order</p>
+                <p className="font-medium text-xs uppercase tracking-widest mb-0.5" style={{color:"#C9A227"}}>New Order</p>
                 <p className="omf-title text-white text-xl font-semibold mb-1">{fmtOrd(newOrderNotification.orderNumber)}</p>
                 {newOrderNotification.orderType==='dine-in'&&newOrderNotification.tableNumber&&<p className="text-sm" style={{color:"#D1D5DB"}}>Table {newOrderNotification.tableNumber}</p>}
                 <p className="text-sm" style={{color:"#9CA3AF"}}>{getItemsCount(newOrderNotification.items)}</p>
@@ -852,7 +852,7 @@ const OrdersManagement = () => {
                           <td className="px-4 py-3 text-sm" style={{color:'#6B7280'}}>{order.customerPhone||'—'}</td>
                           <td className="px-4 py-3.5"><span className="text-sm text-white capitalize font-medium">{orderTypeIcon(order.orderType)} {order.orderType||'—'}</span></td>
                           <td className="px-4 py-3.5 text-sm text-white font-medium">
-                            {order.orderType==='dine-in'?(order.tableNumber?`🪑 ${order.tableNumber}`:'—'):order.orderType==='delivery'?<span style={{color:'#6B7280',fontSize:11}}>🛵 Delivery</span>:'—'}
+                            {order.orderType==='dine-in'?(order.tableNumber?`🪑 ${order.tableNumber}`:'—'):order.orderType==='delivery'?<span style={{color:'#7a6a3a',fontSize:11}}>🛵 Delivery</span>:'—'}
                           </td>
                           <td className="px-4 py-3.5 text-sm font-medium" style={{color:'#6B7280'}}>🍴 {getItemsCount(order.items)}</td>
                           <td className="px-4 py-3"><span className="text-sm font-medium text-white">{CUR}{(order.totalAmount||order.total||0).toFixed(0)}</span></td>
@@ -940,7 +940,7 @@ const OrdersManagement = () => {
               return (
                 <div key={order.id} data-testid={`order-card-${order.id}`}
                   className="omf-in" style={{animationDelay:`${Math.min(oi*35,350)}ms`,animationFillMode:'both',background:'#111827',border:`1px solid ${order.orderStatus==='new'?'rgba(59,130,246,0.25)':order.orderStatus==='preparing'?'rgba(245,158,11,0.25)':order.orderStatus==='completed'?'rgba(34,197,94,0.25)':order.orderStatus==='cancelled'?'rgba(239,68,68,0.2)':'#1F2937'}`,borderRadius:'10px',overflow:'hidden',transition:'all 150ms cubic-bezier(0.4,0,0.2,1)'}}
-                  onMouseEnter={e=>{e.currentTarget.style.borderColor='rgba(200,205,214,0.18)';}}
+                  onMouseEnter={e=>{e.currentTarget.style.borderColor='rgba(201,162,39,0.22)';}}
                   onMouseLeave={e=>{e.currentTarget.style.borderColor='rgba(255,255,255,0.07)';}}
                 >
                   {/* Card top */}
@@ -1032,7 +1032,7 @@ const OrdersManagement = () => {
                             <button onClick={()=>setDeleteConfirmId(null)} className="omf-btn omf-btn-ghost flex-1 justify-center py-2.5" style={{borderRadius:12}}>✗ Cancel</button>
                           </div>
                         ):(
-                          <button onClick={()=>setDeleteConfirmId(order.id)} className="omf-btn omf-btn-ghost w-full justify-center py-2.5" style={{borderRadius:12,color:'#6B7280'}}>
+                          <button onClick={()=>setDeleteConfirmId(order.id)} className="omf-btn omf-btn-ghost w-full justify-center py-2.5" style={{borderRadius:12,color:'#5a4a1a'}}>
                             <Trash2 className="w-3.5 h-3.5"/>🗑️ Remove Order
                           </button>
                         )}
@@ -1050,7 +1050,7 @@ const OrdersManagement = () => {
             <p className="text-xs font-bold" style={{color:'#4B5563'}}>
               {filteredOrders.length} order{filteredOrders.length!==1?'s':''} · Live
             </p>
-            <span className="inline-block w-1.5 h-1.5 rounded-full animate-pulse" style={{background:'#C8CDD6'}}/>
+            <span className="inline-block w-1.5 h-1.5 rounded-full animate-pulse" style={{background:'#C9A227'}}/>
           </div>
         </>
       )}
