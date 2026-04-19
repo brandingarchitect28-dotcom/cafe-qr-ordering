@@ -209,7 +209,7 @@ const Dashboard = () => {
         <div className="flex items-start justify-between px-4 pt-6 pb-5 flex-shrink-0">
           <div>
             <span className="dash-brand-name">Branding<br/>Architect</span>
-            <span className="dash-brand-sub">SmartCafé OS</span>
+            <span className="dash-brand-sub">Your Smart OS</span>
           </div>
           <button
             className="transition-colors p-1.5 rounded-xl hover:bg-white/5 mt-1"
