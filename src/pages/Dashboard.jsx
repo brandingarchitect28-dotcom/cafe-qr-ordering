@@ -197,7 +197,11 @@ const Dashboard = () => {
 
   return (
     <div className={`min-h-screen ${pageBg} dash`} style={{ fontFamily: "'DM Sans', system-ui, sans-serif" }}>
-      <GlobalOrderPopup order={newOrder} onClose={clearNewOrder} />
+      <GlobalOrderPopup
+        order={newOrder}
+        onClose={clearNewOrder}
+        onNavigateToOrders={() => { setActiveTab('orders'); clearNewOrder(); }}
+      />
       {sidebarOpen && (
         <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-40" onClick={() => setSidebarOpen(false)} />
       )}
