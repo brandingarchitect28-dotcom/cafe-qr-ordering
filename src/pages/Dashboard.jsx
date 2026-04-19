@@ -37,34 +37,34 @@ if (typeof document !== 'undefined' && !document.getElementById('dash-cafe-css')
   const el = document.createElement('style');
   el.id = 'dash-cafe-css';
   el.textContent = `
-    @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700;800&family=Playfair+Display:wght@600;700;800;900&display=swap');
+    @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700;800&family=Playfair+Display:ital,wght@0,700;0,800;0,900;1,700&display=swap');
     .dash { font-family: 'DM Sans', system-ui, sans-serif; }
     .dash-title { font-family: 'Playfair Display', serif !important; }
 
-    /* Nav items — larger, bolder, more visible like reference screenshot */
+    /* Nav items — high contrast, visible, professional */
     .dash-nav-item {
       width: 100%;
       display: flex; align-items: center; gap: 11px;
       padding: 11px 14px; border-radius: 10px;
       font-family: 'DM Sans', system-ui, sans-serif;
-      font-weight: 600; font-size: 15px;
+      font-weight: 500; font-size: 15px;
       cursor: pointer; transition: all 160ms;
       border: none; background: transparent;
-      color: #8a7a65; text-align: left;
-      letter-spacing: 0.01em;
+      color: #a89880; text-align: left;
+      letter-spacing: 0.015em;
       -webkit-font-smoothing: antialiased;
     }
-    .dash-nav-item:hover { background: rgba(201,162,39,0.07); color: #e5d5b5; }
+    .dash-nav-item:hover { background: rgba(201,162,39,0.07); color: #f0e0c0; }
     .dash-nav-item.active {
       background: linear-gradient(135deg,#C9A227,#A67C00);
       color: #fff; font-weight: 700;
       box-shadow: 0 3px 14px rgba(201,162,39,0.32);
     }
-    .dash-nav-icon { opacity: 0.55; flex-shrink: 0; transition: opacity 160ms; }
-    .dash-nav-item:hover .dash-nav-icon  { opacity: 0.85; }
+    .dash-nav-icon { opacity: 0.5; flex-shrink: 0; transition: opacity 160ms; }
+    .dash-nav-item:hover .dash-nav-icon  { opacity: 0.9; }
     .dash-nav-item.active .dash-nav-icon { opacity: 1; }
 
-    /* TASK 5 & 6: Sidebar scroll + sticky footer */
+    /* Sidebar */
     .dash-sidebar {
       background: #0a0702;
       border-right: 1.5px solid rgba(201,162,39,0.1);
@@ -75,33 +75,35 @@ if (typeof document !== 'undefined' && !document.getElementById('dash-cafe-css')
       overflow-x: hidden;
       overscroll-behavior: contain;
       -webkit-overflow-scrolling: touch;
-      /* leave room for sticky footer — handled by flex column */
     }
     .dash-nav-scroll::-webkit-scrollbar { width: 3px; }
     .dash-nav-scroll::-webkit-scrollbar-track { background: transparent; }
     .dash-nav-scroll::-webkit-scrollbar-thumb { background: rgba(201,162,39,0.18); border-radius: 3px; }
 
-    /* Branding header — large bold all-caps stacked like reference screenshot */
+    /* Branding — Playfair Display bold serif, Title Case, premium weight */
     .dash-brand-name {
-      font-family: 'DM Sans', system-ui, sans-serif;
-      font-size: 20px;
-      font-weight: 800;
-      letter-spacing: 0.06em;
+      font-family: 'Playfair Display', Georgia, serif;
+      font-size: 24px;
+      font-weight: 900;
+      font-style: normal;
+      letter-spacing: 0.02em;
       text-transform: uppercase;
       color: #C9A227;
-      line-height: 1.15;
+      line-height: 1.08;
       -webkit-font-smoothing: antialiased;
+      display: block;
     }
     .dash-brand-sub {
       font-family: 'DM Sans', system-ui, sans-serif;
-      font-size: 10px;
-      font-weight: 600;
-      letter-spacing: 0.1em;
+      font-size: 9px;
+      font-weight: 700;
+      letter-spacing: 0.2em;
       text-transform: uppercase;
       color: #C9A227;
-      opacity: 0.5;
-      margin-top: 3px;
+      opacity: 0.4;
+      margin-top: 6px;
       -webkit-font-smoothing: antialiased;
+      display: block;
     }
   `;
   document.head.appendChild(el);
@@ -203,25 +205,25 @@ const Dashboard = () => {
       {/* ── Sidebar ── */}
       <aside className={`fixed top-0 left-0 h-screen w-64 dash-sidebar flex flex-col z-50 transform transition-transform ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'}`}>
 
-        {/* Branding header — "BRANDING ARCHITECT" large bold, "SmartCafé OS" small gold below */}
-        <div className="flex items-start justify-between px-4 pt-5 pb-4 flex-shrink-0">
-          <div className="flex flex-col">
+        {/* Branding header */}
+        <div className="flex items-start justify-between px-4 pt-6 pb-5 flex-shrink-0">
+          <div>
             <span className="dash-brand-name">Branding<br/>Architect</span>
             <span className="dash-brand-sub">SmartCafé OS</span>
           </div>
           <button
             className="transition-colors p-1.5 rounded-xl hover:bg-white/5 mt-1"
-            style={{ color: '#7a6a55' }}
+            style={{ color: '#5a4a3a' }}
             onClick={() => setSidebarOpen(false)}
             aria-label="Close sidebar"
             onMouseEnter={e => e.currentTarget.style.color = '#fff'}
-            onMouseLeave={e => e.currentTarget.style.color = '#7a6a55'}
+            onMouseLeave={e => e.currentTarget.style.color = '#5a4a3a'}
           >
             <X className="w-4 h-4" />
           </button>
         </div>
 
-        <div className="mx-4 flex-shrink-0" style={{ height: 1, background: 'rgba(201,162,39,0.1)' }} />
+        <div className="mx-4 mb-1 flex-shrink-0" />
 
         {/*
           TASK 5 & 6: Nav scroll container is flex-1 with overflow-y auto.
