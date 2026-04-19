@@ -50,16 +50,16 @@ if (typeof document !== 'undefined' && !document.getElementById('dash-cafe-css')
       border: none; background: transparent;
       color: #7a6a55; text-align: left;
     }
-    .dash-nav-item:hover { background: rgba(255,140,0,0.07); color: #fff; }
+    .dash-nav-item:hover { background: rgba(201,162,39,0.07); color: #fff; }
     .dash-nav-item.active {
-      background: linear-gradient(135deg,#FF7A20,#E55A00);
+      background: linear-gradient(135deg,#C9A227,#A67C00);
       color: #fff; font-weight: 800;
-      box-shadow: 0 3px 14px rgba(255,120,0,0.32);
+      box-shadow: 0 3px 14px rgba(201,162,39,0.32);
     }
     .dash-nav-item.active .dash-nav-emoji { filter: brightness(1.2); }
     .dash-sidebar {
       background: #0a0702;
-      border-right: 1.5px solid rgba(255,140,0,0.1);
+      border-right: 1.5px solid rgba(201,162,39,0.1);
     }
   `;
   document.head.appendChild(el);
@@ -90,10 +90,8 @@ const Dashboard = () => {
   const cafeId   = user?.cafeId;
   const navigate = useNavigate();
   const { T, isLight } = useTheme();
-
   const { newOrder, clearNewOrder } = useGlobalOrderNotification(cafeId);
   const { data: cafe } = useDocument('cafes', cafeId);
-
   const [activeTab,   setActiveTab  ] = useState('overview');
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
@@ -129,24 +127,21 @@ const Dashboard = () => {
   ];
 
   const pageBg = isLight ? 'bg-[#F5F5F5]' : 'bg-[#050505]';
-
   if (cafe && cafe.isActive === false) return <CafeDisabled isAdmin={true} />;
 
   return (
     <div className={`min-h-screen ${pageBg} dash`} style={{ fontFamily: "'DM Sans', system-ui, sans-serif" }}>
       <GlobalOrderPopup order={newOrder} onClose={clearNewOrder} />
-
       {sidebarOpen && (
         <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-40" onClick={() => setSidebarOpen(false)} />
       )}
-
       <aside className={`fixed top-0 left-0 h-screen w-64 dash-sidebar flex flex-col p-4 z-50 transform transition-transform ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'}`}>
         <div className="flex items-center justify-between mb-6">
           <div className="flex items-center gap-2.5">
             <div className="w-9 h-9 rounded-xl flex items-center justify-center text-lg flex-shrink-0"
-              style={{ background: 'rgba(255,140,0,0.12)', border: '1.5px solid rgba(255,140,0,0.22)' }}>☕</div>
+              style={{ background: 'rgba(201,162,39,0.12)', border: '1.5px solid rgba(201,162,39,0.22)' }}>☕</div>
             <div>
-              <h1 className="text-sm font-black dash-title" style={{ color: '#FF7A20', lineHeight: 1.1 }}>SmartCafé OS</h1>
+              <h1 className="text-sm font-black dash-title" style={{ color: '#C9A227', lineHeight: 1.1 }}>SmartCafé OS</h1>
               <p className="text-xs font-bold" style={{ color: '#4a3f35' }}>Branding Architect</p>
             </div>
           </div>
@@ -157,9 +152,7 @@ const Dashboard = () => {
             <X className="w-5 h-5" />
           </button>
         </div>
-
-        <div className="mb-4" style={{ height: 1, background: 'rgba(255,140,0,0.1)' }} />
-
+        <div className="mb-4" style={{ height: 1, background: 'rgba(201,162,39,0.1)' }} />
         <nav className="flex-1 space-y-0.5 overflow-y-auto overscroll-contain" style={{ WebkitOverflowScrolling: 'touch' }}>
           {menuItems.map((item) => {
             const isActive = activeTab === item.id;
@@ -174,11 +167,9 @@ const Dashboard = () => {
             );
           })}
         </nav>
-
-        <div className="my-3" style={{ height: 1, background: 'rgba(255,140,0,0.08)' }} />
-
+        <div className="my-3" style={{ height: 1, background: 'rgba(201,162,39,0.08)' }} />
         <div className="flex-shrink-0 space-y-1">
-          <div className="px-4 py-2 rounded-xl" style={{ background: 'rgba(255,140,0,0.05)' }}>
+          <div className="px-4 py-2 rounded-xl" style={{ background: 'rgba(201,162,39,0.05)' }}>
             <p className="text-xs font-bold" style={{ color: '#4a3f35' }}>Logged in as</p>
             <p className="text-white text-sm font-black truncate">{user?.email}</p>
           </div>
@@ -189,11 +180,10 @@ const Dashboard = () => {
           </button>
         </div>
       </aside>
-
       <div>
         <header className="sticky top-0 z-30 h-16 px-5 flex items-center justify-between"
-          style={{ background: 'rgba(5,5,5,0.88)', backdropFilter: 'blur(16px)', borderBottom: '1px solid rgba(255,140,0,0.1)' }}>
-          <button className="transition-opacity hover:opacity-70" style={{ color: '#FF7A20' }}
+          style={{ background: 'rgba(5,5,5,0.88)', backdropFilter: 'blur(16px)', borderBottom: '1px solid rgba(201,162,39,0.1)' }}>
+          <button className="transition-opacity hover:opacity-70" style={{ color: '#C9A227' }}
             onClick={() => setSidebarOpen(prev => !prev)} aria-label="Toggle sidebar">
             <MenuIcon className="w-6 h-6" />
           </button>
@@ -205,7 +195,6 @@ const Dashboard = () => {
           </div>
           <div className="w-6" />
         </header>
-
         <main className="p-5">
           {activeTab === 'overview'   && <Overview />}
           {activeTab === 'orders'     && <OrdersManagement />}
