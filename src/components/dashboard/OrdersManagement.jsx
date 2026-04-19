@@ -36,141 +36,182 @@ if (typeof document !== 'undefined' && !document.getElementById('om-food-css')) 
   const el = document.createElement('style');
   el.id = 'om-food-css';
   el.textContent = `
-    @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700;800&family=Playfair+Display:wght@600;700;800;900&display=swap');
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
 
-    .omf { font-family: 'DM Sans', system-ui, sans-serif; }
-    .omf-title { font-family: 'Playfair Display', serif !important; letter-spacing: 0.01em; }
+    .omf { font-family: 'Inter', system-ui, sans-serif; }
+    .omf-title { font-family: 'Inter', system-ui, sans-serif !important; font-weight: 600; letter-spacing: -0.02em; }
 
-    /* Cards */
+    /* ── Base cards: neutral dark, never gold-tinted ── */
     .omf-card {
-      background: #120f00;
-      border: 1.5px solid rgba(255,255,255,0.07);
-      border-radius: 16px;
-      transition: border-color 200ms, box-shadow 200ms;
+      background: #111827;
+      border: 1px solid #1F2937;
+      border-radius: 12px;
+      transition: border-color 150ms cubic-bezier(0.4,0,0.2,1), box-shadow 150ms cubic-bezier(0.4,0,0.2,1);
     }
-    .omf-card:hover { border-color: rgba(201,162,39,0.25); }
+    .omf-card:hover {
+      border-color: #374151;
+      box-shadow: 0 4px 24px rgba(0,0,0,0.4);
+    }
 
-    /* Table rows */
-    .omf-row { border-bottom: 1px solid rgba(255,255,255,0.05); transition: background 150ms; cursor: pointer; }
-    .omf-row:hover { background: rgba(201,162,39,0.04); }
-    .omf-row-open { background: rgba(201,162,39,0.03) !important; }
+    /* ── Table rows ── */
+    .omf-row { border-bottom: 1px solid #1F2937; transition: background 150ms cubic-bezier(0.4,0,0.2,1); cursor: pointer; }
+    .omf-row:hover { background: rgba(255,255,255,0.025); }
+    .omf-row-open { background: rgba(255,255,255,0.02) !important; }
 
-    /* Buttons */
+    /* ── Buttons: clean, purposeful ── */
     .omf-btn {
-      display: inline-flex; align-items: center; gap: 5px;
-      font-family: 'DM Sans', system-ui, sans-serif;
-      font-weight: 800; font-size: 12px;
-      padding: 6px 12px; border-radius: 10px;
-      border: 1.5px solid transparent;
-      cursor: pointer; transition: all 180ms;
-      white-space: nowrap;
+      display: inline-flex; align-items: center; gap: 6px;
+      font-family: 'Inter', system-ui, sans-serif;
+      font-weight: 500; font-size: 12px;
+      padding: 6px 12px; border-radius: 8px;
+      border: 1px solid transparent;
+      cursor: pointer;
+      transition: all 150ms cubic-bezier(0.4,0,0.2,1);
+      white-space: nowrap; letter-spacing: -0.01em;
     }
-    .omf-btn:hover  { transform: translateY(-1px); filter: brightness(1.1); }
-    .omf-btn:active { transform: scale(0.96); }
+    .omf-btn:hover  { transform: translateY(-1px); }
+    .omf-btn:active { transform: scale(0.98); }
 
-    /* PRIMARY — premium emerald green (matches store-open card) */
+    /* PRIMARY: premium silver-grey */
     .omf-btn-orange {
-      background: linear-gradient(135deg, #C9A227, #8B6914);
-      color: #fff;
-      box-shadow: 0 3px 14px rgba(201,162,39,0.32);
+      background: #C8CDD6;
+      color: #0B0F14;
+      font-weight: 700;
+      box-shadow: 0 1px 8px rgba(200,205,214,0.14);
     }
-    .omf-btn-orange:hover { box-shadow: 0 5px 22px rgba(201,162,39,0.48); }
+    .omf-btn-orange:hover {
+      background: #D4D8E0;
+      box-shadow: 0 4px 16px rgba(200,205,214,0.22);
+    }
 
-    .omf-btn-ghost  { background: rgba(255,255,255,0.05); color: #7a6a3a; border-color: rgba(255,255,255,0.08); }
-    .omf-btn-ghost:hover  { background: rgba(255,255,255,0.09); color: #fff; }
-    .omf-btn-red    { background: rgba(220,50,50,0.12); color: #ff7070; border-color: rgba(220,50,50,0.22); }
-    .omf-btn-red:hover    { background: rgba(220,50,50,0.22); }
-    .omf-btn-blue   { background: rgba(59,130,246,0.1); color: #60a5fa; border-color: rgba(59,130,246,0.2); }
-    .omf-btn-blue:hover   { background: rgba(59,130,246,0.2); }
-    .omf-btn-green  { background: rgba(201,162,39,0.1); color: #C9A227; border-color: rgba(201,162,39,0.22); }
-    .omf-btn-green:hover  { background: rgba(201,162,39,0.2); }
-    .omf-btn-yellow { background: rgba(255,190,11,0.1); color: #fbbf24; border-color: rgba(255,190,11,0.22); }
-    .omf-btn-yellow:hover { background: rgba(255,190,11,0.2); }
+    /* Ghost: neutral, subtle */
+    .omf-btn-ghost  { background: rgba(255,255,255,0.04); color: #6B7280; border-color: #1F2937; }
+    .omf-btn-ghost:hover  { background: rgba(255,255,255,0.07); color: #D1D5DB; border-color: #374151; }
 
-    /* Inputs */
+    /* Semantic actions */
+    .omf-btn-red    { background: rgba(239,68,68,0.08); color: #F87171; border-color: rgba(239,68,68,0.2); }
+    .omf-btn-red:hover    { background: rgba(239,68,68,0.14); }
+    .omf-btn-blue   { background: rgba(59,130,246,0.08); color: #60A5FA; border-color: rgba(59,130,246,0.2); }
+    .omf-btn-blue:hover   { background: rgba(59,130,246,0.14); }
+    .omf-btn-green  { background: rgba(34,197,94,0.08); color: #4ADE80; border-color: rgba(34,197,94,0.2); }
+    .omf-btn-green:hover  { background: rgba(34,197,94,0.14); }
+    .omf-btn-yellow { background: rgba(245,158,11,0.08); color: #FCD34D; border-color: rgba(245,158,11,0.2); }
+    .omf-btn-yellow:hover { background: rgba(245,158,11,0.14); }
+
+    /* ── Inputs: clean neutral surfaces ── */
     .omf-input {
-      background: #1a1500; border: 1.5px solid rgba(255,255,255,0.08); border-radius: 12px;
-      color: #fdf8e1; padding: 10px 14px; font-size: 14px; font-weight: 600;
-      font-family: 'DM Sans', system-ui, sans-serif;
-      outline: none; width: 100%; transition: border-color 180ms, box-shadow 180ms;
+      background: #0B0F14;
+      border: 1px solid #1F2937;
+      border-radius: 8px;
+      color: #F9FAFB;
+      padding: 10px 14px;
+      font-size: 14px;
+      font-weight: 400;
+      font-family: 'Inter', system-ui, sans-serif;
+      outline: none;
+      width: 100%;
+      transition: border-color 150ms cubic-bezier(0.4,0,0.2,1), box-shadow 150ms cubic-bezier(0.4,0,0.2,1);
     }
-    .omf-input:focus { border-color: rgba(201,162,39,0.55); box-shadow: 0 0 0 3px rgba(201,162,39,0.1); }
-    .omf-input::placeholder { color: #3d341a; }
+    .omf-input:focus {
+      border-color: #C8CDD6;
+      box-shadow: 0 0 0 2px rgba(200,205,214,0.10);
+    }
+    .omf-input::placeholder { color: #374151; }
     .omf-input[type="date"] { color-scheme: dark; }
 
-    /* Selects */
+    /* ── Selects ── */
     .omf-select {
-      background: #1a1500; border: 1.5px solid rgba(255,255,255,0.08); border-radius: 9px;
-      color: #fdf8e1; padding: 6px 10px; font-size: 12px; font-weight: 700;
-      font-family: 'DM Sans', system-ui, sans-serif;
-      outline: none; cursor: pointer; transition: border-color 160ms;
+      background: #0B0F14;
+      border: 1px solid #1F2937;
+      border-radius: 6px;
+      color: #D1D5DB;
+      padding: 6px 10px;
+      font-size: 12px;
+      font-weight: 500;
+      font-family: 'Inter', system-ui, sans-serif;
+      outline: none;
+      cursor: pointer;
+      transition: border-color 150ms;
     }
-    .omf-select:focus { border-color: rgba(201,162,39,0.5); }
-    .omf-select option { background: #1a1500; }
+    .omf-select:focus { border-color: #C8CDD6; }
+    .omf-select option { background: #111827; }
 
-    /* Badges */
+    /* ── Badges: semantic, controlled ── */
     .omf-badge {
       display: inline-flex; align-items: center; gap: 4px;
-      padding: 3px 10px; border-radius: 20px;
-      font-size: 11px; font-weight: 800;
-      border: 1.5px solid transparent;
-      font-family: 'DM Sans', system-ui, sans-serif;
+      padding: 2px 8px; border-radius: 4px;
+      font-size: 11px; font-weight: 500;
+      border: 1px solid transparent;
+      font-family: 'Inter', system-ui, sans-serif;
+      letter-spacing: 0.01em;
     }
 
-    /* Filter tabs */
+    /* ── Filter tabs: minimal pill style ── */
     .omf-tab {
-      padding: 6px 16px; border-radius: 22px; font-size: 13px; font-weight: 800;
-      cursor: pointer; transition: all 180ms; border: 1.5px solid transparent;
-      font-family: 'DM Sans', system-ui, sans-serif;
+      padding: 5px 14px; border-radius: 6px; font-size: 12px; font-weight: 500;
+      cursor: pointer;
+      transition: all 150ms cubic-bezier(0.4,0,0.2,1);
+      border: 1px solid #1F2937;
+      font-family: 'Inter', system-ui, sans-serif;
+      letter-spacing: -0.01em;
     }
-    .omf-tab-on  {
-      background: linear-gradient(135deg, #C9A227, #8B6914);
-      color: #fff;
-      box-shadow: 0 3px 14px rgba(201,162,39,0.35);
+    .omf-tab-on {
+      background: #C8CDD6;
+      color: #0B0F14;
+      border-color: #C8CDD6;
+      font-weight: 700;
+      box-shadow: 0 1px 10px rgba(200,205,214,0.16);
     }
-    .omf-tab-off { background: rgba(255,255,255,0.04); color: #7a6a3a; border-color: rgba(255,255,255,0.07); }
-    .omf-tab-off:hover { background: rgba(201,162,39,0.08); color: #C9A227; border-color: rgba(201,162,39,0.2); }
+    .omf-tab-off { background: transparent; color: #6B7280; }
+    .omf-tab-off:hover { background: rgba(255,255,255,0.04); color: #D1D5DB; border-color: #374151; }
 
-    /* Scrollbar */
-    .omf-scroll::-webkit-scrollbar { width: 4px; height: 4px; }
+    /* ── Scrollbar ── */
+    .omf-scroll::-webkit-scrollbar { width: 3px; height: 3px; }
     .omf-scroll::-webkit-scrollbar-track { background: transparent; }
-    .omf-scroll::-webkit-scrollbar-thumb { background: rgba(201,162,39,0.25); border-radius: 4px; }
+    .omf-scroll::-webkit-scrollbar-thumb { background: #374151; border-radius: 3px; }
 
-    /* Fade-in */
-    @keyframes omfIn { from { opacity:0; transform:translateY(8px); } to { opacity:1; transform:translateY(0); } }
-    .omf-in { animation: omfIn 280ms ease forwards; }
+    /* ── Fade-in: subtle, fast ── */
+    @keyframes omfIn { from { opacity:0; transform:translateY(4px); } to { opacity:1; transform:translateY(0); } }
+    .omf-in { animation: omfIn 200ms cubic-bezier(0.4,0,0.2,1) forwards; }
 
-    /* Order number style — premium green */
-    .omf-ordnum { font-family: 'Playfair Display', serif; color: #C9A227; }
+    /* ── Order number: weight hierarchy, silver accent ── */
+    .omf-ordnum { font-family: 'Inter', system-ui, sans-serif; color: #C8CDD6; font-weight: 600; }
 
-    /* Section label */
+    /* ── Section label: subtle uppercase ── */
     .omf-sec {
-      font-size: 11px; font-weight: 900; text-transform: uppercase; letter-spacing: 0.08em;
-      color: #C9A227; display: flex; align-items: center; gap: 5px;
-      font-family: 'DM Sans', system-ui, sans-serif;
+      font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.08em;
+      color: #6B7280; display: flex; align-items: center; gap: 5px;
+      font-family: 'Inter', system-ui, sans-serif;
     }
 
-    /* Sheet modal */
+    /* ── Sheet modal: deep neutral ── */
     .omf-sheet {
-      background: linear-gradient(180deg, #1a1400 0%, #110d00 100%);
-      border: 1.5px solid rgba(201,162,39,0.18);
-      box-shadow: 0 -20px 60px rgba(201,162,39,0.14);
+      background: #0F172A;
+      border: 1px solid #1F2937;
+      box-shadow: 0 -24px 80px rgba(0,0,0,0.6);
     }
-    .omf-sheet-grip { width: 36px; height: 4px; border-radius: 4px; background: rgba(201,162,39,0.28); }
+    .omf-sheet-grip { width: 32px; height: 3px; border-radius: 3px; background: #374151; }
+
+    /* ── Status border system for mobile cards ── */
+    .omf-status-new      { border-color: rgba(59,130,246,0.3) !important; }
+    .omf-status-preparing { border-color: rgba(245,158,11,0.3) !important; }
+    .omf-status-completed { border-color: rgba(34,197,94,0.3) !important; }
+    .omf-status-cancelled { border-color: rgba(239,68,68,0.2) !important; }
+    .omf-status-pending   { border-color: rgba(239,68,68,0.25) !important; }
   `;
   document.head.appendChild(el);
 }
 
 // ─── helpers ──────────────────────────────────────────────────────────────────
 const STATUS = {
-  new:       { emoji: '🆕', label: 'New',       bg: 'rgba(59,130,246,0.14)',  color: '#60a5fa', bd: 'rgba(59,130,246,0.24)' },
-  preparing: { emoji: '👨‍🍳', label: 'Preparing', bg: 'rgba(255,190,11,0.14)', color: '#fbbf24', bd: 'rgba(255,190,11,0.24)' },
-  completed: { emoji: '✅', label: 'Done',       bg: 'rgba(201,162,39,0.12)',    color: '#C9A227', bd: 'rgba(201,162,39,0.22)' },
-  cancelled: { emoji: '❌', label: 'Cancelled',  bg: 'rgba(220,50,50,0.12)',   color: '#f87171', bd: 'rgba(220,50,50,0.22)' },
+  new:       { emoji: '', label: 'New',       bg: 'rgba(59,130,246,0.1)',   color: '#60A5FA', bd: 'rgba(59,130,246,0.25)' },
+  preparing: { emoji: '', label: 'Preparing', bg: 'rgba(245,158,11,0.1)',  color: '#FCD34D', bd: 'rgba(245,158,11,0.25)' },
+  completed: { emoji: '', label: 'Done',      bg: 'rgba(34,197,94,0.1)',   color: '#4ADE80', bd: 'rgba(34,197,94,0.25)' },
+  cancelled: { emoji: '', label: 'Cancelled', bg: 'rgba(239,68,68,0.08)', color: '#F87171', bd: 'rgba(239,68,68,0.2)'  },
 };
 const PAYMENT = {
-  paid:    { emoji: '💰', bg: 'rgba(201,162,39,0.12)',   color: '#C9A227', bd: 'rgba(201,162,39,0.22)' },
-  pending: { emoji: '⏳', bg: 'rgba(220,50,50,0.12)',  color: '#f87171', bd: 'rgba(220,50,50,0.22)' },
+  paid:    { emoji: '', bg: 'rgba(34,197,94,0.1)',   color: '#4ADE80', bd: 'rgba(34,197,94,0.25)' },
+  pending: { emoji: '', bg: 'rgba(239,68,68,0.08)', color: '#F87171', bd: 'rgba(239,68,68,0.2)' },
 };
 const getSt  = s => STATUS[s]  || STATUS.new;
 const getPay = s => PAYMENT[s] || PAYMENT.pending;
@@ -274,13 +315,13 @@ const AddItemsToOrderModal = ({ order, cafeCurrency, onClose, setVariantModal, v
         >
           <div className="flex justify-center pt-3 pb-1 sm:hidden flex-shrink-0"><div className="omf-sheet-grip"/></div>
           {/* Header */}
-          <div className="flex items-center justify-between px-5 py-4 flex-shrink-0" style={{borderBottom:'1px solid rgba(201,162,39,0.12)'}}>
+          <div className="flex items-center justify-between px-5 py-4 flex-shrink-0" style={{borderBottom:'1px solid #1F2937'}}>
             <div>
-              <h3 className="omf-title text-white font-bold text-lg flex items-center gap-2">🛒 Add Items to Order</h3>
-              <p className="text-xs mt-0.5" style={{color:'#7a6a3a'}}>#{order.orderNumber ? String(order.orderNumber).padStart(3,'0') : order.id.slice(0,6)}{order.customerName ? ` · ${order.customerName}` : ''}</p>
+              <h3 className="omf-title text-white font-semibold text-base">Add Items to Order</h3>
+              <p className="text-xs mt-0.5" style={{color:'#6B7280'}}>#{order.orderNumber ? String(order.orderNumber).padStart(3,'0') : order.id.slice(0,6)}{order.customerName ? ` · ${order.customerName}` : ''}</p>
             </div>
-            <button onClick={onClose} className="w-8 h-8 rounded-full flex items-center justify-center" style={{background:'rgba(201,162,39,0.1)',border:'1px solid rgba(201,162,39,0.2)'}}>
-              <X className="w-4 h-4" style={{color:'#C9A227'}}/>
+            <button onClick={onClose} className="w-8 h-8 rounded-full flex items-center justify-center" style={{background:'#1F2937',border:'1px solid #374151'}}>
+              <X className="w-4 h-4" style={{color:'#9CA3AF'}}/>
             </button>
           </div>
           {/* Search */}
@@ -295,10 +336,10 @@ const AddItemsToOrderModal = ({ order, cafeCurrency, onClose, setVariantModal, v
             {loadingMenu ? (
               <div className="flex flex-col items-center justify-center py-12 gap-2">
                 <div className="text-4xl animate-bounce">🍳</div>
-                <p className="text-sm" style={{color:'#7a6a3a'}}>Loading menu…</p>
+                <p className="text-sm" style={{color:'#6B7280'}}>Loading menu…</p>
               </div>
             ) : filtered.length === 0 ? (
-              <div className="text-center py-10"><div className="text-4xl mb-2">🫙</div><p className="text-sm" style={{color:'#5a4a1a'}}>No items found</p></div>
+              <div className="text-center py-10"><div className="text-4xl mb-2">🫙</div><p className="text-sm" style={{color:'#4B5563'}}>No items found</p></div>
             ) : filtered.map(item => {
               const qty = cartQty(item.id);
               const sp = item.sizePricing;
@@ -313,23 +354,23 @@ const AddItemsToOrderModal = ({ order, cafeCurrency, onClose, setVariantModal, v
               return (
                 <div key={item.id} className="flex items-center justify-between p-3 rounded-xl transition-all"
                   style={{background:'rgba(255,255,255,0.03)',border:'1px solid rgba(255,255,255,0.06)'}}
-                  onMouseEnter={e=>{e.currentTarget.style.borderColor='rgba(201,162,39,0.22)';e.currentTarget.style.background='rgba(201,162,39,0.04)';}}
+                  onMouseEnter={e=>{e.currentTarget.style.borderColor='#374151';e.currentTarget.style.background='rgba(255,255,255,0.03)';}}
                   onMouseLeave={e=>{e.currentTarget.style.borderColor='rgba(255,255,255,0.06)';e.currentTarget.style.background='rgba(255,255,255,0.03)';}}
                 >
                   <div className="flex-1 min-w-0 mr-3">
                     <p className="text-white text-sm font-bold truncate">{item.name}</p>
-                    {item.category && <p className="text-xs mt-0.5" style={{color:'#5a4a1a'}}>{item.category}</p>}
+                    {item.category && <p className="text-xs mt-0.5" style={{color:'#4B5563'}}>{item.category}</p>}
                     {hasV ? (
                       <div className="flex flex-wrap gap-1 mt-1.5">
-                        {iv.map((v,vi)=><span key={vi} className="omf-badge" style={{background:'rgba(201,162,39,0.12)',color:'#C9A227',borderColor:'rgba(201,162,39,0.25)',fontSize:'0.65rem'}}>{v.name||`S${vi+1}`} {CUR}{fmtN(v.price)}</span>)}
+                        {iv.map((v,vi)=><span key={vi} className="omf-badge" style={{background:'rgba(200,205,214,0.07)',color:'#C8CDD6',borderColor:'rgba(200,205,214,0.18)',fontSize:'0.65rem'}}>{v.name||`S${vi+1}`} {CUR}{fmtN(v.price)}</span>)}
                       </div>
-                    ) : <p className="text-sm font-black mt-1" style={{color:'#C9A227'}}>{dp}</p>}
+                    ) : <p className="text-sm font-medium mt-1" style={{color:'#C8CDD6'}}>{dp}</p>}
                   </div>
                   {!hasV && qty > 0 ? (
                     <div className="flex items-center gap-2 flex-shrink-0">
                       <button onClick={()=>removeFromCart(item.id)} className="w-7 h-7 rounded-full flex items-center justify-center" style={{background:'rgba(255,255,255,0.07)',border:'1px solid rgba(255,255,255,0.1)'}}><Minus className="w-3 h-3 text-white"/></button>
                       <span className="text-white font-black text-sm min-w-[16px] text-center">{qty}</span>
-                      <button onClick={()=>{const e=newCart.find(i=>i.id===item.id);if(e)directAdd({...e});else addToCart(item);}} className="w-7 h-7 rounded-full flex items-center justify-center text-white" style={{background:'linear-gradient(135deg,#C9A227,#8B6914)'}}><Plus className="w-3 h-3"/></button>
+                      <button onClick={()=>{const e=newCart.find(i=>i.id===item.id);if(e)directAdd({...e});else addToCart(item);}} className="w-7 h-7 rounded-full flex items-center justify-center" style={{background:'#C8CDD6'}}><Plus className="w-3 h-3" style={{color:'#0B0F14'}}/></button>
                     </div>
                   ) : (
                     <motion.button whileTap={{scale:0.93}} onClick={()=>addToCart(item)} className="omf-btn omf-btn-orange flex-shrink-0">{lbl}</motion.button>
@@ -340,30 +381,30 @@ const AddItemsToOrderModal = ({ order, cafeCurrency, onClose, setVariantModal, v
           </div>
           {/* Cart footer */}
           {newCart.length > 0 && (
-            <div className="px-4 py-4 flex-shrink-0 space-y-3" style={{borderTop:'1px solid rgba(201,162,39,0.12)',background:'rgba(0,0,0,0.25)'}}>
-              <p className="text-xs font-black" style={{color:'#C9A227'}}>🛒 Cart · {newCart.length} item{newCart.length!==1?'s':''}</p>
+            <div className="px-4 py-4 flex-shrink-0 space-y-3" style={{borderTop:'1px solid #1F2937',background:'#0B0F14'}}>
+              <p className="text-xs font-medium" style={{color:'#9CA3AF'}}>Cart · {newCart.length} item{newCart.length!==1?'s':''}</p>
               <div className="space-y-1.5">
                 {newCart.map((item,idx)=>{
                   const adds = Array.isArray(item.addons)?item.addons:[];
                   const at   = adds.reduce((s,a)=>s+(parseFloat(a.price)||0)*(parseInt(a.quantity)||1),0);
                   const lt   = (parseFloat(item.basePrice??item.price)+at)*(parseInt(item.quantity)||1);
-                  return <div key={idx} className="flex justify-between text-xs" style={{color:'#7a6a3a'}}><span>{item.name}{item.selectedVariant?` (${item.selectedVariant})`:''} ×{item.quantity}{adds.length>0?` +${adds.length} add-on${adds.length>1?'s':''}`:''}</span><span className="text-white font-bold">{CUR}{fmtN(lt)}</span></div>;
+                  return <div key={idx} className="flex justify-between text-xs" style={{color:'#6B7280'}}><span>{item.name}{item.selectedVariant?` (${item.selectedVariant})`:''} ×{item.quantity}{adds.length>0?` +${adds.length} add-on${adds.length>1?'s':''}`:''}</span><span className="text-white font-bold">{CUR}{fmtN(lt)}</span></div>;
                 })}
-                <div className="flex justify-between text-sm font-black pt-1" style={{borderTop:'1px solid rgba(201,162,39,0.1)'}}>
-                  <span style={{color:'#7a6a3a'}}>New items total</span>
-                  <span style={{color:'#C9A227'}}>{CUR}{fmtN(cartTotal)}</span>
+                <div className="flex justify-between text-sm font-black pt-1" style={{borderTop:'1px solid #1F2937'}}>
+                  <span style={{color:'#6B7280'}}>New items total</span>
+                  <span style={{color:'#C8CDD6',fontWeight:600}}>{CUR}{fmtN(cartTotal)}</span>
                 </div>
               </div>
               <motion.button whileHover={{scale:1.01}} whileTap={{scale:0.97}} onClick={handleSave} disabled={saving}
                 className="w-full py-3.5 rounded-xl font-black text-sm flex items-center justify-center gap-2 disabled:opacity-60 text-white"
-                style={{background:'linear-gradient(135deg,#C9A227,#8B6914)',boxShadow:'0 6px 20px rgba(201,162,39,0.3)'}}
+                style={{background:'#C8CDD6',boxShadow:'0 2px 12px rgba(200,205,214,0.18)',color:'#0B0F14'}}
               >
                 {saving?<><RefreshCw className="w-4 h-4 animate-spin"/>Sending to kitchen…</>:<><ShoppingCart className="w-4 h-4"/>Add to Order · {CUR}{fmtN(cartTotal)}</>}
               </motion.button>
             </div>
           )}
         </motion.div>
-        {addonModal && <AddOnModal item={addonModal} onConfirm={entry=>{directAdd(entry);setAddonModal(null);}} onClose={()=>setAddonModal(null)} currencySymbol={CUR} primaryColor="#C9A227" theme="dark"/>}
+        {addonModal && <AddOnModal item={addonModal} onConfirm={entry=>{directAdd(entry);setAddonModal(null);}} onClose={()=>setAddonModal(null)} currencySymbol={CUR} primaryColor="#C8CDD6" theme="dark"/>}
       </motion.div>
     </AnimatePresence>
   );
@@ -593,8 +634,8 @@ const OrdersManagement = () => {
                 </span>
                 <div className="flex items-center gap-2 flex-shrink-0">
                   {item.isFree
-                    ? <span className="omf-badge" style={{background:'rgba(201,162,39,0.12)',color:'#C9A227',borderColor:'rgba(201,162,39,0.2)'}}>🎁 FREE</span>
-                    : <span className="font-black text-sm" style={{color:'#C9A227'}}>{CUR}{total.toFixed(2)}</span>
+                    ? <span className="omf-badge" style={{background:'rgba(34,197,94,0.1)',color:'#4ADE80',borderColor:'rgba(34,197,94,0.2)'}}>FREE</span>
+                    : <span className="text-sm font-medium text-white">{CUR}{total.toFixed(2)}</span>
                   }
                   {order.orderStatus!=='completed'&&order.orderStatus!=='cancelled'&&(
                     isConfirmingRemove(order.id,idx)?(
@@ -611,30 +652,30 @@ const OrdersManagement = () => {
                 </div>
               </div>
               <p className="text-xs mt-0.5 ml-4" style={{color:'#555'}}>
-                {item.isFree?<span style={{color:'#C9A227'}}>🎁 FREE · was {CUR}{(parseFloat(item.actualPrice)||0).toFixed(2)}</span>:<>Base: {CUR}{base.toFixed(2)}{qty>1?` ×${qty}`:''}</>}
+                {item.isFree?<span style={{color:'#4ADE80'}}>FREE · was {CUR}{(parseFloat(item.actualPrice)||0).toFixed(2)}</span>:<>Base: {CUR}{base.toFixed(2)}{qty>1?` ×${qty}`:''}</>}
               </p>
-              {item.comboItems?.length>0&&<div className="ml-4 mt-0.5 space-y-0.5">{item.comboItems.map((ci,ci2)=><p key={ci2} className="text-xs" style={{color:'#5a4a1a'}}>🔗 {ci.name}{ci.quantity>1?` ×${ci.quantity}`:''}</p>)}</div>}
+              {item.comboItems?.length>0&&<div className="ml-4 mt-0.5 space-y-0.5">{item.comboItems.map((ci,ci2)=><p key={ci2} className="text-xs" style={{color:'#4B5563'}}>🔗 {ci.name}{ci.quantity>1?` ×${ci.quantity}`:''}</p>)}</div>}
               {adds.length>0?(
                 <div className="ml-4 mt-1.5 space-y-0.5">
                   <p className="text-xs font-bold" style={{color:'#777'}}>✨ Add-ons ({adds.length}):</p>
                   {adds.map((a,ai)=>{const aq=parseInt(a.quantity)||1;const ap=parseFloat(a.price)||0;return <div key={ai} className="flex justify-between text-xs" style={{color:'#666'}}><span>╰ {a.name} ×{aq}</span><span>+{CUR}{(ap*aq).toFixed(2)}</span></div>;})}
                   <div className="flex justify-between text-xs pt-0.5" style={{color:'#888'}}><span>Add-ons total</span><span>+{CUR}{(aT*qty).toFixed(2)}</span></div>
                 </div>
-              ):<p className="text-xs ml-4 mt-0.5 italic" style={{color:'#5a4a1a'}}>No add-ons</p>}
+              ):<p className="text-xs ml-4 mt-0.5 italic" style={{color:'#4B5563'}}>No add-ons</p>}
             </div>
           );
         })}
         {/* Totals */}
-        <div className="pt-2.5 mt-1 space-y-1.5" style={{borderTop:'1px solid rgba(201,162,39,0.1)'}}>
-          <div className="flex justify-between text-xs" style={{color:'#4a6a4a'}}><span>🧮 Items Total</span><span>{CUR}{itemsTotal.toFixed(2)}</span></div>
-          {addonsTotal>0&&<div className="flex justify-between text-xs" style={{color:'#4a6a4a'}}><span>✨ Add-ons</span><span>+{CUR}{addonsTotal.toFixed(2)}</span></div>}
-          {sN(order?.gstAmount)>0&&<div className="flex justify-between text-xs" style={{color:'#5a4a1a'}}><span>🏛️ GST</span><span>+{CUR}{sN(order.gstAmount).toFixed(2)}</span></div>}
-          {sN(order?.taxAmount)>0&&<div className="flex justify-between text-xs" style={{color:'#5a4a1a'}}><span>🏛️ Tax</span><span>+{CUR}{sN(order.taxAmount).toFixed(2)}</span></div>}
-          {sN(order?.serviceChargeAmount)>0&&<div className="flex justify-between text-xs" style={{color:'#5a4a1a'}}><span>🛎️ Service Charge</span><span>+{CUR}{sN(order.serviceChargeAmount).toFixed(2)}</span></div>}
-          {sN(order?.platformFeeAmount)>0&&<div className="flex justify-between text-xs" style={{color:'#5a4a1a'}}><span>💻 Platform Fee</span><span>+{CUR}{sN(order.platformFeeAmount).toFixed(2)}</span></div>}
-          <div className="flex justify-between font-black text-sm pt-1.5" style={{borderTop:'1px solid rgba(201,162,39,0.1)'}}>
+        <div className="pt-2.5 mt-1 space-y-1.5" style={{borderTop:'1px solid #1F2937'}}>
+          <div className="flex justify-between text-xs" style={{color:'#4B6B7A'}}><span>🧮 Items Total</span><span>{CUR}{itemsTotal.toFixed(2)}</span></div>
+          {addonsTotal>0&&<div className="flex justify-between text-xs" style={{color:'#4B6B7A'}}><span>✨ Add-ons</span><span>+{CUR}{addonsTotal.toFixed(2)}</span></div>}
+          {sN(order?.gstAmount)>0&&<div className="flex justify-between text-xs" style={{color:'#4B5563'}}><span>🏛️ GST</span><span>+{CUR}{sN(order.gstAmount).toFixed(2)}</span></div>}
+          {sN(order?.taxAmount)>0&&<div className="flex justify-between text-xs" style={{color:'#4B5563'}}><span>🏛️ Tax</span><span>+{CUR}{sN(order.taxAmount).toFixed(2)}</span></div>}
+          {sN(order?.serviceChargeAmount)>0&&<div className="flex justify-between text-xs" style={{color:'#4B5563'}}><span>🛎️ Service Charge</span><span>+{CUR}{sN(order.serviceChargeAmount).toFixed(2)}</span></div>}
+          {sN(order?.platformFeeAmount)>0&&<div className="flex justify-between text-xs" style={{color:'#4B5563'}}><span>💻 Platform Fee</span><span>+{CUR}{sN(order.platformFeeAmount).toFixed(2)}</span></div>}
+          <div className="flex justify-between font-black text-sm pt-1.5" style={{borderTop:'1px solid #1F2937'}}>
             <span className="text-white">💵 Grand Total</span>
-            <span style={{color:'#C9A227'}}>{CUR}{(sub+fees).toFixed(2)}</span>
+            <span className="text-white font-semibold">{CUR}{(sub+fees).toFixed(2)}</span>
           </div>
         </div>
       </div>
@@ -666,17 +707,17 @@ const OrdersManagement = () => {
             <div className="absolute inset-x-0 bottom-0 sm:inset-0 sm:flex sm:items-center sm:justify-center">
               <div className="relative w-full sm:max-w-sm rounded-t-3xl sm:rounded-2xl overflow-hidden omf-sheet" onClick={e=>e.stopPropagation()}>
                 <div className="flex justify-center pt-3 pb-1 sm:hidden"><div className="omf-sheet-grip mx-auto"/></div>
-                <div className="flex items-center justify-between px-6 py-4" style={{borderBottom:'1px solid rgba(201,162,39,0.12)'}}>
-                  <div><h3 className="omf-title text-white font-bold text-base">📏 Select Size</h3><p className="text-xs mt-0.5" style={{color:'#7a6a3a'}}>{vItem.name}</p></div>
-                  <button onClick={()=>setAddItemsVariantModal(null)} className="w-8 h-8 rounded-full flex items-center justify-center" style={{background:'rgba(201,162,39,0.1)',border:'1px solid rgba(201,162,39,0.2)'}}><X className="w-4 h-4" style={{color:'#C9A227'}}/></button>
+                <div className="flex items-center justify-between px-6 py-4" style={{borderBottom:'1px solid #1F2937'}}>
+                  <div><h3 className="omf-title text-white font-semibold text-base">Select Size</h3><p className="text-xs mt-0.5" style={{color:'#6B7280'}}>{vItem.name}</p></div>
+                  <button onClick={()=>setAddItemsVariantModal(null)} className="w-8 h-8 rounded-full flex items-center justify-center" style={{background:'#1F2937',border:'1px solid #374151'}}><X className="w-4 h-4" style={{color:'#9CA3AF'}}/></button>
                 </div>
                 <div className="px-5 py-4 space-y-2.5 pb-8">
                   {vars.map((v,vi)=>(
                     <button key={vi} onClick={()=>{setAddItemsVariantModal(null);addItemsVariantAddRef.current?.(vItem,v);}}
                       className="w-full flex items-center justify-between p-3.5 rounded-xl font-black transition-all"
-                      style={{background:'rgba(201,162,39,0.1)',border:'1.5px solid rgba(201,162,39,0.25)',color:'#C9A227'}}
-                      onMouseEnter={e=>{e.currentTarget.style.background='rgba(201,162,39,0.2)';}}
-                      onMouseLeave={e=>{e.currentTarget.style.background='rgba(201,162,39,0.1)';}}
+                      style={{background:'#1F2937',border:'1px solid #374151',color:'#D1D5DB'}}
+                      onMouseEnter={e=>{e.currentTarget.style.background='#374151';e.currentTarget.style.borderColor='#C8CDD6';}}
+                      onMouseLeave={e=>{e.currentTarget.style.background='#1F2937';e.currentTarget.style.borderColor='#374151';}}
                     >
                       <span className="text-sm">{sizeEmoji[vi]||'🍽️'} {v.name}</span>
                       <span className="text-sm">{CUR_V}{fmtN(v.price)}</span>
@@ -695,18 +736,18 @@ const OrdersManagement = () => {
           <motion.div initial={{opacity:0,x:100,scale:0.9}} animate={{opacity:1,x:0,scale:1}} exit={{opacity:0,x:100,scale:0.9}}
             transition={{type:'spring',damping:22,stiffness:260}}
             className="fixed top-4 right-4 z-50 p-5 rounded-2xl max-w-sm"
-            style={{background:'linear-gradient(135deg,#C9A227,#8B6914)',boxShadow:'0 20px 60px rgba(201,162,39,0.5),0 0 0 1px rgba(255,255,255,0.15)'}}
+            style={{background:'#111827',border:'1px solid #C8CDD6',boxShadow:'0 24px 64px rgba(0,0,0,0.7)'}}
             data-testid="new-order-notification"
           >
             <button onClick={()=>setNewOrderNotification(null)} className="absolute top-3 right-3 w-6 h-6 rounded-full flex items-center justify-center" style={{background:'rgba(0,0,0,0.2)'}}><X className="w-3.5 h-3.5 text-white"/></button>
             <div className="flex items-start gap-4">
-              <div className="w-12 h-12 rounded-2xl flex items-center justify-center text-2xl flex-shrink-0" style={{background:'rgba(0,0,0,0.15)'}}>🔔</div>
+              <div className="w-12 h-12 rounded-2xl flex items-center justify-center text-2xl flex-shrink-0" style={{background:'rgba(255,255,255,0.08)'}}><Bell className="w-5 h-5 text-white"/></div>
               <div>
-                <p className="font-black text-white/75 text-xs uppercase tracking-widest mb-0.5">New Order!</p>
-                <p className="omf-title font-black text-white text-2xl mb-1">{fmtOrd(newOrderNotification.orderNumber)}</p>
-                {newOrderNotification.orderType==='dine-in'&&newOrderNotification.tableNumber&&<p className="font-bold text-sm text-white/80">🪑 Table {newOrderNotification.tableNumber}</p>}
-                <p className="text-sm text-white/70">🍽️ {getItemsCount(newOrderNotification.items)}</p>
-                <p className="font-black text-xl text-white mt-1">💰 {newOrderNotification.currencySymbol||cafeCurrency}{(newOrderNotification.totalAmount||0).toFixed(0)}</p>
+                <p className="font-medium text-xs uppercase tracking-widest mb-0.5" style={{color:"#C8CDD6"}}>New Order</p>
+                <p className="omf-title text-white text-xl font-semibold mb-1">{fmtOrd(newOrderNotification.orderNumber)}</p>
+                {newOrderNotification.orderType==='dine-in'&&newOrderNotification.tableNumber&&<p className="text-sm" style={{color:"#D1D5DB"}}>Table {newOrderNotification.tableNumber}</p>}
+                <p className="text-sm" style={{color:"#9CA3AF"}}>{getItemsCount(newOrderNotification.items)}</p>
+                <p className="text-lg font-semibold text-white mt-1">{newOrderNotification.currencySymbol||cafeCurrency}{(newOrderNotification.totalAmount||0).toFixed(0)}</p>
               </div>
             </div>
           </motion.div>
@@ -716,53 +757,52 @@ const OrdersManagement = () => {
       {/* ── Header ─────────────────────────────────────────────── */}
       <div className="flex flex-wrap justify-between items-center gap-3">
         <div className="flex items-center gap-3">
-          <div className="text-4xl">🍽️</div>
           <div>
-            <h2 className="omf-title text-2xl font-black text-white">Orders Management</h2>
-            <p className="text-xs mt-0.5 flex items-center gap-1.5" style={{color:'#7a6a3a'}}>
-              <span className="inline-block w-1.5 h-1.5 rounded-full animate-pulse" style={{background:'#C9A227'}}/>
-              Live kitchen feed
+            <h2 className="omf-title text-xl font-semibold text-white tracking-tight">Orders</h2>
+            <p className="text-xs mt-0.5 flex items-center gap-1.5" style={{color:'#6B7280'}}>
+              <span className="inline-block w-1.5 h-1.5 rounded-full animate-pulse" style={{background:'#4ADE80'}}/>
+              Live — real-time kitchen feed
             </p>
           </div>
         </div>
         <div className="flex items-center gap-2.5">
-          <button onClick={()=>setShowExternalModal(true)} data-testid="add-external-order-btn" className="omf-btn omf-btn-orange" style={{padding:'9px 16px',fontSize:'13px',borderRadius:'12px'}}>
-            <PlusCircle className="w-4 h-4"/>➕ Add External Order
+          <button onClick={()=>setShowExternalModal(true)} data-testid="add-external-order-btn" className="omf-btn omf-btn-orange" style={{padding:'8px 16px',fontSize:'12px',borderRadius:'8px'}}>
+            <PlusCircle className="w-3.5 h-3.5"/>Add Order
           </button>
-          <button onClick={()=>setSoundEnabled(!soundEnabled)} data-testid="sound-toggle" className="omf-btn"
-            style={{padding:'9px 14px',fontSize:'13px',borderRadius:'12px',background:soundEnabled?'rgba(201,162,39,0.12)':'rgba(255,255,255,0.04)',color:soundEnabled?'#C9A227':'#7a6a3a',border:`1.5px solid ${soundEnabled?'rgba(201,162,39,0.25)':'rgba(255,255,255,0.07)'}`}}
-          >{soundEnabled?'🔊 Sound On':'🔇 Sound Off'}</button>
+          <button onClick={()=>setSoundEnabled(!soundEnabled)} data-testid="sound-toggle" className="omf-btn omf-btn-ghost"
+            style={{padding:'8px 14px',fontSize:'12px',borderRadius:'8px',color:soundEnabled?'#D1D5DB':'#6B7280'}}
+          >{soundEnabled?'Sound On':'Sound Off'}</button>
         </div>
       </div>
 
       {/* ── Search + Export ─────────────────────────────────────── */}
       <div className="flex flex-col md:flex-row gap-3">
         <div className="relative flex-1">
-          <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-sm">🔍</span>
+          <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4" style={{color:'#374151'}}/>
           <input type="text" data-testid="order-search" value={searchQuery} onChange={e=>setSearchQuery(e.target.value)} className="omf-input" style={{paddingLeft:'2.4rem',height:'44px'}} placeholder="Search by order #, customer name, or phone…"/>
         </div>
         <CSVLink data={csvData} filename={`orders-${new Date().toISOString().split('T')[0]}.csv`}
           className="omf-btn omf-btn-green"
           style={{borderRadius:'12px',padding:'10px 20px',fontSize:'13px',fontWeight:700,whiteSpace:'nowrap',textDecoration:'none',display:'flex',alignItems:'center',gap:'7px'}}
           data-testid="export-csv-btn"
-        ><Download className="w-4 h-4"/>📊 Export CSV</CSVLink>
+        ><Download className="w-4 h-4"/>Export CSV</CSVLink>
       </div>
 
       {/* ── Date Filters ───────────────────────────────────────── */}
       <div className="flex flex-col md:flex-row gap-3">
         <div className="flex-1">
-          <label className="block text-xs font-bold mb-1.5" style={{color:'#7a6a3a'}}>📅 Start Date</label>
+          <label className="block text-xs font-bold mb-1.5" style={{color:'#6B7280'}}>Start Date</label>
           <input type="date" data-testid="start-date-filter" value={startDate} onChange={e=>setStartDate(e.target.value)} className="omf-input" style={{height:'44px'}}/>
         </div>
         <div className="flex-1">
-          <label className="block text-xs font-bold mb-1.5" style={{color:'#7a6a3a'}}>📅 End Date</label>
+          <label className="block text-xs font-bold mb-1.5" style={{color:'#6B7280'}}>End Date</label>
           <input type="date" data-testid="end-date-filter" value={endDate} onChange={e=>setEndDate(e.target.value)} className="omf-input" style={{height:'44px'}}/>
         </div>
       </div>
 
       {/* ── Status Filters ─────────────────────────────────────── */}
       <div className="flex flex-wrap gap-2">
-        {[['all','🍽️ All'],['new','🆕 New'],['preparing','👨‍🍳 Preparing'],['completed','✅ Done'],['cancelled','❌ Cancelled']].map(([k,l])=>(
+        {[['all','All'],['new','New'],['preparing','Preparing'],['completed','Done'],['cancelled','Cancelled']].map(([k,l])=>(
           <button key={k} data-testid={`filter-${k}`} onClick={()=>setStatusFilter(k)} className={`omf-tab ${statusFilter===k?'omf-tab-on':'omf-tab-off'}`}>{l}</button>
         ))}
       </div>
@@ -770,14 +810,16 @@ const OrdersManagement = () => {
       {/* ── Loading / Empty ─────────────────────────────────────── */}
       {loading?(
         <div className="flex flex-col items-center justify-center py-16 gap-3">
-          <div className="text-5xl animate-bounce">👨‍🍳</div>
-          <p className="text-sm font-bold" style={{color:'#7a6a3a'}}>Fetching orders from the kitchen…</p>
+          <RefreshCw className="w-5 h-5 animate-spin" style={{color:'#6B7280'}}/>
+          <p className="text-sm font-medium" style={{color:'#6B7280'}}>Loading orders…</p>
         </div>
       ):filteredOrders.length===0?(
         <div className="omf-card flex flex-col items-center justify-center py-16 gap-3 text-center">
-          <div className="text-6xl mb-1">🫙</div>
-          <p className="omf-title font-black text-white text-lg">No orders yet!</p>
-          <p className="text-sm" style={{color:'#7a6a3a'}}>New orders will fly in real-time 🚀</p>
+          <div className="w-12 h-12 rounded-xl flex items-center justify-center mb-2" style={{background:'#1F2937'}}>
+            <ShoppingCart className="w-5 h-5" style={{color:'#374151'}}/>
+          </div>
+          <p className="text-base font-semibold text-white">No orders yet</p>
+          <p className="text-sm" style={{color:'#6B7280'}}>New orders will appear here in real-time</p>
         </div>
       ):(
         <>
@@ -788,9 +830,9 @@ const OrdersManagement = () => {
             >
               <table className="w-full">
                 <thead>
-                  <tr style={{borderBottom:'1px solid rgba(201,162,39,0.12)',background:'rgba(201,162,39,0.04)'}}>
-                    {[['🔖','Order #'],['👤','Customer'],['📞','Phone'],['🍽️','Type'],['🪑','Table'],['📦','Items'],['💵','Total'],['💳','Payment'],['📊','Status'],['⚙️','Actions']].map(([em,h])=>(
-                      <th key={h} className="text-left px-4 py-3.5 text-xs font-black uppercase tracking-wider" style={{color:'#C9A227'}}>{em} {h}</th>
+                  <tr style={{borderBottom:'1px solid #1F2937',background:'#0B0F14'}}>
+                    {[['Order #'],['Customer'],['Phone'],['Type'],['Table'],['Items'],['Total'],['Payment'],['Status'],['Actions']].map(([h])=>(
+                      <th key={h} className="text-left px-4 py-3 text-xs font-medium uppercase tracking-wider" style={{color:'#4B5563',letterSpacing:'0.06em'}}>{h}</th>
                     ))}
                   </tr>
                 </thead>
@@ -805,15 +847,15 @@ const OrdersManagement = () => {
                           onClick={()=>setExpandedOrder(expandedOrder===order.id?null:order.id)}
                           data-testid={`order-row-${order.id}`}
                         >
-                          <td className="px-4 py-3.5"><span className="omf-ordnum font-black text-base">{fmtOrd(order.orderNumber)}</span></td>
-                          <td className="px-4 py-3.5 text-white font-bold text-sm">{order.customerName||'—'}</td>
-                          <td className="px-4 py-3.5 text-sm" style={{color:'#7a6a3a'}}>{order.customerPhone||'—'}</td>
+                          <td className="px-4 py-3"><span className="omf-ordnum text-sm font-semibold">{fmtOrd(order.orderNumber)}</span></td>
+                          <td className="px-4 py-3 text-white text-sm font-medium">{order.customerName||'—'}</td>
+                          <td className="px-4 py-3 text-sm" style={{color:'#6B7280'}}>{order.customerPhone||'—'}</td>
                           <td className="px-4 py-3.5"><span className="text-sm text-white capitalize font-medium">{orderTypeIcon(order.orderType)} {order.orderType||'—'}</span></td>
                           <td className="px-4 py-3.5 text-sm text-white font-medium">
-                            {order.orderType==='dine-in'?(order.tableNumber?`🪑 ${order.tableNumber}`:'—'):order.orderType==='delivery'?<span style={{color:'#7a6a3a',fontSize:11}}>🛵 Delivery</span>:'—'}
+                            {order.orderType==='dine-in'?(order.tableNumber?`🪑 ${order.tableNumber}`:'—'):order.orderType==='delivery'?<span style={{color:'#6B7280',fontSize:11}}>🛵 Delivery</span>:'—'}
                           </td>
-                          <td className="px-4 py-3.5 text-sm font-medium" style={{color:'#7a6a3a'}}>🍴 {getItemsCount(order.items)}</td>
-                          <td className="px-4 py-3.5"><span className="font-black text-sm" style={{color:'#C9A227'}}>💵 {CUR}{(order.totalAmount||order.total||0).toFixed(0)}</span></td>
+                          <td className="px-4 py-3.5 text-sm font-medium" style={{color:'#6B7280'}}>🍴 {getItemsCount(order.items)}</td>
+                          <td className="px-4 py-3"><span className="text-sm font-medium text-white">{CUR}{(order.totalAmount||order.total||0).toFixed(0)}</span></td>
                           <td className="px-4 py-3.5"><span className="omf-badge" style={{background:pb.bg,color:pb.color,borderColor:pb.bd}}>{pb.emoji} {order.paymentStatus||'pending'}</span></td>
                           <td className="px-4 py-3.5"><span className="omf-badge capitalize" style={{background:sb.bg,color:sb.color,borderColor:sb.bd}}>{sb.emoji} {sb.label}</span></td>
                           <td className="px-4 py-3.5" onClick={e=>e.stopPropagation()}>
@@ -849,31 +891,31 @@ const OrdersManagement = () => {
                         {/* Expanded row */}
                         {expandedOrder===order.id&&(
                           <tr>
-                            <td colSpan="10" style={{background:'rgba(201,162,39,0.025)',borderBottom:'1px solid rgba(201,162,39,0.08)'}}>
+                            <td colSpan="10" style={{background:'#0B0F14',borderBottom:'1px solid #1F2937'}}>
                               <div className="px-5 py-5 grid grid-cols-2 gap-8">
                                 <div>
-                                  <p className="omf-sec mb-3">🍴 Order Items</p>
+                                  <p className="omf-sec mb-3">Order Items</p>
                                   {renderItemsList(order,CUR,false)}
                                 </div>
                                 <div>
-                                  <p className="omf-sec mb-3">📋 Details</p>
+                                  <p className="omf-sec mb-3">Details</p>
                                   <div className="space-y-2.5 text-sm">
-                                    <div className="flex items-center gap-2.5" style={{color:'#7a6a3a'}}><span>🕐</span><span>{order.createdAt?.toDate?.().toLocaleString()||'N/A'}</span></div>
-                                    {order.customerPhone&&<div className="flex items-center gap-2.5" style={{color:'#7a6a3a'}}><span>📞</span><span>{order.customerPhone}</span></div>}
-                                    {order.orderType==='delivery'&&order.deliveryAddress&&<div className="flex items-start gap-2.5" style={{color:'#7a6a3a'}}><span>📍</span><span>{order.deliveryAddress}</span></div>}
+                                    <div className="flex items-center gap-2.5" style={{color:'#6B7280'}}><span>🕐</span><span>{order.createdAt?.toDate?.().toLocaleString()||'N/A'}</span></div>
+                                    {order.customerPhone&&<div className="flex items-center gap-2.5" style={{color:'#6B7280'}}><span>📞</span><span>{order.customerPhone}</span></div>}
+                                    {order.orderType==='delivery'&&order.deliveryAddress&&<div className="flex items-start gap-2.5" style={{color:'#6B7280'}}><span>📍</span><span>{order.deliveryAddress}</span></div>}
                                     {order?.orderType==='delivery'&&(
                                       <div className="text-sm mt-1">
-                                        <strong style={{color:'#C9A227'}}>🛵 Delivery Address:</strong>
+                                        <strong style={{color:'#9CA3AF',fontWeight:500}}>Delivery Address:</strong>
                                         <div className="text-white mt-0.5">{order?.deliveryAddress||'N/A'}</div>
                                       </div>
                                     )}
                                     {order.specialInstructions&&(
-                                      <div className="mt-3 p-3 rounded-xl" style={{background:'rgba(201,162,39,0.1)',border:'1px solid rgba(201,162,39,0.2)'}}>
-                                        <p className="text-xs font-black mb-1" style={{color:'#C9A227'}}>📝 Special Instructions</p>
+                                      <div className="mt-3 p-3 rounded-xl" style={{background:'#1F2937',border:'1px solid #374151'}}>
+                                        <p className="text-xs font-black mb-1" style={{color:'#9CA3AF',fontWeight:500}}>Special Instructions</p>
                                         <p className="text-white text-sm">{order.specialInstructions}</p>
                                       </div>
                                     )}
-                                    <div className="text-xs mt-1" style={{color:'#7a6a3a'}}>
+                                    <div className="text-xs mt-1" style={{color:'#6B7280'}}>
                                       {order.paymentMode==='counter'?'🏪 Pay at Counter':order.paymentMode==='table'?'🪑 Pay on Table':'📱 Prepaid (UPI)'}
                                     </div>
                                   </div>
@@ -897,14 +939,14 @@ const OrdersManagement = () => {
               const CUR=order.currencySymbol||cafeCurrency;
               return (
                 <div key={order.id} data-testid={`order-card-${order.id}`}
-                  className="omf-in" style={{animationDelay:`${Math.min(oi*35,350)}ms`,animationFillMode:'both',background:'#120f00',border:'1.5px solid rgba(255,255,255,0.07)',borderRadius:'16px',overflow:'hidden',transition:'border-color 200ms'}}
-                  onMouseEnter={e=>{e.currentTarget.style.borderColor='rgba(201,162,39,0.22)';}}
+                  className="omf-in" style={{animationDelay:`${Math.min(oi*35,350)}ms`,animationFillMode:'both',background:'#111827',border:`1px solid ${order.orderStatus==='new'?'rgba(59,130,246,0.25)':order.orderStatus==='preparing'?'rgba(245,158,11,0.25)':order.orderStatus==='completed'?'rgba(34,197,94,0.25)':order.orderStatus==='cancelled'?'rgba(239,68,68,0.2)':'#1F2937'}`,borderRadius:'10px',overflow:'hidden',transition:'all 150ms cubic-bezier(0.4,0,0.2,1)'}}
+                  onMouseEnter={e=>{e.currentTarget.style.borderColor='rgba(200,205,214,0.18)';}}
                   onMouseLeave={e=>{e.currentTarget.style.borderColor='rgba(255,255,255,0.07)';}}
                 >
                   {/* Card top */}
                   <div className="p-4 flex items-center justify-between cursor-pointer" onClick={()=>setExpandedOrder(expandedOrder===order.id?null:order.id)}>
                     <div className="flex items-center gap-3">
-                      <div className="w-11 h-11 rounded-2xl flex items-center justify-center text-xl flex-shrink-0" style={{background:'rgba(201,162,39,0.1)',border:'1.5px solid rgba(201,162,39,0.2)'}}>
+                      <div className="w-11 h-11 rounded-2xl flex items-center justify-center text-xl flex-shrink-0" style={{background:'#1F2937',border:'1px solid #374151'}}>
                         {orderTypeIcon(order.orderType)}
                       </div>
                       <div>
@@ -912,42 +954,42 @@ const OrdersManagement = () => {
                           <span className="omf-ordnum font-black text-sm">{fmtOrd(order.orderNumber)}</span>
                         </div>
                         <p className="text-white font-bold text-sm">{order.customerName||'—'}</p>
-                        <p className="text-xs" style={{color:'#7a6a3a'}}>{order.customerPhone||'—'}</p>
+                        <p className="text-xs" style={{color:'#6B7280'}}>{order.customerPhone||'—'}</p>
                       </div>
                     </div>
                     <div className="flex flex-col items-end gap-1.5">
-                      <span className="font-black text-sm" style={{color:'#C9A227'}}>💵 {CUR}{(order.totalAmount||order.total||0).toFixed(0)}</span>
+                      <span className="text-sm font-semibold text-white">{CUR}{(order.totalAmount||order.total||0).toFixed(0)}</span>
                       <span className="omf-badge capitalize" style={{background:sb.bg,color:sb.color,borderColor:sb.bd}}>{sb.emoji} {sb.label}</span>
                     </div>
                   </div>
 
                   {/* Meta strip */}
                   <div className="px-4 pb-3.5 flex flex-wrap items-center gap-2" style={{borderTop:'1px solid rgba(255,255,255,0.04)'}}>
-                    <span className="text-xs font-medium capitalize" style={{color:'#7a6a3a'}}>{orderTypeIcon(order.orderType)} {order.orderType}</span>
+                    <span className="text-xs font-medium capitalize" style={{color:'#6B7280'}}>{orderTypeIcon(order.orderType)} {order.orderType}</span>
                     {order.orderType==='dine-in'&&order.tableNumber&&<span className="text-xs text-white font-bold">· Table {order.tableNumber}</span>}
-                    {order.orderType==='delivery'&&order.deliveryAddress&&<span className="text-xs truncate max-w-[160px]" style={{color:'#7a6a3a'}}>📍 {order.deliveryAddress}</span>}
-                    <span className="text-xs font-medium" style={{color:'#7a6a3a'}}>· 🍴 {getItemsCount(order.items)}</span>
+                    {order.orderType==='delivery'&&order.deliveryAddress&&<span className="text-xs truncate max-w-[160px]" style={{color:'#6B7280'}}>📍 {order.deliveryAddress}</span>}
+                    <span className="text-xs font-medium" style={{color:'#6B7280'}}>· 🍴 {getItemsCount(order.items)}</span>
                     <span className="omf-badge" style={{background:pb.bg,color:pb.color,borderColor:pb.bd}}>{pb.emoji} {order.paymentStatus||'pending'}</span>
                   </div>
 
                   {/* Expanded */}
                   {expandedOrder===order.id&&(
-                    <div className="px-4 pb-5 space-y-4" style={{borderTop:'1px solid rgba(201,162,39,0.08)'}}>
+                    <div className="px-4 pb-5 space-y-4" style={{borderTop:'1px solid #1F2937'}}>
                       <div className="pt-4">
-                        <p className="omf-sec mb-3">🍴 Items</p>
+                        <p className="omf-sec mb-3">Items</p>
                         {renderItemsList(order,CUR,true)}
                       </div>
 
                       {order?.orderType==='delivery'&&(
                         <div className="p-3 rounded-xl" style={{background:'rgba(255,255,255,0.03)',border:'1px solid rgba(255,255,255,0.06)'}}>
-                          <strong style={{color:'#C9A227'}}>🛵 Delivery Address</strong>
+                          <strong style={{color:'#9CA3AF',fontWeight:500}}>Delivery Address</strong>
                           <div className="text-white mt-1 text-sm">{order?.deliveryAddress||'N/A'}</div>
                         </div>
                       )}
 
                       {order.specialInstructions&&(
-                        <div className="p-3 rounded-xl" style={{background:'rgba(201,162,39,0.1)',border:'1px solid rgba(201,162,39,0.2)'}}>
-                          <p className="text-xs font-black mb-1" style={{color:'#C9A227'}}>📝 Special Instructions</p>
+                        <div className="p-3 rounded-xl" style={{background:'#1F2937',border:'1px solid #374151'}}>
+                          <p className="text-xs font-black mb-1" style={{color:'#9CA3AF',fontWeight:500}}>Special Instructions</p>
                           <p className="text-white text-sm">{order.specialInstructions}</p>
                         </div>
                       )}
@@ -963,7 +1005,7 @@ const OrdersManagement = () => {
 
                       <div className="flex gap-2" onClick={e=>e.stopPropagation()}>
                         <button onClick={e=>handleViewInvoice(order.id,e)} disabled={invoiceLoading===order.id} className="omf-btn omf-btn-yellow flex-1 justify-center py-2.5" style={{borderRadius:12}}>
-                          <Eye className="w-4 h-4"/>{invoiceLoading===order.id?'⏳ Loading…':'🧾 View Bill'}
+                          <Eye className="w-4 h-4"/>{invoiceLoading===order.id?'Loading…':'View Bill'}
                         </button>
                         <button onClick={e=>handleDownloadInvoice(order.id,e)} disabled={invoiceLoading===order.id} className="omf-btn omf-btn-ghost flex-1 justify-center py-2.5" style={{borderRadius:12}}>
                           <FileText className="w-4 h-4"/>📄 PDF
@@ -979,7 +1021,7 @@ const OrdersManagement = () => {
                       {order.orderStatus!=='completed'&&order.orderStatus!=='cancelled'&&(
                         <div onClick={e=>e.stopPropagation()}>
                           <button onClick={()=>setAddItemsOrder(order)} data-testid={`add-items-mobile-${order.id}`} className="omf-btn omf-btn-blue w-full justify-center py-2.5" style={{borderRadius:12}}>
-                            <Plus className="w-4 h-4"/>➕ Add Items to Order
+                            <Plus className="w-4 h-4"/>Add Items
                           </button>
                         </div>
                       )}
@@ -990,7 +1032,7 @@ const OrdersManagement = () => {
                             <button onClick={()=>setDeleteConfirmId(null)} className="omf-btn omf-btn-ghost flex-1 justify-center py-2.5" style={{borderRadius:12}}>✗ Cancel</button>
                           </div>
                         ):(
-                          <button onClick={()=>setDeleteConfirmId(order.id)} className="omf-btn omf-btn-ghost w-full justify-center py-2.5" style={{borderRadius:12,color:'#5a4a1a'}}>
+                          <button onClick={()=>setDeleteConfirmId(order.id)} className="omf-btn omf-btn-ghost w-full justify-center py-2.5" style={{borderRadius:12,color:'#6B7280'}}>
                             <Trash2 className="w-3.5 h-3.5"/>🗑️ Remove Order
                           </button>
                         )}
@@ -1005,10 +1047,10 @@ const OrdersManagement = () => {
           {/* Footer */}
           <div className="flex items-center justify-center gap-2 py-2">
             <span>🍽️</span>
-            <p className="text-xs font-bold" style={{color:'#7a6a3a'}}>
-              {filteredOrders.length} order{filteredOrders.length!==1?'s':''} · Live kitchen feed active
+            <p className="text-xs font-bold" style={{color:'#4B5563'}}>
+              {filteredOrders.length} order{filteredOrders.length!==1?'s':''} · Live
             </p>
-            <span className="inline-block w-1.5 h-1.5 rounded-full animate-pulse" style={{background:'#C9A227'}}/>
+            <span className="inline-block w-1.5 h-1.5 rounded-full animate-pulse" style={{background:'#C8CDD6'}}/>
           </div>
         </>
       )}
