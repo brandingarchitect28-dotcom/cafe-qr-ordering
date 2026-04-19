@@ -1,14 +1,7 @@
 /**
  * StaffManagement.jsx
- *
- * Main Staff Management dashboard — tab-based navigation between
- * Staff List, Attendance, and Salary views.
- *
- * Isolated module — no existing code touched.
- * Drop-in replacement: same import path as before
- * (src/components/dashboard/StaffManagement.jsx)
- *
- * ADD: staff profile page
+ * OM vibe applied — CSS injection + className swaps only.
+ * ALL logic, state, hooks, imports, and child components 100% unchanged.
  */
 
 import React, { useState, useEffect } from 'react';
@@ -23,6 +16,63 @@ import AttendanceDashboard from './staff/AttendanceDashboard';
 import SalaryDashboard from './staff/SalaryDashboard';
 import { useTheme } from '../../hooks/useTheme';
 
+// ── OM-matched CSS ────────────────────────────────────────────────────────────
+if (typeof document !== 'undefined' && !document.getElementById('staff-omf-css')) {
+  const el = document.createElement('style');
+  el.id = 'staff-omf-css';
+  el.textContent = `
+    @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700;800&family=Playfair+Display:wght@600;700;800;900&display=swap');
+
+    .stf-wrap  { font-family: 'DM Sans', system-ui, sans-serif; }
+    .stf-title { font-family: 'Playfair Display', serif !important; letter-spacing: 0.01em; }
+
+    /* Section label — exact omf-sec */
+    .stf-sec {
+      font-size: 11px; font-weight: 900; text-transform: uppercase; letter-spacing: 0.08em;
+      color: #C9A227; display: flex; align-items: center; gap: 5px;
+      font-family: 'DM Sans', system-ui, sans-serif;
+    }
+
+    /* Tab nav — exact omf-tab */
+    .stf-tab {
+      display: flex; align-items: center; gap: 7px;
+      padding: 9px 18px; border-radius: 10px;
+      font-family: 'DM Sans', system-ui, sans-serif;
+      font-weight: 700; font-size: 13px;
+      cursor: pointer; transition: all 180ms;
+      border: 1.5px solid transparent; background: transparent;
+      white-space: nowrap;
+    }
+    .stf-tab-on {
+      background: linear-gradient(135deg, #C9A227, #8B6914);
+      color: #fff; font-weight: 800;
+      box-shadow: 0 3px 14px rgba(201,162,39,0.32);
+    }
+    .stf-tab-off { background: rgba(255,255,255,0.04); color: #7a6a3a; border-color: rgba(255,255,255,0.07); }
+    .stf-tab-off:hover { background: rgba(201,162,39,0.08); color: #C9A227; border-color: rgba(201,162,39,0.2); }
+
+    /* Tab container */
+    .stf-tab-bar {
+      display: flex; gap: 4px; padding: 4px;
+      background: #120f00;
+      border: 1.5px solid rgba(255,255,255,0.07);
+      border-radius: 14px; width: fit-content;
+    }
+
+    /* Locked card */
+    .stf-locked {
+      background: #120f00;
+      border: 1.5px solid rgba(255,255,255,0.07);
+      border-radius: 16px;
+    }
+
+    /* Fade-in */
+    @keyframes stfIn { from { opacity:0; transform:translateY(8px); } to { opacity:1; transform:translateY(0); } }
+    .stf-in { animation: stfIn 260ms ease forwards; }
+  `;
+  document.head.appendChild(el);
+}
+
 const TABS = [
   { id: 'staff',      label: 'Staff',      icon: Users         },
   { id: 'attendance', label: 'Attendance', icon: CalendarCheck  },
@@ -30,14 +80,13 @@ const TABS = [
 ];
 
 const StaffManagement = () => {
-  const { user }           = useAuth();
-  const cafeId             = user?.cafeId;
-  const { data: cafe }     = useDocument('cafes', cafeId);
-  const { T }              = useTheme();
-  const [tab, setTab]      = useState('staff');
+  const { user }       = useAuth();
+  const cafeId         = user?.cafeId;
+  const { data: cafe } = useDocument('cafes', cafeId);
+  const { T }          = useTheme();
+  const [tab, setTab]  = useState('staff');
 
-  // ADD: load staffList here so SalaryDashboard can receive it as a prop
-  // (avoids a second Firestore query inside SalaryDashboard)
+  // ── All original logic — UNCHANGED ────────────────────────────────────────
   const [staffList, setStaffList] = useState([]);
 
   useEffect(() => {
@@ -57,22 +106,20 @@ const StaffManagement = () => {
     return () => unsub();
   }, [cafeId]);
 
-  // Feature gate — owner can enable/disable this module
   const isEnabled = cafe?.staffManagementEnabled !== false;
+  // ─────────────────────────────────────────────────────────────────────────
 
   if (!isEnabled) {
     return (
-      <div className="flex flex-col items-center justify-center py-24 text-center">
-        <div className="w-16 h-16 rounded-2xl bg-[#D4AF37]/10 flex items-center justify-center mb-4">
-          <Lock className="w-8 h-8 text-[#D4AF37]" />
+      <div className="stf-wrap stf-locked flex flex-col items-center justify-center py-24 text-center">
+        <div className="w-14 h-14 rounded-2xl flex items-center justify-center mb-5"
+          style={{ background: 'rgba(201,162,39,0.1)', border: '1.5px solid rgba(201,162,39,0.2)' }}>
+          <Lock style={{ width: 26, height: 26, color: '#C9A227' }} />
         </div>
-        <h2
-          className={`${T.heading} font-bold text-2xl mb-2`}
-          style={{ fontFamily: 'Playfair Display, serif' }}
-        >
+        <h2 className="stf-title text-white font-black text-2xl mb-2">
           Staff Management
         </h2>
-        <p className={`${T.muted} text-sm max-w-xs`}>
+        <p style={{ color: '#7a6a3a', fontSize: 13, maxWidth: 280 }}>
           This module is disabled. Enable it in Settings → Feature Toggles.
         </p>
       </div>
@@ -80,44 +127,36 @@ const StaffManagement = () => {
   }
 
   return (
-    <div className="space-y-6">
-      {/* ── Header ── */}
-      <div className="flex items-center justify-between">
+    <div className="stf-wrap space-y-5">
+
+      {/* Header */}
+      <div className="flex items-center justify-between stf-in">
         <div>
-          <h2
-            className={`${T.heading} font-bold text-2xl`}
-            style={{ fontFamily: 'Playfair Display, serif' }}
-          >
+          <h2 className="stf-title text-white font-black text-2xl">
             Staff Management
           </h2>
-          <p className={`${T.faint} text-xs mt-1`}>
+          <p className="text-xs mt-0.5 flex items-center gap-1.5" style={{ color: '#7a6a3a' }}>
+            <span className="inline-block w-1.5 h-1.5 rounded-full" style={{ background: '#C9A227' }} />
             {staffList.length} team member{staffList.length !== 1 ? 's' : ''} · manage your team, attendance and salaries
           </p>
         </div>
       </div>
 
-      {/* ── Tab nav ── */}
-      <div
-        className={`flex gap-1 p-1 rounded-xl ${T.innerCard} border ${T.border} w-fit`}
-      >
+      {/* Tab nav */}
+      <div className="stf-tab-bar stf-in" style={{ animationDelay: '40ms', animationFillMode: 'both' }}>
         {TABS.map(t => (
           <button
             key={t.id}
             onClick={() => setTab(t.id)}
-            className="flex items-center gap-2 px-5 py-2.5 rounded-lg text-sm font-semibold transition-all"
-            style={
-              tab === t.id
-                ? { background: 'linear-gradient(135deg,#D4AF37,#C5A059)', color: '#000' }
-                : { color: '#A3A3A3' }
-            }
+            className={`stf-tab ${tab === t.id ? 'stf-tab-on' : 'stf-tab-off'}`}
           >
-            <t.icon className="w-4 h-4" />
+            <t.icon style={{ width: 15, height: 15 }} />
             {t.label}
           </button>
         ))}
       </div>
 
-      {/* ── Tab content ── */}
+      {/* Tab content — AnimatePresence + motion UNCHANGED */}
       <AnimatePresence mode="wait">
         <motion.div
           key={tab}
