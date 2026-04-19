@@ -1,14 +1,5 @@
 /**
  * KitchenDashboardTab.jsx
- *
- * Shown when the cafe owner clicks "Kitchen" in the dashboard sidebar.
- * Provides:
- *   1. A live summary of active orders by status (mirrors the KDS).
- *   2. A button to open the full Kitchen Display in a new tab.
- *   3. Quick status update capability (same as OrdersManagement).
- *
- * UI UPGRADE: Café-vibe premium aesthetic. Zero logic changes.
- * PATCH: Added selectedVariant size label display next to item names.
  */
 
 import React, { useMemo } from 'react';
@@ -24,14 +15,13 @@ import {
 import { toast } from 'sonner';
 import { useTheme } from '../../hooks/useTheme';
 
-// ── Inject café-vibe CSS once ─────────────────────────────────────────────────
 if (typeof document !== 'undefined' && !document.getElementById('kdt-cafe-css')) {
   const el = document.createElement('style');
   el.id = 'kdt-cafe-css';
   el.textContent = `
-    @import url('https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800;900&family=Fredoka+One&display=swap');
-    .kdt { font-family: 'Nunito', system-ui, sans-serif; }
-    .kdt-title { font-family: 'Fredoka One', system-ui, sans-serif !important; }
+    @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700;800&family=Playfair+Display:wght@600;700;800;900&display=swap');
+    .kdt { font-family: 'DM Sans', system-ui, sans-serif; }
+    .kdt-title { font-family: 'Playfair Display', serif !important; }
     .kdt-card {
       background: #141008;
       border: 1.5px solid rgba(255,255,255,0.07);
@@ -53,7 +43,6 @@ if (typeof document !== 'undefined' && !document.getElementById('kdt-cafe-css'))
   document.head.appendChild(el);
 }
 
-// Status column config (same accent palette as KitchenDisplay)
 const COLS = [
   { id: 'new',       label: 'New',       icon: Bell,         accent: '#3B82F6', bg: 'rgba(59,130,246,0.08)',  emoji: '🆕' },
   { id: 'preparing', label: 'Preparing', icon: Flame,        accent: '#F59E0B', bg: 'rgba(245,158,11,0.08)',  emoji: '👨‍🍳' },
@@ -105,7 +94,7 @@ const KitchenDashboardTab = () => {
     return (
       <div className="kdt flex flex-col items-center justify-center py-20 gap-3">
         <div className="text-4xl animate-bounce">🍳</div>
-        <p className="text-sm font-bold" style={{ color: '#7a6a55' }}>Loading kitchen…</p>
+        <p className="text-sm font-bold" style={{ color: '#7a6a3a' }}>Loading kitchen…</p>
       </div>
     );
   }
@@ -113,7 +102,6 @@ const KitchenDashboardTab = () => {
   return (
     <div className="kdt space-y-5">
 
-      {/* ── Header card ───────────────────────────────────────────────────── */}
       <div className="kdt-card p-5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div className="flex items-center gap-4">
           <div className="w-12 h-12 rounded-2xl flex items-center justify-center text-2xl flex-shrink-0"
@@ -122,7 +110,7 @@ const KitchenDashboardTab = () => {
           </div>
           <div>
             <h3 className="text-lg font-black text-white kdt-title">Kitchen Display System</h3>
-            <p className="text-xs font-semibold mt-0.5" style={{ color: '#7a6a55' }}>
+            <p className="text-xs font-semibold mt-0.5" style={{ color: '#7a6a3a' }}>
               Open on your kitchen tablet for a full-screen live view
             </p>
           </div>
@@ -139,9 +127,8 @@ const KitchenDashboardTab = () => {
         </a>
       </div>
 
-      {/* ── Kitchen URL copy strip ─────────────────────────────────────────── */}
       <div className="kdt-card px-4 py-3 flex items-center gap-3">
-        <span className="text-xs font-bold flex-shrink-0" style={{ color: '#7a6a55' }}>🔗 Kitchen URL:</span>
+        <span className="text-xs font-bold flex-shrink-0" style={{ color: '#7a6a3a' }}>🔗 Kitchen URL:</span>
         <code className="text-xs font-mono flex-1 truncate" style={{ color: '#FF7A20' }}>{kitchenUrl}</code>
         <button
           onClick={() => { navigator.clipboard.writeText(kitchenUrl); toast.success('Kitchen URL copied! 📋'); }}
@@ -152,41 +139,28 @@ const KitchenDashboardTab = () => {
         </button>
       </div>
 
-      {/* ── Live status summary counters ───────────────────────────────────── */}
       <div className="grid grid-cols-3 gap-3">
         {columns.map(col => {
           const Icon = col.icon;
           return (
-            <div
-              key={col.id}
-              className="kdt-card p-4 flex items-center gap-3"
-              style={{ borderLeft: `3px solid ${col.accent}` }}
-            >
-              <div
-                className="w-10 h-10 rounded-xl flex items-center justify-center text-lg flex-shrink-0"
-                style={{ backgroundColor: col.bg }}
-              >
+            <div key={col.id} className="kdt-card p-4 flex items-center gap-3" style={{ borderLeft: `3px solid ${col.accent}` }}>
+              <div className="w-10 h-10 rounded-xl flex items-center justify-center text-lg flex-shrink-0" style={{ backgroundColor: col.bg }}>
                 {col.emoji}
               </div>
               <div>
-                <p className="text-2xl font-black" style={{ color: col.accent }}>
-                  {col.orders.length}
-                </p>
-                <p className="text-xs font-bold uppercase tracking-wide" style={{ color: '#7a6a55' }}>
-                  {col.label}
-                </p>
+                <p className="text-2xl font-black" style={{ color: col.accent }}>{col.orders.length}</p>
+                <p className="text-xs font-bold uppercase tracking-wide" style={{ color: '#7a6a3a' }}>{col.label}</p>
               </div>
             </div>
           );
         })}
       </div>
 
-      {/* ── Active order cards ─────────────────────────────────────────────── */}
       {activeOrders.length === 0 ? (
         <div className="kdt-card p-12 text-center">
           <div className="text-5xl mb-3">🫙</div>
-          <p className="font-bold" style={{ color: '#7a6a55' }}>No active orders in the kitchen right now</p>
-          <p className="text-xs mt-1" style={{ color: '#4a3f35' }}>Orders will appear here in real-time ✨</p>
+          <p className="font-bold" style={{ color: '#7a6a3a' }}>No active orders in the kitchen right now</p>
+          <p className="text-xs mt-1" style={{ color: '#5a4a1a' }}>Orders will appear here in real-time ✨</p>
         </div>
       ) : (
         <div className="space-y-3">
@@ -196,7 +170,6 @@ const KitchenDashboardTab = () => {
           <AnimatePresence mode="popLayout">
             {activeOrders.map(order => {
               const colMeta = COLS.find(c => c.id === order.orderStatus) || COLS[0];
-              const Icon    = colMeta.icon;
               const elapsed = (() => {
                 if (!order.createdAt) return '';
                 const d = order.createdAt.toDate ? order.createdAt.toDate() : new Date(order.createdAt);
@@ -206,19 +179,9 @@ const KitchenDashboardTab = () => {
               })();
 
               return (
-                <motion.div
-                  key={order.id}
-                  layout
-                  initial={{ opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0  }}
-                  exit={{    opacity: 0, y: -6  }}
-                  className="kdt-order-card"
-                >
-                  {/* Status colour bar */}
+                <motion.div key={order.id} layout initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -6 }} className="kdt-order-card">
                   <div style={{ height: 3, background: `linear-gradient(90deg, ${colMeta.accent}, transparent)` }} />
-
                   <div className="flex items-start gap-4 px-4 py-3 flex-wrap">
-                    {/* Order type icon + number */}
                     <div className="flex items-center gap-2 min-w-[90px]">
                       <div className="w-9 h-9 rounded-xl flex items-center justify-center text-lg flex-shrink-0"
                         style={{ background: 'rgba(255,140,0,0.1)', border: '1.5px solid rgba(255,140,0,0.18)' }}>
@@ -228,25 +191,16 @@ const KitchenDashboardTab = () => {
                         #{order.orderNumber ? String(order.orderNumber).padStart(3,'0') : order.id.slice(0,6)}
                       </span>
                     </div>
-
-                    {/* Status badge */}
-                    <span
-                      className="flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-black"
-                      style={{ backgroundColor: colMeta.bg, color: colMeta.accent, border: `1.5px solid ${colMeta.accent}30` }}
-                    >
+                    <span className="flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-black"
+                      style={{ backgroundColor: colMeta.bg, color: colMeta.accent, border: `1.5px solid ${colMeta.accent}30` }}>
                       {colMeta.emoji} {colMeta.label}
                     </span>
-
-                    {/* Table number */}
                     {order.tableNumber && (
-                      <span className="text-xs font-bold px-2 py-1 rounded-lg"
-                        style={{ background: 'rgba(255,255,255,0.05)', color: '#A3A3A3' }}>
+                      <span className="text-xs font-bold px-2 py-1 rounded-lg" style={{ background: 'rgba(255,255,255,0.05)', color: '#A3A3A3' }}>
                         🪑 Table {order.tableNumber}
                       </span>
                     )}
-
-                    {/* Items summary */}
-                    <div className="flex-1 text-sm min-w-0" style={{ color: '#7a6a55' }}>
+                    <div className="flex-1 text-sm min-w-0" style={{ color: '#7a6a3a' }}>
                       {order.items?.map((item, idx) => (
                         <div key={idx} className="mb-0.5">
                           <span className="font-semibold">
@@ -255,36 +209,26 @@ const KitchenDashboardTab = () => {
                           {item.comboItems?.length > 0 && (
                             <div className="ml-3 mt-0.5">
                               {item.comboItems.map((ci, cIdx) => (
-                                <span key={cIdx} className="block text-xs opacity-70">
-                                  — {ci.name}{ci.quantity > 1 ? ` ×${ci.quantity}` : ''}
-                                </span>
+                                <span key={cIdx} className="block text-xs opacity-70">— {ci.name}{ci.quantity > 1 ? ` ×${ci.quantity}` : ''}</span>
                               ))}
                             </div>
                           )}
                           {item.addons?.length > 0 && (
-                            <span className="block text-xs opacity-70 ml-3">
-                              ✨ {item.addons.map(a => a.name).join(', ')}
-                            </span>
+                            <span className="block text-xs opacity-70 ml-3">✨ {item.addons.map(a => a.name).join(', ')}</span>
                           )}
                         </div>
                       ))}
                     </div>
-
-                    {/* Elapsed */}
-                    <div className="flex items-center gap-1 text-xs flex-shrink-0 font-bold" style={{ color: '#4a3f35' }}>
-                      <Clock className="w-3 h-3" />
-                      {elapsed}
+                    <div className="flex items-center gap-1 text-xs flex-shrink-0 font-bold" style={{ color: '#5a4a1a' }}>
+                      <Clock className="w-3 h-3" />{elapsed}
                     </div>
-
-                    {/* Advance button */}
                     {NEXT[order.orderStatus] && (
                       <button
                         onClick={() => advanceStatus(order.id, order.orderStatus)}
                         className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-black text-black transition-all flex-shrink-0"
                         style={{ background: NEXT_COLOR[order.orderStatus], boxShadow: `0 3px 12px ${NEXT_COLOR[order.orderStatus]}40` }}
                       >
-                        <ArrowRight className="w-3 h-3" />
-                        {NEXT_LABEL[order.orderStatus]}
+                        <ArrowRight className="w-3 h-3" />{NEXT_LABEL[order.orderStatus]}
                       </button>
                     )}
                   </div>
@@ -295,15 +239,13 @@ const KitchenDashboardTab = () => {
         </div>
       )}
 
-      {/* Footer */}
       <div className="flex items-center justify-center gap-2 py-2">
         <span>☕</span>
-        <p className="text-xs font-bold" style={{ color: '#7a6a55' }}>
+        <p className="text-xs font-bold" style={{ color: '#7a6a3a' }}>
           {activeOrders.length} active order{activeOrders.length !== 1 ? 's' : ''} · Live kitchen feed active
         </p>
         <span className="inline-block w-1.5 h-1.5 rounded-full animate-pulse" style={{ background: '#34d399' }} />
       </div>
-
     </div>
   );
 };
