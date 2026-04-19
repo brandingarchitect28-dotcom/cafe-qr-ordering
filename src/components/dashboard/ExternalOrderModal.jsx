@@ -32,90 +32,94 @@ if (typeof document !== 'undefined' && !document.getElementById('ext-omf-css')) 
     .ext-wrap  { font-family: 'DM Sans', system-ui, sans-serif; }
     .ext-title { font-family: 'Playfair Display', serif !important; letter-spacing: 0.01em; }
 
-    /* Modal surface */
+    /* Modal surface — deep black with crisp gold border */
     .ext-modal {
-      background: linear-gradient(180deg, #1a1400 0%, #110d00 100%);
-      border: 1.5px solid rgba(201,162,39,0.18);
-      box-shadow: 0 -20px 60px rgba(201,162,39,0.08), 0 32px 80px rgba(0,0,0,0.7);
+      background: #0a0a0a;
+      border: 1.5px solid rgba(201,162,39,0.45);
+      box-shadow:
+        0 0 0 1px rgba(201,162,39,0.08),
+        0 -8px 40px rgba(201,162,39,0.06),
+        0 32px 80px rgba(0,0,0,0.9),
+        inset 0 1px 0 rgba(201,162,39,0.08);
     }
     .ext-modal-header {
-      background: rgba(0,0,0,0.3);
-      border-bottom: 1px solid rgba(255,255,255,0.06);
+      background: #0d0d0d;
+      border-bottom: 1px solid rgba(201,162,39,0.18);
     }
     .ext-modal-footer {
-      background: rgba(0,0,0,0.25);
-      border-top: 1px solid rgba(255,255,255,0.06);
+      background: #0d0d0d;
+      border-top: 1px solid rgba(201,162,39,0.18);
     }
 
-    /* Section label — exact omf-sec */
+    /* Section label */
     .ext-sec {
       font-size: 11px; font-weight: 900; text-transform: uppercase; letter-spacing: 0.08em;
       color: #C9A227; display: flex; align-items: center; gap: 5px;
       font-family: 'DM Sans', system-ui, sans-serif; margin-bottom: 10px;
     }
 
-    /* Inputs — exact omf-input */
+    /* Inputs — pure black bg, gold outline */
     .ext-input {
-      background: #1a1500; border: 1.5px solid rgba(255,255,255,0.08); border-radius: 12px;
+      background: #000; border: 1.5px solid rgba(201,162,39,0.28); border-radius: 12px;
       color: #fdf8e1; padding: 10px 14px; font-size: 14px; font-weight: 600;
       font-family: 'DM Sans', system-ui, sans-serif;
       outline: none; width: 100%; transition: border-color 180ms, box-shadow 180ms;
     }
-    .ext-input:focus { border-color: rgba(201,162,39,0.55); box-shadow: 0 0 0 3px rgba(201,162,39,0.1); }
-    .ext-input::placeholder { color: #3d341a; }
+    .ext-input:focus { border-color: rgba(201,162,39,0.75); box-shadow: 0 0 0 3px rgba(201,162,39,0.1); }
+    .ext-input::placeholder { color: rgba(201,162,39,0.22); }
 
-    /* Selects — exact omf-select */
+    /* Selects — pure black bg, gold outline */
     .ext-select {
-      background: #1a1500; border: 1.5px solid rgba(255,255,255,0.08); border-radius: 10px;
+      background: #000; border: 1.5px solid rgba(201,162,39,0.28); border-radius: 10px;
       color: #fdf8e1; padding: 10px 14px; font-size: 14px; font-weight: 600;
       font-family: 'DM Sans', system-ui, sans-serif;
       outline: none; cursor: pointer; transition: border-color 160ms; width: 100%;
     }
-    .ext-select:focus { border-color: rgba(201,162,39,0.5); }
-    .ext-select option { background: #1a1500; }
+    .ext-select:focus { border-color: rgba(201,162,39,0.7); }
+    .ext-select option { background: #0a0a0a; color: #fdf8e1; }
 
-    /* Textarea */
+    /* Textarea — pure black bg, gold outline */
     .ext-textarea {
-      background: #1a1500; border: 1.5px solid rgba(255,255,255,0.08); border-radius: 12px;
+      background: #000; border: 1.5px solid rgba(201,162,39,0.28); border-radius: 12px;
       color: #fdf8e1; padding: 10px 14px; font-size: 14px; font-weight: 600;
       font-family: 'DM Sans', system-ui, sans-serif;
       outline: none; width: 100%; resize: none; transition: border-color 180ms, box-shadow 180ms;
     }
-    .ext-textarea:focus { border-color: rgba(201,162,39,0.55); box-shadow: 0 0 0 3px rgba(201,162,39,0.1); }
-    .ext-textarea::placeholder { color: #3d341a; }
+    .ext-textarea:focus { border-color: rgba(201,162,39,0.75); box-shadow: 0 0 0 3px rgba(201,162,39,0.1); }
+    .ext-textarea::placeholder { color: rgba(201,162,39,0.22); }
 
-    /* Primary btn — omf-btn-orange */
+    /* Primary btn */
     .ext-btn-primary {
       display: inline-flex; align-items: center; gap: 6px;
-      background: linear-gradient(135deg, #C9A227, #8B6914); color: #fff;
+      background: linear-gradient(135deg, #C9A227, #8B6914); color: #0a0a0a;
       font-family: 'DM Sans', system-ui, sans-serif; font-weight: 800; font-size: 13px;
       padding: 10px 22px; border-radius: 10px; border: none; cursor: pointer;
-      box-shadow: 0 3px 14px rgba(201,162,39,0.32); transition: all 180ms; white-space: nowrap;
+      box-shadow: 0 3px 14px rgba(201,162,39,0.35); transition: all 180ms; white-space: nowrap;
     }
-    .ext-btn-primary:hover  { box-shadow: 0 5px 22px rgba(201,162,39,0.48); transform: translateY(-1px); }
+    .ext-btn-primary:hover  { box-shadow: 0 5px 24px rgba(201,162,39,0.55); transform: translateY(-1px); }
     .ext-btn-primary:active { transform: scale(0.96); }
-    .ext-btn-primary:disabled { opacity: 0.55; cursor: not-allowed; transform: none; }
+    .ext-btn-primary:disabled { opacity: 0.45; cursor: not-allowed; transform: none; }
 
-    /* Ghost btn — omf-btn-ghost */
+    /* Ghost btn */
     .ext-btn-ghost {
       display: inline-flex; align-items: center; gap: 6px;
-      background: rgba(255,255,255,0.05); color: #7a6a3a;
+      background: #000; color: #8a7a4a;
       font-family: 'DM Sans', system-ui, sans-serif; font-weight: 700; font-size: 13px;
       padding: 10px 18px; border-radius: 10px;
-      border: 1.5px solid rgba(255,255,255,0.08); cursor: pointer; transition: all 180ms;
+      border: 1.5px solid rgba(201,162,39,0.22); cursor: pointer; transition: all 180ms;
     }
-    .ext-btn-ghost:hover  { background: rgba(255,255,255,0.09); color: #fff; }
+    .ext-btn-ghost:hover  { border-color: rgba(201,162,39,0.5); color: #fdf8e1; background: rgba(201,162,39,0.04); }
     .ext-btn-ghost:active { transform: scale(0.96); }
 
     /* Green WA btn */
     .ext-btn-wa {
       display: inline-flex; align-items: center; gap: 6px;
-      background: rgba(34,197,94,0.1); color: #4ade80;
+      background: #000; color: #4ade80;
       font-family: 'DM Sans', system-ui, sans-serif; font-weight: 700; font-size: 13px;
       padding: 10px 18px; border-radius: 10px;
-      border: 1.5px solid rgba(34,197,94,0.22); cursor: pointer; transition: all 180ms;
+      border: 1.5px solid rgba(34,197,94,0.3); cursor: pointer; transition: all 180ms;
     }
-    .ext-btn-wa:hover { background: rgba(34,197,94,0.18); }
+    .ext-btn-wa:hover { background: rgba(34,197,94,0.06); border-color: rgba(34,197,94,0.5); }
 
     /* Source pill button */
     .ext-source-btn {
@@ -123,10 +127,10 @@ if (typeof document !== 'undefined' && !document.getElementById('ext-omf-css')) 
       padding: 12px 8px; border-radius: 10px;
       font-family: 'DM Sans', system-ui, sans-serif; font-weight: 800; font-size: 11px;
       cursor: pointer; transition: all 160ms;
-      border: 1.5px solid rgba(255,255,255,0.07);
-      background: rgba(255,255,255,0.03); color: #7a6a3a;
+      border: 1.5px solid rgba(201,162,39,0.2);
+      background: #000; color: #8a7a4a;
     }
-    .ext-source-btn:hover { border-color: rgba(255,255,255,0.14); color: #fdf8e1; }
+    .ext-source-btn:hover { border-color: rgba(201,162,39,0.45); color: #fdf8e1; }
     .ext-source-btn-on   { color: #fff; }
 
     /* Mode toggle button */
@@ -134,35 +138,36 @@ if (typeof document !== 'undefined' && !document.getElementById('ext-omf-css')) 
       padding: 10px 12px; border-radius: 10px; font-size: 13px; font-weight: 700;
       font-family: 'DM Sans', system-ui, sans-serif;
       cursor: pointer; transition: all 160ms;
-      border: 1.5px solid rgba(255,255,255,0.07);
-      background: rgba(255,255,255,0.03); color: #7a6a3a;
+      border: 1.5px solid rgba(201,162,39,0.2);
+      background: #000; color: #8a7a4a;
     }
-    .ext-mode-btn:hover { border-color: rgba(255,255,255,0.14); color: #fdf8e1; }
+    .ext-mode-btn:hover { border-color: rgba(201,162,39,0.45); color: #fdf8e1; }
     .ext-mode-btn-on {
-      background: rgba(201,162,39,0.1); color: #C9A227;
-      border-color: rgba(201,162,39,0.3);
+      background: rgba(201,162,39,0.07); color: #C9A227;
+      border-color: rgba(201,162,39,0.55);
+      box-shadow: inset 0 0 0 1px rgba(201,162,39,0.08);
     }
 
-    /* Cart card */
+    /* Cart card — black with gold border */
     .ext-cart-card {
-      background: #120f00;
-      border: 1.5px solid rgba(255,255,255,0.07);
+      background: #000;
+      border: 1.5px solid rgba(201,162,39,0.3);
       border-radius: 14px; overflow: hidden;
     }
-    .ext-cart-row { border-bottom: 1px solid rgba(255,255,255,0.05); }
+    .ext-cart-row { border-bottom: 1px solid rgba(201,162,39,0.1); }
 
     /* Empty cart area */
     .ext-empty-cart {
-      background: rgba(255,255,255,0.02);
-      border: 1.5px dashed rgba(255,255,255,0.08);
-      border-radius: 14px; cursor: pointer; transition: border-color 180ms;
+      background: #000;
+      border: 1.5px dashed rgba(201,162,39,0.25);
+      border-radius: 14px; cursor: pointer; transition: border-color 180ms, background 180ms;
     }
-    .ext-empty-cart:hover { border-color: rgba(201,162,39,0.3); }
+    .ext-empty-cart:hover { border-color: rgba(201,162,39,0.5); background: rgba(201,162,39,0.02); }
 
     /* Info notice */
     .ext-notice {
-      background: rgba(201,162,39,0.06);
-      border: 1.5px solid rgba(201,162,39,0.15);
+      background: rgba(201,162,39,0.04);
+      border: 1.5px solid rgba(201,162,39,0.28);
       border-radius: 12px;
     }
 
@@ -179,42 +184,42 @@ if (typeof document !== 'undefined' && !document.getElementById('ext-omf-css')) 
     .ext-label {
       display: block; font-size: 11px; font-weight: 900;
       text-transform: uppercase; letter-spacing: 0.06em;
-      color: #7a6a3a; margin-bottom: 7px;
+      color: #9a8a5a; margin-bottom: 7px;
       font-family: 'DM Sans', system-ui, sans-serif;
     }
 
     /* Scrollbar */
     .ext-scroll::-webkit-scrollbar { width: 3px; }
     .ext-scroll::-webkit-scrollbar-track { background: transparent; }
-    .ext-scroll::-webkit-scrollbar-thumb { background: rgba(201,162,39,0.22); border-radius: 3px; }
+    .ext-scroll::-webkit-scrollbar-thumb { background: rgba(201,162,39,0.3); border-radius: 3px; }
 
-    /* Sheet (item picker) */
+    /* Sheet (item picker) — black with gold border */
     .ext-sheet {
-      background: linear-gradient(180deg, #1a1400 0%, #110d00 100%);
-      border: 1.5px solid rgba(201,162,39,0.18);
-      box-shadow: 0 -20px 60px rgba(201,162,39,0.14);
+      background: #0a0a0a;
+      border: 1.5px solid rgba(201,162,39,0.4);
+      box-shadow: 0 -16px 50px rgba(201,162,39,0.1), 0 0 0 1px rgba(201,162,39,0.06);
     }
-    .ext-sheet-grip { width: 36px; height: 4px; border-radius: 4px; background: rgba(201,162,39,0.28); }
+    .ext-sheet-grip { width: 36px; height: 4px; border-radius: 4px; background: rgba(201,162,39,0.35); }
 
     /* Search input */
     .ext-search {
-      background: #1a1500; border: 1.5px solid rgba(255,255,255,0.08); border-radius: 12px;
+      background: #000; border: 1.5px solid rgba(201,162,39,0.28); border-radius: 12px;
       color: #fdf8e1; padding: 9px 14px 9px 36px; font-size: 13px; font-weight: 600;
       font-family: 'DM Sans', system-ui, sans-serif;
       outline: none; width: 100%; transition: border-color 180ms;
     }
-    .ext-search:focus { border-color: rgba(201,162,39,0.5); }
-    .ext-search::placeholder { color: #3d341a; }
+    .ext-search:focus { border-color: rgba(201,162,39,0.7); }
+    .ext-search::placeholder { color: rgba(201,162,39,0.22); }
 
     /* Menu item row in picker */
     .ext-menu-item {
       display: flex; align-items: center; justify-content: space-between;
       padding: 10px 12px; border-radius: 12px;
-      background: rgba(255,255,255,0.03);
-      border: 1.5px solid rgba(255,255,255,0.06);
+      background: #000;
+      border: 1.5px solid rgba(201,162,39,0.18);
       transition: border-color 160ms, background 160ms;
     }
-    .ext-menu-item:hover { border-color: rgba(201,162,39,0.2); background: rgba(201,162,39,0.04); }
+    .ext-menu-item:hover { border-color: rgba(201,162,39,0.45); background: rgba(201,162,39,0.03); }
 
     /* Fade-in */
     @keyframes extIn { from { opacity:0; transform:translateY(8px); } to { opacity:1; transform:translateY(0); } }
@@ -242,11 +247,11 @@ const calculateOrderTotals = (items = []) => {
 
 // ─── Platform source definitions — UNCHANGED (exported) ───────────────────────
 export const ORDER_SOURCES = [
-  { value: 'zomato', label: 'Zomato',      color: '#EF4444', bg: 'bg-red-500/15 border-red-500/30 text-red-400'              },
-  { value: 'swiggy', label: 'Swiggy',      color: '#F97316', bg: 'bg-orange-500/15 border-orange-500/30 text-orange-400'    },
-  { value: 'phone',  label: 'Phone Order', color: '#3B82F6', bg: 'bg-blue-500/15 border-blue-500/30 text-blue-400'          },
-  { value: 'walkin', label: 'Walk-in',     color: '#10B981', bg: 'bg-emerald-500/15 border-emerald-500/30 text-emerald-400' },
-  { value: 'other',  label: 'Other',       color: '#8B5CF6', bg: 'bg-purple-500/15 border-purple-500/30 text-purple-400'    },
+  { value: 'zomato', label: 'Zomato',      emoji: '🍅', color: '#EF4444', bg: 'bg-red-500/15 border-red-500/30 text-red-400'              },
+  { value: 'swiggy', label: 'Swiggy',      emoji: '🧡', color: '#F97316', bg: 'bg-orange-500/15 border-orange-500/30 text-orange-400'    },
+  { value: 'phone',  label: 'Phone Order', emoji: '📞', color: '#3B82F6', bg: 'bg-blue-500/15 border-blue-500/30 text-blue-400'          },
+  { value: 'walkin', label: 'Walk-in',     emoji: '🚶', color: '#10B981', bg: 'bg-emerald-500/15 border-emerald-500/30 text-emerald-400' },
+  { value: 'other',  label: 'Other',       emoji: '✨', color: '#8B5CF6', bg: 'bg-purple-500/15 border-purple-500/30 text-purple-400'    },
 ];
 
 export const getSourceMeta = (source) =>
@@ -336,8 +341,8 @@ const ExternalItemPickerModal = ({ cafeId, CUR, onClose, onConfirm, setVariantMo
           <div className="flex items-center justify-between px-5 py-4 flex-shrink-0"
             style={{borderBottom:'1px solid rgba(201,162,39,0.12)'}}>
             <div>
-              <h3 className="ext-title text-white font-bold text-lg">Select Items</h3>
-              <p className="text-xs mt-0.5" style={{color:'#7a6a3a'}}>Search and add items to this order</p>
+              <h3 className="ext-title text-white font-bold text-lg">🍴 Select Items</h3>
+              <p className="text-xs mt-0.5" style={{color:'#7a6a3a'}}>🔍 Search and add items to this order</p>
             </div>
             <button onClick={onClose} className="w-8 h-8 rounded-full flex items-center justify-center"
               style={{background:'rgba(201,162,39,0.1)',border:'1px solid rgba(201,162,39,0.2)'}}>
@@ -350,7 +355,7 @@ const ExternalItemPickerModal = ({ cafeId, CUR, onClose, onConfirm, setVariantMo
             <div className="relative">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5" style={{color:'#7a6a3a'}}/>
               <input type="text" value={searchQuery} onChange={e=>setSearchQuery(e.target.value)}
-                placeholder="Search menu items…" className="ext-search"/>
+                placeholder="🔍 Search menu items…" className="ext-search"/>
             </div>
           </div>
 
@@ -363,6 +368,7 @@ const ExternalItemPickerModal = ({ cafeId, CUR, onClose, onConfirm, setVariantMo
               </div>
             ) : filteredItems.length === 0 ? (
               <div className="text-center py-10">
+                <p style={{fontSize:'28px',marginBottom:'6px'}}>🫙</p>
                 <p className="text-sm" style={{color:'#5a4a1a'}}>No items found</p>
               </div>
             ) : filteredItems.map(item => {
@@ -375,7 +381,7 @@ const ExternalItemPickerModal = ({ cafeId, CUR, onClose, onConfirm, setVariantMo
               const hasV = iv.length>0; const hasA = Array.isArray(item.addons)&&item.addons.length>0;
               const minP = hasV?Math.min(...iv.map(v=>parseFloat(v.price)||0)):null;
               const dp   = hasV?`from ${CUR}${fmt(minP)}`:`${CUR}${fmt(item.price)}`;
-              const lbl  = hasV?'Pick Size':hasA?'Customize':'Add';
+              const lbl  = hasV?'📐 Pick Size':hasA?'🎨 Customize':'➕ Add';
 
               return (
                 <div key={item.id} className="ext-menu-item">
@@ -423,7 +429,7 @@ const ExternalItemPickerModal = ({ cafeId, CUR, onClose, onConfirm, setVariantMo
             <div className="px-4 py-4 flex-shrink-0 space-y-3"
               style={{borderTop:'1px solid rgba(201,162,39,0.12)',background:'rgba(0,0,0,0.25)'}}>
               <p className="text-xs font-black" style={{color:'#C9A227'}}>
-                Cart · {newCart.length} item{newCart.length!==1?'s':''}
+                🛒 Cart · {newCart.length} item{newCart.length!==1?'s':''}
               </p>
               <div className="space-y-1.5">
                 {newCart.map((item,idx)=>{
@@ -438,7 +444,7 @@ const ExternalItemPickerModal = ({ cafeId, CUR, onClose, onConfirm, setVariantMo
                   );
                 })}
                 <div className="flex justify-between text-sm font-black pt-1" style={{borderTop:'1px solid rgba(201,162,39,0.1)'}}>
-                  <span style={{color:'#7a6a3a'}}>Selected total</span>
+                  <span style={{color:'#7a6a3a'}}>✦ Selected total</span>
                   <span style={{color:'#C9A227'}}>{CUR}{fmt(newCartTotal)}</span>
                 </div>
               </div>
@@ -447,7 +453,7 @@ const ExternalItemPickerModal = ({ cafeId, CUR, onClose, onConfirm, setVariantMo
                 className="w-full py-3.5 rounded-xl font-black text-sm flex items-center justify-center gap-2 text-black"
                 style={{background:'linear-gradient(135deg,#C9A227,#8B6914)',boxShadow:'0 6px 20px rgba(201,162,39,0.3)'}}>
                 <Check className="w-4 h-4"/>
-                Confirm {newCart.length} Item{newCart.length!==1?'s':''} · {CUR}{fmt(newCartTotal)}
+                ✅ Confirm {newCart.length} Item{newCart.length!==1?'s':''} · {CUR}{fmt(newCartTotal)}
               </motion.button>
             </div>
           )}
@@ -575,7 +581,7 @@ const ExternalOrderModal = ({ onClose, onSuccess }) => {
                 <div className="flex justify-center pt-3 pb-1 sm:hidden"><div className="ext-sheet-grip mx-auto"/></div>
                 <div className="flex items-center justify-between px-6 py-4" style={{borderBottom:'1px solid rgba(201,162,39,0.12)'}}>
                   <div>
-                    <h3 className="ext-title text-white font-bold text-base">Select Size</h3>
+                    <h3 className="ext-title text-white font-bold text-base">📐 Select Size</h3>
                     <p className="text-xs mt-0.5" style={{color:'#7a6a3a'}}>{vItem.name}</p>
                   </div>
                   <button onClick={()=>setExtVariantModal(null)} className="w-8 h-8 rounded-full flex items-center justify-center"
@@ -619,8 +625,8 @@ const ExternalOrderModal = ({ onClose, onSuccess }) => {
                   <ShoppingBag className="w-5 h-5" style={{color:'#C9A227'}}/>
                 </div>
                 <div>
-                  <h3 className="ext-title text-white font-black text-lg">Add External Order</h3>
-                  <p className="text-xs mt-0.5" style={{color:'#7a6a3a'}}>Manually log orders from external platforms</p>
+                  <h3 className="ext-title text-white font-black text-lg">✦ Add External Order</h3>
+                  <p className="text-xs mt-0.5" style={{color:'#7a6a3a'}}>📋 Manually log orders from external platforms</p>
                 </div>
               </div>
               <button onClick={onClose} className="w-8 h-8 rounded-full flex items-center justify-center"
@@ -634,14 +640,13 @@ const ExternalOrderModal = ({ onClose, onSuccess }) => {
 
               {/* Platform source */}
               <div>
-                <p className="ext-sec">Platform Source</p>
+                <p className="ext-sec">🌐 Platform Source</p>
                 <div className="grid grid-cols-3 sm:grid-cols-5 gap-2">
                   {ORDER_SOURCES.map(s => (
                     <button key={s.value} type="button" onClick={()=>setSource(s.value)}
                       className="ext-source-btn"
                       style={source===s.value ? {borderColor:s.color,background:s.color+'18',color:'#fff'} : {}}>
-                      <span className="w-4 h-4 rounded-full flex-shrink-0"
-                        style={{background:source===s.value?s.color:'rgba(255,255,255,0.1)'}}/>
+                      <span style={{fontSize:'18px',lineHeight:1}}>{s.emoji}</span>
                       {s.label}
                     </button>
                   ))}
@@ -657,13 +662,13 @@ const ExternalOrderModal = ({ onClose, onSuccess }) => {
               {/* Customer + Phone */}
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="ext-label">Customer Name <span style={{color:'#5a4a1a',textTransform:'none',letterSpacing:0}}>(optional)</span></label>
+                  <label className="ext-label">👤 Customer Name <span style={{color:'#5a4a1a',textTransform:'none',letterSpacing:0}}>(optional)</span></label>
                   <input type="text" value={customerName} onChange={e=>setCustomerName(e.target.value)}
                     placeholder={`e.g., ${sourceMeta.label} Customer`}
                     className="ext-input" data-testid="ext-customer-name"/>
                 </div>
                 <div>
-                  <label className="ext-label">Phone Number <span style={{color:'#5a4a1a',textTransform:'none',letterSpacing:0}}>(optional)</span></label>
+                  <label className="ext-label">📱 Phone Number <span style={{color:'#5a4a1a',textTransform:'none',letterSpacing:0}}>(optional)</span></label>
                   <input type="tel" value={customerPhone} onChange={e=>setCustomerPhone(e.target.value)}
                     placeholder="e.g., 9876543210"
                     className="ext-input" data-testid="ext-customer-phone"/>
@@ -672,9 +677,9 @@ const ExternalOrderModal = ({ onClose, onSuccess }) => {
 
               {/* Order mode */}
               <div>
-                <p className="ext-sec">Order Mode</p>
+                <p className="ext-sec">🛵 Order Mode</p>
                 <div className="grid grid-cols-3 gap-2">
-                  {[{value:'takeaway',label:'Takeaway'},{value:'dine-in',label:'Dine-In'},{value:'delivery',label:'Delivery'}].map(m=>(
+                  {[{value:'takeaway',label:'🥡 Takeaway'},{value:'dine-in',label:'🍽️ Dine-In'},{value:'delivery',label:'🛵 Delivery'}].map(m=>(
                     <button key={m.value} type="button" onClick={()=>setOrderMode(m.value)}
                       className={`ext-mode-btn ${orderMode===m.value?'ext-mode-btn-on':''}`}
                       data-testid={`ext-mode-${m.value}`}>
@@ -686,7 +691,7 @@ const ExternalOrderModal = ({ onClose, onSuccess }) => {
 
               {orderMode==='dine-in' && (
                 <div>
-                  <label className="ext-label">Table Number <span style={{color:'#5a4a1a',textTransform:'none',letterSpacing:0}}>(optional)</span></label>
+                  <label className="ext-label">🪑 Table Number <span style={{color:'#5a4a1a',textTransform:'none',letterSpacing:0}}>(optional)</span></label>
                   <input type="text" value={tableNumber} onChange={e=>setTableNumber(e.target.value)}
                     placeholder="e.g., 5" className="ext-input" data-testid="ext-table-number"/>
                 </div>
@@ -694,7 +699,7 @@ const ExternalOrderModal = ({ onClose, onSuccess }) => {
 
               {orderMode==='delivery' && (
                 <div>
-                  <label className="ext-label">Delivery Address</label>
+                  <label className="ext-label">📍 Delivery Address</label>
                   <input type="text" value={deliveryAddress} onChange={e=>setDeliveryAddress(e.target.value)}
                     placeholder="Enter full delivery address" className="ext-input" data-testid="ext-delivery-address"/>
                 </div>
@@ -703,7 +708,7 @@ const ExternalOrderModal = ({ onClose, onSuccess }) => {
               {/* Items */}
               <div>
                 <div className="flex items-center justify-between mb-3">
-                  <p className="ext-sec" style={{marginBottom:0}}>Items Ordered</p>
+                  <p className="ext-sec" style={{marginBottom:0}}>🛒 Items Ordered</p>
                   <button type="button" onClick={()=>setShowPicker(true)}
                     className="ext-btn-primary" style={{padding:'7px 14px',fontSize:12}}
                     data-testid="ext-add-items-btn">
@@ -714,9 +719,9 @@ const ExternalOrderModal = ({ onClose, onSuccess }) => {
 
                 {cart.length === 0 ? (
                   <div className="ext-empty-cart flex flex-col items-center justify-center py-8" onClick={()=>setShowPicker(true)}>
-                    <ShoppingCart className="w-8 h-8 mb-2" style={{color:'#5a4a1a'}}/>
+                    <span style={{fontSize:'32px',marginBottom:'8px'}}>🍽️</span>
                     <p className="text-sm" style={{color:'#7a6a3a'}}>No items selected</p>
-                    <p className="text-xs mt-0.5" style={{color:'#5a4a1a'}}>Click to browse menu</p>
+                    <p className="text-xs mt-0.5" style={{color:'#5a4a1a'}}>✦ Click to browse menu</p>
                   </div>
                 ) : (
                   <div className="ext-cart-card">
@@ -745,7 +750,7 @@ const ExternalOrderModal = ({ onClose, onSuccess }) => {
                       );
                     })}
                     <div className="flex justify-between items-center px-4 py-3" style={{borderTop:'1px solid rgba(201,162,39,0.1)'}}>
-                      <span className="text-xs font-800" style={{color:'#7a6a3a'}}>Items Total</span>
+                      <span className="text-xs font-800" style={{color:'#7a6a3a'}}>✦ Items Total</span>
                       <span className="font-black text-sm" style={{color:'#C9A227'}}>{CUR}{fmt(cartTotal)}</span>
                     </div>
                   </div>
@@ -755,28 +760,28 @@ const ExternalOrderModal = ({ onClose, onSuccess }) => {
               {/* Payment */}
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="ext-label">Payment Method</label>
+                  <label className="ext-label">💳 Payment Method</label>
                   <select value={paymentMode} onChange={e=>setPaymentMode(e.target.value)}
                     className="ext-select" data-testid="ext-payment-mode">
-                    <option value="counter">Pay at Counter</option>
-                    <option value="prepaid">Prepaid / UPI</option>
-                    <option value="online">Online Payment</option>
-                    <option value="platform">Paid on Platform</option>
+                    <option value="counter">🏪 Pay at Counter</option>
+                    <option value="prepaid">📲 Prepaid / UPI</option>
+                    <option value="online">💻 Online Payment</option>
+                    <option value="platform">📦 Paid on Platform</option>
                   </select>
                 </div>
                 <div>
-                  <label className="ext-label">Payment Status</label>
+                  <label className="ext-label">📊 Payment Status</label>
                   <select value={paymentStatus} onChange={e=>setPaymentStatus(e.target.value)}
                     className="ext-select" data-testid="ext-payment-status">
-                    <option value="pending">Pending</option>
-                    <option value="paid">Paid</option>
+                    <option value="pending">⏳ Pending</option>
+                    <option value="paid">✅ Paid</option>
                   </select>
                 </div>
               </div>
 
               {/* Notes */}
               <div>
-                <label className="ext-label">Notes / Special Instructions <span style={{color:'#5a4a1a',textTransform:'none',letterSpacing:0}}>(optional)</span></label>
+                <label className="ext-label">📝 Notes / Special Instructions <span style={{color:'#5a4a1a',textTransform:'none',letterSpacing:0}}>(optional)</span></label>
                 <textarea value={notes} onChange={e=>setNotes(e.target.value)}
                   placeholder="Any special instructions, allergies, or notes…"
                   rows={3} className="ext-textarea" data-testid="ext-notes"/>
@@ -786,10 +791,10 @@ const ExternalOrderModal = ({ onClose, onSuccess }) => {
               <div className="ext-notice flex items-start gap-3 p-4">
                 <AlertCircle className="w-4 h-4 flex-shrink-0 mt-0.5" style={{color:'#C9A227'}}/>
                 <p className="text-xs leading-relaxed" style={{color:'#7a6a3a'}}>
-                  This order will appear instantly in the <strong style={{color:'#fdf8e1'}}>Kitchen Display</strong>,{' '}
+                  ⚡ This order will appear instantly in the <strong style={{color:'#fdf8e1'}}>Kitchen Display</strong>,{' '}
                   <strong style={{color:'#fdf8e1'}}>Orders Management</strong>, and{' '}
                   <strong style={{color:'#fdf8e1'}}>Analytics</strong> — exactly like a QR order.
-                  An invoice will also be generated automatically.
+                  🧾 An invoice will also be generated automatically.
                 </p>
               </div>
             </form>
@@ -797,21 +802,21 @@ const ExternalOrderModal = ({ onClose, onSuccess }) => {
             {/* Footer */}
             <div className="ext-modal-footer flex items-center justify-between gap-3 px-6 py-4 flex-shrink-0">
               <div className="text-sm" style={{color:'#7a6a3a'}}>
-                {cart.length} item{cart.length!==1?'s':''} ·{' '}
+                🛒 {cart.length} item{cart.length!==1?'s':''} ·{' '}
                 <span className="font-black" style={{color:'#C9A227'}}>{CUR}{fmt(cartTotal)}</span>
               </div>
               <div className="flex gap-2.5 flex-wrap justify-end">
                 {lastCreatedOrder && lastCreatedOrder.paymentStatus==='paid' && lastCreatedOrder.customerPhone && (
                   <button type="button" onClick={handleSendInvoiceWA} className="ext-btn-wa" data-testid="ext-wa-invoice-btn">
-                    <MessageSquare className="w-4 h-4"/>Send Invoice via WhatsApp
+                    <MessageSquare className="w-4 h-4"/>📲 Send Invoice via WhatsApp
                   </button>
                 )}
                 <button type="button" onClick={onClose} className="ext-btn-ghost">Cancel</button>
                 <button type="button" onClick={handleSubmit} disabled={submitting}
                   className="ext-btn-primary" data-testid="ext-submit-btn">
                   {submitting
-                    ? <><RefreshCw className="w-4 h-4 animate-spin"/>Adding…</>
-                    : <><Check className="w-4 h-4"/>Add Order</>
+                    ? <><RefreshCw className="w-4 h-4 animate-spin"/>⏳ Adding…</>
+                    : <><Check className="w-4 h-4"/>✦ Add Order</>
                   }
                 </button>
               </div>
