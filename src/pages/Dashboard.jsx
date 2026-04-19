@@ -41,13 +41,13 @@ if (typeof document !== 'undefined' && !document.getElementById('dash-cafe-css')
     .dash { font-family: 'DM Sans', system-ui, sans-serif; }
     .dash-title { font-family: 'Playfair Display', serif !important; }
 
-    /* TASK 2: Improved nav item — slightly larger, better weight, cleaner rendering */
+    /* Nav items — larger, bolder, more visible like reference screenshot */
     .dash-nav-item {
       width: 100%;
-      display: flex; align-items: center; gap: 10px;
-      padding: 10px 14px; border-radius: 10px;
+      display: flex; align-items: center; gap: 11px;
+      padding: 11px 14px; border-radius: 10px;
       font-family: 'DM Sans', system-ui, sans-serif;
-      font-weight: 600; font-size: 13.5px;
+      font-weight: 600; font-size: 15px;
       cursor: pointer; transition: all 160ms;
       border: none; background: transparent;
       color: #8a7a65; text-align: left;
@@ -60,7 +60,6 @@ if (typeof document !== 'undefined' && !document.getElementById('dash-cafe-css')
       color: #fff; font-weight: 700;
       box-shadow: 0 3px 14px rgba(201,162,39,0.32);
     }
-    .dash-nav-item.active .dash-nav-icon { opacity: 1; }
     .dash-nav-icon { opacity: 0.55; flex-shrink: 0; transition: opacity 160ms; }
     .dash-nav-item:hover .dash-nav-icon  { opacity: 0.85; }
     .dash-nav-item.active .dash-nav-icon { opacity: 1; }
@@ -82,14 +81,26 @@ if (typeof document !== 'undefined' && !document.getElementById('dash-cafe-css')
     .dash-nav-scroll::-webkit-scrollbar-track { background: transparent; }
     .dash-nav-scroll::-webkit-scrollbar-thumb { background: rgba(201,162,39,0.18); border-radius: 3px; }
 
-    /* TASK 1: Branding header */
-    .dash-brand-label {
+    /* Branding header — large bold all-caps stacked like reference screenshot */
+    .dash-brand-name {
       font-family: 'DM Sans', system-ui, sans-serif;
-      font-size: 11px;
-      font-weight: 700;
-      letter-spacing: 0.12em;
+      font-size: 20px;
+      font-weight: 800;
+      letter-spacing: 0.06em;
       text-transform: uppercase;
       color: #C9A227;
+      line-height: 1.15;
+      -webkit-font-smoothing: antialiased;
+    }
+    .dash-brand-sub {
+      font-family: 'DM Sans', system-ui, sans-serif;
+      font-size: 10px;
+      font-weight: 600;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: #C9A227;
+      opacity: 0.5;
+      margin-top: 3px;
       -webkit-font-smoothing: antialiased;
     }
   `;
@@ -192,14 +203,14 @@ const Dashboard = () => {
       {/* ── Sidebar ── */}
       <aside className={`fixed top-0 left-0 h-screen w-64 dash-sidebar flex flex-col z-50 transform transition-transform ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'}`}>
 
-        {/* ── TASK 1: Branding header — "BRANDING ARCHITECT" only, all caps, bold ── */}
-        <div className="flex items-center justify-between px-4 pt-5 pb-4 flex-shrink-0">
-          <div className="flex flex-col gap-0.5">
-            <span className="dash-brand-label">Branding Architect</span>
-            <span className="text-xs font-500" style={{ color: '#3a3028', fontSize: '10px', letterSpacing: '0.04em' }}>SmartCafé OS</span>
+        {/* Branding header — "BRANDING ARCHITECT" large bold, "SmartCafé OS" small gold below */}
+        <div className="flex items-start justify-between px-4 pt-5 pb-4 flex-shrink-0">
+          <div className="flex flex-col">
+            <span className="dash-brand-name">Branding<br/>Architect</span>
+            <span className="dash-brand-sub">SmartCafé OS</span>
           </div>
           <button
-            className="transition-colors p-1.5 rounded-xl hover:bg-white/5"
+            className="transition-colors p-1.5 rounded-xl hover:bg-white/5 mt-1"
             style={{ color: '#7a6a55' }}
             onClick={() => setSidebarOpen(false)}
             aria-label="Close sidebar"
