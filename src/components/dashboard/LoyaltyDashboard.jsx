@@ -4,7 +4,8 @@
  * Complete loyalty system for SmartCafé OS.
  * Firestore collection: loyaltyCustomers
  *
- * UI UPGRADE: Café-vibe premium aesthetic. Zero logic changes.
+ * UI: Matches OrdersManagement premium aesthetic — Inter font, #111827 base,
+ *     #C9A227 gold accents, emoji labels, omf-* design tokens.
  *
  * Features:
  *  - Search by phone or name
@@ -20,7 +21,7 @@
 import React, { useState, useMemo } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
 import {
-  collection, addDoc, updateDoc, deleteDoc, doc, serverTimestamp, query, where,
+  collection, addDoc, updateDoc, deleteDoc, doc, serverTimestamp, where,
 } from 'firebase/firestore';
 import { db } from '../../lib/firebase';
 import { useCollection } from '../../hooks/useFirestore';
@@ -28,120 +29,80 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { toast } from 'sonner';
 import {
   Search, UserPlus, Star, MessageSquare, Phone, User,
-  Award, TrendingUp, RefreshCw, Gift, Undo2, Trash2, Repeat, Calendar, Pencil, Check, ChevronDown,
+  Award, TrendingUp, RefreshCw, Gift, Undo2, Trash2, Repeat,
+  Calendar, Pencil, Check, ChevronDown, X,
 } from 'lucide-react';
 import GoogleReviewSettings from './GoogleReviewSettings';
 
-// ── Premium SaaS CSS — Loyalty Dashboard ─────────────────────────────────────
-if (typeof document !== 'undefined' && !document.getElementById('loy-cafe-css')) {
+// ── Inject CSS once — matches omf-* design language ─────────────────────────
+if (typeof document !== 'undefined' && !document.getElementById('loy-omf-css')) {
   const el = document.createElement('style');
-  el.id = 'loy-cafe-css';
+  el.id = 'loy-omf-css';
   el.textContent = `
-    @import url('https://fonts.googleapis.com/css2?family=Inter:ital,opsz,wght@0,14..32,300;0,14..32,400;0,14..32,500;0,14..32,600;0,14..32,700&display=swap');
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
 
-    /* ─── Reset & Base ─── */
-    .loy *, .loy *::before, .loy *::after { box-sizing: border-box; }
-    .loy {
-      font-family: 'Inter', system-ui, -apple-system, sans-serif;
-      color: #cbd5e1;
-      letter-spacing: -0.012em;
-      line-height: 1.5;
-    }
+    .loy { font-family: 'Inter', system-ui, sans-serif; color: #D1D5DB; }
+    .loy * { box-sizing: border-box; }
+    .loy-title { font-family: 'Inter', system-ui, sans-serif !important; font-weight: 600; letter-spacing: -0.02em; }
 
-    /* ─── Page entry animation ─── */
-    .loy { animation: loyPageIn 0.35s cubic-bezier(0.4,0,0.2,1) forwards; }
-    @keyframes loyPageIn {
-      from { opacity: 0; transform: translateY(10px); }
-      to   { opacity: 1; transform: translateY(0); }
-    }
-
-    /* ─── Typography ─── */
-    .loy-title {
-      font-family: 'Inter', system-ui, sans-serif !important;
-      font-weight: 600;
-      letter-spacing: -0.025em;
-      color: #f1f5f9;
-    }
-    .loy-label {
-      font-size: 11px;
-      font-weight: 500;
-      letter-spacing: 0.07em;
-      text-transform: uppercase;
-      color: #475569;
-      display: block;
-    }
-    .loy-section-title {
-      font-size: 11px;
-      font-weight: 600;
-      letter-spacing: 0.08em;
-      text-transform: uppercase;
-      color: #475569;
-      display: flex;
-      align-items: center;
-      gap: 6px;
-    }
-
-    /* ─── Cards ─── */
+    /* ── Cards ── */
     .loy-card {
-      background: #0f1623;
-      border: 1px solid rgba(255,255,255,0.06);
-      border-radius: 14px;
+      background: #111827;
+      border: 1px solid #1F2937;
+      border-radius: 12px;
+      transition: border-color 150ms cubic-bezier(0.4,0,0.2,1), box-shadow 150ms cubic-bezier(0.4,0,0.2,1);
       overflow: hidden;
-      transition: border-color 200ms cubic-bezier(0.4,0,0.2,1),
-                  box-shadow 200ms cubic-bezier(0.4,0,0.2,1),
-                  transform 200ms cubic-bezier(0.4,0,0.2,1);
     }
     .loy-card:hover {
-      border-color: rgba(201,162,39,0.18);
-      box-shadow: 0 8px 32px rgba(0,0,0,0.35), 0 0 0 0px rgba(201,162,39,0);
-      transform: translateY(-1px);
+      border-color: rgba(201,162,39,0.22);
+      box-shadow: 0 4px 24px rgba(0,0,0,0.4);
     }
 
-    /* ─── Stat Cards ─── */
-    .loy-stat-card {
-      background: #0f1623;
-      border: 1px solid rgba(255,255,255,0.06);
-      border-radius: 14px;
-      padding: 20px 18px;
-      transition: border-color 200ms cubic-bezier(0.4,0,0.2,1),
-                  box-shadow 200ms cubic-bezier(0.4,0,0.2,1),
-                  transform 200ms cubic-bezier(0.4,0,0.2,1);
-      animation: loyFadeIn 0.4s cubic-bezier(0.4,0,0.2,1) forwards;
+    /* ── Stat cards ── */
+    .loy-stat {
+      background: #111827;
+      border: 1px solid #1F2937;
+      border-radius: 12px;
+      padding: 18px 16px;
+      transition: border-color 150ms cubic-bezier(0.4,0,0.2,1), box-shadow 150ms cubic-bezier(0.4,0,0.2,1), transform 150ms cubic-bezier(0.4,0,0.2,1);
     }
-    .loy-stat-card:nth-child(1) { animation-delay: 0.05s; }
-    .loy-stat-card:nth-child(2) { animation-delay: 0.10s; }
-    .loy-stat-card:nth-child(3) { animation-delay: 0.15s; }
-    .loy-stat-card:nth-child(4) { animation-delay: 0.20s; }
-    .loy-stat-card:hover {
-      border-color: rgba(255,255,255,0.1);
-      box-shadow: 0 8px 24px rgba(0,0,0,0.3);
+    .loy-stat:hover {
+      border-color: #374151;
+      box-shadow: 0 4px 24px rgba(0,0,0,0.4);
       transform: translateY(-2px);
     }
 
-    /* ─── Inputs ─── */
+    /* ── Form card ── */
+    .loy-form-card {
+      background: #111827;
+      border: 1px solid #1F2937;
+      border-radius: 12px;
+      padding: 24px;
+      overflow: hidden;
+    }
+
+    /* ── Inputs ── */
     .loy-input {
-      width: 100%;
-      background: #080d17;
-      border: 1px solid rgba(255,255,255,0.08);
-      border-radius: 9px;
-      color: #e2e8f0;
+      background: #0B0F14;
+      border: 1px solid #1F2937;
+      border-radius: 8px;
+      color: #F9FAFB;
       padding: 10px 14px;
       font-size: 14px;
       font-weight: 400;
       font-family: 'Inter', system-ui, sans-serif;
-      letter-spacing: -0.012em;
       outline: none;
-      transition: border-color 150ms cubic-bezier(0.4,0,0.2,1),
-                  box-shadow 150ms cubic-bezier(0.4,0,0.2,1);
+      width: 100%;
+      transition: border-color 150ms cubic-bezier(0.4,0,0.2,1), box-shadow 150ms cubic-bezier(0.4,0,0.2,1);
     }
     .loy-input:focus {
-      border-color: rgba(201,162,39,0.5);
-      box-shadow: 0 0 0 3px rgba(201,162,39,0.08), 0 0 16px rgba(201,162,39,0.05);
+      border-color: #C9A227;
+      box-shadow: 0 0 0 2px rgba(201,162,39,0.12);
     }
-    .loy-input::placeholder { color: #1e293b; }
+    .loy-input::placeholder { color: #374151; }
     .loy-input:disabled { opacity: 0.5; cursor: not-allowed; }
 
-    /* ─── Buttons ─── */
+    /* ── Buttons ── */
     .loy-btn {
       display: inline-flex;
       align-items: center;
@@ -149,213 +110,142 @@ if (typeof document !== 'undefined' && !document.getElementById('loy-cafe-css'))
       gap: 6px;
       font-family: 'Inter', system-ui, sans-serif;
       font-weight: 500;
-      font-size: 13px;
-      letter-spacing: -0.01em;
-      padding: 8px 15px;
-      border-radius: 9px;
+      font-size: 12px;
+      padding: 7px 13px;
+      border-radius: 8px;
       border: 1px solid transparent;
       cursor: pointer;
       transition: all 150ms cubic-bezier(0.4,0,0.2,1);
       white-space: nowrap;
-      position: relative;
-      overflow: hidden;
+      letter-spacing: -0.01em;
     }
-    .loy-btn::after {
-      content: '';
-      position: absolute;
-      inset: 0;
-      background: rgba(255,255,255,0);
-      transition: background 150ms ease;
-    }
-    .loy-btn:hover::after { background: rgba(255,255,255,0.05); }
-    .loy-btn:hover { transform: translateY(-1px); }
-    .loy-btn:active { transform: scale(0.97); }
-    .loy-btn:disabled { opacity: 0.45; cursor: not-allowed; transform: none; }
+    .loy-btn:hover  { transform: translateY(-1px); }
+    .loy-btn:active { transform: scale(0.98); }
+    .loy-btn:disabled { opacity: 0.45; cursor: not-allowed; transform: none; pointer-events: none; }
 
-    /* Primary CTA — amber gold with subtle glow */
-    .loy-btn-orange {
-      background: #C9A227;
-      color: #08100e;
-      font-weight: 600;
-      border-color: rgba(201,162,39,0.3);
-      box-shadow: 0 1px 3px rgba(0,0,0,0.3);
-    }
-    .loy-btn-orange:hover {
-      background: #d4ac2e;
-      box-shadow: 0 4px 16px rgba(201,162,39,0.25), 0 0 0 0px rgba(201,162,39,0);
-    }
-    .loy-btn-orange:active { box-shadow: none; }
-
-    /* Ghost */
-    .loy-btn-ghost {
-      background: transparent;
-      color: #475569;
-      border-color: rgba(255,255,255,0.07);
-    }
-    .loy-btn-ghost:hover { background: rgba(255,255,255,0.04); color: #94a3b8; border-color: rgba(255,255,255,0.12); }
-
-    /* WhatsApp */
-    .loy-btn-green {
-      background: rgba(34,197,94,0.08);
-      color: #22c55e;
-      border-color: rgba(34,197,94,0.16);
-    }
-    .loy-btn-green:hover {
-      background: rgba(34,197,94,0.13);
-      box-shadow: 0 0 12px rgba(34,197,94,0.1);
-    }
-
-    /* Danger */
-    .loy-btn-red {
-      background: rgba(239,68,68,0.08);
-      color: #f87171;
-      border-color: rgba(239,68,68,0.16);
-    }
-    .loy-btn-red:hover {
-      background: rgba(239,68,68,0.13);
-      box-shadow: 0 0 12px rgba(239,68,68,0.1);
-    }
-
-    /* Edit / gold outline */
+    /* Gold primary */
     .loy-btn-gold {
-      background: rgba(201,162,39,0.08);
-      color: #C9A227;
-      border-color: rgba(201,162,39,0.2);
+      background: #C9A227;
+      color: #000;
+      font-weight: 600;
+      box-shadow: 0 1px 8px rgba(201,162,39,0.2);
     }
     .loy-btn-gold:hover {
-      background: rgba(201,162,39,0.14);
-      box-shadow: 0 0 12px rgba(201,162,39,0.12);
+      background: #D4AD35;
+      box-shadow: 0 4px 16px rgba(201,162,39,0.25);
     }
 
-    /* ─── Customer row button ─── */
+    /* Ghost */
+    .loy-btn-ghost { background: rgba(255,255,255,0.04); color: #6B7280; border-color: #1F2937; }
+    .loy-btn-ghost:hover { background: rgba(255,255,255,0.07); color: #D1D5DB; border-color: #374151; }
+
+    /* WhatsApp */
+    .loy-btn-green  { background: rgba(34,197,94,0.08);  color: #4ADE80; border-color: rgba(34,197,94,0.2); }
+    .loy-btn-green:hover  { background: rgba(34,197,94,0.14); }
+
+    /* Danger */
+    .loy-btn-red    { background: rgba(239,68,68,0.08);  color: #F87171; border-color: rgba(239,68,68,0.2); }
+    .loy-btn-red:hover    { background: rgba(239,68,68,0.14); }
+
+    /* Yellow / edit */
+    .loy-btn-yellow { background: rgba(245,158,11,0.08); color: #FCD34D; border-color: rgba(245,158,11,0.2); }
+    .loy-btn-yellow:hover { background: rgba(245,158,11,0.14); }
+
+    /* Blue */
+    .loy-btn-blue   { background: rgba(59,130,246,0.08); color: #60A5FA; border-color: rgba(59,130,246,0.2); }
+    .loy-btn-blue:hover   { background: rgba(59,130,246,0.14); }
+
+    /* ── Badges ── */
+    .loy-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      padding: 2px 8px;
+      border-radius: 4px;
+      font-size: 11px;
+      font-weight: 500;
+      border: 1px solid transparent;
+      font-family: 'Inter', system-ui, sans-serif;
+      letter-spacing: 0.01em;
+    }
+
+    /* ── Filter tabs ── */
+    .loy-tab {
+      padding: 5px 14px; border-radius: 6px; font-size: 12px; font-weight: 500;
+      cursor: pointer;
+      transition: all 150ms cubic-bezier(0.4,0,0.2,1);
+      border: 1px solid #1F2937;
+      font-family: 'Inter', system-ui, sans-serif;
+      letter-spacing: -0.01em;
+    }
+    .loy-tab-on  { background: #C9A227; color: #000; border-color: #C9A227; font-weight: 600; box-shadow: 0 1px 8px rgba(201,162,39,0.2); }
+    .loy-tab-off { background: transparent; color: #6B7280; }
+    .loy-tab-off:hover { background: rgba(255,255,255,0.04); color: #D1D5DB; border-color: #374151; }
+
+    /* ── Row button ── */
     .loy-row-btn {
       width: 100%;
       display: flex;
       align-items: center;
-      gap: 13px;
-      padding: 15px 16px;
-      text-align: left;
+      gap: 12px;
+      padding: 14px 16px;
       background: transparent;
       border: none;
       cursor: pointer;
+      text-align: left;
       transition: background 150ms cubic-bezier(0.4,0,0.2,1);
     }
     .loy-row-btn:hover { background: rgba(255,255,255,0.025); }
 
-    /* ─── Pills ─── */
-    .loy-pill {
-      display: inline-flex;
-      align-items: center;
-      gap: 5px;
-      padding: 4px 10px;
-      border-radius: 7px;
-      font-size: 12px;
-      font-weight: 500;
-      letter-spacing: -0.01em;
+    /* ── Section label ── */
+    .loy-sec {
+      font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.08em;
+      color: #6B7280; display: flex; align-items: center; gap: 5px;
+      font-family: 'Inter', system-ui, sans-serif;
     }
 
-    /* ─── Discount ladder pills ─── */
-    .loy-ladder-pill {
-      font-size: 12px;
-      font-weight: 400;
-      padding: 5px 12px;
-      border-radius: 7px;
-      background: rgba(255,255,255,0.03);
-      border: 1px solid rgba(255,255,255,0.06);
-      color: #475569;
-      letter-spacing: -0.01em;
-      transition: border-color 150ms ease, background 150ms ease;
+    /* ── Ladder pills ── */
+    .loy-tier-pill {
+      font-size: 11px; font-weight: 500;
+      padding: 3px 10px; border-radius: 4px;
+      background: rgba(255,255,255,0.04); border: 1px solid #1F2937;
+      color: #6B7280; letter-spacing: -0.01em;
+      transition: border-color 150ms, background 150ms;
     }
-    .loy-ladder-pill:hover { background: rgba(255,255,255,0.05); border-color: rgba(255,255,255,0.1); }
-    .loy-ladder-pill strong { color: #94a3b8; font-weight: 600; }
+    .loy-tier-pill:hover { background: rgba(255,255,255,0.06); border-color: #374151; }
+    .loy-tier-pill strong { color: #C9A227; font-weight: 600; }
 
-    /* ─── Avatar ─── */
-    .loy-avatar {
-      width: 36px; height: 36px;
-      border-radius: 9px;
-      background: #141d2e;
-      border: 1px solid rgba(255,255,255,0.07);
-      display: flex; align-items: center; justify-content: center;
-      flex-shrink: 0;
-    }
-
-    /* ─── Icon wrapper ─── */
-    .loy-icon-wrap {
-      width: 36px; height: 36px;
-      border-radius: 9px;
-      display: flex; align-items: center; justify-content: center;
-      flex-shrink: 0;
-    }
-
-    /* ─── Empty / Loading state ─── */
+    /* ── Empty / loading ── */
     .loy-empty {
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      padding: 64px 24px;
-      gap: 12px;
-    }
-    .loy-empty-icon {
-      width: 52px; height: 52px;
-      border-radius: 14px;
-      background: rgba(255,255,255,0.03);
-      border: 1px solid rgba(255,255,255,0.06);
-      display: flex; align-items: center; justify-content: center;
+      display: flex; flex-direction: column;
+      align-items: center; justify-content: center;
+      padding: 60px 24px; gap: 10px;
     }
 
-    /* ─── Divider ─── */
-    .loy-divider {
-      border: none;
-      border-top: 1px solid rgba(255,255,255,0.05);
-      margin: 0;
-    }
+    /* ── Animations ── */
+    @keyframes loyIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
+    .loy-in { animation: loyIn 200ms cubic-bezier(0.4,0,0.2,1) forwards; }
 
-    /* ─── Animations ─── */
-    @keyframes loyFadeIn {
-      from { opacity: 0; transform: translateY(7px); }
-      to   { opacity: 1; transform: translateY(0); }
-    }
-    .loy-in { animation: loyFadeIn 0.28s cubic-bezier(0.4,0,0.2,1) forwards; }
+    @keyframes loySpinSlow { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+    .loy-spin { animation: loySpinSlow 1s linear infinite; }
 
-    @keyframes loySpinSlow {
-      from { transform: rotate(0deg); }
-      to   { transform: rotate(360deg); }
-    }
-    .loy-spin { animation: loySpinSlow 1.1s linear infinite; }
+    /* ── Search bar ── */
+    .loy-search-wrap { position: relative; flex: 1; }
+    .loy-search-icon { position: absolute; left: 12px; top: 50%; transform: translateY(-50%); pointer-events: none; }
+    .loy-search-wrap .loy-input { padding-left: 36px; }
 
-    /* ─── Search bar ─── */
-    .loy-search-wrap {
-      position: relative;
-      flex: 1;
-    }
-    .loy-search-icon {
-      position: absolute;
-      left: 13px;
-      top: 50%;
-      transform: translateY(-50%);
-      pointer-events: none;
-    }
-    .loy-search-wrap .loy-input { padding-left: 38px; }
-
-    /* ─── Form card ─── */
-    .loy-form-card {
-      background: #0f1623;
-      border: 1px solid rgba(255,255,255,0.09);
-      border-radius: 14px;
-      overflow: hidden;
-    }
-
-    /* ─── Scrollbar ─── */
-    .loy ::-webkit-scrollbar { width: 4px; }
+    /* ── Scrollbar ── */
+    .loy ::-webkit-scrollbar { width: 3px; }
     .loy ::-webkit-scrollbar-track { background: transparent; }
-    .loy ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.08); border-radius: 2px; }
+    .loy ::-webkit-scrollbar-thumb { background: #374151; border-radius: 3px; }
+
+    /* ── Gold number accent ── */
+    .loy-num { font-family: 'Inter', system-ui, sans-serif; color: #C9A227; font-weight: 600; }
   `;
   document.head.appendChild(el);
 }
 
-
-// ── Discount ladder ────────────────────────────────────────────────────────────
+// ── Discount ladder ─────────────────────────────────────────────────────────
 const discountForVisits = (visits) => {
   if (visits <= 1) return 10;
   if (visits === 2) return 15;
@@ -364,9 +254,9 @@ const discountForVisits = (visits) => {
   return 30;
 };
 
-// ── WhatsApp message ───────────────────────────────────────────────────────────
+// ── WhatsApp message ────────────────────────────────────────────────────────
 const buildWAMessage = (customer) => {
-  const disc = customer.currentDiscount;
+  const disc   = customer.currentDiscount;
   const isFree = disc >= 30;
   const expiryText = (() => {
     if (!customer.expiryDate) return null;
@@ -395,9 +285,12 @@ const LoyaltyDashboard = () => {
   );
 
   const [search,       setSearch      ] = useState('');
+  const [filterTier,   setFilterTier  ] = useState('all');
   const [showAddForm,  setShowAddForm  ] = useState(false);
   const [saving,       setSaving       ] = useState(false);
   const [markingId,    setMarkingId    ] = useState(null);
+  const [deleteConfirmId, setDeleteConfirmId] = useState(null);
+  const [deleting,     setDeleting     ] = useState(false);
 
   const [newName,        setNewName       ] = useState('');
   const [newPhone,       setNewPhone      ] = useState('');
@@ -405,34 +298,39 @@ const LoyaltyDashboard = () => {
   const [customDiscount, setCustomDiscount] = useState('');
 
   const [editingCustomerId, setEditingCustomerId] = useState(null);
-  const [editDiscount,      setEditDiscount     ] = useState('');
-  const [editValidity,      setEditValidity     ] = useState('');
+  const [editDiscount,      setEditDiscount      ] = useState('');
+  const [editValidity,      setEditValidity      ] = useState('');
 
   const [expandedCustomerId, setExpandedCustomerId] = useState(null);
   const toggleCard = (id) => setExpandedCustomerId(prev => prev === id ? null : id);
 
   const filtered = useMemo(() => {
     if (!customers) return [];
+    let list = customers;
     const q = search.trim().toLowerCase();
-    if (!q) return customers;
-    return customers.filter(c => c.name?.toLowerCase().includes(q) || c.phone?.includes(q));
-  }, [customers, search]);
+    if (q) list = list.filter(c => c.name?.toLowerCase().includes(q) || c.phone?.includes(q));
+    if (filterTier === 'new')    list = list.filter(c => (c.visits || 0) === 1);
+    if (filterTier === 'silver') list = list.filter(c => (c.visits || 0) >= 2 && (c.visits || 0) <= 3);
+    if (filterTier === 'gold')   list = list.filter(c => (c.visits || 0) >= 4);
+    return list;
+  }, [customers, search, filterTier]);
+
+  // ── Stats ─────────────────────────────────────────────────────────────────
+  const totalCustomers = customers?.length || 0;
+  const totalVisits    = customers?.reduce((s, c) => s + (c.visits || 0), 0) || 0;
+  const loyalCustomers = customers?.filter(c => (c.visits || 0) >= 3).length || 0;
+  const repeatedVisits = customers?.reduce((s, c) => s + ((c.visits || 0) > 1 ? (c.visits - 1) : 0), 0) || 0;
 
   // ── Add new customer ──────────────────────────────────────────────────────
   const handleAddCustomer = async (e) => {
     e.preventDefault();
-    console.log('[Loyalty] DB instance:', db);
-    console.log('[Loyalty] cafeId:', cafeId);
     if (!newName.trim() || !newPhone.trim()) { toast.error('Name and phone are required'); return; }
     const already = customers?.find(c => c.phone === newPhone.trim());
-    if (already) { toast.error('A customer with this phone number already exists'); return; }
+    if (already) { toast.error('A customer with this phone already exists'); return; }
     setSaving(true);
     try {
-      console.log('[Loyalty] Attempting addDoc to loyaltyCustomers…');
-      const days = Number(validityDays) || 0;
-      const expiryDate = days > 0
-        ? (() => { const d = new Date(); d.setDate(d.getDate() + days); return d; })()
-        : null;
+      const days          = Number(validityDays) || 0;
+      const expiryDate    = days > 0 ? (() => { const d = new Date(); d.setDate(d.getDate() + days); return d; })() : null;
       const discountToUse = customDiscount ? Number(customDiscount) : 10;
       const ref = await addDoc(collection(db, 'loyaltyCustomers'), {
         cafeId, name: newName.trim(), phone: newPhone.trim(),
@@ -441,11 +339,11 @@ const LoyaltyDashboard = () => {
         createdAt: serverTimestamp(), lastVisit: serverTimestamp(),
       });
       console.log('[Loyalty] ✅ Customer saved, docId:', ref.id);
-      toast.success(`${newName.trim()} added to loyalty program ✓`);
+      toast.success(`⭐ ${newName.trim()} added to loyalty program`);
       setNewName(''); setNewPhone(''); setValidityDays(''); setCustomDiscount('');
       setShowAddForm(false);
     } catch (err) {
-      console.error('[Loyalty] ❌ addDoc failed:', err.code, err.message, err);
+      console.error('[Loyalty] ❌ addDoc failed:', err);
       toast.error(`Failed to add customer: ${err.message || 'Unknown error'}`);
     } finally {
       setSaving(false);
@@ -456,25 +354,21 @@ const LoyaltyDashboard = () => {
   const handleMarkVisit = async (customer) => {
     setMarkingId(customer.id);
     try {
-      const newVisits   = (customer.visits || 0) + 1;
-      const newDiscount = discountForVisits(newVisits);
-      console.log('[Loyalty] Marking visit for', customer.name, '→ visits:', newVisits, 'discount:', newDiscount);
-      const discountToUse = customDiscount ? Number(customDiscount) : newDiscount;
-      const daysToUse = Number(validityDays) || Number(customer.validityDays) || 0;
-      const newExpiry = daysToUse > 0
-        ? (() => { const d = new Date(); d.setDate(d.getDate() + daysToUse); return d; })()
-        : null;
+      const newVisits      = (customer.visits || 0) + 1;
+      const newDiscount    = discountForVisits(newVisits);
+      const daysToUse      = Number(customer.validityDays) || 0;
+      const newExpiry      = daysToUse > 0 ? (() => { const d = new Date(); d.setDate(d.getDate() + daysToUse); return d; })() : null;
       await updateDoc(doc(db, 'loyaltyCustomers', customer.id), {
-        visits: newVisits, currentDiscount: discountToUse,
+        visits: newVisits, currentDiscount: newDiscount,
         lastVisit: serverTimestamp(), validityDays: daysToUse,
         ...(newExpiry !== null && { expiryDate: newExpiry }),
       });
       const msg = newDiscount >= 30
         ? `🎁 ${customer.name} unlocked a FREE ITEM! (${newVisits} visits)`
-        : `✓ Visit ${newVisits} marked — ${customer.name} now gets ${newDiscount}% OFF`;
+        : `✅ Visit ${newVisits} marked — ${customer.name} now gets ${newDiscount}% OFF`;
       toast.success(msg);
     } catch (err) {
-      console.error('[LoyaltyDashboard] mark visit error:', err);
+      console.error('[Loyalty] mark visit error:', err);
       toast.error('Failed to update visit');
     } finally {
       setMarkingId(null);
@@ -488,11 +382,10 @@ const LoyaltyDashboard = () => {
     try {
       const newVisits   = customer.visits - 1;
       const newDiscount = discountForVisits(newVisits);
-      console.log('[Loyalty] Undoing visit for', customer.name, '→ visits:', newVisits);
       await updateDoc(doc(db, 'loyaltyCustomers', customer.id), { visits: newVisits, currentDiscount: newDiscount });
-      toast.success(`↩ Visit undone — ${customer.name} now at visit ${newVisits} (${newDiscount}% OFF)`);
+      toast.success(`↩️ Visit undone — ${customer.name} now at visit ${newVisits} (${newDiscount}% OFF)`);
     } catch (err) {
-      console.error('[Loyalty] ❌ undoVisit failed:', err.code, err.message, err);
+      console.error('[Loyalty] undoVisit failed:', err);
       toast.error(`Undo failed: ${err.message || 'Unknown error'}`);
     } finally {
       setMarkingId(null);
@@ -501,14 +394,16 @@ const LoyaltyDashboard = () => {
 
   // ── Delete customer ───────────────────────────────────────────────────────
   const handleDeleteCustomer = async (customer) => {
-    if (!window.confirm(`Delete ${customer.name} permanently from the loyalty program?`)) return;
+    setDeleting(true);
     try {
-      console.log('[Loyalty] Deleting customer:', customer.id, customer.name);
       await deleteDoc(doc(db, 'loyaltyCustomers', customer.id));
-      toast.success(`${customer.name} removed from loyalty program`);
+      toast.success(`🗑️ ${customer.name} removed from loyalty program`);
+      setDeleteConfirmId(null);
     } catch (err) {
-      console.error('[Loyalty] ❌ deleteDoc failed:', err.code, err.message, err);
+      console.error('[Loyalty] deleteDoc failed:', err);
       toast.error(`Delete failed: ${err.message || 'Unknown error'}`);
+    } finally {
+      setDeleting(false);
     }
   };
 
@@ -517,18 +412,15 @@ const LoyaltyDashboard = () => {
     try {
       const newDisc = editDiscount ? Number(editDiscount) : customer.currentDiscount;
       const newDays = editValidity ? Number(editValidity) : (customer.validityDays || 0);
-      const expiry  = newDays > 0
-        ? (() => { const d = new Date(); d.setDate(d.getDate() + newDays); return d; })()
-        : null;
-      console.log('[Loyalty] Saving edit for', customer.name, '→ discount:', newDisc, 'validityDays:', newDays);
+      const expiry  = newDays > 0 ? (() => { const d = new Date(); d.setDate(d.getDate() + newDays); return d; })() : null;
       await updateDoc(doc(db, 'loyaltyCustomers', customer.id), {
         currentDiscount: newDisc, validityDays: newDays,
         ...(expiry !== null && { expiryDate: expiry }),
       });
-      toast.success(`${customer.name} updated ✓ — ${newDisc}% OFF${newDays ? `, valid ${newDays}d` : ''}`);
+      toast.success(`✅ ${customer.name} updated — ${newDisc}% OFF${newDays ? `, valid ${newDays}d` : ''}`);
       setEditingCustomerId(null); setEditDiscount(''); setEditValidity('');
     } catch (err) {
-      console.error('[Loyalty] ❌ saveEdit failed:', err.code, err.message, err);
+      console.error('[Loyalty] saveEdit failed:', err);
       toast.error(`Update failed: ${err.message || 'Unknown error'}`);
     }
   };
@@ -542,104 +434,134 @@ const LoyaltyDashboard = () => {
     window.open(`https://wa.me/${waNum}?text=${encodeURIComponent(msg)}`, '_blank');
   };
 
-  const totalCustomers = customers?.length || 0;
-  const totalVisits    = customers?.reduce((s, c) => s + (c.visits || 0), 0) || 0;
-  const loyalCustomers = customers?.filter(c => (c.visits || 0) >= 3).length || 0;
-  const repeatedVisits = customers?.reduce((s, c) => s + ((c.visits || 0) > 1 ? (c.visits - 1) : 0), 0) || 0;
+  // ── Tier badge helper ─────────────────────────────────────────────────────
+  const getTierBadge = (visits, disc) => {
+    const isFree = disc >= 30;
+    if (isFree)      return { emoji: '🎁', label: 'Free Item', bg: 'rgba(16,185,129,0.1)',  color: '#4ADE80', bd: 'rgba(16,185,129,0.25)' };
+    if (disc >= 25)  return { emoji: '👑', label: `${disc}% OFF`, bg: 'rgba(201,162,39,0.12)', color: '#C9A227', bd: 'rgba(201,162,39,0.3)' };
+    if (disc >= 20)  return { emoji: '⭐', label: `${disc}% OFF`, bg: 'rgba(201,162,39,0.08)', color: '#C9A227', bd: 'rgba(201,162,39,0.2)' };
+    return               { emoji: '🌟', label: `${disc}% OFF`, bg: 'rgba(201,162,39,0.06)', color: '#C9A227', bd: 'rgba(201,162,39,0.15)' };
+  };
 
   return (
-    <div className="loy space-y-6">
+    <div className="loy space-y-5">
 
-      {/* ── Stats row ─────────────────────────────────────────────────────── */}
+      {/* ── Stats ─────────────────────────────────────────────────────────── */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         {[
-          { label: 'Members',       value: totalCustomers, Icon: User,       color: '#C9A227' },
-          { label: 'Total Visits',  value: totalVisits,    Icon: TrendingUp, color: '#60a5fa' },
-          { label: 'Loyal (3+)',    value: loyalCustomers, Icon: Award,      color: '#34d399' },
-          { label: 'Repeat Visits', value: repeatedVisits, Icon: Repeat,     color: '#a78bfa' },
-        ].map(({ label, value, Icon, color }) => (
-          <div key={label} className="loy-stat-card"
-            style={{ borderTop: `2px solid ${color}`, paddingTop: 18 }}>
-            <div className="flex items-center gap-2 mb-3">
-              <div className="loy-icon-wrap" style={{ background: color + '12', width: 30, height: 30, borderRadius: 8 }}>
-                <Icon size={14} style={{ color }} />
-              </div>
-              <span className="loy-label" style={{ letterSpacing: '0.05em', fontSize: 10 }}>{label}</span>
+          { emoji: '👥', label: 'Members',       value: totalCustomers, color: '#C9A227' },
+          { emoji: '📈', label: 'Total Visits',  value: totalVisits,    color: '#60A5FA' },
+          { emoji: '🏆', label: 'Loyal (3+)',    value: loyalCustomers, color: '#4ADE80' },
+          { emoji: '🔄', label: 'Repeat Visits', value: repeatedVisits, color: '#A78BFA' },
+        ].map(({ emoji, label, value, color }) => (
+          <div key={label} className="loy-stat" style={{ borderTop: `2px solid ${color}` }}>
+            <div className="flex items-center gap-2 mb-2.5">
+              <span className="text-base">{emoji}</span>
+              <span className="loy-sec" style={{ letterSpacing: '0.06em', fontSize: 10 }}>{label}</span>
             </div>
-            <p style={{ fontSize: 28, fontWeight: 600, color: '#f1f5f9', letterSpacing: '-0.04em', lineHeight: 1 }}>{value}</p>
+            <p style={{ fontSize: 28, fontWeight: 700, color: '#F9FAFB', letterSpacing: '-0.04em', lineHeight: 1 }}>{value}</p>
           </div>
         ))}
       </div>
 
-      {/* ── Search + Add ───────────────────────────────────────────────────── */}
+      {/* ── Search + Add ────────────────────────────────────────────────────── */}
       <div className="flex flex-col sm:flex-row gap-3">
         <div className="loy-search-wrap">
-          <Search size={14} className="loy-search-icon" style={{ color: '#2d3f52' }} />
-          <input type="text" value={search} onChange={e => setSearch(e.target.value)}
-            placeholder="Search by name or phone…"
-            className="loy-input" />
+          <Search size={13} className="loy-search-icon" style={{ color: '#374151' }} />
+          <input
+            type="text" value={search} onChange={e => setSearch(e.target.value)}
+            placeholder="🔍 Search by name or phone…"
+            className="loy-input"
+          />
         </div>
-        <button onClick={() => setShowAddForm(v => !v)}
-          className="loy-btn loy-btn-orange"
-          style={{ paddingLeft: 18, paddingRight: 18 }}
-          data-testid="add-loyalty-customer-btn">
-          <UserPlus size={14} />
-          Add Customer
+        <button
+          onClick={() => setShowAddForm(v => !v)}
+          className={`loy-btn ${showAddForm ? 'loy-btn-ghost' : 'loy-btn-gold'}`}
+          style={{ paddingLeft: 16, paddingRight: 16 }}
+          data-testid="add-loyalty-customer-btn"
+        >
+          {showAddForm ? <><X size={13} />Cancel</> : <><UserPlus size={13} />➕ Add Customer</>}
         </button>
       </div>
 
-      {/* ── Add customer form ──────────────────────────────────────────────── */}
+      {/* ── Tier filter tabs ──────────────────────────────────────────────── */}
+      <div className="flex gap-2 flex-wrap">
+        {[
+          { key: 'all',    label: '🌐 All' },
+          { key: 'new',    label: '🌟 New (1 visit)' },
+          { key: 'silver', label: '⭐ Silver (2–3)' },
+          { key: 'gold',   label: '👑 Gold (4+)' },
+        ].map(({ key, label }) => (
+          <button
+            key={key}
+            onClick={() => setFilterTier(key)}
+            className={`loy-tab ${filterTier === key ? 'loy-tab-on' : 'loy-tab-off'}`}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
+
+      {/* ── Add customer form ─────────────────────────────────────────────── */}
       <AnimatePresence>
         {showAddForm && (
           <motion.div
-            initial={{ opacity: 0, y: -8, scale: 0.99 }}
+            initial={{ opacity: 0, y: -6, scale: 0.99 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: -8, scale: 0.99 }}
-            transition={{ duration: 0.22, ease: [0.4,0,0.2,1] }}
-            className="loy-form-card p-6"
+            exit={{ opacity: 0, y: -6, scale: 0.99 }}
+            transition={{ duration: 0.18, ease: [0.4,0,0.2,1] }}
+            className="loy-form-card"
           >
-            <div className="flex items-center gap-2 mb-5">
-              <div className="loy-icon-wrap" style={{ background: 'rgba(201,162,39,0.1)' }}>
-                <UserPlus size={15} style={{ color: '#C9A227' }} />
+            <div className="flex items-center justify-between mb-5">
+              <div className="flex items-center gap-2.5">
+                <span className="text-xl">🎟️</span>
+                <div>
+                  <h3 className="loy-title text-white text-base">New Loyalty Customer</h3>
+                  <p className="text-xs mt-0.5" style={{ color: '#6B7280' }}>Enrol a customer in the rewards program</p>
+                </div>
               </div>
-              <div>
-                <h3 className="text-white loy-title text-base">New Loyalty Customer</h3>
-                <p className="text-xs mt-0.5" style={{ color: '#475569' }}>Fill in the details below to enrol a customer</p>
-              </div>
+              <button onClick={() => setShowAddForm(false)} className="w-7 h-7 rounded-full flex items-center justify-center" style={{ background: '#1F2937', border: '1px solid #374151' }}>
+                <X size={13} style={{ color: '#9CA3AF' }} />
+              </button>
             </div>
+
             <form onSubmit={handleAddCustomer} className="space-y-4">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
-                  <label className="loy-label block mb-1.5">Customer Name</label>
+                  <label className="loy-sec mb-1.5 block">👤 Customer Name</label>
                   <input type="text" value={newName} onChange={e => setNewName(e.target.value)}
-                    placeholder="e.g. Priya Sharma" className="loy-input" disabled={saving} data-testid="loyalty-name-input" />
+                    placeholder="e.g. Priya Sharma" className="loy-input" disabled={saving}
+                    data-testid="loyalty-name-input" />
                 </div>
                 <div>
-                  <label className="loy-label block mb-1.5">Phone Number</label>
+                  <label className="loy-sec mb-1.5 block">📱 Phone Number</label>
                   <input type="tel" value={newPhone} onChange={e => setNewPhone(e.target.value)}
-                    placeholder="e.g. 9876543210" className="loy-input" disabled={saving} data-testid="loyalty-phone-input" />
+                    placeholder="e.g. 9876543210" className="loy-input" disabled={saving}
+                    data-testid="loyalty-phone-input" />
                 </div>
               </div>
-              <div>
-                <label className="loy-label block mb-1.5">
-                  Validity (days) <span style={{ color: '#374151', textTransform: 'none', letterSpacing: 'normal', fontWeight: 400 }}>(optional)</span>
-                </label>
-                <input type="number" min="0" value={validityDays} onChange={e => setValidityDays(e.target.value)}
-                  placeholder="e.g. 30" className="loy-input" disabled={saving} data-testid="loyalty-validity-input" />
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="loy-sec mb-1.5 block">📅 Validity (days) <span style={{ textTransform: 'none', letterSpacing: 'normal', fontWeight: 400, color: '#374151' }}>optional</span></label>
+                  <input type="number" min="0" value={validityDays} onChange={e => setValidityDays(e.target.value)}
+                    placeholder="e.g. 30" className="loy-input" disabled={saving}
+                    data-testid="loyalty-validity-input" />
+                </div>
+                <div>
+                  <label className="loy-sec mb-1.5 block">💎 Custom Discount (%) <span style={{ textTransform: 'none', letterSpacing: 'normal', fontWeight: 400, color: '#374151' }}>optional</span></label>
+                  <input type="number" min="0" max="100" value={customDiscount} onChange={e => setCustomDiscount(e.target.value)}
+                    placeholder="Default: 10%" className="loy-input" disabled={saving}
+                    data-testid="loyalty-discount-input" />
+                </div>
               </div>
-              <div>
-                <label className="loy-label block mb-1.5">
-                  Custom Discount (%) <span style={{ color: '#374151', textTransform: 'none', letterSpacing: 'normal', fontWeight: 400 }}>(optional — overrides default 10%)</span>
-                </label>
-                <input type="number" min="0" max="100" value={customDiscount} onChange={e => setCustomDiscount(e.target.value)}
-                  placeholder="e.g. 20" className="loy-input" disabled={saving} data-testid="loyalty-discount-input" />
-              </div>
-              <p className="text-xs" style={{ color: '#475569' }}>
-                First visit is recorded automatically. Customer starts at <span style={{ color: '#94a3b8' }}>10% off</span>.
+              <p className="text-xs" style={{ color: '#6B7280' }}>
+                🌟 First visit is recorded automatically. Customer starts at <span style={{ color: '#C9A227', fontWeight: 600 }}>10% off</span>.
               </p>
-              <div className="flex gap-3">
-                <button type="submit" disabled={saving} className="loy-btn loy-btn-orange disabled:opacity-50" data-testid="loyalty-submit-btn">
-                  {saving ? <><RefreshCw className="w-4 h-4 animate-spin" />Adding…</> : <><UserPlus className="w-4 h-4" />Add Customer</>}
+              <div className="flex gap-2">
+                <button type="submit" disabled={saving} className="loy-btn loy-btn-gold" data-testid="loyalty-submit-btn">
+                  {saving
+                    ? <><RefreshCw size={12} className="loy-spin" />Adding…</>
+                    : <><UserPlus size={12} />➕ Add Customer</>}
                 </button>
                 <button type="button" onClick={() => setShowAddForm(false)} className="loy-btn loy-btn-ghost">Cancel</button>
               </div>
@@ -648,48 +570,48 @@ const LoyaltyDashboard = () => {
         )}
       </AnimatePresence>
 
-      {/* ── Discount ladder ────────────────────────────────────────────────── */}
+      {/* ── Reward tiers ─────────────────────────────────────────────────── */}
       <div>
-      <p className="loy-label mb-2" style={{ fontSize: 10, letterSpacing: '0.08em' }}>Reward Tiers</p>
-      <div className="flex gap-2 flex-wrap">
-        {[
-          { label: '1 visit',   disc: '10%' },
-          { label: '2 visits',  disc: '15%' },
-          { label: '3 visits',  disc: '20%' },
-          { label: '4 visits',  disc: '25%' },
-          { label: '5+ visits', disc: '30% / Free Item' },
-        ].map(({ label, disc }) => (
-          <span key={label} className="loy-ladder-pill">
-            {label} <span style={{ color: '#475569' }}>→</span> <strong>{disc}</strong>
-          </span>
-        ))}
-      </div>
+        <p className="loy-sec mb-2">🏅 Reward Tiers</p>
+        <div className="flex gap-2 flex-wrap">
+          {[
+            { label: '1 visit',   disc: '10%' },
+            { label: '2 visits',  disc: '15%' },
+            { label: '3 visits',  disc: '20%' },
+            { label: '4 visits',  disc: '25%' },
+            { label: '5+ visits', disc: '🎁 Free Item' },
+          ].map(({ label, disc }) => (
+            <span key={label} className="loy-tier-pill">
+              {label} <span style={{ color: '#374151' }}>→</span> <strong>{disc}</strong>
+            </span>
+          ))}
+        </div>
       </div>
 
-      {/* ── Customer list ──────────────────────────────────────────────────── */}
+      {/* ── Customer list ─────────────────────────────────────────────────── */}
       {loading ? (
-        <div className="loy-empty">
-          <RefreshCw size={18} className="loy-spin" style={{ color: '#2d3f52' }} />
-          <p className="text-sm" style={{ color: '#475569' }}>Loading customers…</p>
+        <div className="loy-card">
+          <div className="loy-empty">
+            <div className="text-4xl animate-bounce">⭐</div>
+            <p className="text-sm" style={{ color: '#6B7280' }}>Loading loyalty members…</p>
+          </div>
         </div>
       ) : filtered.length === 0 ? (
         <div className="loy-card">
           <div className="loy-empty">
-            <div className="loy-empty-icon">
-              <User size={20} style={{ color: '#2d3f52' }} />
-            </div>
-            <p className="text-sm font-medium" style={{ color: '#475569' }}>
+            <div className="text-4xl mb-1">🫙</div>
+            <p className="text-sm font-medium" style={{ color: '#6B7280' }}>
               {search ? 'No customers match your search.' : 'No loyalty customers yet.'}
             </p>
-            {!search && <p className="text-xs" style={{ color: '#334155' }}>Add your first customer to get started.</p>}
+            {!search && <p className="text-xs" style={{ color: '#4B5563' }}>Add your first customer to get started.</p>}
           </div>
         </div>
       ) : (
-        <div className="space-y-2" style={{ gap: 0 }}>
-          {filtered.map(customer => {
+        <div className="space-y-2">
+          {filtered.map((customer, ci) => {
             const disc    = customer.currentDiscount || 10;
             const visits  = customer.visits || 0;
-            const isFree  = disc >= 30;
+            const tier    = getTierBadge(visits, disc);
             const marking = markingId === customer.id;
             const isOpen  = expandedCustomerId === customer.id;
 
@@ -697,83 +619,79 @@ const LoyaltyDashboard = () => {
               <motion.div
                 key={customer.id}
                 layout
-                initial={{ opacity: 0, y: 6 }}
+                initial={{ opacity: 0, y: 4 }}
                 animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.22, ease: [0.4,0,0.2,1] }}
-                className="loy-card"
+                transition={{ duration: 0.18, ease: [0.4,0,0.2,1], delay: Math.min(ci * 30, 300) / 1000 }}
+                className="loy-card loy-in"
+                style={{ animationDelay: `${Math.min(ci * 30, 300)}ms`, animationFillMode: 'both' }}
                 data-testid={`loyalty-customer-${customer.id}`}
               >
-                {/* Top accent bar */}
-                <div style={{ height: 2, background: isFree ? 'linear-gradient(90deg,#34d399,transparent)' : 'linear-gradient(90deg,#C9A227,transparent)' }} />
+                {/* Top status bar */}
+                <div style={{ height: 2, background: disc >= 30 ? 'linear-gradient(90deg,#4ADE80,transparent)' : disc >= 25 ? 'linear-gradient(90deg,#C9A227,transparent)' : 'linear-gradient(90deg,rgba(201,162,39,0.5),transparent)' }} />
 
-                {/* Always-visible header */}
+                {/* Collapsed header */}
                 <button
                   onClick={() => toggleCard(customer.id)}
                   className="loy-row-btn"
                   aria-expanded={isOpen}
                   data-testid={`loyalty-toggle-${customer.id}`}
                 >
-                  <div className="loy-avatar">
-                    <User size={15} style={{ color: '#475569' }} />
+                  {/* Avatar */}
+                  <div className="w-10 h-10 rounded-xl flex items-center justify-center text-lg flex-shrink-0" style={{ background: '#1F2937', border: '1px solid #374151' }}>
+                    <User size={16} style={{ color: '#6B7280' }} />
                   </div>
+
+                  {/* Name + phone */}
                   <div className="min-w-0 flex-1">
-                    <p className="text-white font-semibold text-sm truncate" style={{ letterSpacing: "-0.01em" }}>{customer.name}</p>
-                    <div className="flex items-center gap-1.5 mt-0.5">
-                      <Phone size={11} style={{ color: '#374151' }} />
-                      <p className="text-xs truncate" style={{ color: '#475569' }}>{customer.phone}</p>
+                    <p className="text-white font-semibold text-sm truncate" style={{ letterSpacing: '-0.01em' }}>{customer.name}</p>
+                    <div className="flex items-center gap-1 mt-0.5">
+                      <Phone size={10} style={{ color: '#374151' }} />
+                      <p className="text-xs truncate" style={{ color: '#6B7280' }}>{customer.phone}</p>
                     </div>
                   </div>
 
                   {/* Visit count */}
-                  <div className="loy-pill flex-shrink-0"
-                    style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.07)' }}>
-                    <TrendingUp size={11} style={{ color: '#475569' }} />
-                    <span className="text-white text-xs font-semibold">{visits}</span>
-                    <span className="text-xs hidden sm:inline" style={{ color: '#475569' }}>visit{visits !== 1 ? 's' : ''}</span>
+                  <div className="loy-badge flex-shrink-0" style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid #1F2937' }}>
+                    <span className="text-xs">📊</span>
+                    <span className="text-white font-bold text-xs">{visits}</span>
+                    <span className="text-xs hidden sm:inline" style={{ color: '#6B7280' }}>visit{visits !== 1 ? 's' : ''}</span>
                   </div>
 
                   {/* Discount badge */}
-                  <div className="loy-pill flex-shrink-0"
-                    style={{
-                      background: isFree ? 'rgba(16,185,129,0.1)' : 'rgba(201,162,39,0.1)',
-                      border: isFree ? '1px solid rgba(16,185,129,0.22)' : '1px solid rgba(201,162,39,0.22)',
-                    }}>
-                    {isFree ? <Gift size={11} style={{ color: '#34d399' }} /> : <Star size={11} style={{ color: '#C9A227' }} />}
-                    <span className="text-xs font-semibold" style={{ color: isFree ? '#34d399' : '#C9A227' }}>
-                      {isFree ? 'Free' : `${disc}%`}
-                    </span>
+                  <div className="loy-badge flex-shrink-0" style={{ background: tier.bg, border: `1px solid ${tier.bd}` }}>
+                    <span className="text-xs">{tier.emoji}</span>
+                    <span className="text-xs font-semibold" style={{ color: tier.color }}>{tier.label}</span>
                   </div>
 
                   <ChevronDown
-                    className="w-4 h-4 flex-shrink-0 transition-transform duration-300"
-                    style={{ color: '#2d3f52', transform: isOpen ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform 200ms cubic-bezier(0.4,0,0.2,1)' }}
+                    size={14}
+                    className="flex-shrink-0"
+                    style={{ color: '#374151', transform: isOpen ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform 200ms cubic-bezier(0.4,0,0.2,1)' }}
                   />
                 </button>
 
-                {/* Collapsible body */}
+                {/* Expanded body */}
                 <motion.div
                   initial={false}
                   animate={{ height: isOpen ? 'auto' : 0, opacity: isOpen ? 1 : 0 }}
-                  transition={{ duration: 0.22, ease: [0.4,0,0.2,1] }}
+                  transition={{ duration: 0.2, ease: [0.4,0,0.2,1] }}
                   style={{ overflow: 'hidden' }}
                 >
-                  <div className="px-4 pb-5 pt-3 space-y-3" style={{ borderTop: '1px solid rgba(255,255,255,0.05)' }}>
+                  <div className="px-4 pb-5 pt-3 space-y-3" style={{ borderTop: '1px solid #1F2937' }}>
 
-                    {/* Expiry date */}
+                    {/* Expiry */}
                     {customer.expiryDate && (() => {
-                      const exp = customer.expiryDate?.toDate
-                        ? customer.expiryDate.toDate()
-                        : new Date(customer.expiryDate);
+                      const exp = customer.expiryDate?.toDate ? customer.expiryDate.toDate() : new Date(customer.expiryDate);
                       const isExpired = exp < new Date();
                       return (
                         <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg"
                           style={{
-                            background: isExpired ? 'rgba(220,50,50,0.08)' : 'rgba(255,255,255,0.04)',
-                            border: isExpired ? '1px solid rgba(220,50,50,0.25)' : '1px solid rgba(255,255,255,0.08)',
+                            background: isExpired ? 'rgba(239,68,68,0.08)' : 'rgba(255,255,255,0.04)',
+                            border: isExpired ? '1px solid rgba(239,68,68,0.2)' : '1px solid #1F2937',
                           }}>
-                          <Calendar size={11} style={{ color: isExpired ? '#f87171' : '#374151' }} />
-                          <span className="text-xs" style={{ color: isExpired ? '#f87171' : '#475569' }}>
-                            {isExpired ? 'Expired ' : 'Valid till '}
+                          <Calendar size={11} style={{ color: isExpired ? '#F87171' : '#6B7280' }} />
+                          <span className="text-xs" style={{ color: isExpired ? '#F87171' : '#6B7280' }}>
+                            {isExpired ? '⚠️ Expired ' : '📅 Valid till '}
                             {exp.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}
                           </span>
                         </div>
@@ -781,28 +699,25 @@ const LoyaltyDashboard = () => {
                     })()}
 
                     {/* Action buttons */}
-                    <div className="flex gap-2 flex-wrap">
-                      <button onClick={() => handleMarkVisit(customer)} disabled={marking}
-                        className="loy-btn loy-btn-orange disabled:opacity-50"
-                        data-testid={`mark-visit-${customer.id}`}>
-                        {marking ? <RefreshCw size={13} className="animate-spin" /> : <TrendingUp size={13} />}
-                        {marking ? 'Marking…' : 'Mark Visit'}
+                    <div className="flex gap-2 flex-wrap" onClick={e => e.stopPropagation()}>
+                      <button
+                        onClick={() => handleMarkVisit(customer)} disabled={marking}
+                        className="loy-btn loy-btn-gold"
+                        data-testid={`mark-visit-${customer.id}`}
+                      >
+                        {marking ? <><RefreshCw size={12} className="loy-spin" />Marking…</> : <>📈 Mark Visit</>}
                       </button>
-                      <button onClick={() => handleSendWA(customer)}
-                        className="loy-btn loy-btn-green"
-                        data-testid={`wa-loyalty-${customer.id}`}>
-                        <MessageSquare size={13} />WhatsApp
+                      <button onClick={() => handleSendWA(customer)} className="loy-btn loy-btn-green" data-testid={`wa-loyalty-${customer.id}`}>
+                        <MessageSquare size={12} />💬 WhatsApp
                       </button>
-                      <button onClick={() => handleUndoVisit(customer)}
+                      <button
+                        onClick={() => handleUndoVisit(customer)}
                         disabled={marking || (customer.visits || 1) <= 1}
-                        className="loy-btn loy-btn-ghost disabled:opacity-30 disabled:cursor-not-allowed"
-                        data-testid={`undo-visit-${customer.id}`} title="Undo last visit">
-                        <Undo2 size={13} />Undo
-                      </button>
-                      <button onClick={() => handleDeleteCustomer(customer)}
-                        className="loy-btn loy-btn-red"
-                        data-testid={`delete-loyalty-${customer.id}`}>
-                        <Trash2 size={13} />Delete
+                        className="loy-btn loy-btn-ghost"
+                        data-testid={`undo-visit-${customer.id}`}
+                        title="Undo last visit"
+                      >
+                        <Undo2 size={12} />↩️ Undo
                       </button>
                       <button
                         onClick={() => {
@@ -814,23 +729,50 @@ const LoyaltyDashboard = () => {
                             setEditValidity(String(customer.validityDays    || ''));
                           }
                         }}
-                        className={`loy-btn ${editingCustomerId === customer.id ? 'loy-btn-gold' : 'loy-btn-ghost'}`}
-                        data-testid={`edit-loyalty-${customer.id}`}>
-                        <Pencil size={13} />
-                        {editingCustomerId === customer.id ? 'Cancel' : 'Edit'}
+                        className={`loy-btn ${editingCustomerId === customer.id ? 'loy-btn-yellow' : 'loy-btn-ghost'}`}
+                        data-testid={`edit-loyalty-${customer.id}`}
+                      >
+                        <Pencil size={12} />✏️ {editingCustomerId === customer.id ? 'Cancel' : 'Edit'}
                       </button>
+
+                      {/* Delete with confirm */}
+                      {deleteConfirmId === customer.id ? (
+                        <div className="flex gap-2">
+                          <button
+                            onClick={() => handleDeleteCustomer(customer)} disabled={deleting}
+                            className="loy-btn" style={{ background: '#dc2626', color: '#fff', border: 'none' }}
+                            data-testid={`delete-confirm-${customer.id}`}
+                          >
+                            {deleting ? '⏳ Removing…' : '🗑️ Yes, Remove'}
+                          </button>
+                          <button onClick={() => setDeleteConfirmId(null)} className="loy-btn loy-btn-ghost">✗ Cancel</button>
+                        </div>
+                      ) : (
+                        <button
+                          onClick={() => setDeleteConfirmId(customer.id)}
+                          className="loy-btn loy-btn-ghost"
+                          data-testid={`delete-loyalty-${customer.id}`}
+                          style={{ color: '#5a4a1a' }}
+                        >
+                          <Trash2 size={12} />🗑️ Delete
+                        </button>
+                      )}
                     </div>
 
                     {/* Inline edit panel */}
                     {editingCustomerId === customer.id && (
-                      <div className="mt-2 pt-3 space-y-3" style={{ borderTop: '1px solid rgba(255,255,255,0.05)' }}
-                        data-testid={`edit-panel-${customer.id}`}>
-                        <p className="loy-section-title flex items-center gap-1.5">
-                          <Pencil size={11} /> Edit Loyalty Card
-                        </p>
+                      <motion.div
+                        initial={{ opacity: 0, y: -4 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ duration: 0.15 }}
+                        className="pt-3 space-y-3"
+                        style={{ borderTop: '1px solid #1F2937' }}
+                        data-testid={`edit-panel-${customer.id}`}
+                      >
+                        <p className="loy-sec">✏️ Edit Loyalty Card</p>
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                           <div>
-                            <label className="loy-label block mb-1">Discount (%)</label>
+                            <label className="loy-sec mb-1 block">💎 Discount (%)</label>
                             <input type="number" min="0" max="100" value={editDiscount}
                               onChange={e => setEditDiscount(e.target.value)}
                               placeholder={`Current: ${customer.currentDiscount || 10}%`}
@@ -838,7 +780,7 @@ const LoyaltyDashboard = () => {
                               data-testid={`edit-discount-${customer.id}`} />
                           </div>
                           <div>
-                            <label className="loy-label block mb-1">Validity (days)</label>
+                            <label className="loy-sec mb-1 block">📅 Validity (days)</label>
                             <input type="number" min="0" value={editValidity}
                               onChange={e => setEditValidity(e.target.value)}
                               placeholder={`Current: ${customer.validityDays || 0}d`}
@@ -847,18 +789,14 @@ const LoyaltyDashboard = () => {
                           </div>
                         </div>
                         <div className="flex gap-2">
-                          <button onClick={() => handleSaveEdit(customer)}
-                            className="loy-btn loy-btn-orange"
-                            data-testid={`save-edit-${customer.id}`}>
-                            <Check size={13} />Save Changes
+                          <button onClick={() => handleSaveEdit(customer)} className="loy-btn loy-btn-gold" data-testid={`save-edit-${customer.id}`}>
+                            <Check size={12} />✅ Save Changes
                           </button>
-                          <button onClick={() => handleSendWA(customer)}
-                            className="loy-btn loy-btn-green"
-                            data-testid={`resend-wa-${customer.id}`}>
-                            <MessageSquare size={13} />Resend WhatsApp
+                          <button onClick={() => handleSendWA(customer)} className="loy-btn loy-btn-green" data-testid={`resend-wa-${customer.id}`}>
+                            <MessageSquare size={12} />💬 Resend WhatsApp
                           </button>
                         </div>
-                      </div>
+                      </motion.div>
                     )}
                   </div>
                 </motion.div>
@@ -868,16 +806,16 @@ const LoyaltyDashboard = () => {
         </div>
       )}
 
-      {/* Footer */}
-      <div className="flex items-center justify-center gap-2 py-4" style={{ borderTop: '1px solid rgba(255,255,255,0.04)', marginTop: 8 }}>
-        <Star size={11} style={{ color: '#C9A227', opacity: 0.7 }} />
-        <p className="text-xs" style={{ color: '#334155', letterSpacing: '-0.01em' }}>
+      {/* ── Footer ─────────────────────────────────────────────────────────── */}
+      <div className="flex items-center justify-center gap-2 py-3" style={{ borderTop: '1px solid #1F2937' }}>
+        <span>⭐</span>
+        <p className="text-xs font-bold" style={{ color: '#4B5563' }}>
           {totalCustomers} member{totalCustomers !== 1 ? 's' : ''} · {totalVisits} total visits
         </p>
-        <span className="inline-block w-1.5 h-1.5 rounded-full animate-pulse" style={{ background: '#C9A227', opacity: 0.6 }} />
+        <span className="inline-block w-1.5 h-1.5 rounded-full animate-pulse" style={{ background: '#C9A227' }} />
       </div>
 
-      {/* ── Google Review Link setting ──────────────────────────────────────── */}
+      {/* ── Google Review Link setting ───────────────────────────────────────── */}
       <GoogleReviewSettings />
     </div>
   );
