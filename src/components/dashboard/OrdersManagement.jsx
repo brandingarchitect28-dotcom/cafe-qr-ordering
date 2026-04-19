@@ -950,7 +950,6 @@ const OrdersManagement = () => {
               const sb=getSt(order.orderStatus); const pb=getPay(order.paymentStatus);
               const CUR=order.currencySymbol||cafeCurrency;
               return (
-                {/* TASK 1 & 2: statusClass appended — only change to this mobile card */}
                 <div key={order.id} data-testid={`order-card-${order.id}`}
                   className={`omf-in ${sb.statusClass}`}
                   style={{animationDelay:`${Math.min(oi*35,350)}ms`,animationFillMode:'both',background:'#120f00',border:'1.5px solid rgba(255,255,255,0.07)',borderRadius:'16px',overflow:'hidden',transition:'border-color 200ms'}}
