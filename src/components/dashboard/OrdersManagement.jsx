@@ -36,10 +36,10 @@ if (typeof document !== 'undefined' && !document.getElementById('om-food-css')) 
   const el = document.createElement('style');
   el.id = 'om-food-css';
   el.textContent = `
-    @import url('https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800;900&family=Fredoka+One&display=swap');
+    @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700;800&family=Playfair+Display:wght@600;700;800;900&display=swap');
 
-    .omf { font-family: 'Nunito', system-ui, sans-serif; }
-    .omf-title { font-family: 'Fredoka One', system-ui, sans-serif !important; letter-spacing: 0.01em; }
+    .omf { font-family: 'DM Sans', system-ui, sans-serif; }
+    .omf-title { font-family: 'Playfair Display', serif !important; letter-spacing: 0.01em; }
 
     /* Cards */
     .omf-card {
@@ -58,7 +58,7 @@ if (typeof document !== 'undefined' && !document.getElementById('om-food-css')) 
     /* Buttons */
     .omf-btn {
       display: inline-flex; align-items: center; gap: 5px;
-      font-family: 'Nunito', system-ui, sans-serif;
+      font-family: 'DM Sans', system-ui, sans-serif;
       font-weight: 800; font-size: 12px;
       padding: 6px 12px; border-radius: 10px;
       border: 1.5px solid transparent;
@@ -91,7 +91,7 @@ if (typeof document !== 'undefined' && !document.getElementById('om-food-css')) 
     .omf-input {
       background: #1a1500; border: 1.5px solid rgba(255,255,255,0.08); border-radius: 12px;
       color: #fdf8e1; padding: 10px 14px; font-size: 14px; font-weight: 600;
-      font-family: 'Nunito', system-ui, sans-serif;
+      font-family: 'DM Sans', system-ui, sans-serif;
       outline: none; width: 100%; transition: border-color 180ms, box-shadow 180ms;
     }
     .omf-input:focus { border-color: rgba(212,160,23,0.55); box-shadow: 0 0 0 3px rgba(212,160,23,0.1); }
@@ -102,7 +102,7 @@ if (typeof document !== 'undefined' && !document.getElementById('om-food-css')) 
     .omf-select {
       background: #1a1500; border: 1.5px solid rgba(255,255,255,0.08); border-radius: 9px;
       color: #fdf8e1; padding: 6px 10px; font-size: 12px; font-weight: 700;
-      font-family: 'Nunito', system-ui, sans-serif;
+      font-family: 'DM Sans', system-ui, sans-serif;
       outline: none; cursor: pointer; transition: border-color 160ms;
     }
     .omf-select:focus { border-color: rgba(212,160,23,0.5); }
@@ -114,14 +114,14 @@ if (typeof document !== 'undefined' && !document.getElementById('om-food-css')) 
       padding: 3px 10px; border-radius: 20px;
       font-size: 11px; font-weight: 800;
       border: 1.5px solid transparent;
-      font-family: 'Nunito', system-ui, sans-serif;
+      font-family: 'DM Sans', system-ui, sans-serif;
     }
 
     /* Filter tabs */
     .omf-tab {
       padding: 6px 16px; border-radius: 22px; font-size: 13px; font-weight: 800;
       cursor: pointer; transition: all 180ms; border: 1.5px solid transparent;
-      font-family: 'Nunito', system-ui, sans-serif;
+      font-family: 'DM Sans', system-ui, sans-serif;
     }
     .omf-tab-on  {
       background: linear-gradient(135deg, #D4A017, #A67C00);
@@ -141,13 +141,13 @@ if (typeof document !== 'undefined' && !document.getElementById('om-food-css')) 
     .omf-in { animation: omfIn 280ms ease forwards; }
 
     /* Order number style — premium green */
-    .omf-ordnum { font-family: 'Fredoka One', system-ui, sans-serif; color: #D4A017; }
+    .omf-ordnum { font-family: 'Playfair Display', serif; color: #D4A017; }
 
     /* Section label */
     .omf-sec {
       font-size: 11px; font-weight: 900; text-transform: uppercase; letter-spacing: 0.08em;
       color: #D4A017; display: flex; align-items: center; gap: 5px;
-      font-family: 'Nunito', system-ui, sans-serif;
+      font-family: 'DM Sans', system-ui, sans-serif;
     }
 
     /* Sheet modal */
