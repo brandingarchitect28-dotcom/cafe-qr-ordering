@@ -20,9 +20,9 @@ if (typeof document !== 'undefined' && !document.getElementById('set-cafe-css'))
   const el = document.createElement('style');
   el.id = 'set-cafe-css';
   el.textContent = `
-    @import url('https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800;900&family=Fredoka+One&display=swap');
-    .set { font-family: 'Nunito', system-ui, sans-serif; }
-    .set-title { font-family: 'Fredoka One', system-ui, sans-serif !important; }
+    @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700;800&family=Playfair+Display:wght@600;700;800;900&display=swap');
+    .set { font-family: 'DM Sans', system-ui, sans-serif; }
+    .set-title { font-family: 'Playfair Display', serif !important; }
     .set-card {
       background: #141008;
       border: 1.5px solid rgba(255,255,255,0.07);
@@ -30,9 +30,9 @@ if (typeof document !== 'undefined' && !document.getElementById('set-cafe-css'))
       padding: 24px;
       transition: border-color 200ms;
     }
-    .set-card:hover { border-color: rgba(255,140,0,0.14); }
+    .set-card:hover { border-color: rgba(201,162,39,0.14); }
     .set-section-title {
-      font-family: 'Fredoka One', system-ui, sans-serif;
+      font-family: 'Playfair Display', serif;
       font-size: 1.2rem; color: #fff;
       margin-bottom: 20px;
       display: flex; align-items: center; gap: 8px;
@@ -45,12 +45,12 @@ if (typeof document !== 'undefined' && !document.getElementById('set-cafe-css'))
       color: #fff8ee;
       padding: 12px 16px;
       font-size: 14px; font-weight: 600;
-      font-family: 'Nunito', system-ui, sans-serif;
+      font-family: 'DM Sans', system-ui, sans-serif;
       outline: none;
       transition: border-color 180ms, box-shadow 180ms;
       height: 48px;
     }
-    .set-input:focus { border-color: rgba(255,140,0,0.55); box-shadow: 0 0 0 3px rgba(255,140,0,0.1); }
+    .set-input:focus { border-color: rgba(201,162,39,0.55); box-shadow: 0 0 0 3px rgba(201,162,39,0.1); }
     .set-input::placeholder { color: #3d3020; }
     .set-select {
       width: 100%;
@@ -60,20 +60,20 @@ if (typeof document !== 'undefined' && !document.getElementById('set-cafe-css'))
       color: #fff8ee;
       padding: 12px 16px;
       font-size: 14px; font-weight: 600;
-      font-family: 'Nunito', system-ui, sans-serif;
+      font-family: 'DM Sans', system-ui, sans-serif;
       outline: none; cursor: pointer;
       transition: border-color 160ms;
       height: 48px;
     }
-    .set-select:focus { border-color: rgba(255,140,0,0.5); }
+    .set-select:focus { border-color: rgba(201,162,39,0.5); }
     .set-select option { background: #1c1509; }
     .set-label {
       display: block;
-      color: #FF7A20;
+      color: #C9A227;
       font-size: 11px; font-weight: 900;
       text-transform: uppercase; letter-spacing: 0.08em;
       margin-bottom: 6px;
-      font-family: 'Nunito', system-ui, sans-serif;
+      font-family: 'DM Sans', system-ui, sans-serif;
     }
     .set-hint { color: #7a6a55; font-size: 11px; font-weight: 600; margin-top: 5px; }
     .set-toggle-row {
@@ -83,17 +83,17 @@ if (typeof document !== 'undefined' && !document.getElementById('set-cafe-css'))
       border: 1px solid rgba(255,255,255,0.06);
       border-radius: 12px;
     }
-    .set-toggle-row:hover { border-color: rgba(255,140,0,0.15); }
+    .set-toggle-row:hover { border-color: rgba(201,162,39,0.15); }
     .set-save-btn {
       display: inline-flex; align-items: center; gap: 8px;
-      background: linear-gradient(135deg,#FF7A20,#E55A00);
+      background: linear-gradient(135deg,#C9A227,#A67C00);
       color: #fff; font-weight: 900; font-size: 15px;
-      font-family: 'Nunito', system-ui, sans-serif;
+      font-family: 'DM Sans', system-ui, sans-serif;
       padding: 14px 32px; border-radius: 14px; border: none;
       cursor: pointer; transition: all 200ms;
-      box-shadow: 0 4px 18px rgba(255,120,0,0.35);
+      box-shadow: 0 4px 18px rgba(201,162,39,0.35);
     }
-    .set-save-btn:hover { transform: translateY(-1px); box-shadow: 0 6px 24px rgba(255,120,0,0.45); }
+    .set-save-btn:hover { transform: translateY(-1px); box-shadow: 0 6px 24px rgba(201,162,39,0.45); }
     .set-save-btn:active { transform: scale(0.97); }
     .set-save-btn:disabled { opacity: 0.55; cursor: not-allowed; transform: none; }
   `;
@@ -275,7 +275,7 @@ const Settings = () => {
   // ── Toggle component ──────────────────────────────────────────────────────
   const Toggle = ({ enabled, onToggle }) => (
     <button type="button" onClick={onToggle}
-      className={`relative inline-flex h-7 w-12 items-center rounded-full transition-colors duration-200 focus:outline-none flex-shrink-0 ${enabled ? 'bg-[#FF7A20]' : 'bg-white/10'}`}>
+      className={`relative inline-flex h-7 w-12 items-center rounded-full transition-colors duration-200 focus:outline-none flex-shrink-0 ${enabled ? 'bg-[#C9A227]' : 'bg-white/10'}`}>
       <span className={`inline-block h-5 w-5 transform rounded-full bg-white shadow transition-transform duration-200 ${enabled ? 'translate-x-6' : 'translate-x-1'}`} />
     </button>
   );
@@ -312,14 +312,14 @@ const Settings = () => {
             <label className="set-label">Logo</label>
             <div className="space-y-3">
               {settings.logo && (
-                <div className="w-24 h-24 rounded-2xl overflow-hidden" style={{ border: '1.5px solid rgba(255,140,0,0.25)' }}>
+                <div className="w-24 h-24 rounded-2xl overflow-hidden" style={{ border: '1.5px solid rgba(201,162,39,0.25)' }}>
                   <img src={settings.logo} alt="Logo" className="w-full h-full object-cover" />
                 </div>
               )}
               <input type="file" accept="image/*" data-testid="settings-logo-upload"
                 onChange={handleLogoUpload}
                 className="w-full rounded-xl px-4 py-3 text-sm font-semibold transition-all file:mr-4 file:py-2 file:px-4 file:rounded-xl file:border-0 file:font-black file:text-black file:cursor-pointer"
-                style={{ background: '#1c1509', border: '1.5px solid rgba(255,255,255,0.08)', color: '#7a6a55', '--tw-file-bg': '#FF7A20' }} />
+                style={{ background: '#1c1509', border: '1.5px solid rgba(255,255,255,0.08)', color: '#7a6a55', '--tw-file-bg': '#C9A227' }} />
             </div>
           </div>
         </div>
@@ -485,7 +485,7 @@ const Settings = () => {
                 onClick={() => setSettings(prev => ({ ...prev, mode: 'light' }))}
                 className="flex-1 flex items-center justify-center gap-3 py-4 px-6 rounded-xl border-2 font-black text-sm transition-all"
                 style={settings.mode === 'light'
-                  ? { borderColor: '#FF7A20', background: 'rgba(255,120,0,0.1)', color: '#FF7A20' }
+                  ? { borderColor: '#C9A227', background: 'rgba(201,162,39,0.1)', color: '#C9A227' }
                   : { borderColor: 'rgba(255,255,255,0.1)', color: 'rgba(255,255,255,0.5)' }}>
                 <Sun className="w-5 h-5" />☀️ Light Mode
               </button>
@@ -493,7 +493,7 @@ const Settings = () => {
                 onClick={() => setSettings(prev => ({ ...prev, mode: 'dark' }))}
                 className="flex-1 flex items-center justify-center gap-3 py-4 px-6 rounded-xl border-2 font-black text-sm transition-all"
                 style={settings.mode === 'dark'
-                  ? { borderColor: '#FF7A20', background: 'rgba(255,120,0,0.1)', color: '#FF7A20' }
+                  ? { borderColor: '#C9A227', background: 'rgba(201,162,39,0.1)', color: '#C9A227' }
                   : { borderColor: 'rgba(255,255,255,0.1)', color: 'rgba(255,255,255,0.5)' }}>
                 <Moon className="w-5 h-5" />🌙 Dark Mode
               </button>
@@ -513,7 +513,7 @@ const Settings = () => {
               </div>
               <input type="text" value={settings.primaryColor}
                 onChange={e => { const val = e.target.value; if (/^#[0-9A-Fa-f]{0,6}$/.test(val)) setSettings(prev => ({ ...prev, primaryColor: val })); }}
-                className="set-input flex-1 font-mono uppercase" placeholder="#FF7A20" maxLength={7} />
+                className="set-input flex-1 font-mono uppercase" placeholder="#C9A227" maxLength={7} />
             </div>
             <p className="set-hint mt-2">Used for buttons, highlights, and accents on your ordering page</p>
           </div>
@@ -523,7 +523,7 @@ const Settings = () => {
             <label className="set-label">Quick Presets</label>
             <div className="flex flex-wrap gap-2">
               {[
-                { color:'#D4AF37', name:'Gold'   }, { color:'#FF7A20', name:'Orange' },
+                { color:'#D4AF37', name:'Gold'   }, { color:'#C9A227', name:'Orange' },
                 { color:'#E74C3C', name:'Red'    }, { color:'#27AE60', name:'Green'  },
                 { color:'#3498DB', name:'Blue'   }, { color:'#9B59B6', name:'Purple' },
                 { color:'#1ABC9C', name:'Teal'   }, { color:'#E91E63', name:'Pink'   },
@@ -640,7 +640,7 @@ const Settings = () => {
                 <button type="button" onClick={() => setShowKeySecret(v => !v)}
                   className="absolute right-3 top-1/2 -translate-y-1/2 transition-colors"
                   style={{ color: '#4a3f35' }}
-                  onMouseEnter={e => e.currentTarget.style.color = '#FF7A20'}
+                  onMouseEnter={e => e.currentTarget.style.color = '#C9A227'}
                   onMouseLeave={e => e.currentTarget.style.color = '#4a3f35'}>
                   {showKeySecret ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                 </button>
