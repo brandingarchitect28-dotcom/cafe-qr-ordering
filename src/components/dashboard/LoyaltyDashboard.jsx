@@ -32,68 +32,324 @@ import {
 } from 'lucide-react';
 import GoogleReviewSettings from './GoogleReviewSettings';
 
-// ── Inject premium SaaS CSS once ──────────────────────────────────────────────
+// ── Premium SaaS CSS — Loyalty Dashboard ─────────────────────────────────────
 if (typeof document !== 'undefined' && !document.getElementById('loy-cafe-css')) {
   const el = document.createElement('style');
   el.id = 'loy-cafe-css';
   el.textContent = `
-    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
-    .loy { font-family: 'Inter', system-ui, sans-serif; color: #e2e8f0; letter-spacing: -0.01em; }
-    .loy-title { font-family: 'Inter', system-ui, sans-serif !important; letter-spacing: -0.03em; font-weight: 600; }
+    @import url('https://fonts.googleapis.com/css2?family=Inter:ital,opsz,wght@0,14..32,300;0,14..32,400;0,14..32,500;0,14..32,600;0,14..32,700&display=swap');
+
+    /* ─── Reset & Base ─── */
+    .loy *, .loy *::before, .loy *::after { box-sizing: border-box; }
+    .loy {
+      font-family: 'Inter', system-ui, -apple-system, sans-serif;
+      color: #cbd5e1;
+      letter-spacing: -0.012em;
+      line-height: 1.5;
+    }
+
+    /* ─── Page entry animation ─── */
+    .loy { animation: loyPageIn 0.35s cubic-bezier(0.4,0,0.2,1) forwards; }
+    @keyframes loyPageIn {
+      from { opacity: 0; transform: translateY(10px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+
+    /* ─── Typography ─── */
+    .loy-title {
+      font-family: 'Inter', system-ui, sans-serif !important;
+      font-weight: 600;
+      letter-spacing: -0.025em;
+      color: #f1f5f9;
+    }
+    .loy-label {
+      font-size: 11px;
+      font-weight: 500;
+      letter-spacing: 0.07em;
+      text-transform: uppercase;
+      color: #475569;
+      display: block;
+    }
+    .loy-section-title {
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: #475569;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    /* ─── Cards ─── */
     .loy-card {
-      background: #131720;
+      background: #0f1623;
       border: 1px solid rgba(255,255,255,0.06);
-      border-radius: 12px;
+      border-radius: 14px;
       overflow: hidden;
-      transition: border-color 200ms ease, box-shadow 200ms ease;
+      transition: border-color 200ms cubic-bezier(0.4,0,0.2,1),
+                  box-shadow 200ms cubic-bezier(0.4,0,0.2,1),
+                  transform 200ms cubic-bezier(0.4,0,0.2,1);
     }
-    .loy-card:hover { border-color: rgba(201,162,39,0.2); box-shadow: 0 4px 24px rgba(0,0,0,0.3); }
+    .loy-card:hover {
+      border-color: rgba(201,162,39,0.18);
+      box-shadow: 0 8px 32px rgba(0,0,0,0.35), 0 0 0 0px rgba(201,162,39,0);
+      transform: translateY(-1px);
+    }
+
+    /* ─── Stat Cards ─── */
+    .loy-stat-card {
+      background: #0f1623;
+      border: 1px solid rgba(255,255,255,0.06);
+      border-radius: 14px;
+      padding: 20px 18px;
+      transition: border-color 200ms cubic-bezier(0.4,0,0.2,1),
+                  box-shadow 200ms cubic-bezier(0.4,0,0.2,1),
+                  transform 200ms cubic-bezier(0.4,0,0.2,1);
+      animation: loyFadeIn 0.4s cubic-bezier(0.4,0,0.2,1) forwards;
+    }
+    .loy-stat-card:nth-child(1) { animation-delay: 0.05s; }
+    .loy-stat-card:nth-child(2) { animation-delay: 0.10s; }
+    .loy-stat-card:nth-child(3) { animation-delay: 0.15s; }
+    .loy-stat-card:nth-child(4) { animation-delay: 0.20s; }
+    .loy-stat-card:hover {
+      border-color: rgba(255,255,255,0.1);
+      box-shadow: 0 8px 24px rgba(0,0,0,0.3);
+      transform: translateY(-2px);
+    }
+
+    /* ─── Inputs ─── */
     .loy-input {
-      width: 100%; background: #0f1117;
-      border: 1px solid rgba(255,255,255,0.08); border-radius: 8px;
-      color: #e2e8f0; padding: 10px 14px; font-size: 14px; font-weight: 400;
-      font-family: 'Inter', system-ui, sans-serif; letter-spacing: -0.01em;
-      outline: none; transition: border-color 150ms ease, box-shadow 150ms ease;
-    }
-    .loy-input:focus { border-color: rgba(201,162,39,0.45); box-shadow: 0 0 0 3px rgba(201,162,39,0.07); }
-    .loy-input::placeholder { color: #374151; }
-    .loy-btn {
-      display: inline-flex; align-items: center; gap: 6px;
+      width: 100%;
+      background: #080d17;
+      border: 1px solid rgba(255,255,255,0.08);
+      border-radius: 9px;
+      color: #e2e8f0;
+      padding: 10px 14px;
+      font-size: 14px;
+      font-weight: 400;
       font-family: 'Inter', system-ui, sans-serif;
-      font-weight: 500; font-size: 13px; letter-spacing: -0.01em;
-      padding: 8px 14px; border-radius: 8px;
-      border: 1px solid transparent;
-      cursor: pointer; transition: all 150ms ease; white-space: nowrap;
+      letter-spacing: -0.012em;
+      outline: none;
+      transition: border-color 150ms cubic-bezier(0.4,0,0.2,1),
+                  box-shadow 150ms cubic-bezier(0.4,0,0.2,1);
     }
-    .loy-btn:hover { transform: translateY(-1px); box-shadow: 0 4px 12px rgba(0,0,0,0.3); }
-    .loy-btn:active { transform: scale(0.97); box-shadow: none; }
-    .loy-btn-orange { background: #C9A227; color: #0f1117; font-weight: 600; }
-    .loy-btn-orange:hover { background: #d4ac2e; }
-    .loy-btn-ghost  { background: transparent; color: #64748b; border-color: rgba(255,255,255,0.08); }
-    .loy-btn-ghost:hover  { background: rgba(255,255,255,0.05); color: #94a3b8; }
-    .loy-btn-green  { background: rgba(37,211,102,0.08); color: #22c55e; border-color: rgba(37,211,102,0.18); }
-    .loy-btn-green:hover  { background: rgba(37,211,102,0.14); }
-    .loy-btn-red    { background: rgba(220,38,38,0.08); color: #f87171; border-color: rgba(220,38,38,0.18); }
-    .loy-btn-red:hover    { background: rgba(220,38,38,0.14); }
-    .loy-btn-gold   { background: rgba(201,162,39,0.1); color: #C9A227; border-color: rgba(201,162,39,0.22); }
-    .loy-btn-gold:hover   { background: rgba(201,162,39,0.16); }
-    .loy-label { font-size: 11px; font-weight: 500; letter-spacing: 0.06em; text-transform: uppercase; color: #475569; }
-    .loy-stat-card { background: #131720; border: 1px solid rgba(255,255,255,0.06); border-radius: 12px; padding: 20px; transition: border-color 200ms ease, box-shadow 200ms ease; }
-    .loy-stat-card:hover { border-color: rgba(255,255,255,0.1); box-shadow: 0 4px 20px rgba(0,0,0,0.25); }
-    .loy-row-btn { width: 100%; display: flex; align-items: center; gap: 12px; padding: 14px 16px; text-align: left; background: transparent; border: none; cursor: pointer; transition: background 150ms ease; }
-    .loy-row-btn:hover { background: rgba(255,255,255,0.02); }
-    .loy-pill { display: inline-flex; align-items: center; gap: 5px; padding: 4px 10px; border-radius: 6px; font-size: 12px; font-weight: 500; }
-    .loy-ladder-pill { font-size: 12px; font-weight: 500; padding: 5px 11px; border-radius: 6px; background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.07); color: #64748b; letter-spacing: -0.01em; }
+    .loy-input:focus {
+      border-color: rgba(201,162,39,0.5);
+      box-shadow: 0 0 0 3px rgba(201,162,39,0.08), 0 0 16px rgba(201,162,39,0.05);
+    }
+    .loy-input::placeholder { color: #1e293b; }
+    .loy-input:disabled { opacity: 0.5; cursor: not-allowed; }
+
+    /* ─── Buttons ─── */
+    .loy-btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      font-family: 'Inter', system-ui, sans-serif;
+      font-weight: 500;
+      font-size: 13px;
+      letter-spacing: -0.01em;
+      padding: 8px 15px;
+      border-radius: 9px;
+      border: 1px solid transparent;
+      cursor: pointer;
+      transition: all 150ms cubic-bezier(0.4,0,0.2,1);
+      white-space: nowrap;
+      position: relative;
+      overflow: hidden;
+    }
+    .loy-btn::after {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: rgba(255,255,255,0);
+      transition: background 150ms ease;
+    }
+    .loy-btn:hover::after { background: rgba(255,255,255,0.05); }
+    .loy-btn:hover { transform: translateY(-1px); }
+    .loy-btn:active { transform: scale(0.97); }
+    .loy-btn:disabled { opacity: 0.45; cursor: not-allowed; transform: none; }
+
+    /* Primary CTA — amber gold with subtle glow */
+    .loy-btn-orange {
+      background: #C9A227;
+      color: #08100e;
+      font-weight: 600;
+      border-color: rgba(201,162,39,0.3);
+      box-shadow: 0 1px 3px rgba(0,0,0,0.3);
+    }
+    .loy-btn-orange:hover {
+      background: #d4ac2e;
+      box-shadow: 0 4px 16px rgba(201,162,39,0.25), 0 0 0 0px rgba(201,162,39,0);
+    }
+    .loy-btn-orange:active { box-shadow: none; }
+
+    /* Ghost */
+    .loy-btn-ghost {
+      background: transparent;
+      color: #475569;
+      border-color: rgba(255,255,255,0.07);
+    }
+    .loy-btn-ghost:hover { background: rgba(255,255,255,0.04); color: #94a3b8; border-color: rgba(255,255,255,0.12); }
+
+    /* WhatsApp */
+    .loy-btn-green {
+      background: rgba(34,197,94,0.08);
+      color: #22c55e;
+      border-color: rgba(34,197,94,0.16);
+    }
+    .loy-btn-green:hover {
+      background: rgba(34,197,94,0.13);
+      box-shadow: 0 0 12px rgba(34,197,94,0.1);
+    }
+
+    /* Danger */
+    .loy-btn-red {
+      background: rgba(239,68,68,0.08);
+      color: #f87171;
+      border-color: rgba(239,68,68,0.16);
+    }
+    .loy-btn-red:hover {
+      background: rgba(239,68,68,0.13);
+      box-shadow: 0 0 12px rgba(239,68,68,0.1);
+    }
+
+    /* Edit / gold outline */
+    .loy-btn-gold {
+      background: rgba(201,162,39,0.08);
+      color: #C9A227;
+      border-color: rgba(201,162,39,0.2);
+    }
+    .loy-btn-gold:hover {
+      background: rgba(201,162,39,0.14);
+      box-shadow: 0 0 12px rgba(201,162,39,0.12);
+    }
+
+    /* ─── Customer row button ─── */
+    .loy-row-btn {
+      width: 100%;
+      display: flex;
+      align-items: center;
+      gap: 13px;
+      padding: 15px 16px;
+      text-align: left;
+      background: transparent;
+      border: none;
+      cursor: pointer;
+      transition: background 150ms cubic-bezier(0.4,0,0.2,1);
+    }
+    .loy-row-btn:hover { background: rgba(255,255,255,0.025); }
+
+    /* ─── Pills ─── */
+    .loy-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      padding: 4px 10px;
+      border-radius: 7px;
+      font-size: 12px;
+      font-weight: 500;
+      letter-spacing: -0.01em;
+    }
+
+    /* ─── Discount ladder pills ─── */
+    .loy-ladder-pill {
+      font-size: 12px;
+      font-weight: 400;
+      padding: 5px 12px;
+      border-radius: 7px;
+      background: rgba(255,255,255,0.03);
+      border: 1px solid rgba(255,255,255,0.06);
+      color: #475569;
+      letter-spacing: -0.01em;
+      transition: border-color 150ms ease, background 150ms ease;
+    }
+    .loy-ladder-pill:hover { background: rgba(255,255,255,0.05); border-color: rgba(255,255,255,0.1); }
     .loy-ladder-pill strong { color: #94a3b8; font-weight: 600; }
-    .loy-divider { border: none; border-top: 1px solid rgba(255,255,255,0.05); margin: 0; }
-    .loy-avatar { width: 36px; height: 36px; border-radius: 8px; background: #1e2535; border: 1px solid rgba(255,255,255,0.08); display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
-    .loy-icon-wrap { width: 36px; height: 36px; border-radius: 8px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
-    .loy-section-title { font-size: 11px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: #475569; }
-    .loy-empty { display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 56px 24px; gap: 10px; }
-    @keyframes loyFadeIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
-    .loy-in { animation: loyFadeIn 250ms ease forwards; }
-    @keyframes loySpinSlow { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
-    .loy-spin { animation: loySpinSlow 1.2s linear infinite; }
+
+    /* ─── Avatar ─── */
+    .loy-avatar {
+      width: 36px; height: 36px;
+      border-radius: 9px;
+      background: #141d2e;
+      border: 1px solid rgba(255,255,255,0.07);
+      display: flex; align-items: center; justify-content: center;
+      flex-shrink: 0;
+    }
+
+    /* ─── Icon wrapper ─── */
+    .loy-icon-wrap {
+      width: 36px; height: 36px;
+      border-radius: 9px;
+      display: flex; align-items: center; justify-content: center;
+      flex-shrink: 0;
+    }
+
+    /* ─── Empty / Loading state ─── */
+    .loy-empty {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 64px 24px;
+      gap: 12px;
+    }
+    .loy-empty-icon {
+      width: 52px; height: 52px;
+      border-radius: 14px;
+      background: rgba(255,255,255,0.03);
+      border: 1px solid rgba(255,255,255,0.06);
+      display: flex; align-items: center; justify-content: center;
+    }
+
+    /* ─── Divider ─── */
+    .loy-divider {
+      border: none;
+      border-top: 1px solid rgba(255,255,255,0.05);
+      margin: 0;
+    }
+
+    /* ─── Animations ─── */
+    @keyframes loyFadeIn {
+      from { opacity: 0; transform: translateY(7px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+    .loy-in { animation: loyFadeIn 0.28s cubic-bezier(0.4,0,0.2,1) forwards; }
+
+    @keyframes loySpinSlow {
+      from { transform: rotate(0deg); }
+      to   { transform: rotate(360deg); }
+    }
+    .loy-spin { animation: loySpinSlow 1.1s linear infinite; }
+
+    /* ─── Search bar ─── */
+    .loy-search-wrap {
+      position: relative;
+      flex: 1;
+    }
+    .loy-search-icon {
+      position: absolute;
+      left: 13px;
+      top: 50%;
+      transform: translateY(-50%);
+      pointer-events: none;
+    }
+    .loy-search-wrap .loy-input { padding-left: 38px; }
+
+    /* ─── Form card ─── */
+    .loy-form-card {
+      background: #0f1623;
+      border: 1px solid rgba(255,255,255,0.09);
+      border-radius: 14px;
+      overflow: hidden;
+    }
+
+    /* ─── Scrollbar ─── */
+    .loy ::-webkit-scrollbar { width: 4px; }
+    .loy ::-webkit-scrollbar-track { background: transparent; }
+    .loy ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.08); border-radius: 2px; }
   `;
   document.head.appendChild(el);
 }
@@ -292,41 +548,42 @@ const LoyaltyDashboard = () => {
   const repeatedVisits = customers?.reduce((s, c) => s + ((c.visits || 0) > 1 ? (c.visits - 1) : 0), 0) || 0;
 
   return (
-    <div className="loy space-y-5">
+    <div className="loy space-y-6">
 
       {/* ── Stats row ─────────────────────────────────────────────────────── */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         {[
-          { label: 'Total Members',  value: totalCustomers, Icon: User,       color: '#C9A227' },
-          { label: 'Total Visits',   value: totalVisits,    Icon: TrendingUp, color: '#60a5fa' },
-          { label: 'Loyal (3+)',     value: loyalCustomers, Icon: Award,      color: '#34d399' },
-          { label: 'Repeat Visits',  value: repeatedVisits, Icon: Repeat,     color: '#a78bfa' },
+          { label: 'Members',       value: totalCustomers, Icon: User,       color: '#C9A227' },
+          { label: 'Total Visits',  value: totalVisits,    Icon: TrendingUp, color: '#60a5fa' },
+          { label: 'Loyal (3+)',    value: loyalCustomers, Icon: Award,      color: '#34d399' },
+          { label: 'Repeat Visits', value: repeatedVisits, Icon: Repeat,     color: '#a78bfa' },
         ].map(({ label, value, Icon, color }) => (
-          <div key={label} className="loy-stat-card flex items-center gap-3"
-            style={{ borderLeft: `2px solid ${color}` }}>
-            <div className="loy-icon-wrap" style={{ background: color + '14' }}>
-              <Icon size={16} style={{ color }} />
+          <div key={label} className="loy-stat-card"
+            style={{ borderTop: `2px solid ${color}`, paddingTop: 18 }}>
+            <div className="flex items-center gap-2 mb-3">
+              <div className="loy-icon-wrap" style={{ background: color + '12', width: 30, height: 30, borderRadius: 8 }}>
+                <Icon size={14} style={{ color }} />
+              </div>
+              <span className="loy-label" style={{ letterSpacing: '0.05em', fontSize: 10 }}>{label}</span>
             </div>
-            <div>
-              <p className="text-2xl font-semibold text-white" style={{ letterSpacing: '-0.03em' }}>{value}</p>
-              <p className="text-xs mt-0.5" style={{ color: '#475569' }}>{label}</p>
-            </div>
+            <p style={{ fontSize: 28, fontWeight: 600, color: '#f1f5f9', letterSpacing: '-0.04em', lineHeight: 1 }}>{value}</p>
           </div>
         ))}
       </div>
 
       {/* ── Search + Add ───────────────────────────────────────────────────── */}
       <div className="flex flex-col sm:flex-row gap-3">
-        <div className="relative flex-1">
-          <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2" style={{ color: '#374151' }} />
+        <div className="loy-search-wrap">
+          <Search size={14} className="loy-search-icon" style={{ color: '#2d3f52' }} />
           <input type="text" value={search} onChange={e => setSearch(e.target.value)}
             placeholder="Search by name or phone…"
-            className="loy-input" style={{ paddingLeft: '2.25rem' }} />
+            className="loy-input" />
         </div>
         <button onClick={() => setShowAddForm(v => !v)}
           className="loy-btn loy-btn-orange"
+          style={{ paddingLeft: 18, paddingRight: 18 }}
           data-testid="add-loyalty-customer-btn">
-          <UserPlus size={15} />
+          <UserPlus size={14} />
           Add Customer
         </button>
       </div>
@@ -335,11 +592,11 @@ const LoyaltyDashboard = () => {
       <AnimatePresence>
         {showAddForm && (
           <motion.div
-            initial={{ opacity: 0, y: -10 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -10 }}
-            className="loy-card p-6"
-            style={{ border: '1.5px solid rgba(255,255,255,0.1)' }}
+            initial={{ opacity: 0, y: -8, scale: 0.99 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: -8, scale: 0.99 }}
+            transition={{ duration: 0.22, ease: [0.4,0,0.2,1] }}
+            className="loy-form-card p-6"
           >
             <div className="flex items-center gap-2 mb-5">
               <div className="loy-icon-wrap" style={{ background: 'rgba(201,162,39,0.1)' }}>
@@ -392,6 +649,8 @@ const LoyaltyDashboard = () => {
       </AnimatePresence>
 
       {/* ── Discount ladder ────────────────────────────────────────────────── */}
+      <div>
+      <p className="loy-label mb-2" style={{ fontSize: 10, letterSpacing: '0.08em' }}>Reward Tiers</p>
       <div className="flex gap-2 flex-wrap">
         {[
           { label: '1 visit',   disc: '10%' },
@@ -405,18 +664,19 @@ const LoyaltyDashboard = () => {
           </span>
         ))}
       </div>
+      </div>
 
       {/* ── Customer list ──────────────────────────────────────────────────── */}
       {loading ? (
         <div className="loy-empty">
-          <RefreshCw size={20} className="loy-spin" style={{ color: '#334155' }} />
+          <RefreshCw size={18} className="loy-spin" style={{ color: '#2d3f52' }} />
           <p className="text-sm" style={{ color: '#475569' }}>Loading customers…</p>
         </div>
       ) : filtered.length === 0 ? (
         <div className="loy-card">
           <div className="loy-empty">
-            <div className="loy-icon-wrap" style={{ background: 'rgba(255,255,255,0.04)', width: 44, height: 44 }}>
-              <User size={18} style={{ color: '#334155' }} />
+            <div className="loy-empty-icon">
+              <User size={20} style={{ color: '#2d3f52' }} />
             </div>
             <p className="text-sm font-medium" style={{ color: '#475569' }}>
               {search ? 'No customers match your search.' : 'No loyalty customers yet.'}
@@ -425,7 +685,7 @@ const LoyaltyDashboard = () => {
           </div>
         </div>
       ) : (
-        <div className="space-y-2">
+        <div className="space-y-2" style={{ gap: 0 }}>
           {filtered.map(customer => {
             const disc    = customer.currentDiscount || 10;
             const visits  = customer.visits || 0;
@@ -437,8 +697,9 @@ const LoyaltyDashboard = () => {
               <motion.div
                 key={customer.id}
                 layout
-                initial={{ opacity: 0, y: 8 }}
+                initial={{ opacity: 0, y: 6 }}
                 animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.22, ease: [0.4,0,0.2,1] }}
                 className="loy-card"
                 data-testid={`loyalty-customer-${customer.id}`}
               >
@@ -448,7 +709,7 @@ const LoyaltyDashboard = () => {
                 {/* Always-visible header */}
                 <button
                   onClick={() => toggleCard(customer.id)}
-                  className="w-full flex items-center gap-3 px-4 py-3 text-left"
+                  className="loy-row-btn"
                   aria-expanded={isOpen}
                   data-testid={`loyalty-toggle-${customer.id}`}
                 >
@@ -485,7 +746,7 @@ const LoyaltyDashboard = () => {
 
                   <ChevronDown
                     className="w-4 h-4 flex-shrink-0 transition-transform duration-300"
-                    style={{ color: '#606870', transform: isOpen ? 'rotate(180deg)' : 'rotate(0deg)' }}
+                    style={{ color: '#2d3f52', transform: isOpen ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform 200ms cubic-bezier(0.4,0,0.2,1)' }}
                   />
                 </button>
 
@@ -493,10 +754,10 @@ const LoyaltyDashboard = () => {
                 <motion.div
                   initial={false}
                   animate={{ height: isOpen ? 'auto' : 0, opacity: isOpen ? 1 : 0 }}
-                  transition={{ duration: 0.25, ease: 'easeInOut' }}
+                  transition={{ duration: 0.22, ease: [0.4,0,0.2,1] }}
                   style={{ overflow: 'hidden' }}
                 >
-                  <div className="px-4 pb-4 pt-2 space-y-3" style={{ borderTop: '1px solid rgba(255,255,255,0.06)' }}>
+                  <div className="px-4 pb-5 pt-3 space-y-3" style={{ borderTop: '1px solid rgba(255,255,255,0.05)' }}>
 
                     {/* Expiry date */}
                     {customer.expiryDate && (() => {
@@ -505,7 +766,7 @@ const LoyaltyDashboard = () => {
                         : new Date(customer.expiryDate);
                       const isExpired = exp < new Date();
                       return (
-                        <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl"
+                        <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg"
                           style={{
                             background: isExpired ? 'rgba(220,50,50,0.08)' : 'rgba(255,255,255,0.04)',
                             border: isExpired ? '1px solid rgba(220,50,50,0.25)' : '1px solid rgba(255,255,255,0.08)',
@@ -530,18 +791,18 @@ const LoyaltyDashboard = () => {
                       <button onClick={() => handleSendWA(customer)}
                         className="loy-btn loy-btn-green"
                         data-testid={`wa-loyalty-${customer.id}`}>
-                        <MessageSquare className="w-3.5 h-3.5" />WhatsApp
+                        <MessageSquare size={13} />WhatsApp
                       </button>
                       <button onClick={() => handleUndoVisit(customer)}
                         disabled={marking || (customer.visits || 1) <= 1}
                         className="loy-btn loy-btn-ghost disabled:opacity-30 disabled:cursor-not-allowed"
                         data-testid={`undo-visit-${customer.id}`} title="Undo last visit">
-                        <Undo2 className="w-3.5 h-3.5" />Undo
+                        <Undo2 size={13} />Undo
                       </button>
                       <button onClick={() => handleDeleteCustomer(customer)}
                         className="loy-btn loy-btn-red"
                         data-testid={`delete-loyalty-${customer.id}`}>
-                        <Trash2 className="w-3.5 h-3.5" />Delete
+                        <Trash2 size={13} />Delete
                       </button>
                       <button
                         onClick={() => {
@@ -555,14 +816,14 @@ const LoyaltyDashboard = () => {
                         }}
                         className={`loy-btn ${editingCustomerId === customer.id ? 'loy-btn-gold' : 'loy-btn-ghost'}`}
                         data-testid={`edit-loyalty-${customer.id}`}>
-                        <Pencil className="w-3.5 h-3.5" />
+                        <Pencil size={13} />
                         {editingCustomerId === customer.id ? 'Cancel' : 'Edit'}
                       </button>
                     </div>
 
                     {/* Inline edit panel */}
                     {editingCustomerId === customer.id && (
-                      <div className="mt-2 pt-3 space-y-3" style={{ borderTop: '1px solid rgba(255,255,255,0.07)' }}
+                      <div className="mt-2 pt-3 space-y-3" style={{ borderTop: '1px solid rgba(255,255,255,0.05)' }}
                         data-testid={`edit-panel-${customer.id}`}>
                         <p className="loy-section-title flex items-center gap-1.5">
                           <Pencil size={11} /> Edit Loyalty Card
@@ -589,12 +850,12 @@ const LoyaltyDashboard = () => {
                           <button onClick={() => handleSaveEdit(customer)}
                             className="loy-btn loy-btn-orange"
                             data-testid={`save-edit-${customer.id}`}>
-                            <Check className="w-3.5 h-3.5" />Save Changes
+                            <Check size={13} />Save Changes
                           </button>
                           <button onClick={() => handleSendWA(customer)}
                             className="loy-btn loy-btn-green"
                             data-testid={`resend-wa-${customer.id}`}>
-                            <MessageSquare className="w-3.5 h-3.5" />Resend WhatsApp
+                            <MessageSquare size={13} />Resend WhatsApp
                           </button>
                         </div>
                       </div>
@@ -608,12 +869,12 @@ const LoyaltyDashboard = () => {
       )}
 
       {/* Footer */}
-      <div className="flex items-center justify-center gap-2 py-3">
-        <Star size={12} style={{ color: '#C9A227' }} />
-        <p className="text-xs" style={{ color: '#475569' }}>
+      <div className="flex items-center justify-center gap-2 py-4" style={{ borderTop: '1px solid rgba(255,255,255,0.04)', marginTop: 8 }}>
+        <Star size={11} style={{ color: '#C9A227', opacity: 0.7 }} />
+        <p className="text-xs" style={{ color: '#334155', letterSpacing: '-0.01em' }}>
           {totalCustomers} member{totalCustomers !== 1 ? 's' : ''} · {totalVisits} total visits
         </p>
-        <span className="inline-block w-1.5 h-1.5 rounded-full animate-pulse" style={{ background: '#C9A227' }} />
+        <span className="inline-block w-1.5 h-1.5 rounded-full animate-pulse" style={{ background: '#C9A227', opacity: 0.6 }} />
       </div>
 
       {/* ── Google Review Link setting ──────────────────────────────────────── */}
