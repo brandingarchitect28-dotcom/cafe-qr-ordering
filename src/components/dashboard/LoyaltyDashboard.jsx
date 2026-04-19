@@ -32,137 +32,116 @@ import {
 } from 'lucide-react';
 import GoogleReviewSettings from './GoogleReviewSettings';
 
-// ── Premium Café OS CSS — Loyalty Dashboard ──────────────────────────────────
+// ── Premium SaaS CSS — Loyalty Dashboard ─────────────────────────────────────
 if (typeof document !== 'undefined' && !document.getElementById('loy-cafe-css')) {
   const el = document.createElement('style');
   el.id = 'loy-cafe-css';
   el.textContent = `
-    @import url('https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,300;14..32,400;14..32,500;14..32,600;14..32,700&display=swap');
+    @import url('https://fonts.googleapis.com/css2?family=Inter:ital,opsz,wght@0,14..32,300;0,14..32,400;0,14..32,500;0,14..32,600;0,14..32,700&display=swap');
 
-    /* ── COLOR TOKENS (matching QR Code screen)
-       bg:          #0d0d0b  (near-black, warm tint)
-       card:        #161610  (dark olive-black)
-       card-raised: #1c1c14  (warm dark, like the How-to card)
-       accent:      #C9A227  (amber gold — only for CTAs, highlights)
-       border:      rgba(201,162,39,0.12)  soft gold border on cards
-       text-primary:#e8e0cc  (warm off-white)
-       text-muted:  #6b6450  (warm muted brown-grey)
-       text-dim:    #3d3828  (very dim, placeholders)
-    ── */
-
+    /* ─── Reset & Base ─── */
     .loy *, .loy *::before, .loy *::after { box-sizing: border-box; }
-
     .loy {
       font-family: 'Inter', system-ui, -apple-system, sans-serif;
-      color: #e8e0cc;
+      color: #cbd5e1;
       letter-spacing: -0.012em;
-      line-height: 1.55;
-      animation: loyPageIn 0.32s cubic-bezier(0.4,0,0.2,1) both;
+      line-height: 1.5;
     }
+
+    /* ─── Page entry animation ─── */
+    .loy { animation: loyPageIn 0.35s cubic-bezier(0.4,0,0.2,1) forwards; }
     @keyframes loyPageIn {
-      from { opacity: 0; transform: translateY(8px); }
+      from { opacity: 0; transform: translateY(10px); }
       to   { opacity: 1; transform: translateY(0); }
     }
 
-    /* ── Typography ── */
+    /* ─── Typography ─── */
     .loy-title {
       font-family: 'Inter', system-ui, sans-serif !important;
       font-weight: 600;
-      letter-spacing: -0.024em;
-      color: #f0e8d5;
+      letter-spacing: -0.025em;
+      color: #f1f5f9;
     }
     .loy-label {
-      font-size: 10.5px;
+      font-size: 11px;
       font-weight: 500;
-      letter-spacing: 0.08em;
+      letter-spacing: 0.07em;
       text-transform: uppercase;
-      color: #6b6450;
+      color: #475569;
       display: block;
     }
     .loy-section-title {
-      font-size: 10.5px;
+      font-size: 11px;
       font-weight: 600;
       letter-spacing: 0.08em;
       text-transform: uppercase;
-      color: #6b6450;
+      color: #475569;
       display: flex;
       align-items: center;
       gap: 6px;
     }
 
-    /* ── Stat Cards — top-bordered like QR Code buttons ── */
-    .loy-stat-card {
-      background: #161610;
-      border: 1px solid rgba(201,162,39,0.1);
-      border-radius: 12px;
-      padding: 18px 16px;
-      transition:
-        border-color 200ms cubic-bezier(0.4,0,0.2,1),
-        box-shadow   200ms cubic-bezier(0.4,0,0.2,1),
-        transform    200ms cubic-bezier(0.4,0,0.2,1);
-      opacity: 0;
-      animation: loyFadeUp 0.35s cubic-bezier(0.4,0,0.2,1) forwards;
-    }
-    .loy-stat-card:nth-child(1) { animation-delay: 0.04s; }
-    .loy-stat-card:nth-child(2) { animation-delay: 0.09s; }
-    .loy-stat-card:nth-child(3) { animation-delay: 0.14s; }
-    .loy-stat-card:nth-child(4) { animation-delay: 0.19s; }
-    .loy-stat-card:hover {
-      border-color: rgba(201,162,39,0.28);
-      box-shadow: 0 6px 28px rgba(0,0,0,0.45), 0 0 0 0 rgba(201,162,39,0);
-      transform: translateY(-2px);
-    }
-
-    /* ── Main Cards — like the main card in QR screen ── */
+    /* ─── Cards ─── */
     .loy-card {
-      background: #161610;
-      border: 1px solid rgba(201,162,39,0.1);
-      border-radius: 12px;
+      background: #0f1623;
+      border: 1px solid rgba(255,255,255,0.06);
+      border-radius: 14px;
       overflow: hidden;
-      transition:
-        border-color 200ms cubic-bezier(0.4,0,0.2,1),
-        box-shadow   200ms cubic-bezier(0.4,0,0.2,1),
-        transform    200ms cubic-bezier(0.4,0,0.2,1);
+      transition: border-color 200ms cubic-bezier(0.4,0,0.2,1),
+                  box-shadow 200ms cubic-bezier(0.4,0,0.2,1),
+                  transform 200ms cubic-bezier(0.4,0,0.2,1);
     }
     .loy-card:hover {
-      border-color: rgba(201,162,39,0.22);
-      box-shadow: 0 6px 28px rgba(0,0,0,0.4);
+      border-color: rgba(201,162,39,0.18);
+      box-shadow: 0 8px 32px rgba(0,0,0,0.35), 0 0 0 0px rgba(201,162,39,0);
       transform: translateY(-1px);
     }
 
-    /* ── Form card — slightly raised, like How-to card ── */
-    .loy-form-card {
-      background: #1c1c14;
-      border: 1px solid rgba(201,162,39,0.14);
-      border-radius: 12px;
-      overflow: hidden;
+    /* ─── Stat Cards ─── */
+    .loy-stat-card {
+      background: #0f1623;
+      border: 1px solid rgba(255,255,255,0.06);
+      border-radius: 14px;
+      padding: 20px 18px;
+      transition: border-color 200ms cubic-bezier(0.4,0,0.2,1),
+                  box-shadow 200ms cubic-bezier(0.4,0,0.2,1),
+                  transform 200ms cubic-bezier(0.4,0,0.2,1);
+      animation: loyFadeIn 0.4s cubic-bezier(0.4,0,0.2,1) forwards;
+    }
+    .loy-stat-card:nth-child(1) { animation-delay: 0.05s; }
+    .loy-stat-card:nth-child(2) { animation-delay: 0.10s; }
+    .loy-stat-card:nth-child(3) { animation-delay: 0.15s; }
+    .loy-stat-card:nth-child(4) { animation-delay: 0.20s; }
+    .loy-stat-card:hover {
+      border-color: rgba(255,255,255,0.1);
+      box-shadow: 0 8px 24px rgba(0,0,0,0.3);
+      transform: translateY(-2px);
     }
 
-    /* ── Inputs ── */
+    /* ─── Inputs ─── */
     .loy-input {
       width: 100%;
-      background: #0d0d0b;
-      border: 1px solid rgba(201,162,39,0.12);
-      border-radius: 8px;
-      color: #e8e0cc;
+      background: #080d17;
+      border: 1px solid rgba(255,255,255,0.08);
+      border-radius: 9px;
+      color: #e2e8f0;
       padding: 10px 14px;
       font-size: 14px;
       font-weight: 400;
       font-family: 'Inter', system-ui, sans-serif;
-      letter-spacing: -0.01em;
+      letter-spacing: -0.012em;
       outline: none;
-      transition:
-        border-color 150ms cubic-bezier(0.4,0,0.2,1),
-        box-shadow   150ms cubic-bezier(0.4,0,0.2,1);
+      transition: border-color 150ms cubic-bezier(0.4,0,0.2,1),
+                  box-shadow 150ms cubic-bezier(0.4,0,0.2,1);
     }
     .loy-input:focus {
-      border-color: rgba(201,162,39,0.55);
-      box-shadow: 0 0 0 3px rgba(201,162,39,0.07);
+      border-color: rgba(201,162,39,0.5);
+      box-shadow: 0 0 0 3px rgba(201,162,39,0.08), 0 0 16px rgba(201,162,39,0.05);
     }
-    .loy-input::placeholder { color: #3d3828; }
-    .loy-input:disabled { opacity: 0.45; cursor: not-allowed; }
+    .loy-input::placeholder { color: #1e293b; }
+    .loy-input:disabled { opacity: 0.5; cursor: not-allowed; }
 
-    /* ── Buttons base ── */
+    /* ─── Buttons ─── */
     .loy-btn {
       display: inline-flex;
       align-items: center;
@@ -171,77 +150,84 @@ if (typeof document !== 'undefined' && !document.getElementById('loy-cafe-css'))
       font-family: 'Inter', system-ui, sans-serif;
       font-weight: 500;
       font-size: 13px;
-      letter-spacing: -0.008em;
+      letter-spacing: -0.01em;
       padding: 8px 15px;
-      border-radius: 8px;
+      border-radius: 9px;
       border: 1px solid transparent;
       cursor: pointer;
       transition: all 150ms cubic-bezier(0.4,0,0.2,1);
       white-space: nowrap;
+      position: relative;
+      overflow: hidden;
     }
+    .loy-btn::after {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: rgba(255,255,255,0);
+      transition: background 150ms ease;
+    }
+    .loy-btn:hover::after { background: rgba(255,255,255,0.05); }
     .loy-btn:hover { transform: translateY(-1px); }
     .loy-btn:active { transform: scale(0.97); }
-    .loy-btn:disabled { opacity: 0.4; cursor: not-allowed; transform: none !important; }
+    .loy-btn:disabled { opacity: 0.45; cursor: not-allowed; transform: none; }
 
-    /* Primary — solid gold, like Download QR button */
+    /* Primary CTA — amber gold with subtle glow */
     .loy-btn-orange {
       background: #C9A227;
-      color: #0d0d0b;
+      color: #08100e;
       font-weight: 600;
-      border-color: #C9A227;
+      border-color: rgba(201,162,39,0.3);
+      box-shadow: 0 1px 3px rgba(0,0,0,0.3);
     }
     .loy-btn-orange:hover {
-      background: #d9af2d;
-      box-shadow: 0 4px 18px rgba(201,162,39,0.3);
+      background: #d4ac2e;
+      box-shadow: 0 4px 16px rgba(201,162,39,0.25), 0 0 0 0px rgba(201,162,39,0);
     }
     .loy-btn-orange:active { box-shadow: none; }
 
-    /* Outlined gold — like Print QR button */
+    /* Ghost */
     .loy-btn-ghost {
       background: transparent;
-      color: #6b6450;
-      border-color: rgba(201,162,39,0.18);
+      color: #475569;
+      border-color: rgba(255,255,255,0.07);
     }
-    .loy-btn-ghost:hover {
-      background: rgba(201,162,39,0.06);
-      color: #C9A227;
-      border-color: rgba(201,162,39,0.3);
-    }
+    .loy-btn-ghost:hover { background: rgba(255,255,255,0.04); color: #94a3b8; border-color: rgba(255,255,255,0.12); }
 
     /* WhatsApp */
     .loy-btn-green {
-      background: rgba(34,197,94,0.07);
-      color: #4ade80;
-      border-color: rgba(34,197,94,0.18);
+      background: rgba(34,197,94,0.08);
+      color: #22c55e;
+      border-color: rgba(34,197,94,0.16);
     }
     .loy-btn-green:hover {
-      background: rgba(34,197,94,0.12);
-      box-shadow: 0 0 14px rgba(34,197,94,0.1);
+      background: rgba(34,197,94,0.13);
+      box-shadow: 0 0 12px rgba(34,197,94,0.1);
     }
 
     /* Danger */
     .loy-btn-red {
-      background: rgba(239,68,68,0.07);
+      background: rgba(239,68,68,0.08);
       color: #f87171;
-      border-color: rgba(239,68,68,0.18);
+      border-color: rgba(239,68,68,0.16);
     }
     .loy-btn-red:hover {
-      background: rgba(239,68,68,0.12);
-      box-shadow: 0 0 14px rgba(239,68,68,0.1);
+      background: rgba(239,68,68,0.13);
+      box-shadow: 0 0 12px rgba(239,68,68,0.1);
     }
 
-    /* Edit — gold outline */
+    /* Edit / gold outline */
     .loy-btn-gold {
       background: rgba(201,162,39,0.08);
       color: #C9A227;
-      border-color: rgba(201,162,39,0.25);
+      border-color: rgba(201,162,39,0.2);
     }
     .loy-btn-gold:hover {
       background: rgba(201,162,39,0.14);
-      box-shadow: 0 0 14px rgba(201,162,39,0.12);
+      box-shadow: 0 0 12px rgba(201,162,39,0.12);
     }
 
-    /* ── Customer row ── */
+    /* ─── Customer row button ─── */
     .loy-row-btn {
       width: 100%;
       display: flex;
@@ -254,84 +240,83 @@ if (typeof document !== 'undefined' && !document.getElementById('loy-cafe-css'))
       cursor: pointer;
       transition: background 150ms cubic-bezier(0.4,0,0.2,1);
     }
-    .loy-row-btn:hover { background: rgba(201,162,39,0.03); }
+    .loy-row-btn:hover { background: rgba(255,255,255,0.025); }
 
-    /* ── Pills ── */
+    /* ─── Pills ─── */
     .loy-pill {
       display: inline-flex;
       align-items: center;
       gap: 5px;
       padding: 4px 10px;
-      border-radius: 6px;
+      border-radius: 7px;
       font-size: 12px;
       font-weight: 500;
       letter-spacing: -0.01em;
     }
 
-    /* ── Reward tier pills — like "How to Use" items ── */
+    /* ─── Discount ladder pills ─── */
     .loy-ladder-pill {
       font-size: 12px;
       font-weight: 400;
       padding: 5px 12px;
-      border-radius: 6px;
-      background: rgba(201,162,39,0.05);
-      border: 1px solid rgba(201,162,39,0.1);
-      color: #6b6450;
+      border-radius: 7px;
+      background: rgba(255,255,255,0.03);
+      border: 1px solid rgba(255,255,255,0.06);
+      color: #475569;
       letter-spacing: -0.01em;
       transition: border-color 150ms ease, background 150ms ease;
     }
-    .loy-ladder-pill:hover {
-      background: rgba(201,162,39,0.09);
-      border-color: rgba(201,162,39,0.2);
-    }
-    .loy-ladder-pill strong { color: #C9A227; font-weight: 600; }
+    .loy-ladder-pill:hover { background: rgba(255,255,255,0.05); border-color: rgba(255,255,255,0.1); }
+    .loy-ladder-pill strong { color: #94a3b8; font-weight: 600; }
 
-    /* ── Avatar ── */
+    /* ─── Avatar ─── */
     .loy-avatar {
       width: 36px; height: 36px;
-      border-radius: 8px;
-      background: #1c1c14;
-      border: 1px solid rgba(201,162,39,0.12);
+      border-radius: 9px;
+      background: #141d2e;
+      border: 1px solid rgba(255,255,255,0.07);
       display: flex; align-items: center; justify-content: center;
       flex-shrink: 0;
     }
 
-    /* ── Icon wrapper ── */
+    /* ─── Icon wrapper ─── */
     .loy-icon-wrap {
       width: 36px; height: 36px;
-      border-radius: 8px;
+      border-radius: 9px;
       display: flex; align-items: center; justify-content: center;
       flex-shrink: 0;
     }
 
-    /* ── Empty / Loading ── */
+    /* ─── Empty / Loading state ─── */
     .loy-empty {
-      display: flex; flex-direction: column;
-      align-items: center; justify-content: center;
-      padding: 64px 24px; gap: 12px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 64px 24px;
+      gap: 12px;
     }
     .loy-empty-icon {
       width: 52px; height: 52px;
-      border-radius: 12px;
-      background: rgba(201,162,39,0.05);
-      border: 1px solid rgba(201,162,39,0.1);
+      border-radius: 14px;
+      background: rgba(255,255,255,0.03);
+      border: 1px solid rgba(255,255,255,0.06);
       display: flex; align-items: center; justify-content: center;
     }
 
-    /* ── Search ── */
-    .loy-search-wrap { position: relative; flex: 1; }
-    .loy-search-icon {
-      position: absolute; left: 13px; top: 50%;
-      transform: translateY(-50%); pointer-events: none;
+    /* ─── Divider ─── */
+    .loy-divider {
+      border: none;
+      border-top: 1px solid rgba(255,255,255,0.05);
+      margin: 0;
     }
-    .loy-search-wrap .loy-input { padding-left: 38px; }
 
-    /* ── Animations ── */
-    @keyframes loyFadeUp {
-      from { opacity: 0; transform: translateY(8px); }
+    /* ─── Animations ─── */
+    @keyframes loyFadeIn {
+      from { opacity: 0; transform: translateY(7px); }
       to   { opacity: 1; transform: translateY(0); }
     }
-    .loy-in { animation: loyFadeUp 0.26s cubic-bezier(0.4,0,0.2,1) forwards; }
+    .loy-in { animation: loyFadeIn 0.28s cubic-bezier(0.4,0,0.2,1) forwards; }
 
     @keyframes loySpinSlow {
       from { transform: rotate(0deg); }
@@ -339,11 +324,33 @@ if (typeof document !== 'undefined' && !document.getElementById('loy-cafe-css'))
     }
     .loy-spin { animation: loySpinSlow 1.1s linear infinite; }
 
-    /* ── Scrollbar ── */
-    .loy ::-webkit-scrollbar { width: 3px; }
+    /* ─── Search bar ─── */
+    .loy-search-wrap {
+      position: relative;
+      flex: 1;
+    }
+    .loy-search-icon {
+      position: absolute;
+      left: 13px;
+      top: 50%;
+      transform: translateY(-50%);
+      pointer-events: none;
+    }
+    .loy-search-wrap .loy-input { padding-left: 38px; }
+
+    /* ─── Form card ─── */
+    .loy-form-card {
+      background: #0f1623;
+      border: 1px solid rgba(255,255,255,0.09);
+      border-radius: 14px;
+      overflow: hidden;
+    }
+
+    /* ─── Scrollbar ─── */
+    .loy ::-webkit-scrollbar { width: 4px; }
     .loy ::-webkit-scrollbar-track { background: transparent; }
-    .loy ::-webkit-scrollbar-thumb { background: rgba(201,162,39,0.15); border-radius: 2px; }
-  \`;
+    .loy ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.08); border-radius: 2px; }
+  `;
   document.head.appendChild(el);
 }
 
@@ -547,9 +554,9 @@ const LoyaltyDashboard = () => {
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         {[
           { label: 'Members',       value: totalCustomers, Icon: User,       color: '#C9A227' },
-          { label: 'Total Visits',  value: totalVisits,    Icon: TrendingUp, color: '#C9A227' },
-          { label: 'Loyal (3+)',    value: loyalCustomers, Icon: Award,      color: '#b5893a' },
-          { label: 'Repeat Visits', value: repeatedVisits, Icon: Repeat,     color: '#8a7040' },
+          { label: 'Total Visits',  value: totalVisits,    Icon: TrendingUp, color: '#60a5fa' },
+          { label: 'Loyal (3+)',    value: loyalCustomers, Icon: Award,      color: '#34d399' },
+          { label: 'Repeat Visits', value: repeatedVisits, Icon: Repeat,     color: '#a78bfa' },
         ].map(({ label, value, Icon, color }) => (
           <div key={label} className="loy-stat-card"
             style={{ borderTop: `2px solid ${color}`, paddingTop: 18 }}>
@@ -559,7 +566,7 @@ const LoyaltyDashboard = () => {
               </div>
               <span className="loy-label" style={{ letterSpacing: '0.05em', fontSize: 10 }}>{label}</span>
             </div>
-            <p style={{ fontSize: 28, fontWeight: 600, color: '#f0e8d5', letterSpacing: '-0.04em', lineHeight: 1 }}>{value}</p>
+            <p style={{ fontSize: 28, fontWeight: 600, color: '#f1f5f9', letterSpacing: '-0.04em', lineHeight: 1 }}>{value}</p>
           </div>
         ))}
       </div>
@@ -567,7 +574,7 @@ const LoyaltyDashboard = () => {
       {/* ── Search + Add ───────────────────────────────────────────────────── */}
       <div className="flex flex-col sm:flex-row gap-3">
         <div className="loy-search-wrap">
-          <Search size={14} className="loy-search-icon" style={{ color: '#4a4230' }} />
+          <Search size={14} className="loy-search-icon" style={{ color: '#2d3f52' }} />
           <input type="text" value={search} onChange={e => setSearch(e.target.value)}
             placeholder="Search by name or phone…"
             className="loy-input" />
@@ -592,12 +599,12 @@ const LoyaltyDashboard = () => {
             className="loy-form-card p-6"
           >
             <div className="flex items-center gap-2 mb-5">
-              <div className="loy-icon-wrap" style={{ background: 'rgba(201,162,39,0.09)', border: '1px solid rgba(201,162,39,0.15)' }}>
+              <div className="loy-icon-wrap" style={{ background: 'rgba(201,162,39,0.1)' }}>
                 <UserPlus size={15} style={{ color: '#C9A227' }} />
               </div>
               <div>
-                <h3 className="loy-title text-base">New Loyalty Customer</h3>
-                <p className="text-xs mt-0.5" style={{ color: '#6b6450' }}>Fill in the details below to enrol a customer</p>
+                <h3 className="text-white loy-title text-base">New Loyalty Customer</h3>
+                <p className="text-xs mt-0.5" style={{ color: '#475569' }}>Fill in the details below to enrol a customer</p>
               </div>
             </div>
             <form onSubmit={handleAddCustomer} className="space-y-4">
@@ -615,20 +622,20 @@ const LoyaltyDashboard = () => {
               </div>
               <div>
                 <label className="loy-label block mb-1.5">
-                  Validity (days) <span style={{ color: '#4a4230', textTransform: 'none', letterSpacing: 'normal', fontWeight: 400 }}>(optional)</span>
+                  Validity (days) <span style={{ color: '#374151', textTransform: 'none', letterSpacing: 'normal', fontWeight: 400 }}>(optional)</span>
                 </label>
                 <input type="number" min="0" value={validityDays} onChange={e => setValidityDays(e.target.value)}
                   placeholder="e.g. 30" className="loy-input" disabled={saving} data-testid="loyalty-validity-input" />
               </div>
               <div>
                 <label className="loy-label block mb-1.5">
-                  Custom Discount (%) <span style={{ color: '#4a4230', textTransform: 'none', letterSpacing: 'normal', fontWeight: 400 }}>(optional — overrides default 10%)</span>
+                  Custom Discount (%) <span style={{ color: '#374151', textTransform: 'none', letterSpacing: 'normal', fontWeight: 400 }}>(optional — overrides default 10%)</span>
                 </label>
                 <input type="number" min="0" max="100" value={customDiscount} onChange={e => setCustomDiscount(e.target.value)}
                   placeholder="e.g. 20" className="loy-input" disabled={saving} data-testid="loyalty-discount-input" />
               </div>
-              <p className="text-xs" style={{ color: '#6b6450' }}>
-                First visit is recorded automatically. Customer starts at <span style={{ color: '#C9A227' }}>10% off</span>.
+              <p className="text-xs" style={{ color: '#475569' }}>
+                First visit is recorded automatically. Customer starts at <span style={{ color: '#94a3b8' }}>10% off</span>.
               </p>
               <div className="flex gap-3">
                 <button type="submit" disabled={saving} className="loy-btn loy-btn-orange disabled:opacity-50" data-testid="loyalty-submit-btn">
@@ -653,7 +660,7 @@ const LoyaltyDashboard = () => {
           { label: '5+ visits', disc: '30% / Free Item' },
         ].map(({ label, disc }) => (
           <span key={label} className="loy-ladder-pill">
-            {label} <span style={{ color: '#4a4230' }}>→</span> <strong>{disc}</strong>
+            {label} <span style={{ color: '#475569' }}>→</span> <strong>{disc}</strong>
           </span>
         ))}
       </div>
@@ -662,19 +669,19 @@ const LoyaltyDashboard = () => {
       {/* ── Customer list ──────────────────────────────────────────────────── */}
       {loading ? (
         <div className="loy-empty">
-          <RefreshCw size={18} className="loy-spin" style={{ color: '#4a4230' }} />
-          <p className="text-sm" style={{ color: '#6b6450' }}>Loading customers…</p>
+          <RefreshCw size={18} className="loy-spin" style={{ color: '#2d3f52' }} />
+          <p className="text-sm" style={{ color: '#475569' }}>Loading customers…</p>
         </div>
       ) : filtered.length === 0 ? (
         <div className="loy-card">
           <div className="loy-empty">
             <div className="loy-empty-icon">
-              <User size={20} style={{ color: '#4a4230' }} />
+              <User size={20} style={{ color: '#2d3f52' }} />
             </div>
-            <p className="text-sm font-medium" style={{ color: '#a09070' }}>
+            <p className="text-sm font-medium" style={{ color: '#475569' }}>
               {search ? 'No customers match your search.' : 'No loyalty customers yet.'}
             </p>
-            {!search && <p className="text-xs" style={{ color: '#6b6450' }}>Add your first customer to get started.</p>}
+            {!search && <p className="text-xs" style={{ color: '#334155' }}>Add your first customer to get started.</p>}
           </div>
         </div>
       ) : (
@@ -697,7 +704,7 @@ const LoyaltyDashboard = () => {
                 data-testid={`loyalty-customer-${customer.id}`}
               >
                 {/* Top accent bar */}
-                <div style={{ height: 2, background: 'linear-gradient(90deg,#C9A227,transparent)' }} />
+                <div style={{ height: 2, background: isFree ? 'linear-gradient(90deg,#34d399,transparent)' : 'linear-gradient(90deg,#C9A227,transparent)' }} />
 
                 {/* Always-visible header */}
                 <button
@@ -707,39 +714,39 @@ const LoyaltyDashboard = () => {
                   data-testid={`loyalty-toggle-${customer.id}`}
                 >
                   <div className="loy-avatar">
-                    <User size={15} style={{ color: '#6b6450' }} />
+                    <User size={15} style={{ color: '#475569' }} />
                   </div>
                   <div className="min-w-0 flex-1">
-                    <p className="font-semibold text-sm truncate" style={{ letterSpacing: "-0.01em", color: "#f0e8d5" }}>{customer.name}</p>
+                    <p className="text-white font-semibold text-sm truncate" style={{ letterSpacing: "-0.01em" }}>{customer.name}</p>
                     <div className="flex items-center gap-1.5 mt-0.5">
-                      <Phone size={11} style={{ color: '#4a4230' }} />
-                      <p className="text-xs truncate" style={{ color: '#6b6450' }}>{customer.phone}</p>
+                      <Phone size={11} style={{ color: '#374151' }} />
+                      <p className="text-xs truncate" style={{ color: '#475569' }}>{customer.phone}</p>
                     </div>
                   </div>
 
                   {/* Visit count */}
                   <div className="loy-pill flex-shrink-0"
-                    style={{ background: 'rgba(201,162,39,0.05)', border: '1px solid rgba(201,162,39,0.12)' }}>
-                    <TrendingUp size={11} style={{ color: '#6b6450' }} />
-                    <span className="text-xs font-semibold" style={{ color: "#e8e0cc" }}>{visits}</span>
-                    <span className="text-xs hidden sm:inline" style={{ color: '#6b6450' }}>visit{visits !== 1 ? 's' : ''}</span>
+                    style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.07)' }}>
+                    <TrendingUp size={11} style={{ color: '#475569' }} />
+                    <span className="text-white text-xs font-semibold">{visits}</span>
+                    <span className="text-xs hidden sm:inline" style={{ color: '#475569' }}>visit{visits !== 1 ? 's' : ''}</span>
                   </div>
 
                   {/* Discount badge */}
                   <div className="loy-pill flex-shrink-0"
                     style={{
-                      background: isFree ? 'rgba(201,162,39,0.12)' : 'rgba(201,162,39,0.08)',
-                      border: isFree ? '1px solid rgba(201,162,39,0.3)' : '1px solid rgba(201,162,39,0.18)',
+                      background: isFree ? 'rgba(16,185,129,0.1)' : 'rgba(201,162,39,0.1)',
+                      border: isFree ? '1px solid rgba(16,185,129,0.22)' : '1px solid rgba(201,162,39,0.22)',
                     }}>
-                    {isFree ? <Gift size={11} style={{ color: '#C9A227' }} /> : <Star size={11} style={{ color: '#C9A227' }} />}
-                    <span className="text-xs font-semibold" style={{ color: '#C9A227' }}>
+                    {isFree ? <Gift size={11} style={{ color: '#34d399' }} /> : <Star size={11} style={{ color: '#C9A227' }} />}
+                    <span className="text-xs font-semibold" style={{ color: isFree ? '#34d399' : '#C9A227' }}>
                       {isFree ? 'Free' : `${disc}%`}
                     </span>
                   </div>
 
                   <ChevronDown
                     className="w-4 h-4 flex-shrink-0 transition-transform duration-300"
-                    style={{ color: '#4a4230', transform: isOpen ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform 200ms cubic-bezier(0.4,0,0.2,1)' }}
+                    style={{ color: '#2d3f52', transform: isOpen ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform 200ms cubic-bezier(0.4,0,0.2,1)' }}
                   />
                 </button>
 
@@ -750,7 +757,7 @@ const LoyaltyDashboard = () => {
                   transition={{ duration: 0.22, ease: [0.4,0,0.2,1] }}
                   style={{ overflow: 'hidden' }}
                 >
-                  <div className="px-4 pb-5 pt-3 space-y-3" style={{ borderTop: '1px solid rgba(201,162,39,0.08)' }}>
+                  <div className="px-4 pb-5 pt-3 space-y-3" style={{ borderTop: '1px solid rgba(255,255,255,0.05)' }}>
 
                     {/* Expiry date */}
                     {customer.expiryDate && (() => {
@@ -761,11 +768,11 @@ const LoyaltyDashboard = () => {
                       return (
                         <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg"
                           style={{
-                            background: isExpired ? 'rgba(220,50,50,0.08)' : 'rgba(201,162,39,0.05)',
-                            border: isExpired ? '1px solid rgba(220,50,50,0.22)' : '1px solid rgba(201,162,39,0.14)',
+                            background: isExpired ? 'rgba(220,50,50,0.08)' : 'rgba(255,255,255,0.04)',
+                            border: isExpired ? '1px solid rgba(220,50,50,0.25)' : '1px solid rgba(255,255,255,0.08)',
                           }}>
-                          <Calendar size={11} style={{ color: isExpired ? '#f87171' : '#6b6450' }} />
-                          <span className="text-xs" style={{ color: isExpired ? '#f87171' : '#6b6450' }}>
+                          <Calendar size={11} style={{ color: isExpired ? '#f87171' : '#374151' }} />
+                          <span className="text-xs" style={{ color: isExpired ? '#f87171' : '#475569' }}>
                             {isExpired ? 'Expired ' : 'Valid till '}
                             {exp.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}
                           </span>
@@ -816,9 +823,9 @@ const LoyaltyDashboard = () => {
 
                     {/* Inline edit panel */}
                     {editingCustomerId === customer.id && (
-                      <div className="mt-2 pt-3 space-y-3" style={{ borderTop: '1px solid rgba(201,162,39,0.08)' }}
+                      <div className="mt-2 pt-3 space-y-3" style={{ borderTop: '1px solid rgba(255,255,255,0.05)' }}
                         data-testid={`edit-panel-${customer.id}`}>
-                        <p className="loy-section-title">
+                        <p className="loy-section-title flex items-center gap-1.5">
                           <Pencil size={11} /> Edit Loyalty Card
                         </p>
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -862,9 +869,9 @@ const LoyaltyDashboard = () => {
       )}
 
       {/* Footer */}
-      <div className="flex items-center justify-center gap-2 py-4" style={{ borderTop: '1px solid rgba(201,162,39,0.08)', marginTop: 8 }}>
-        <Star size={11} style={{ color: '#C9A227', opacity: 0.8 }} />
-        <p className="text-xs" style={{ color: '#6b6450', letterSpacing: '-0.01em' }}>
+      <div className="flex items-center justify-center gap-2 py-4" style={{ borderTop: '1px solid rgba(255,255,255,0.04)', marginTop: 8 }}>
+        <Star size={11} style={{ color: '#C9A227', opacity: 0.7 }} />
+        <p className="text-xs" style={{ color: '#334155', letterSpacing: '-0.01em' }}>
           {totalCustomers} member{totalCustomers !== 1 ? 's' : ''} · {totalVisits} total visits
         </p>
         <span className="inline-block w-1.5 h-1.5 rounded-full animate-pulse" style={{ background: '#C9A227', opacity: 0.6 }} />
