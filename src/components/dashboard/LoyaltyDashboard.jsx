@@ -234,6 +234,8 @@ const LoyaltyDashboard = () => {
   const [showNameDropdown,    setShowNameDropdown   ] = useState(false);
   const [showPhoneDropdown,   setShowPhoneDropdown  ] = useState(false);
   const [showAllTopCustomers, setShowAllTopCustomers] = useState(false);
+  // Top Customers search (TASK 1)
+  const [topSearch,           setTopSearch          ] = useState('');
   // Visual limit for loyalty card list: show 5 by default, expand on demand
   const [showAllCustomers,    setShowAllCustomers   ] = useState(false);
 
@@ -260,23 +262,24 @@ const LoyaltyDashboard = () => {
 
   // ── NEW memos ─────────────────────────────────────────────────────────────
 
-  // Unique sorted names for name dropdown
+  // TASK 4: Name dropdown — unique names from ORDERS data only (read-only, no API)
   const uniqueNames = useMemo(() => {
-    if (!customers || customers.length === 0) return [];
-    const names = customers
-      .map(c => c.name?.trim())
+    if (!orders || orders.length === 0) return [];
+    const names = orders
+      .filter(o => !o.isDeleted)
+      .map(o => o.customerName?.trim())
       .filter(Boolean);
     return [...new Set(names)].sort((a, b) => a.localeCompare(b));
-  }, [customers]);
+  }, [orders]);
 
-  // Phone dropdown: filtered by selected name, or all
+  // TASK 4: Phone dropdown — from orders; filtered by selected name if set, else all
   const filteredPhones = useMemo(() => {
-    if (!customers || customers.length === 0) return [];
+    if (!orders || orders.length === 0) return [];
     const pool = newName.trim()
-      ? customers.filter(c => c.name?.trim().toLowerCase() === newName.trim().toLowerCase())
-      : customers;
+      ? orders.filter(o => !o.isDeleted && o.customerName?.trim().toLowerCase() === newName.trim().toLowerCase())
+      : orders.filter(o => !o.isDeleted);
     const phones = pool
-      .map(c => ({ name: c.name?.trim(), phone: c.phone?.trim() }))
+      .map(o => ({ name: o.customerName?.trim(), phone: o.customerPhone?.trim() }))
       .filter(x => x.phone);
     // Deduplicate by phone
     const seen = new Set();
@@ -285,7 +288,7 @@ const LoyaltyDashboard = () => {
       seen.add(x.phone);
       return true;
     });
-  }, [customers, newName]);
+  }, [orders, newName]);
 
   // ── CORRECTED: Top Customers derived from ORDERS data ────────────────────
   //
@@ -335,7 +338,18 @@ const LoyaltyDashboard = () => {
   }, [orders]);
 
   const topCustomers = sortedByFrequency.slice(0, 3);
-  const displayedTopCustomers = showAllTopCustomers ? sortedByFrequency : topCustomers;
+  // TASK 1: filter by search before slicing — fast, no API, pure memo
+  const searchFilteredTop = useMemo(() => {
+    const q = topSearch.trim().toLowerCase();
+    if (!q) return sortedByFrequency;
+    return sortedByFrequency.filter(c =>
+      c.name?.toLowerCase().includes(q) || c.phone?.toLowerCase().includes(q)
+    );
+  }, [sortedByFrequency, topSearch]);
+  // TASK 2: toggle from header; apply search on both views
+  const displayedTopCustomers = showAllTopCustomers
+    ? searchFilteredTop
+    : searchFilteredTop.slice(0, 3);
 
   // ── Copy handler ──────────────────────────────────────────────────────────
   const handleCopy = useCallback((customer) => {
@@ -709,8 +723,9 @@ const LoyaltyDashboard = () => {
       {/* ── FEATURE 3: Top Customers Insight Panel ─────────────────────── */}
       {/* ═══════════════════════════════════════════════════════════════════ */}
       {!loading && sortedByFrequency.length > 0 && (
-        <div className="loy-insight-card">
-          {/* Panel header */}
+        // TASK 3: subtle gold glow border to visually distinguish from loyalty list below
+        <div className="loy-insight-card" style={{ boxShadow: '0 0 0 1px rgba(201,162,39,0.18), 0 4px 24px rgba(201,162,39,0.07)' }}>
+          {/* Panel header — TASK 2: View All toggle moved here */}
           <div className="flex items-center justify-between px-5 py-4"
             style={{ borderBottom: '1px solid rgba(201,162,39,0.12)' }}>
             <div className="flex items-center gap-2.5">
@@ -723,12 +738,46 @@ const LoyaltyDashboard = () => {
                 <p className="text-xs font-bold" style={{ color: '#5a4a35' }}>Based on order history</p>
               </div>
             </div>
-            <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-xl"
-              style={{ background: 'rgba(201,162,39,0.07)', border: '1px solid rgba(201,162,39,0.12)' }}>
-              <Users className="w-3 h-3" style={{ color: '#C9A227' }} />
-              <span className="text-xs font-black" style={{ color: '#C9A227' }}>
-                {sortedByFrequency.length}
-              </span>
+            <div className="flex items-center gap-2">
+              {/* Count pill */}
+              <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-xl"
+                style={{ background: 'rgba(201,162,39,0.07)', border: '1px solid rgba(201,162,39,0.12)' }}>
+                <Users className="w-3 h-3" style={{ color: '#C9A227' }} />
+                <span className="text-xs font-black" style={{ color: '#C9A227' }}>
+                  {sortedByFrequency.length}
+                </span>
+              </div>
+              {/* TASK 2: View All / Show Less toggle in header */}
+              {sortedByFrequency.length > 3 && (
+                <button
+                  type="button"
+                  onClick={() => setShowAllTopCustomers(v => !v)}
+                  className="loy-btn loy-btn-ghost"
+                  style={{ fontSize: 11, padding: '5px 10px' }}
+                  data-testid="top-customers-view-more"
+                >
+                  {showAllTopCustomers
+                    ? <><ChevronUp className="w-3 h-3" />Show Less</>
+                    : <><ChevronDown className="w-3 h-3" />View All</>
+                  }
+                </button>
+              )}
+            </div>
+          </div>
+
+          {/* TASK 1: Search bar inside Top Customers section */}
+          <div className="px-5 pt-3 pb-2">
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5" style={{ color: '#5a4a35' }} />
+              <input
+                type="text"
+                value={topSearch}
+                onChange={e => setTopSearch(e.target.value)}
+                placeholder="Search by name or phone…"
+                className="loy-input"
+                style={{ paddingLeft: '2rem', padding: '7px 12px 7px 2rem', fontSize: 13 }}
+                data-testid="top-customers-search"
+              />
             </div>
           </div>
 
@@ -821,30 +870,7 @@ const LoyaltyDashboard = () => {
             </AnimatePresence>
           </div>
 
-          {/* View More / See Less footer */}
-          {sortedByFrequency.length > 3 && (
-            <button
-              type="button"
-              onClick={() => setShowAllTopCustomers(v => !v)}
-              className="w-full flex items-center justify-center gap-2 py-3 text-xs font-black transition-colors"
-              style={{
-                borderTop: '1px solid rgba(255,255,255,0.04)',
-                color: '#7a6a55',
-                background: 'transparent',
-                border: 'none',
-                borderTop: '1px solid rgba(255,255,255,0.04)',
-                cursor: 'pointer',
-              }}
-              onMouseEnter={e => { e.currentTarget.style.color = '#C9A227'; e.currentTarget.style.background = 'rgba(201,162,39,0.04)'; }}
-              onMouseLeave={e => { e.currentTarget.style.color = '#7a6a55'; e.currentTarget.style.background = 'transparent'; }}
-              data-testid="top-customers-view-more"
-            >
-              {showAllTopCustomers
-                ? <><ChevronUp className="w-3.5 h-3.5" /> See Less</>
-                : <><ChevronDown className="w-3.5 h-3.5" /> View All {sortedByFrequency.length} Customers</>
-              }
-            </button>
-          )}
+          {/* No bottom toggle — moved to header (TASK 2) */}
         </div>
       )}
 
