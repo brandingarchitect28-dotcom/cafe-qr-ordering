@@ -39,6 +39,8 @@ import { motion, AnimatePresence } from 'framer-motion';
 import {
   FileText, Search, MessageSquare, Eye, Download,
   IndianRupee, CheckCircle, Clock,
+  Receipt, DollarSign, BarChart2, ClipboardList, User, Phone, Calendar,
+  Truck, Utensils, Coffee, Wallet,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import InvoiceModal from './InvoiceModal';
@@ -145,7 +147,8 @@ const StatusBadge = ({ status }) => {
         border:     `1.5px solid ${isPaid ? 'rgba(16,185,129,0.22)' : 'rgba(245,158,11,0.22)'}`,
       }}
     >
-      {isPaid ? '💰 Paid' : '⏳ Pending'}
+      {/* 💰 → Wallet, ⏳ → Clock */}
+      {isPaid ? <><Wallet className="w-3 h-3" /> Paid</> : <><Clock className="w-3 h-3" /> Pending</>}
     </span>
   );
 };
@@ -352,9 +355,10 @@ const InvoicesTab = () => {
       {/* Header — UNCHANGED */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div className="flex items-center gap-3">
-          <div className="w-11 h-11 rounded-2xl flex items-center justify-center text-xl flex-shrink-0"
+          {/* 🧾 → Receipt */}
+          <div className="w-11 h-11 rounded-2xl flex items-center justify-center flex-shrink-0"
             style={{ background: 'rgba(201,162,39,0.1)', border: '1.5px solid rgba(201,162,39,0.2)' }}>
-            🧾
+            <Receipt className="w-5 h-5" style={{ color: '#C9A227' }} />
           </div>
           <div>
             <h2 className="text-white font-black text-2xl inv-title">Invoices</h2>
@@ -370,7 +374,8 @@ const InvoicesTab = () => {
       <div className="flex flex-col sm:flex-row gap-3 min-w-0">
         <div className="flex items-end gap-2 flex-wrap min-w-0">
           <div className="min-w-0">
-            <label className="inv-date-label">📅 From</label>
+            {/* 📅 → Calendar inline in label */}
+            <label className="inv-date-label"><Calendar className="inline w-3 h-3 mr-1" />From</label>
             <input
               type="date"
               value={dateFrom}
@@ -381,7 +386,7 @@ const InvoicesTab = () => {
             />
           </div>
           <div className="min-w-0">
-            <label className="inv-date-label">📅 To</label>
+            <label className="inv-date-label"><Calendar className="inline w-3 h-3 mr-1" />To</label>
             <input
               type="date"
               value={dateTo}
@@ -414,7 +419,8 @@ const InvoicesTab = () => {
       {/* Filters + CSV — UNCHANGED structure, TASK 4: font sizes slightly tighter */}
       <div className="flex flex-col sm:flex-row gap-3">
         <div className="relative flex-1">
-          <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm">🔍</span>
+          {/* 🔍 → Search */}
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4" style={{ color: '#7a6a55' }} />
           <input
             type="text"
             value={search}
@@ -427,7 +433,7 @@ const InvoicesTab = () => {
         <div className="flex gap-2 flex-wrap">
           {['all', 'paid', 'pending'].map(s => (
             <button key={s} onClick={() => setStatusFilter(s)}
-              className="px-3 h-10 rounded-xl font-black capitalize transition-all"
+              className="px-3 h-10 rounded-xl font-black capitalize transition-all flex items-center gap-1.5"
               style={{
                 fontSize: '12px',
                 ...(statusFilter === s
@@ -435,7 +441,12 @@ const InvoicesTab = () => {
                   : { background: 'rgba(255,255,255,0.04)', color: '#7a6a55', border: '1.5px solid rgba(255,255,255,0.07)' }
                 )
               }}>
-              {s === 'all' ? '📋 All' : s === 'paid' ? '💰 Paid' : '⏳ Pending'}
+              {/* 📋 → ClipboardList, 💰 → Wallet, ⏳ → Clock */}
+              {s === 'all'
+                ? <><ClipboardList className="w-3.5 h-3.5" /> All</>
+                : s === 'paid'
+                  ? <><Wallet className="w-3.5 h-3.5" /> Paid</>
+                  : <><Clock className="w-3.5 h-3.5" /> Pending</>}
             </button>
           ))}
           <button
@@ -443,8 +454,9 @@ const InvoicesTab = () => {
             className="flex items-center gap-1.5 px-3 h-10 rounded-xl font-black transition-all"
             style={{ fontSize: '12px', background: 'rgba(255,255,255,0.04)', color: '#7a6a55', border: '1.5px solid rgba(255,255,255,0.07)' }}
           >
+            {/* 📥 → Download (already imported) */}
             <Download className="w-3.5 h-3.5" />
-            <span className="hidden sm:inline">📥 Export CSV</span>
+            <span className="hidden sm:inline"><Download className="inline w-3 h-3 mr-1" /> Export CSV</span>
             <span className="sm:hidden">CSV</span>
           </button>
         </div>
@@ -453,15 +465,16 @@ const InvoicesTab = () => {
       {/* Stats row — UNCHANGED */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         {[
-          { label: 'Total Invoices', val: invoices.length,              color: '#C9A227', emoji: '🧾' },
-          { label: 'Paid',           val: paidInvoices.length,          color: '#34d399', emoji: '💰' },
-          { label: 'Pending',        val: pendingOrders,                 color: '#fbbf24', emoji: '⏳' },
-          { label: 'Total Revenue',  val: `${CUR}${fmt(totalRevenue)}`, color: '#60a5fa', emoji: '📊' },
+          { label: 'Total Invoices', val: invoices.length,              color: '#C9A227', icon: Receipt      },
+          { label: 'Paid',           val: paidInvoices.length,          color: '#34d399', icon: Wallet       },
+          { label: 'Pending',        val: pendingOrders,                 color: '#fbbf24', icon: Clock        },
+          { label: 'Total Revenue',  val: `${CUR}${fmt(totalRevenue)}`, color: '#60a5fa', icon: BarChart2    },
         ].map(s => (
           <motion.div key={s.label} whileHover={{ y: -2 }}
             className="inv-card p-4"
             style={{ borderLeft: `3px solid ${s.color}` }}>
-            <p className="text-2xl mb-0.5">{s.emoji}</p>
+            {/* 🧾 → Receipt, 💰 → Wallet, ⏳ → Clock, 📊 → BarChart2 */}
+            <s.icon className="w-6 h-6 mb-0.5" style={{ color: s.color }} />
             <p className="font-black text-xl" style={{ color: s.color }}>{s.val}</p>
             {/* TASK 4: label slightly smaller */}
             <p className="font-bold mt-0.5" style={{ color: '#7a6a55', fontSize: '11px' }}>{s.label}</p>
@@ -479,7 +492,8 @@ const InvoicesTab = () => {
         </div>
       ) : filtered.length === 0 ? (
         <div className="inv-card p-12 text-center">
-          <div className="text-5xl mb-3">🧾</div>
+          {/* 🧾 → Receipt */}
+          <Receipt className="w-12 h-12 mb-3 mx-auto" style={{ color: '#3a2e1a' }} />
           {/* TASK 4: slightly smaller secondary text */}
           <p className="font-bold" style={{ color: '#7a6a55', fontSize: '13px' }}>
             {invoices.length === 0
@@ -516,17 +530,19 @@ const InvoicesTab = () => {
                       <StatusBadge status={inv.paymentStatus} />
                     </div>
                     <div className="flex items-center gap-2 mt-1 flex-wrap">
+                      {/* 👤 → User, 📞 → Phone, 📅 → Calendar */}
                       {inv.customerName && (
-                        <span className="font-semibold" style={{ color: '#fff8ee', fontSize: '12px' }}>👤 {inv.customerName}</span>
+                        <span className="font-semibold flex items-center gap-1" style={{ color: '#fff8ee', fontSize: '12px' }}><User className="w-3 h-3" /> {inv.customerName}</span>
                       )}
                       {inv.customerPhone && (
-                        <span className="font-bold" style={{ color: '#4a3f35', fontSize: '11px' }}>📞 {inv.customerPhone}</span>
+                        <span className="font-bold flex items-center gap-1" style={{ color: '#4a3f35', fontSize: '11px' }}><Phone className="w-3 h-3" /> {inv.customerPhone}</span>
                       )}
-                      <span className="font-bold" style={{ color: '#4a3f35', fontSize: '11px' }}>📅 {formatDate(inv.createdAt)}</span>
+                      <span className="font-bold flex items-center gap-1" style={{ color: '#4a3f35', fontSize: '11px' }}><Calendar className="w-3 h-3" /> {formatDate(inv.createdAt)}</span>
                     </div>
                     {inv?.orderType === 'delivery' && (
-                      <div className="mt-1 font-semibold" style={{ color: '#7a6a55', fontSize: '11px' }}>
-                        🛵 {inv?.deliveryAddress || 'N/A'}
+                      <div className="mt-1 font-semibold flex items-center gap-1" style={{ color: '#7a6a55', fontSize: '11px' }}>
+                        {/* 🛵 → Truck */}
+                        <Truck className="w-3 h-3" /> {inv?.deliveryAddress || 'N/A'}
                       </div>
                     )}
                   </div>
@@ -540,8 +556,8 @@ const InvoicesTab = () => {
                       {inv.serviceChargeAmount > 0 && (
                         <p className="font-bold" style={{ color: '#4a3f35', fontSize: '11px' }}>SC: {CUR}{fmt(inv.serviceChargeAmount)}</p>
                       )}
-                      {/* TASK 4: total amount kept prominent, just slightly tightened */}
-                      <p className="font-black" style={{ color: '#C9A227', fontSize: '14px' }}>💵 {CUR}{fmt(inv.totalAmount)}</p>
+                      {/* 💵 → Wallet inline */}
+                      <p className="font-black flex items-center justify-end gap-1" style={{ color: '#C9A227', fontSize: '14px' }}><Wallet className="w-3.5 h-3.5" /> {CUR}{fmt(inv.totalAmount)}</p>
                     </div>
                     <div className="flex gap-2">
                       <button
@@ -570,9 +586,10 @@ const InvoicesTab = () => {
                   <div className="px-5 pb-3 pt-2" style={{ borderTop: '1px solid rgba(255,255,255,0.04)' }}>
                     <div className="flex flex-wrap gap-1.5">
                       {inv.items.slice(0, 4).map((item, j) => (
-                        <span key={j} className="px-2 py-0.5 rounded-full font-bold"
+                        <span key={j} className="px-2 py-0.5 rounded-full font-bold flex items-center gap-1"
                           style={{ fontSize: '11px', background: 'rgba(201,162,39,0.08)', color: '#7a6a55', border: '1px solid rgba(201,162,39,0.15)' }}>
-                          🍴 {item.name} ×{item.quantity}
+                          {/* 🍴 → Utensils */}
+                          <Utensils className="w-3 h-3" /> {item.name} ×{item.quantity}
                         </span>
                       ))}
                       {inv.items.length > 4 && (
@@ -596,7 +613,8 @@ const InvoicesTab = () => {
 
       {/* Footer — UNCHANGED */}
       <div className="flex items-center justify-center gap-2 py-2">
-        <span>☕</span>
+        {/* ☕ → Coffee */}
+        <Coffee className="w-4 h-4" style={{ color: '#7a6a55' }} />
         <p className="font-bold" style={{ color: '#7a6a55', fontSize: '11px' }}>
           {filtered.length} invoice{filtered.length !== 1 ? 's' : ''} · Real-time sync active
         </p>
