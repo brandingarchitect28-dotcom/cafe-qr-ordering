@@ -122,9 +122,15 @@ if (typeof document !== 'undefined' && !document.getElementById('loy-cafe-css'))
     /* ── Top Customers Panel ── */
     .loy-insight-card {
       background: linear-gradient(135deg, #16100a 0%, #1a1208 100%);
-      border: 1.5px solid rgba(201,162,39,0.18);
+      border: 1.5px solid rgba(212,175,55,0.28);
       border-radius: 16px;
       overflow: hidden;
+      box-shadow:
+        0 0 0 1px rgba(212,175,55,0.10),
+        0 0 12px rgba(212,175,55,0.13),
+        0 0 24px rgba(212,175,55,0.07),
+        0 0 10px rgba(192,192,192,0.05),
+        0 4px 32px rgba(0,0,0,0.45);
     }
     .loy-rank-row {
       display: flex; align-items: center; gap: 10px;
@@ -858,7 +864,7 @@ const LoyaltyDashboard = () => {
       {/* ═══════════════════════════════════════════════════════════════════ */}
       {!loading && sortedByFrequency.length > 0 && (
         // TASK 3: subtle gold glow border to visually distinguish from loyalty list below
-        <div className="loy-insight-card" style={{ boxShadow: '0 0 0 1px rgba(201,162,39,0.18), 0 4px 24px rgba(201,162,39,0.07)' }}>
+        <div className="loy-insight-card" style={{ boxShadow: '0 0 0 1px rgba(212,175,55,0.12), 0 0 14px rgba(212,175,55,0.15), 0 0 28px rgba(212,175,55,0.08), 0 0 12px rgba(192,192,192,0.06), 0 6px 36px rgba(0,0,0,0.5)' }}>
           {/* Panel header — TASK 2: View All toggle moved here */}
           <div className="flex items-center justify-between px-5 py-4"
             style={{ borderBottom: '1px solid rgba(201,162,39,0.12)' }}>
