@@ -965,3 +965,420 @@ html.light-mode .divide-white\/5 > * + * {
   border-color: rgba(0,0,0,0.08) !important;
 }
 
+
+/* ============================================================
+   ▼▼▼ NEW ADDITIONS BELOW — APPENDED ONLY, NOTHING ABOVE TOUCHED ▼▼▼
+   ============================================================ */
+
+/* ── FIX 1: .App root wrapper ────────────────────────────────
+   App.jsx wraps everything in <div className="App">.
+   In dark mode it gets background:#050505 from App.css inline.
+   In light mode that persists because App.css has no light rule.
+   This single rule fixes the root container.
+   ──────────────────────────────────────────────────────────── */
+html.light-mode .App {
+  background-color: #F5F3EE !important;
+  color: #1A1A1A !important;
+}
+
+/* ── FIX 2: MenuManagement (.mm-*) ──────────────────────────
+   Component injects its own <style> with hardcoded dark colors.
+   These overrides run on top of that injected CSS.
+   ──────────────────────────────────────────────────────────── */
+html.light-mode .mm-card,
+html.light-mode .mm-item-card,
+html.light-mode .mm-sheet,
+html.light-mode .mm-stat {
+  background: #FFFFFF !important;
+  background-color: #FFFFFF !important;
+  border-color: rgba(0,0,0,0.10) !important;
+}
+
+html.light-mode .mm-item-card::before {
+  opacity: 0 !important;
+}
+
+html.light-mode .mm-input,
+html.light-mode .mm-select {
+  background: #FFFFFF !important;
+  background-color: #FFFFFF !important;
+  border-color: rgba(0,0,0,0.15) !important;
+  color: #111111 !important;
+}
+
+html.light-mode .mm-input::placeholder {
+  color: #999999 !important;
+}
+
+html.light-mode .mm-label {
+  color: #555555 !important;
+}
+
+html.light-mode .mm-btn-ghost {
+  background: rgba(0,0,0,0.05) !important;
+  color: #444444 !important;
+  border-color: rgba(0,0,0,0.12) !important;
+}
+
+html.light-mode .mm-btn-ghost:hover {
+  background: rgba(0,0,0,0.09) !important;
+  color: #111111 !important;
+}
+
+html.light-mode .mm-form-section {
+  background: rgba(0,0,0,0.03) !important;
+  border-color: rgba(0,0,0,0.10) !important;
+}
+
+html.light-mode .mm-sec {
+  color: #B8941F !important;
+}
+
+html.light-mode .mm-price {
+  color: #B8941F !important;
+}
+
+html.light-mode .mm-badge {
+  border-color: rgba(0,0,0,0.10) !important;
+}
+
+html.light-mode .mm-img-wrap {
+  background: #F0EDE8 !important;
+}
+
+html.light-mode .mm-tab-off {
+  background: rgba(0,0,0,0.04) !important;
+  color: #666666 !important;
+  border-color: rgba(0,0,0,0.10) !important;
+}
+
+/* ── FIX 3: OffersManagement (.ofm2-*) ───────────────────────*/
+html.light-mode .ofm2-card,
+html.light-mode .ofm2-flat,
+html.light-mode .ofm2-sheet,
+html.light-mode .ofm2-stat,
+html.light-mode .ofm2-subcard {
+  background: #FFFFFF !important;
+  background-color: #FFFFFF !important;
+  background-image: none !important;
+  border-color: rgba(0,0,0,0.10) !important;
+}
+
+html.light-mode .ofm2-section {
+  background: rgba(0,0,0,0.03) !important;
+  border-color: rgba(0,0,0,0.10) !important;
+}
+
+html.light-mode .ofm2-input,
+html.light-mode .ofm2-select {
+  background: #FFFFFF !important;
+  background-color: #FFFFFF !important;
+  border-color: rgba(0,0,0,0.15) !important;
+  color: #111111 !important;
+}
+
+html.light-mode .ofm2-input::placeholder {
+  color: #999999 !important;
+}
+
+html.light-mode .ofm2-label {
+  color: #555555 !important;
+}
+
+html.light-mode .ofm2-sec {
+  color: #B8941F !important;
+}
+
+html.light-mode .ofm2-btn-ghost {
+  background: rgba(0,0,0,0.05) !important;
+  color: #444444 !important;
+  border-color: rgba(0,0,0,0.12) !important;
+}
+
+html.light-mode .ofm2-btn-ghost:hover {
+  background: rgba(0,0,0,0.09) !important;
+  color: #111111 !important;
+}
+
+html.light-mode .ofm2-picker-item {
+  background: rgba(0,0,0,0.03) !important;
+  border-color: rgba(0,0,0,0.10) !important;
+}
+
+html.light-mode .ofm2-picker-item:hover {
+  background: rgba(212,175,55,0.08) !important;
+  border-color: rgba(212,175,55,0.30) !important;
+}
+
+html.light-mode .ofm2-type-btn {
+  background: rgba(0,0,0,0.03) !important;
+  border-color: rgba(0,0,0,0.10) !important;
+}
+
+html.light-mode .ofm2-type-btn:hover {
+  background: rgba(212,175,55,0.06) !important;
+  border-color: rgba(212,175,55,0.28) !important;
+}
+
+html.light-mode .ofm2-type-btn-active {
+  background: rgba(212,175,55,0.12) !important;
+  border-color: rgba(212,175,55,0.50) !important;
+}
+
+/* ── FIX 4: LoyaltyDashboard (.loy-*) ───────────────────────*/
+html.light-mode .loy-card {
+  background: #FFFFFF !important;
+  background-color: #FFFFFF !important;
+  border-color: rgba(0,0,0,0.10) !important;
+}
+
+html.light-mode .loy-input {
+  background: #FFFFFF !important;
+  background-color: #FFFFFF !important;
+  border-color: rgba(0,0,0,0.15) !important;
+  color: #111111 !important;
+}
+
+html.light-mode .loy-input::placeholder {
+  color: #999999 !important;
+}
+
+html.light-mode .loy-btn-ghost {
+  background: rgba(0,0,0,0.05) !important;
+  color: #444444 !important;
+  border-color: rgba(0,0,0,0.12) !important;
+}
+
+html.light-mode .loy-btn-ghost:hover {
+  background: rgba(0,0,0,0.09) !important;
+  color: #111111 !important;
+}
+
+/* ── FIX 5: KitchenDashboard (.kdt-*) ───────────────────────*/
+html.light-mode .kdt-card,
+html.light-mode .kdt-order-card {
+  background: #FFFFFF !important;
+  background-color: #FFFFFF !important;
+  border-color: rgba(0,0,0,0.10) !important;
+}
+
+/* ── FIX 6: InventoryManagement (.imv-*) ────────────────────*/
+html.light-mode .imv-card {
+  background: #FFFFFF !important;
+  background-color: #FFFFFF !important;
+  border-color: rgba(0,0,0,0.10) !important;
+}
+
+html.light-mode .imv-input,
+html.light-mode .imv-select {
+  background: #FFFFFF !important;
+  background-color: #FFFFFF !important;
+  border-color: rgba(0,0,0,0.15) !important;
+  color: #111111 !important;
+}
+
+html.light-mode .imv-input::placeholder {
+  color: #999999 !important;
+}
+
+html.light-mode .imv-btn-ghost {
+  background: rgba(0,0,0,0.05) !important;
+  color: #444444 !important;
+  border-color: rgba(0,0,0,0.12) !important;
+}
+
+html.light-mode .imv-btn-ghost:hover {
+  background: rgba(0,0,0,0.09) !important;
+  color: #111111 !important;
+}
+
+html.light-mode .imv-row:hover {
+  background: rgba(0,0,0,0.03) !important;
+}
+
+/* ── FIX 7: InvoicesTab (.inv-*) ─────────────────────────────*/
+html.light-mode .inv-card {
+  background: #FFFFFF !important;
+  background-color: #FFFFFF !important;
+  border-color: rgba(0,0,0,0.10) !important;
+}
+
+html.light-mode .inv-input,
+html.light-mode .inv-date {
+  background: #FFFFFF !important;
+  background-color: #FFFFFF !important;
+  border-color: rgba(0,0,0,0.15) !important;
+  color: #111111 !important;
+}
+
+html.light-mode .inv-input::placeholder {
+  color: #999999 !important;
+}
+
+html.light-mode .inv-date-label {
+  color: #555555 !important;
+}
+
+html.light-mode .inv-btn-gold {
+  background: rgba(212,175,55,0.12) !important;
+  color: #8B6914 !important;
+  border-color: rgba(212,175,55,0.30) !important;
+}
+
+/* ── FIX 8: ExternalOrderModal (.ext-*) ─────────────────────*/
+html.light-mode .ext-modal,
+html.light-mode .ext-sheet,
+html.light-mode .ext-cart-card,
+html.light-mode .ext-empty-cart,
+html.light-mode .ext-notice {
+  background: #FFFFFF !important;
+  background-color: #FFFFFF !important;
+  border-color: rgba(0,0,0,0.12) !important;
+}
+
+html.light-mode .ext-modal-header,
+html.light-mode .ext-modal-footer {
+  background: #F5F3EE !important;
+  background-color: #F5F3EE !important;
+  border-color: rgba(0,0,0,0.08) !important;
+}
+
+html.light-mode .ext-input,
+html.light-mode .ext-select,
+html.light-mode .ext-textarea,
+html.light-mode .ext-search {
+  background: #FFFFFF !important;
+  background-color: #FFFFFF !important;
+  border-color: rgba(0,0,0,0.15) !important;
+  color: #111111 !important;
+}
+
+html.light-mode .ext-input::placeholder,
+html.light-mode .ext-search::placeholder,
+html.light-mode .ext-textarea::placeholder {
+  color: rgba(0,0,0,0.30) !important;
+}
+
+html.light-mode .ext-btn-ghost {
+  background: #F0EDE8 !important;
+  color: #444444 !important;
+  border-color: rgba(0,0,0,0.12) !important;
+}
+
+html.light-mode .ext-btn-ghost:hover {
+  background: #E8E5E0 !important;
+  color: #111111 !important;
+  border-color: rgba(0,0,0,0.18) !important;
+}
+
+html.light-mode .ext-source-btn {
+  background: #F5F3EE !important;
+  color: #555555 !important;
+  border-color: rgba(0,0,0,0.12) !important;
+}
+
+html.light-mode .ext-source-btn:hover {
+  border-color: rgba(212,175,55,0.45) !important;
+  color: #111111 !important;
+}
+
+html.light-mode .ext-mode-btn {
+  background: #F5F3EE !important;
+  color: #555555 !important;
+  border-color: rgba(0,0,0,0.12) !important;
+}
+
+html.light-mode .ext-mode-btn:hover {
+  border-color: rgba(212,175,55,0.45) !important;
+  color: #111111 !important;
+}
+
+html.light-mode .ext-mode-btn-on {
+  background: rgba(212,175,55,0.10) !important;
+  color: #8B6914 !important;
+  border-color: rgba(212,175,55,0.55) !important;
+}
+
+html.light-mode .ext-menu-item {
+  background: #FFFFFF !important;
+  border-color: rgba(0,0,0,0.10) !important;
+}
+
+html.light-mode .ext-menu-item:hover {
+  background: rgba(212,175,55,0.04) !important;
+  border-color: rgba(212,175,55,0.30) !important;
+}
+
+html.light-mode .ext-label {
+  color: #555555 !important;
+}
+
+html.light-mode .ext-sec {
+  color: #B8941F !important;
+}
+
+/* ── FIX 9: GlobalOrderPopup — always dark (intentional) ─────
+   The popup uses gold gradient background by design.
+   Its text is white-on-gold which is readable in both modes.
+   NO override needed — left intentionally dark.
+   ──────────────────────────────────────────────────────────── */
+
+/* ── FIX 10: Toaster (sonner) — light mode ───────────────────
+   App.jsx hardcodes dark toast styles inline.
+   Override via the generated class selectors.
+   ──────────────────────────────────────────────────────────── */
+html.light-mode [data-sonner-toast] {
+  background: #FFFFFF !important;
+  color: #111111 !important;
+  border-color: rgba(0,0,0,0.10) !important;
+}
+
+/* ── FIX 11: Injected CSS background colors ──────────────────
+   Components inject styles with hex values that Tailwind
+   class overrides can't catch. Target by inline style content.
+   ──────────────────────────────────────────────────────────── */
+html.light-mode [style*="background: #141008"],
+html.light-mode [style*="background-color: #141008"],
+html.light-mode [style*="background: #1a1208"],
+html.light-mode [style*="background: #130e05"],
+html.light-mode [style*="background: #0d0a05"],
+html.light-mode [style*="background: #1c1509"],
+html.light-mode [style*="background: #150f06"],
+html.light-mode [style*="background: #1e1408"] {
+  background-color: #FFFFFF !important;
+  background-image: none !important;
+}
+
+/* Inline style text colors — muted dark text */
+html.light-mode [style*="color: #7a6a55"],
+html.light-mode [style*="color: rgb(122, 106, 85)"] {
+  color: #666666 !important;
+}
+
+html.light-mode [style*="color: #4a3f35"],
+html.light-mode [style*="color: rgb(74, 63, 53)"] {
+  color: #777777 !important;
+}
+
+html.light-mode [style*="color: #3d3020"],
+html.light-mode [style*="color: rgb(61, 48, 32)"] {
+  color: #999999 !important;
+}
+
+html.light-mode [style*="color: #a08060"],
+html.light-mode [style*="color: rgb(160, 128, 96)"] {
+  color: #666666 !important;
+}
+
+html.light-mode [style*="color: #fff8ee"],
+html.light-mode [style*="color: rgb(255, 248, 238)"] {
+  color: #111111 !important;
+}
+
+/* ── FIX 12: Inline border colors from injected CSS ──────────*/
+html.light-mode [style*="border: 1.5px solid rgba(255,255,255,0.07)"],
+html.light-mode [style*="border: 1.5px solid rgba(255,255,255,0.08)"],
+html.light-mode [style*="border-color: rgba(255,255,255,0.07)"],
+html.light-mode [style*="border-color: rgba(255,255,255,0.08)"] {
+  border-color: rgba(0,0,0,0.10) !important;
+}
