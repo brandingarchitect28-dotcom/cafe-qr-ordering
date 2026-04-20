@@ -28,13 +28,13 @@ import {
   collection, addDoc, updateDoc, deleteDoc, doc, serverTimestamp, query, where,
 } from 'firebase/firestore';
 import { db } from '../../lib/firebase';
-import { useCollection } from '../../hooks/useFirestore';
+import { useCollection, useDocument } from '../../hooks/useFirestore';
 import { motion, AnimatePresence } from 'framer-motion';
 import { toast } from 'sonner';
 import {
   Search, UserPlus, Star, MessageSquare, Phone, User,
   Award, TrendingUp, RefreshCw, Gift, Undo2, Trash2, Repeat, Calendar, Pencil, Check, ChevronDown,
-  Users, Trophy, RotateCcw, Coffee, Edit, Copy, ChevronUp, Flame, Crown,
+  Users, Trophy, RotateCcw, Coffee, Edit, Copy, ChevronUp, Flame, Crown, Send, X,
 } from 'lucide-react';
 import GoogleReviewSettings from './GoogleReviewSettings';
 
@@ -146,6 +146,37 @@ if (typeof document !== 'undefined' && !document.getElementById('loy-cafe-css'))
     }
     .loy-copy-btn:hover { background: rgba(201,162,39,0.12); color: #C9A227; border-color: rgba(201,162,39,0.25); transform: translateY(-1px); }
     .loy-copy-btn:active { transform: scale(0.95); }
+
+    /* ── Send Loyalty Card Modal ── */
+    .loy-modal-backdrop {
+      position: fixed; inset: 0; z-index: 1000;
+      background: rgba(0,0,0,0.72);
+      display: flex; align-items: center; justify-content: center;
+      padding: 16px;
+      backdrop-filter: blur(4px);
+    }
+    .loy-modal {
+      background: #1a1208;
+      border: 1.5px solid rgba(201,162,39,0.28);
+      border-radius: 18px;
+      width: 100%; max-width: 420px;
+      box-shadow: 0 24px 64px rgba(0,0,0,0.7), 0 0 0 1px rgba(201,162,39,0.1);
+      overflow: hidden;
+    }
+    .loy-modal-header {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 18px 20px 14px;
+      border-bottom: 1px solid rgba(201,162,39,0.12);
+    }
+    .loy-modal-body { padding: 20px; }
+    .loy-modal-footer { padding: 0 20px 20px; display: flex; gap: 10px; }
+    .loy-modal-close {
+      display: inline-flex; align-items: center; justify-content: center;
+      width: 30px; height: 30px; border-radius: 8px;
+      background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.08);
+      color: #7a6a55; cursor: pointer; transition: all 150ms; flex-shrink: 0;
+    }
+    .loy-modal-close:hover { background: rgba(220,50,50,0.12); color: #f87171; border-color: rgba(220,50,50,0.22); }
   `;
   document.head.appendChild(el);
 }
@@ -199,6 +230,12 @@ const LoyaltyDashboard = () => {
   const { user } = useAuth();
   const cafeId = user?.cafeId;
 
+  // ── Cafe doc: used ONLY to build QR menu link for Send Loyalty Card ──────
+  // Same pattern as QRGenerator — READ-ONLY, no writes, no side effects.
+  const { data: cafeDoc } = useDocument('cafes', cafeId || null);
+  const baseUrl    = process.env.REACT_APP_PRODUCTION_URL || window.location.origin;
+  const cafeMenuUrl = cafeId ? `${baseUrl}/cafe/${cafeId}` : '';
+
   const { data: customers, loading } = useCollection(
     'loyaltyCustomers',
     cafeId ? [where('cafeId', '==', cafeId)] : []
@@ -238,6 +275,11 @@ const LoyaltyDashboard = () => {
   const [topSearch,           setTopSearch          ] = useState('');
   // Visual limit for loyalty card list: show 5 by default, expand on demand
   const [showAllCustomers,    setShowAllCustomers   ] = useState(false);
+
+  // ── NEW: Send Loyalty Card modal state ─────────────────────────────────
+  const [loyaltyCardModal, setLoyaltyCardModal] = useState(null); // null | { customer }
+  const [lcDiscount,       setLcDiscount      ] = useState('');
+  const [lcValidity,       setLcValidity      ] = useState('');
 
   const nameDropdownRef  = useRef(null);
   const phoneDropdownRef = useRef(null);
@@ -377,6 +419,46 @@ const LoyaltyDashboard = () => {
       toast.success(`Copied: ${text}`);
     }
   }, []);
+
+  // ── NEW: Send Loyalty Card via WhatsApp ──────────────────────────────────
+  // Opens modal; on confirm builds WA message with discount, validity, menu link.
+  const openLoyaltyCardModal = useCallback((customer) => {
+    setLcDiscount(String(customer.currentDiscount || 10));
+    setLcValidity('');
+    setLoyaltyCardModal({ customer });
+  }, []);
+
+  const closeLoyaltyCardModal = useCallback(() => {
+    setLoyaltyCardModal(null);
+    setLcDiscount('');
+    setLcValidity('');
+  }, []);
+
+  const handleSendLoyaltyCardWA = useCallback(() => {
+    const customer = loyaltyCardModal?.customer;
+    if (!customer) return;
+    if (!lcDiscount.trim()) { toast.error('Please enter a discount percentage'); return; }
+    if (!lcValidity.trim())  { toast.error('Please enter a validity date / description'); return; }
+    if (!customer.phone)     { toast.error('No phone number for this customer'); return; }
+
+    // Build WA message — menu link from cafeMenuUrl (same source as QRGenerator)
+    const menuLink = cafeMenuUrl || `${window.location.origin}/cafe/${cafeId}`;
+    const message =
+      `Hello ${customer.name},\n\n` +
+      `🎉 You've received a special loyalty reward!\n` +
+      `Get ${lcDiscount}% OFF on your next visit.\n` +
+      `🗓 Valid till: ${lcValidity}\n\n` +
+      `Order now and enjoy your food without waiting.\n` +
+      `👉 ${menuLink}\n\n` +
+      `We look forward to serving you!`;
+
+    // Build WA URL — normalise phone to digits only, prepend 91 if 10-digit Indian number
+    const digits = customer.phone.replace(/\D/g, '');
+    const waNum  = digits.length === 10 ? `91${digits}` : digits;
+    window.open(`https://wa.me/${waNum}?text=${encodeURIComponent(message)}`, '_blank');
+    toast.success(`Loyalty card sent to ${customer.name} via WhatsApp`);
+    closeLoyaltyCardModal();
+  }, [loyaltyCardModal, lcDiscount, lcValidity, cafeMenuUrl, cafeId, closeLoyaltyCardModal]);
 
   // ── Existing handlers (ALL UNCHANGED) ────────────────────────────────────
   const handleAddCustomer = async (e) => {
@@ -864,6 +946,20 @@ const LoyaltyDashboard = () => {
                       <Copy className="w-3 h-3" />
                       <span className="hidden sm:inline">Copy</span>
                     </button>
+
+                    {/* Send Loyalty Card button — NEW ADDITION */}
+                    <button
+                      type="button"
+                      className="loy-copy-btn"
+                      onClick={() => openLoyaltyCardModal(customer)}
+                      title={customer.phone ? `Send loyalty card to ${customer.name}` : 'No phone number available'}
+                      disabled={!customer.phone}
+                      style={!customer.phone ? { opacity: 0.35, cursor: 'not-allowed' } : {}}
+                      data-testid={`send-loyalty-card-${customer.id}`}
+                    >
+                      <Send className="w-3 h-3" />
+                      <span className="hidden sm:inline">Send</span>
+                    </button>
                   </motion.div>
                 );
               })}
@@ -1108,6 +1204,144 @@ const LoyaltyDashboard = () => {
 
       {/* ── Google Review Link setting (UNCHANGED) ──────────────────────────── */}
       <GoogleReviewSettings />
+
+      {/* ── NEW: Send Loyalty Card Modal ─────────────────────────────────────
+           Rendered as a portal-style overlay inside the component root.
+           Zero effect on any existing layout — fixed position, z-index 1000.
+      ──────────────────────────────────────────────────────────────────────── */}
+      <AnimatePresence>
+        {loyaltyCardModal && (
+          <motion.div
+            className="loy-modal-backdrop"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.18 }}
+            onMouseDown={(e) => { if (e.target === e.currentTarget) closeLoyaltyCardModal(); }}
+            data-testid="loyalty-card-modal-backdrop"
+          >
+            <motion.div
+              className="loy-modal"
+              initial={{ opacity: 0, scale: 0.95, y: 12 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 12 }}
+              transition={{ duration: 0.2 }}
+              data-testid="loyalty-card-modal"
+            >
+              {/* Modal header */}
+              <div className="loy-modal-header">
+                <div className="flex items-center gap-2.5">
+                  <div className="w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0"
+                    style={{ background: 'rgba(37,211,102,0.1)', border: '1px solid rgba(37,211,102,0.22)' }}>
+                    <Send className="w-4 h-4" style={{ color: '#25D366' }} />
+                  </div>
+                  <div>
+                    <p className="text-white font-black text-sm loy-title">Send Loyalty Card</p>
+                    <p className="text-xs font-bold mt-0.5" style={{ color: '#5a4a35' }}>
+                      via WhatsApp · {loyaltyCardModal.customer.name}
+                    </p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  className="loy-modal-close"
+                  onClick={closeLoyaltyCardModal}
+                  data-testid="loyalty-card-modal-close"
+                >
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              </div>
+
+              {/* Modal body — inputs */}
+              <div className="loy-modal-body space-y-4">
+
+                {/* Customer info pill */}
+                <div className="flex items-center gap-2 px-3 py-2 rounded-xl"
+                  style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.07)' }}>
+                  <User className="w-3.5 h-3.5 flex-shrink-0" style={{ color: '#C9A227' }} />
+                  <span className="text-xs font-black text-white">{loyaltyCardModal.customer.name}</span>
+                  <span className="mx-1" style={{ color: '#3d3020' }}>·</span>
+                  <Phone className="w-3 h-3 flex-shrink-0" style={{ color: '#5a4a35' }} />
+                  <span className="text-xs font-bold" style={{ color: '#7a6a55' }}>{loyaltyCardModal.customer.phone || '—'}</span>
+                </div>
+
+                {/* Discount input */}
+                <div>
+                  <label className="block text-xs font-black uppercase tracking-widest mb-1.5" style={{ color: '#C9A227' }}>
+                    Discount (%)
+                  </label>
+                  <input
+                    type="number"
+                    min="1" max="100"
+                    value={lcDiscount}
+                    onChange={e => setLcDiscount(e.target.value)}
+                    placeholder="e.g. 20"
+                    className="loy-input"
+                    data-testid="lc-discount-input"
+                    autoFocus
+                  />
+                </div>
+
+                {/* Validity input */}
+                <div>
+                  <label className="block text-xs font-black uppercase tracking-widest mb-1.5" style={{ color: '#C9A227' }}>
+                    Valid Till
+                  </label>
+                  <input
+                    type="text"
+                    value={lcValidity}
+                    onChange={e => setLcValidity(e.target.value)}
+                    placeholder="e.g. 30 April 2026"
+                    className="loy-input"
+                    data-testid="lc-validity-input"
+                  />
+                </div>
+
+                {/* Message preview */}
+                {lcDiscount && lcValidity && (
+                  <div className="rounded-xl p-3 text-xs font-bold leading-relaxed"
+                    style={{
+                      background: 'rgba(37,211,102,0.06)',
+                      border: '1px solid rgba(37,211,102,0.15)',
+                      color: 'rgba(255,255,255,0.55)',
+                      whiteSpace: 'pre-line',
+                    }}
+                    data-testid="lc-message-preview"
+                  >
+                    <span className="block text-xs font-black uppercase tracking-widest mb-1.5" style={{ color: '#25D366' }}>
+                      Message Preview
+                    </span>
+                    {`Hello ${loyaltyCardModal.customer.name},\n\n🎉 You've received a special loyalty reward!\nGet ${lcDiscount}% OFF on your next visit.\n🗓 Valid till: ${lcValidity}\n\nOrder now and enjoy your food without waiting.\n👉 ${cafeMenuUrl || `${window.location.origin}/cafe/${cafeId}`}\n\nWe look forward to serving you!`}
+                  </div>
+                )}
+              </div>
+
+              {/* Modal footer — action buttons */}
+              <div className="loy-modal-footer">
+                <button
+                  type="button"
+                  onClick={handleSendLoyaltyCardWA}
+                  disabled={!lcDiscount.trim() || !lcValidity.trim() || !loyaltyCardModal.customer.phone}
+                  className="loy-btn loy-btn-green flex-1 justify-center disabled:opacity-40 disabled:cursor-not-allowed"
+                  data-testid="lc-send-btn"
+                >
+                  <MessageSquare className="w-3.5 h-3.5" />
+                  Send via WhatsApp
+                </button>
+                <button
+                  type="button"
+                  onClick={closeLoyaltyCardModal}
+                  className="loy-btn loy-btn-ghost"
+                  data-testid="lc-cancel-btn"
+                >
+                  Cancel
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
     </div>
   );
 };
