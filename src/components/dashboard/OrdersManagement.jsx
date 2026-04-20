@@ -3,7 +3,16 @@ import { useAuth } from '../../contexts/AuthContext';
 import { useCollection, useDocument } from '../../hooks/useFirestore';
 import { where, doc, updateDoc, collection, addDoc, runTransaction, serverTimestamp, query, onSnapshot, getDoc } from 'firebase/firestore';
 import { db } from '../../lib/firebase';
-import { AlertCircle, Search, Download, Phone, MapPin, Clock, Bell, Volume2, X, FileText, Eye, Trash2, MessageSquare, PlusCircle, Plus, Minus, ShoppingCart, RefreshCw } from 'lucide-react';
+import {
+  AlertCircle, Search, Download, Phone, MapPin, Clock, Bell, Volume2, X, FileText, Eye, Trash2,
+  MessageSquare, PlusCircle, Plus, Minus, ShoppingCart, RefreshCw,
+  // ── TASK 1: new icon imports for emoji replacements ──
+  Utensils, Receipt, Loader, CheckCircle, XCircle, ChefHat, Truck, Package,
+  ShoppingBag, Armchair, Calendar, Hash, User, PhoneCall, Info, Star,
+  Volume1, VolumeX, Bell as BellIcon, CircleDollarSign, Printer,
+  ClipboardList, Bike, Coffee, BadgeCheck, Ban, Tag, CreditCard,
+  LayoutGrid, Flame, Timer, Link, Sparkles, Pencil, Store, Soup,
+} from 'lucide-react';
 import { toast } from 'sonner';
 import { CSVLink } from 'react-csv';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -30,6 +39,9 @@ const calculateOrderTotals = (items = []) => {
   }
   return { itemsTotal, addonsTotal, grandTotal: itemsTotal + addonsTotal };
 };
+
+// ─── TASK 2: helper to get today's date string (YYYY-MM-DD) ──────────────────
+const getTodayString = () => new Date().toISOString().split('T')[0];
 
 // ─── Inject premium green-theme CSS once ─────────────────────────────────────
 if (typeof document !== 'undefined' && !document.getElementById('om-food-css')) {
@@ -157,13 +169,6 @@ if (typeof document !== 'undefined' && !document.getElementById('om-food-css')) 
     }
     .omf-sheet-grip { width: 36px; height: 4px; border-radius: 4px; background: rgba(201,162,39,0.28); }
 
-    /* ─────────────────────────────────────────────────────────────────────
-       STATUS INDICATORS — TASKS 1, 2, 3
-       Added only: left border (3px) + very faint background tint.
-       Nothing else in the component is touched.
-    ───────────────────────────────────────────────────────────────────── */
-
-    /* NEW — blue left border + faint blue tint + soft pulse to draw eye */
     .omf-status-new {
       border-left: 3px solid rgba(59,130,246,0.8) !important;
       background: rgba(59,130,246,0.045) !important;
@@ -174,22 +179,18 @@ if (typeof document !== 'undefined' && !document.getElementById('om-food-css')) 
       0%,100% { border-left-color: rgba(59,130,246,0.7); }
       50%      { border-left-color: rgba(99,155,255,1);   }
     }
-    /* Only pulse the border-left, not the whole element */
     .omf-status-new { animation: omf-new-pulse 2.4s ease-in-out infinite; }
 
-    /* PREPARING — amber/warm left border only (badge already signals this) */
     .omf-status-preparing {
       border-left: 3px solid rgba(251,191,36,0.65) !important;
     }
 
-    /* COMPLETED — green left border + very faint green tint (TASK 3: distinct done state) */
     .omf-status-completed {
       border-left: 3px solid rgba(34,197,94,0.7) !important;
       background: rgba(34,197,94,0.03) !important;
     }
     .omf-row.omf-status-completed:hover { background: rgba(34,197,94,0.06) !important; }
 
-    /* CANCELLED — muted red-gray border + slight dim */
     .omf-status-cancelled {
       border-left: 3px solid rgba(180,60,60,0.4) !important;
       opacity: 0.7;
@@ -199,23 +200,15 @@ if (typeof document !== 'undefined' && !document.getElementById('om-food-css')) 
 }
 
 // ─── helpers ──────────────────────────────────────────────────────────────────
-
-/*
-  STATUS — identical shape to original.
-  Only addition: `statusClass` property, read exclusively by the two
-  className strings in the render section (desktop <tr> and mobile card <div>).
-  Zero other usage of statusClass anywhere in this file.
-*/
 const STATUS = {
-  new:       { emoji: '🆕', label: 'New',       bg: 'rgba(59,130,246,0.14)',  color: '#60a5fa', bd: 'rgba(59,130,246,0.24)',  statusClass: 'omf-status-new'       },
-  preparing: { emoji: '👨‍🍳', label: 'Preparing', bg: 'rgba(255,190,11,0.14)', color: '#fbbf24', bd: 'rgba(255,190,11,0.24)',  statusClass: 'omf-status-preparing' },
-  // TASK 3: completed now has green color values + own CSS class
-  completed: { emoji: '✅', label: 'Done',       bg: 'rgba(34,197,94,0.14)',   color: '#4ade80', bd: 'rgba(34,197,94,0.28)',   statusClass: 'omf-status-completed' },
-  cancelled: { emoji: '❌', label: 'Cancelled',  bg: 'rgba(220,50,50,0.12)',   color: '#f87171', bd: 'rgba(220,50,50,0.22)',   statusClass: 'omf-status-cancelled' },
+  new:       { icon: <Tag      className="w-3 h-3" />, label: 'New',       bg: 'rgba(59,130,246,0.14)',  color: '#60a5fa', bd: 'rgba(59,130,246,0.24)',  statusClass: 'omf-status-new'       },
+  preparing: { icon: <ChefHat  className="w-3 h-3" />, label: 'Preparing', bg: 'rgba(255,190,11,0.14)', color: '#fbbf24', bd: 'rgba(255,190,11,0.24)',  statusClass: 'omf-status-preparing' },
+  completed: { icon: <CheckCircle className="w-3 h-3" />, label: 'Done',   bg: 'rgba(34,197,94,0.14)',   color: '#4ade80', bd: 'rgba(34,197,94,0.28)',   statusClass: 'omf-status-completed' },
+  cancelled: { icon: <XCircle  className="w-3 h-3" />, label: 'Cancelled', bg: 'rgba(220,50,50,0.12)',   color: '#f87171', bd: 'rgba(220,50,50,0.22)',   statusClass: 'omf-status-cancelled' },
 };
 const PAYMENT = {
-  paid:    { emoji: '💰', bg: 'rgba(201,162,39,0.12)',   color: '#C9A227', bd: 'rgba(201,162,39,0.22)' },
-  pending: { emoji: '⏳', bg: 'rgba(220,50,50,0.12)',  color: '#ff7070', bd: 'rgba(220,50,50,0.22)' },
+  paid:    { icon: <CircleDollarSign className="w-3 h-3" />, bg: 'rgba(201,162,39,0.12)',   color: '#C9A227', bd: 'rgba(201,162,39,0.22)' },
+  pending: { icon: <Timer            className="w-3 h-3" />, bg: 'rgba(220,50,50,0.12)',  color: '#ff7070', bd: 'rgba(220,50,50,0.22)' },
 };
 const getSt  = s => STATUS[s]  || STATUS.new;
 const getPay = s => PAYMENT[s] || PAYMENT.pending;
@@ -226,7 +219,11 @@ const getItemsCount = items => {
   const t = items.reduce((s, i) => s + (i.quantity || 1), 0);
   return `${t} item${t !== 1 ? 's' : ''}`;
 };
-const orderTypeIcon = t => t === 'dine-in' ? '🪑' : t === 'delivery' ? '🛵' : '🥡';
+// TASK 1: orderTypeIcon now returns a Lucide icon component
+const orderTypeIcon = t =>
+  t === 'dine-in'  ? <Armchair className="w-4 h-4 inline-block" /> :
+  t === 'delivery' ? <Bike     className="w-4 h-4 inline-block" /> :
+                     <Package  className="w-4 h-4 inline-block" />;
 
 // ─── AddItemsToOrderModal ─────────────────────────────────────────────────────
 const AddItemsToOrderModal = ({ order, cafeCurrency, onClose, setVariantModal, variantAddRef }) => {
@@ -303,7 +300,7 @@ const AddItemsToOrderModal = ({ order, cafeCurrency, onClose, setVariantModal, v
       const gst = cafe?.gstEnabled ? newSub*safeNum(cafe.gstRate)/100 : 0;
       const pf  = cafe?.platformFeeEnabled ? safeNum(cafe.platformFeeAmount) : 0;
       await updateDoc(doc(db,'orders',order.id), { items: updatedItems, subtotalAmount: newSub, taxAmount: tax, serviceChargeAmount: sc, gstAmount: gst, totalAmount: Math.round(newSub+tax+sc+gst+pf) });
-      toast.success(`🍽️ ${newItems.length} item${newItems.length!==1?'s':''} added!`);
+      toast.success(`${newItems.length} item${newItems.length!==1?'s':''} added!`);
       onClose();
     } catch(err) { console.error('[AddItemsToOrder] Failed:',err); toast.error('Failed to add items'); }
     finally { setSaving(false); }
@@ -321,7 +318,8 @@ const AddItemsToOrderModal = ({ order, cafeCurrency, onClose, setVariantModal, v
           {/* Header */}
           <div className="flex items-center justify-between px-5 py-4 flex-shrink-0" style={{borderBottom:'1px solid rgba(201,162,39,0.12)'}}>
             <div>
-              <h3 className="omf-title text-white font-bold text-lg flex items-center gap-2">🛒 Add Items to Order</h3>
+              {/* TASK 1: 🛒 → ShoppingCart icon */}
+              <h3 className="omf-title text-white font-bold text-lg flex items-center gap-2"><ShoppingCart className="w-5 h-5" style={{color:'#C9A227'}}/> Add Items to Order</h3>
               <p className="text-xs mt-0.5" style={{color:'#7a6a3a'}}>#{order.orderNumber ? String(order.orderNumber).padStart(3,'0') : order.id.slice(0,6)}{order.customerName ? ` · ${order.customerName}` : ''}</p>
             </div>
             <button onClick={onClose} className="w-8 h-8 rounded-full flex items-center justify-center" style={{background:'rgba(201,162,39,0.1)',border:'1px solid rgba(201,162,39,0.2)'}}>
@@ -331,7 +329,8 @@ const AddItemsToOrderModal = ({ order, cafeCurrency, onClose, setVariantModal, v
           {/* Search */}
           <div className="px-4 py-3 flex-shrink-0" style={{borderBottom:'1px solid rgba(255,255,255,0.05)'}}>
             <div className="relative">
-              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm">🔍</span>
+              {/* TASK 1: 🔍 → Search icon */}
+              <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2" style={{color:'#7a6a3a'}}/>
               <input type="text" value={searchQuery} onChange={e=>setSearchQuery(e.target.value)} placeholder="Search menu items…" className="omf-input" style={{paddingLeft:'2.2rem'}}/>
             </div>
           </div>
@@ -339,11 +338,16 @@ const AddItemsToOrderModal = ({ order, cafeCurrency, onClose, setVariantModal, v
           <div className="flex-1 overflow-y-auto omf-scroll px-4 py-3 space-y-2">
             {loadingMenu ? (
               <div className="flex flex-col items-center justify-center py-12 gap-2">
-                <div className="text-4xl animate-bounce">🍳</div>
+                {/* TASK 1: 🍳 → Flame icon (cooking) */}
+                <Flame className="w-10 h-10 animate-bounce" style={{color:'#C9A227'}}/>
                 <p className="text-sm" style={{color:'#7a6a3a'}}>Loading menu…</p>
               </div>
             ) : filtered.length === 0 ? (
-              <div className="text-center py-10"><div className="text-4xl mb-2">🫙</div><p className="text-sm" style={{color:'#5a4a1a'}}>No items found</p></div>
+              <div className="text-center py-10">
+                {/* TASK 1: 🫙 → Package icon (empty) */}
+                <Package className="w-10 h-10 mx-auto mb-2" style={{color:'#3d341a'}}/>
+                <p className="text-sm" style={{color:'#5a4a1a'}}>No items found</p>
+              </div>
             ) : filtered.map(item => {
               const qty = cartQty(item.id);
               const sp = item.sizePricing;
@@ -354,7 +358,8 @@ const AddItemsToOrderModal = ({ order, cafeCurrency, onClose, setVariantModal, v
               const hasV = iv.length>0; const hasA = Array.isArray(item.addons)&&item.addons.length>0;
               const minP = hasV ? Math.min(...iv.map(v=>parseFloat(v.price)||0)) : null;
               const dp   = hasV ? `from ${CUR}${fmtN(minP)}` : `${CUR}${fmtN(item.price)}`;
-              const lbl  = hasV ? '📏 Pick Size' : hasA ? '✨ Customize' : '➕ Add';
+              // TASK 1: text labels replace emoji for button text
+              const lbl  = hasV ? <><LayoutGrid className="w-3 h-3"/>Pick Size</> : hasA ? <><Sparkles className="w-3 h-3"/>Customize</> : <><Plus className="w-3 h-3"/>Add</>;
               return (
                 <div key={item.id} className="flex items-center justify-between p-3 rounded-xl transition-all"
                   style={{background:'rgba(255,255,255,0.03)',border:'1px solid rgba(255,255,255,0.06)'}}
@@ -386,7 +391,8 @@ const AddItemsToOrderModal = ({ order, cafeCurrency, onClose, setVariantModal, v
           {/* Cart footer */}
           {newCart.length > 0 && (
             <div className="px-4 py-4 flex-shrink-0 space-y-3" style={{borderTop:'1px solid rgba(201,162,39,0.12)',background:'rgba(0,0,0,0.25)'}}>
-              <p className="text-xs font-black" style={{color:'#C9A227'}}>🛒 Cart · {newCart.length} item{newCart.length!==1?'s':''}</p>
+              {/* TASK 1: 🛒 → ShoppingCart icon */}
+              <p className="text-xs font-black flex items-center gap-1.5" style={{color:'#C9A227'}}><ShoppingCart className="w-3 h-3"/> Cart · {newCart.length} item{newCart.length!==1?'s':''}</p>
               <div className="space-y-1.5">
                 {newCart.map((item,idx)=>{
                   const adds = Array.isArray(item.addons)?item.addons:[];
@@ -423,8 +429,10 @@ const OrdersManagement = () => {
 
   const [statusFilter, setStatusFilter] = useState('all');
   const [searchQuery,  setSearchQuery ] = useState('');
-  const [startDate,    setStartDate   ] = useState('');
+  // ── TASK 2: default startDate = today, endDate = '' ──────────────────────
+  const [startDate,    setStartDate   ] = useState(getTodayString);
   const [endDate,      setEndDate     ] = useState('');
+  // ─────────────────────────────────────────────────────────────────────────
   const [expandedOrder,       setExpandedOrder      ] = useState(null);
   const [newOrderNotification,setNewOrderNotification] = useState(null);
   const [soundEnabled, setSoundEnabled] = useState(true);
@@ -633,12 +641,16 @@ const OrdersManagement = () => {
           return (
             <div key={idx} className="pb-2.5" style={{borderBottom:'1px solid rgba(255,255,255,0.04)'}}>
               <div className="flex justify-between items-start gap-2">
-                <span className="text-white font-bold text-sm flex-1">
-                  🍴 {item.name}{item.selectedVariant?` (${item.selectedVariant})`:''} ×{qty}
+                {/* TASK 1: 🍴 → Utensils icon */}
+                <span className="text-white font-bold text-sm flex-1 flex items-center gap-1.5">
+                  <Utensils className="w-3.5 h-3.5 flex-shrink-0" style={{color:'#C9A227'}}/> {item.name}{item.selectedVariant?` (${item.selectedVariant})`:''} ×{qty}
                 </span>
                 <div className="flex items-center gap-2 flex-shrink-0">
                   {item.isFree
-                    ? <span className="omf-badge" style={{background:'rgba(201,162,39,0.12)',color:'#C9A227',borderColor:'rgba(201,162,39,0.2)'}}>🎁 FREE</span>
+                    ? <span className="omf-badge" style={{background:'rgba(201,162,39,0.12)',color:'#C9A227',borderColor:'rgba(201,162,39,0.2)'}}>
+                        {/* TASK 1: 🎁 → Tag icon */}
+                        <Tag className="w-3 h-3"/> FREE
+                      </span>
                     : <span className="font-black text-sm" style={{color:'#C9A227'}}>{CUR}{total.toFixed(2)}</span>
                   }
                   {order.orderStatus!=='completed'&&order.orderStatus!=='cancelled'&&(
@@ -656,12 +668,13 @@ const OrdersManagement = () => {
                 </div>
               </div>
               <p className="text-xs mt-0.5 ml-4" style={{color:'#555'}}>
-                {item.isFree?<span style={{color:'#C9A227'}}>🎁 FREE · was {CUR}{(parseFloat(item.actualPrice)||0).toFixed(2)}</span>:<>Base: {CUR}{base.toFixed(2)}{qty>1?` ×${qty}`:''}</>}
+                {item.isFree?<span style={{color:'#C9A227'}}><Tag className="w-3 h-3 inline mr-1"/>FREE · was {CUR}{(parseFloat(item.actualPrice)||0).toFixed(2)}</span>:<>Base: {CUR}{base.toFixed(2)}{qty>1?` ×${qty}`:''}</>}
               </p>
-              {item.comboItems?.length>0&&<div className="ml-4 mt-0.5 space-y-0.5">{item.comboItems.map((ci,ci2)=><p key={ci2} className="text-xs" style={{color:'#5a4a1a'}}>🔗 {ci.name}{ci.quantity>1?` ×${ci.quantity}`:''}</p>)}</div>}
+              {item.comboItems?.length>0&&<div className="ml-4 mt-0.5 space-y-0.5">{item.comboItems.map((ci,ci2)=><p key={ci2} className="text-xs flex items-center gap-1" style={{color:'#5a4a1a'}}><Link className="w-3 h-3"/> {ci.name}{ci.quantity>1?` ×${ci.quantity}`:''}</p>)}</div>}
               {adds.length>0?(
                 <div className="ml-4 mt-1.5 space-y-0.5">
-                  <p className="text-xs font-bold" style={{color:'#777'}}>✨ Add-ons ({adds.length}):</p>
+                  {/* TASK 1: ✨ → Sparkles icon */}
+                  <p className="text-xs font-bold flex items-center gap-1" style={{color:'#777'}}><Sparkles className="w-3 h-3"/> Add-ons ({adds.length}):</p>
                   {adds.map((a,ai)=>{const aq=parseInt(a.quantity)||1;const ap=parseFloat(a.price)||0;return <div key={ai} className="flex justify-between text-xs" style={{color:'#666'}}><span>╰ {a.name} ×{aq}</span><span>+{CUR}{(ap*aq).toFixed(2)}</span></div>;})}
                   <div className="flex justify-between text-xs pt-0.5" style={{color:'#888'}}><span>Add-ons total</span><span>+{CUR}{(aT*qty).toFixed(2)}</span></div>
                 </div>
@@ -671,14 +684,15 @@ const OrdersManagement = () => {
         })}
         {/* Totals */}
         <div className="pt-2.5 mt-1 space-y-1.5" style={{borderTop:'1px solid rgba(201,162,39,0.1)'}}>
-          <div className="flex justify-between text-xs" style={{color:'#4a6a4a'}}><span>🧮 Items Total</span><span>{CUR}{itemsTotal.toFixed(2)}</span></div>
-          {addonsTotal>0&&<div className="flex justify-between text-xs" style={{color:'#4a6a4a'}}><span>✨ Add-ons</span><span>+{CUR}{addonsTotal.toFixed(2)}</span></div>}
-          {sN(order?.gstAmount)>0&&<div className="flex justify-between text-xs" style={{color:'#5a4a1a'}}><span>🏛️ GST</span><span>+{CUR}{sN(order.gstAmount).toFixed(2)}</span></div>}
-          {sN(order?.taxAmount)>0&&<div className="flex justify-between text-xs" style={{color:'#5a4a1a'}}><span>🏛️ Tax</span><span>+{CUR}{sN(order.taxAmount).toFixed(2)}</span></div>}
-          {sN(order?.serviceChargeAmount)>0&&<div className="flex justify-between text-xs" style={{color:'#5a4a1a'}}><span>🛎️ Service Charge</span><span>+{CUR}{sN(order.serviceChargeAmount).toFixed(2)}</span></div>}
-          {sN(order?.platformFeeAmount)>0&&<div className="flex justify-between text-xs" style={{color:'#5a4a1a'}}><span>💻 Platform Fee</span><span>+{CUR}{sN(order.platformFeeAmount).toFixed(2)}</span></div>}
+          <div className="flex justify-between text-xs" style={{color:'#4a6a4a'}}><span className="flex items-center gap-1"><Hash className="w-3 h-3"/> Items Total</span><span>{CUR}{itemsTotal.toFixed(2)}</span></div>
+          {addonsTotal>0&&<div className="flex justify-between text-xs" style={{color:'#4a6a4a'}}><span className="flex items-center gap-1"><Sparkles className="w-3 h-3"/> Add-ons</span><span>+{CUR}{addonsTotal.toFixed(2)}</span></div>}
+          {sN(order?.gstAmount)>0&&<div className="flex justify-between text-xs" style={{color:'#5a4a1a'}}><span className="flex items-center gap-1"><Receipt className="w-3 h-3"/> GST</span><span>+{CUR}{sN(order.gstAmount).toFixed(2)}</span></div>}
+          {sN(order?.taxAmount)>0&&<div className="flex justify-between text-xs" style={{color:'#5a4a1a'}}><span className="flex items-center gap-1"><Receipt className="w-3 h-3"/> Tax</span><span>+{CUR}{sN(order.taxAmount).toFixed(2)}</span></div>}
+          {sN(order?.serviceChargeAmount)>0&&<div className="flex justify-between text-xs" style={{color:'#5a4a1a'}}><span className="flex items-center gap-1"><BellIcon className="w-3 h-3"/> Service Charge</span><span>+{CUR}{sN(order.serviceChargeAmount).toFixed(2)}</span></div>}
+          {sN(order?.platformFeeAmount)>0&&<div className="flex justify-between text-xs" style={{color:'#5a4a1a'}}><span className="flex items-center gap-1"><CircleDollarSign className="w-3 h-3"/> Platform Fee</span><span>+{CUR}{sN(order.platformFeeAmount).toFixed(2)}</span></div>}
           <div className="flex justify-between font-black text-sm pt-1.5" style={{borderTop:'1px solid rgba(201,162,39,0.1)'}}>
-            <span className="text-white">💵 Grand Total</span>
+            {/* TASK 1: 💵 → CircleDollarSign icon */}
+            <span className="text-white flex items-center gap-1"><CircleDollarSign className="w-4 h-4" style={{color:'#C9A227'}}/> Grand Total</span>
             <span style={{color:'#C9A227'}}>{CUR}{(sub+fees).toFixed(2)}</span>
           </div>
         </div>
@@ -691,7 +705,7 @@ const OrdersManagement = () => {
     <div className="omf space-y-5 relative">
 
       {viewingInvoice&&<InvoiceModal invoice={viewingInvoice} onClose={()=>setViewingInvoice(null)}/>}
-      {showExternalModal&&<ExternalOrderModal onClose={()=>setShowExternalModal(false)} onSuccess={(id,num)=>toast.success(`🎉 Order #${String(num).padStart(3,'0')} added to kitchen!`)}/>}
+      {showExternalModal&&<ExternalOrderModal onClose={()=>setShowExternalModal(false)} onSuccess={(id,num)=>toast.success(`Order #${String(num).padStart(3,'0')} added to kitchen!`)}/>}
 
       {addItemsOrder&&(
         <div style={{visibility:addItemsVariantModal?'hidden':'visible'}}>
@@ -704,7 +718,8 @@ const OrdersManagement = () => {
         const vItem=addItemsVariantModal;
         const CUR_V=addItemsOrder?.currencySymbol||cafeCurrency||'₹';
         const vars=vItem._resolvedVariants||[];
-        const sizeEmoji=['☕','🥤','🧋'];
+        // TASK 1: size icons instead of emoji
+        const sizeIcons=[<Coffee className="w-4 h-4"/>,<ShoppingBag className="w-4 h-4"/>,<Package className="w-4 h-4"/>];
         return (
           <div className="fixed inset-0 z-[200]">
             <div className="absolute inset-0 bg-black/80 backdrop-blur-md" onClick={()=>setAddItemsVariantModal(null)}/>
@@ -712,7 +727,8 @@ const OrdersManagement = () => {
               <div className="relative w-full sm:max-w-sm rounded-t-3xl sm:rounded-2xl overflow-hidden omf-sheet" onClick={e=>e.stopPropagation()}>
                 <div className="flex justify-center pt-3 pb-1 sm:hidden"><div className="omf-sheet-grip mx-auto"/></div>
                 <div className="flex items-center justify-between px-6 py-4" style={{borderBottom:'1px solid rgba(201,162,39,0.12)'}}>
-                  <div><h3 className="omf-title text-white font-bold text-base">📏 Select Size</h3><p className="text-xs mt-0.5" style={{color:'#7a6a3a'}}>{vItem.name}</p></div>
+                  {/* TASK 1: 📏 → LayoutGrid icon */}
+                  <div><h3 className="omf-title text-white font-bold text-base flex items-center gap-2"><LayoutGrid className="w-4 h-4" style={{color:'#C9A227'}}/> Select Size</h3><p className="text-xs mt-0.5" style={{color:'#7a6a3a'}}>{vItem.name}</p></div>
                   <button onClick={()=>setAddItemsVariantModal(null)} className="w-8 h-8 rounded-full flex items-center justify-center" style={{background:'rgba(201,162,39,0.1)',border:'1px solid rgba(201,162,39,0.2)'}}><X className="w-4 h-4" style={{color:'#C9A227'}}/></button>
                 </div>
                 <div className="px-5 py-4 space-y-2.5 pb-8">
@@ -723,7 +739,7 @@ const OrdersManagement = () => {
                       onMouseEnter={e=>{e.currentTarget.style.background='rgba(201,162,39,0.2)';}}
                       onMouseLeave={e=>{e.currentTarget.style.background='rgba(201,162,39,0.1)';}}
                     >
-                      <span className="text-sm">{sizeEmoji[vi]||'🍽️'} {v.name}</span>
+                      <span className="text-sm flex items-center gap-2">{sizeIcons[vi]||<Utensils className="w-4 h-4"/>} {v.name}</span>
                       <span className="text-sm">{CUR_V}{fmtN(v.price)}</span>
                     </button>
                   ))}
@@ -745,13 +761,14 @@ const OrdersManagement = () => {
           >
             <button onClick={()=>setNewOrderNotification(null)} className="absolute top-3 right-3 w-6 h-6 rounded-full flex items-center justify-center" style={{background:'rgba(0,0,0,0.2)'}}><X className="w-3.5 h-3.5 text-white"/></button>
             <div className="flex items-start gap-4">
-              <div className="w-12 h-12 rounded-2xl flex items-center justify-center text-2xl flex-shrink-0" style={{background:'rgba(0,0,0,0.15)'}}>🔔</div>
+              {/* TASK 1: 🔔 → Bell icon */}
+              <div className="w-12 h-12 rounded-2xl flex items-center justify-center flex-shrink-0" style={{background:'rgba(0,0,0,0.15)'}}><BellIcon className="w-6 h-6 text-white"/></div>
               <div>
                 <p className="font-black text-white/75 text-xs uppercase tracking-widest mb-0.5">New Order!</p>
                 <p className="omf-title font-black text-white text-2xl mb-1">{fmtOrd(newOrderNotification.orderNumber)}</p>
-                {newOrderNotification.orderType==='dine-in'&&newOrderNotification.tableNumber&&<p className="font-bold text-sm text-white/80">🪑 Table {newOrderNotification.tableNumber}</p>}
-                <p className="text-sm text-white/70">🍽️ {getItemsCount(newOrderNotification.items)}</p>
-                <p className="font-black text-xl text-white mt-1">💰 {newOrderNotification.currencySymbol||cafeCurrency}{(newOrderNotification.totalAmount||0).toFixed(0)}</p>
+                {newOrderNotification.orderType==='dine-in'&&newOrderNotification.tableNumber&&<p className="font-bold text-sm text-white/80 flex items-center gap-1"><Armchair className="w-4 h-4"/> Table {newOrderNotification.tableNumber}</p>}
+                <p className="text-sm text-white/70 flex items-center gap-1"><Utensils className="w-4 h-4"/> {getItemsCount(newOrderNotification.items)}</p>
+                <p className="font-black text-xl text-white mt-1 flex items-center gap-1"><CircleDollarSign className="w-5 h-5"/> {newOrderNotification.currencySymbol||cafeCurrency}{(newOrderNotification.totalAmount||0).toFixed(0)}</p>
               </div>
             </div>
           </motion.div>
@@ -761,7 +778,8 @@ const OrdersManagement = () => {
       {/* ── Header ─────────────────────────────────────────────── */}
       <div className="flex flex-wrap justify-between items-center gap-3">
         <div className="flex items-center gap-3">
-          <div className="text-4xl">🍽️</div>
+          {/* TASK 1: 🍽️ → Utensils icon */}
+          <Utensils className="w-9 h-9" style={{color:'#C9A227'}}/>
           <div>
             <h2 className="omf-title text-2xl font-black text-white">Orders Management</h2>
             <p className="text-xs mt-0.5 flex items-center gap-1.5" style={{color:'#7a6a3a'}}>
@@ -772,42 +790,54 @@ const OrdersManagement = () => {
         </div>
         <div className="flex items-center gap-2.5">
           <button onClick={()=>setShowExternalModal(true)} data-testid="add-external-order-btn" className="omf-btn omf-btn-orange" style={{padding:'9px 16px',fontSize:'13px',borderRadius:'12px'}}>
-            <PlusCircle className="w-4 h-4"/>➕ Add External Order
+            <PlusCircle className="w-4 h-4"/> Add External Order
           </button>
           <button onClick={()=>setSoundEnabled(!soundEnabled)} data-testid="sound-toggle" className="omf-btn"
             style={{padding:'9px 14px',fontSize:'13px',borderRadius:'12px',background:soundEnabled?'rgba(201,162,39,0.12)':'rgba(255,255,255,0.04)',color:soundEnabled?'#C9A227':'#7a6a3a',border:`1.5px solid ${soundEnabled?'rgba(201,162,39,0.25)':'rgba(255,255,255,0.07)'}`}}
-          >{soundEnabled?'🔊 Sound On':'🔇 Sound Off'}</button>
+          >
+            {/* TASK 1: 🔊/🔇 → Volume2/VolumeX icon */}
+            {soundEnabled?<><Volume2 className="w-4 h-4"/> Sound On</>:<><VolumeX className="w-4 h-4"/> Sound Off</>}
+          </button>
         </div>
       </div>
 
       {/* ── Search + Export ─────────────────────────────────────── */}
       <div className="flex flex-col md:flex-row gap-3">
         <div className="relative flex-1">
-          <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-sm">🔍</span>
+          {/* TASK 1: 🔍 → Search icon */}
+          <Search className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2" style={{color:'#7a6a3a'}}/>
           <input type="text" data-testid="order-search" value={searchQuery} onChange={e=>setSearchQuery(e.target.value)} className="omf-input" style={{paddingLeft:'2.4rem',height:'44px'}} placeholder="Search by order #, customer name, or phone…"/>
         </div>
         <CSVLink data={csvData} filename={`orders-${new Date().toISOString().split('T')[0]}.csv`}
           className="omf-btn omf-btn-green"
           style={{borderRadius:'12px',padding:'10px 20px',fontSize:'13px',fontWeight:700,whiteSpace:'nowrap',textDecoration:'none',display:'flex',alignItems:'center',gap:'7px'}}
           data-testid="export-csv-btn"
-        ><Download className="w-4 h-4"/>📊 Export CSV</CSVLink>
+        ><Download className="w-4 h-4"/> Export CSV</CSVLink>
       </div>
 
       {/* ── Date Filters ───────────────────────────────────────── */}
       <div className="flex flex-col md:flex-row gap-3">
         <div className="flex-1">
-          <label className="block text-xs font-bold mb-1.5" style={{color:'#7a6a3a'}}>📅 Start Date</label>
+          {/* TASK 1: 📅 → Calendar icon */}
+          <label className="block text-xs font-bold mb-1.5 flex items-center gap-1" style={{color:'#7a6a3a'}}><Calendar className="w-3.5 h-3.5"/> Start Date</label>
           <input type="date" data-testid="start-date-filter" value={startDate} onChange={e=>setStartDate(e.target.value)} className="omf-input" style={{height:'44px'}}/>
         </div>
         <div className="flex-1">
-          <label className="block text-xs font-bold mb-1.5" style={{color:'#7a6a3a'}}>📅 End Date</label>
+          <label className="block text-xs font-bold mb-1.5 flex items-center gap-1" style={{color:'#7a6a3a'}}><Calendar className="w-3.5 h-3.5"/> End Date</label>
           <input type="date" data-testid="end-date-filter" value={endDate} onChange={e=>setEndDate(e.target.value)} className="omf-input" style={{height:'44px'}}/>
         </div>
       </div>
 
       {/* ── Status Filters ─────────────────────────────────────── */}
       <div className="flex flex-wrap gap-2">
-        {[['all','🍽️ All'],['new','🆕 New'],['preparing','👨‍🍳 Preparing'],['completed','✅ Done'],['cancelled','❌ Cancelled']].map(([k,l])=>(
+        {/* TASK 1: emoji labels → icon + text */}
+        {[
+          ['all',       <><Utensils   className="w-3.5 h-3.5 inline-block mr-1"/> All</>],
+          ['new',       <><Tag        className="w-3.5 h-3.5 inline-block mr-1"/> New</>],
+          ['preparing', <><ChefHat   className="w-3.5 h-3.5 inline-block mr-1"/> Preparing</>],
+          ['completed', <><CheckCircle className="w-3.5 h-3.5 inline-block mr-1"/> Done</>],
+          ['cancelled', <><XCircle   className="w-3.5 h-3.5 inline-block mr-1"/> Cancelled</>],
+        ].map(([k,l])=>(
           <button key={k} data-testid={`filter-${k}`} onClick={()=>setStatusFilter(k)} className={`omf-tab ${statusFilter===k?'omf-tab-on':'omf-tab-off'}`}>{l}</button>
         ))}
       </div>
@@ -815,14 +845,16 @@ const OrdersManagement = () => {
       {/* ── Loading / Empty ─────────────────────────────────────── */}
       {loading?(
         <div className="flex flex-col items-center justify-center py-16 gap-3">
-          <div className="text-5xl animate-bounce">👨‍🍳</div>
+          {/* TASK 1: 👨‍🍳 → ChefHat icon */}
+          <ChefHat className="w-12 h-12 animate-bounce" style={{color:'#C9A227'}}/>
           <p className="text-sm font-bold" style={{color:'#7a6a3a'}}>Fetching orders from the kitchen…</p>
         </div>
       ):filteredOrders.length===0?(
         <div className="omf-card flex flex-col items-center justify-center py-16 gap-3 text-center">
-          <div className="text-6xl mb-1">🫙</div>
+          {/* TASK 1: 🫙 → Package icon */}
+          <Package className="w-14 h-14 mb-1" style={{color:'#3d341a'}}/>
           <p className="omf-title font-black text-white text-lg">No orders yet!</p>
-          <p className="text-sm" style={{color:'#7a6a3a'}}>New orders will fly in real-time 🚀</p>
+          <p className="text-sm" style={{color:'#7a6a3a'}}>New orders will fly in real-time</p>
         </div>
       ):(
         <>
@@ -834,8 +866,22 @@ const OrdersManagement = () => {
               <table className="w-full">
                 <thead>
                   <tr style={{borderBottom:'1px solid rgba(201,162,39,0.12)',background:'rgba(201,162,39,0.04)'}}>
-                    {[['🔖','Order #'],['👤','Customer'],['📞','Phone'],['🍽️','Type'],['🪑','Table'],['📦','Items'],['💵','Total'],['💳','Payment'],['📊','Status'],['⚙️','Actions']].map(([em,h])=>(
-                      <th key={h} className="text-left px-4 py-3.5 text-xs font-black uppercase tracking-wider" style={{color:'#C9A227'}}>{em} {h}</th>
+                    {/* TASK 1: emoji column headers → icon + text */}
+                    {[
+                      [<Tag className="w-3.5 h-3.5 inline-block"/>,'Order #'],
+                      [<User className="w-3.5 h-3.5 inline-block"/>,'Customer'],
+                      [<PhoneCall className="w-3.5 h-3.5 inline-block"/>,'Phone'],
+                      [<Utensils className="w-3.5 h-3.5 inline-block"/>,'Type'],
+                      [<Armchair className="w-3.5 h-3.5 inline-block"/>,'Table'],
+                      [<Package className="w-3.5 h-3.5 inline-block"/>,'Items'],
+                      [<CircleDollarSign className="w-3.5 h-3.5 inline-block"/>,'Total'],
+                      [<CreditCard className="w-3.5 h-3.5 inline-block"/>,'Payment'],
+                      [<LayoutGrid className="w-3.5 h-3.5 inline-block"/>,'Status'],
+                      [<Pencil className="w-3.5 h-3.5 inline-block"/>,'Actions'],
+                    ].map(([ic,h])=>(
+                      <th key={h} className="text-left px-4 py-3.5 text-xs font-black uppercase tracking-wider" style={{color:'#C9A227'}}>
+                        <span className="flex items-center gap-1.5">{ic} {h}</span>
+                      </th>
                     ))}
                   </tr>
                 </thead>
@@ -845,10 +891,6 @@ const OrdersManagement = () => {
                     const CUR=order.currencySymbol||cafeCurrency;
                     return (
                       <React.Fragment key={order.id}>
-                        {/*
-                          ── TASK 1 & 2: statusClass appended to existing className string.
-                             That is the ONLY change to this <tr>.
-                        */}
                         <tr className={`omf-row omf-in ${sb.statusClass} ${expandedOrder===order.id?'omf-row-open':''}`}
                           style={{animationDelay:`${Math.min(oi*25,250)}ms`,animationFillMode:'both'}}
                           onClick={()=>setExpandedOrder(expandedOrder===order.id?null:order.id)}
@@ -857,31 +899,37 @@ const OrdersManagement = () => {
                           <td className="px-4 py-3.5"><span className="omf-ordnum font-black text-base">{fmtOrd(order.orderNumber)}</span></td>
                           <td className="px-4 py-3.5 text-white font-bold text-sm">{order.customerName||'—'}</td>
                           <td className="px-4 py-3.5 text-sm" style={{color:'#7a6a3a'}}>{order.customerPhone||'—'}</td>
-                          <td className="px-4 py-3.5"><span className="text-sm text-white capitalize font-medium">{orderTypeIcon(order.orderType)} {order.orderType||'—'}</span></td>
-                          <td className="px-4 py-3.5 text-sm text-white font-medium">
-                            {order.orderType==='dine-in'?(order.tableNumber?`🪑 ${order.tableNumber}`:'—'):order.orderType==='delivery'?<span style={{color:'#7a6a3a',fontSize:11}}>🛵 Delivery</span>:'—'}
+                          <td className="px-4 py-3.5">
+                            {/* TASK 1: orderTypeIcon now returns Lucide icon */}
+                            <span className="text-sm text-white capitalize font-medium flex items-center gap-1">{orderTypeIcon(order.orderType)} {order.orderType||'—'}</span>
                           </td>
-                          <td className="px-4 py-3.5 text-sm font-medium" style={{color:'#7a6a3a'}}>🍴 {getItemsCount(order.items)}</td>
-                          <td className="px-4 py-3.5"><span className="font-black text-sm" style={{color:'#C9A227'}}>💵 {CUR}{(order.totalAmount||order.total||0).toFixed(0)}</span></td>
-                          <td className="px-4 py-3.5"><span className="omf-badge" style={{background:pb.bg,color:pb.color,borderColor:pb.bd}}>{pb.emoji} {order.paymentStatus||'pending'}</span></td>
-                          {/*
-                            TASK 3: completed badge now renders green (#4ade80) because
-                            STATUS.completed.color was updated from '#C9A227' to '#4ade80'.
-                            The badge style prop reads sb.color — no JSX change needed.
-                          */}
-                          <td className="px-4 py-3.5"><span className="omf-badge capitalize" style={{background:sb.bg,color:sb.color,borderColor:sb.bd}}>{sb.emoji} {sb.label}</span></td>
+                          <td className="px-4 py-3.5 text-sm text-white font-medium">
+                            {order.orderType==='dine-in'
+                              ? (order.tableNumber ? <span className="flex items-center gap-1"><Armchair className="w-3.5 h-3.5"/> {order.tableNumber}</span> : '—')
+                              : order.orderType==='delivery'
+                                ? <span className="flex items-center gap-1" style={{color:'#7a6a3a',fontSize:11}}><Bike className="w-3.5 h-3.5"/> Delivery</span>
+                                : '—'}
+                          </td>
+                          <td className="px-4 py-3.5 text-sm font-medium flex items-center gap-1" style={{color:'#7a6a3a'}}><Utensils className="w-3.5 h-3.5"/> {getItemsCount(order.items)}</td>
+                          <td className="px-4 py-3.5"><span className="font-black text-sm flex items-center gap-1" style={{color:'#C9A227'}}><CircleDollarSign className="w-3.5 h-3.5"/> {CUR}{(order.totalAmount||order.total||0).toFixed(0)}</span></td>
+                          <td className="px-4 py-3.5"><span className="omf-badge" style={{background:pb.bg,color:pb.color,borderColor:pb.bd}}>{pb.icon} {order.paymentStatus||'pending'}</span></td>
+                          <td className="px-4 py-3.5"><span className="omf-badge capitalize" style={{background:sb.bg,color:sb.color,borderColor:sb.bd}}>{sb.icon} {sb.label}</span></td>
                           <td className="px-4 py-3.5" onClick={e=>e.stopPropagation()}>
                             <div className="flex flex-col gap-2">
                               <div className="flex gap-1.5">
                                 <select data-testid={`order-status-${order.id}`} value={order.orderStatus||'new'} onChange={e=>updateOrderStatus(order.id,e.target.value)} className="omf-select">
-                                  <option value="new">🆕 New</option><option value="preparing">👨‍🍳 Preparing</option><option value="completed">✅ Done</option><option value="cancelled">❌ Cancelled</option>
+                                  <option value="new">New</option>
+                                  <option value="preparing">Preparing</option>
+                                  <option value="completed">Done</option>
+                                  <option value="cancelled">Cancelled</option>
                                 </select>
                                 <select data-testid={`payment-status-${order.id}`} value={order.paymentStatus||'pending'} onChange={e=>updatePaymentStatus(order.id,e.target.value)} className="omf-select">
-                                  <option value="pending">⏳ Pending</option><option value="paid">💰 Paid</option>
+                                  <option value="pending">Pending</option>
+                                  <option value="paid">Paid</option>
                                 </select>
                               </div>
                               <div className="flex gap-1.5 flex-wrap">
-                                <button onClick={e=>handleViewInvoice(order.id,e)} disabled={invoiceLoading===order.id} data-testid={`view-invoice-${order.id}`} className="omf-btn omf-btn-yellow"><Eye className="w-3 h-3"/>{invoiceLoading===order.id?'…':'🧾 Bill'}</button>
+                                <button onClick={e=>handleViewInvoice(order.id,e)} disabled={invoiceLoading===order.id} data-testid={`view-invoice-${order.id}`} className="omf-btn omf-btn-yellow"><Eye className="w-3 h-3"/>{invoiceLoading===order.id?'…':'Bill'}</button>
                                 <button onClick={e=>handleDownloadInvoice(order.id,e)} disabled={invoiceLoading===order.id} data-testid={`download-invoice-${order.id}`} className="omf-btn omf-btn-ghost"><FileText className="w-3 h-3"/>PDF</button>
                                 {order.customerPhone&&<button onClick={e=>handleSendInvoiceWA(order,e)} data-testid={`wa-invoice-${order.id}`} className="omf-btn omf-btn-green"><MessageSquare className="w-3 h-3"/>WA</button>}
                                 {order.orderStatus!=='completed'&&order.orderStatus!=='cancelled'&&(
@@ -900,35 +948,42 @@ const OrdersManagement = () => {
                           </td>
                         </tr>
 
-                        {/* Expanded row — UNCHANGED */}
+                        {/* Expanded row */}
                         {expandedOrder===order.id&&(
                           <tr>
                             <td colSpan="10" style={{background:'rgba(201,162,39,0.025)',borderBottom:'1px solid rgba(201,162,39,0.08)'}}>
                               <div className="px-5 py-5 grid grid-cols-2 gap-8">
                                 <div>
-                                  <p className="omf-sec mb-3">🍴 Order Items</p>
+                                  {/* TASK 1: 🍴 → Utensils icon in section label */}
+                                  <p className="omf-sec mb-3"><Utensils className="w-3.5 h-3.5"/> Order Items</p>
                                   {renderItemsList(order,CUR,false)}
                                 </div>
                                 <div>
-                                  <p className="omf-sec mb-3">📋 Details</p>
+                                  {/* TASK 1: 📋 → ClipboardList icon */}
+                                  <p className="omf-sec mb-3"><ClipboardList className="w-3.5 h-3.5"/> Details</p>
                                   <div className="space-y-2.5 text-sm">
-                                    <div className="flex items-center gap-2.5" style={{color:'#7a6a3a'}}><span>🕐</span><span>{order.createdAt?.toDate?.().toLocaleString()||'N/A'}</span></div>
-                                    {order.customerPhone&&<div className="flex items-center gap-2.5" style={{color:'#7a6a3a'}}><span>📞</span><span>{order.customerPhone}</span></div>}
-                                    {order.orderType==='delivery'&&order.deliveryAddress&&<div className="flex items-start gap-2.5" style={{color:'#7a6a3a'}}><span>📍</span><span>{order.deliveryAddress}</span></div>}
+                                    <div className="flex items-center gap-2.5" style={{color:'#7a6a3a'}}><Clock className="w-3.5 h-3.5"/><span>{order.createdAt?.toDate?.().toLocaleString()||'N/A'}</span></div>
+                                    {order.customerPhone&&<div className="flex items-center gap-2.5" style={{color:'#7a6a3a'}}><PhoneCall className="w-3.5 h-3.5"/><span>{order.customerPhone}</span></div>}
+                                    {order.orderType==='delivery'&&order.deliveryAddress&&<div className="flex items-start gap-2.5" style={{color:'#7a6a3a'}}><MapPin className="w-3.5 h-3.5"/><span>{order.deliveryAddress}</span></div>}
                                     {order?.orderType==='delivery'&&(
                                       <div className="text-sm mt-1">
-                                        <strong style={{color:'#C9A227'}}>🛵 Delivery Address:</strong>
+                                        <strong style={{color:'#C9A227'}} className="flex items-center gap-1"><Bike className="w-3.5 h-3.5"/> Delivery Address:</strong>
                                         <div className="text-white mt-0.5">{order?.deliveryAddress||'N/A'}</div>
                                       </div>
                                     )}
                                     {order.specialInstructions&&(
                                       <div className="mt-3 p-3 rounded-xl" style={{background:'rgba(201,162,39,0.1)',border:'1px solid rgba(201,162,39,0.2)'}}>
-                                        <p className="text-xs font-black mb-1" style={{color:'#C9A227'}}>📝 Special Instructions</p>
+                                        {/* TASK 1: 📝 → Pencil icon */}
+                                        <p className="text-xs font-black mb-1 flex items-center gap-1" style={{color:'#C9A227'}}><Pencil className="w-3 h-3"/> Special Instructions</p>
                                         <p className="text-white text-sm">{order.specialInstructions}</p>
                                       </div>
                                     )}
-                                    <div className="text-xs mt-1" style={{color:'#7a6a3a'}}>
-                                      {order.paymentMode==='counter'?'🏪 Pay at Counter':order.paymentMode==='table'?'🪑 Pay on Table':'📱 Prepaid (UPI)'}
+                                    <div className="text-xs mt-1 flex items-center gap-1" style={{color:'#7a6a3a'}}>
+                                      {order.paymentMode==='counter'
+                                        ? <><Store className="w-3.5 h-3.5"/> Pay at Counter</>
+                                        : order.paymentMode==='table'
+                                          ? <><Armchair className="w-3.5 h-3.5"/> Pay on Table</>
+                                          : <><CreditCard className="w-3.5 h-3.5"/> Prepaid (UPI)</>}
                                     </div>
                                   </div>
                                 </div>
@@ -959,7 +1014,8 @@ const OrdersManagement = () => {
                   {/* Card top */}
                   <div className="p-4 flex items-center justify-between cursor-pointer" onClick={()=>setExpandedOrder(expandedOrder===order.id?null:order.id)}>
                     <div className="flex items-center gap-3">
-                      <div className="w-11 h-11 rounded-2xl flex items-center justify-center text-xl flex-shrink-0" style={{background:'rgba(201,162,39,0.1)',border:'1.5px solid rgba(201,162,39,0.2)'}}>
+                      <div className="w-11 h-11 rounded-2xl flex items-center justify-center flex-shrink-0" style={{background:'rgba(201,162,39,0.1)',border:'1.5px solid rgba(201,162,39,0.2)'}}>
+                        {/* TASK 1: orderTypeIcon returns Lucide icon */}
                         {orderTypeIcon(order.orderType)}
                       </div>
                       <div>
@@ -971,83 +1027,86 @@ const OrdersManagement = () => {
                       </div>
                     </div>
                     <div className="flex flex-col items-end gap-1.5">
-                      <span className="font-black text-sm" style={{color:'#C9A227'}}>💵 {CUR}{(order.totalAmount||order.total||0).toFixed(0)}</span>
-                      {/* TASK 3: green badge for completed via sb.color — no JSX change needed */}
-                      <span className="omf-badge capitalize" style={{background:sb.bg,color:sb.color,borderColor:sb.bd}}>{sb.emoji} {sb.label}</span>
+                      <span className="font-black text-sm flex items-center gap-1" style={{color:'#C9A227'}}><CircleDollarSign className="w-3.5 h-3.5"/> {CUR}{(order.totalAmount||order.total||0).toFixed(0)}</span>
+                      <span className="omf-badge capitalize" style={{background:sb.bg,color:sb.color,borderColor:sb.bd}}>{sb.icon} {sb.label}</span>
                     </div>
                   </div>
 
-                  {/* Meta strip — UNCHANGED */}
+                  {/* Meta strip */}
                   <div className="px-4 pb-3.5 flex flex-wrap items-center gap-2" style={{borderTop:'1px solid rgba(255,255,255,0.04)'}}>
-                    <span className="text-xs font-medium capitalize" style={{color:'#7a6a3a'}}>{orderTypeIcon(order.orderType)} {order.orderType}</span>
+                    <span className="text-xs font-medium capitalize flex items-center gap-1" style={{color:'#7a6a3a'}}>{orderTypeIcon(order.orderType)} {order.orderType}</span>
                     {order.orderType==='dine-in'&&order.tableNumber&&<span className="text-xs text-white font-bold">· Table {order.tableNumber}</span>}
-                    {order.orderType==='delivery'&&order.deliveryAddress&&<span className="text-xs truncate max-w-[160px]" style={{color:'#7a6a3a'}}>📍 {order.deliveryAddress}</span>}
-                    <span className="text-xs font-medium" style={{color:'#7a6a3a'}}>· 🍴 {getItemsCount(order.items)}</span>
-                    <span className="omf-badge" style={{background:pb.bg,color:pb.color,borderColor:pb.bd}}>{pb.emoji} {order.paymentStatus||'pending'}</span>
+                    {order.orderType==='delivery'&&order.deliveryAddress&&<span className="text-xs truncate max-w-[160px] flex items-center gap-1" style={{color:'#7a6a3a'}}><MapPin className="w-3 h-3"/> {order.deliveryAddress}</span>}
+                    <span className="text-xs font-medium flex items-center gap-1" style={{color:'#7a6a3a'}}>· <Utensils className="w-3 h-3"/> {getItemsCount(order.items)}</span>
+                    <span className="omf-badge" style={{background:pb.bg,color:pb.color,borderColor:pb.bd}}>{pb.icon} {order.paymentStatus||'pending'}</span>
                   </div>
 
-                  {/* Expanded — UNCHANGED */}
+                  {/* Expanded */}
                   {expandedOrder===order.id&&(
                     <div className="px-4 pb-5 space-y-4" style={{borderTop:'1px solid rgba(201,162,39,0.08)'}}>
                       <div className="pt-4">
-                        <p className="omf-sec mb-3">🍴 Items</p>
+                        <p className="omf-sec mb-3"><Utensils className="w-3.5 h-3.5"/> Items</p>
                         {renderItemsList(order,CUR,true)}
                       </div>
 
                       {order?.orderType==='delivery'&&(
                         <div className="p-3 rounded-xl" style={{background:'rgba(255,255,255,0.03)',border:'1px solid rgba(255,255,255,0.06)'}}>
-                          <strong style={{color:'#C9A227'}}>🛵 Delivery Address</strong>
+                          <strong style={{color:'#C9A227'}} className="flex items-center gap-1"><Bike className="w-3.5 h-3.5"/> Delivery Address</strong>
                           <div className="text-white mt-1 text-sm">{order?.deliveryAddress||'N/A'}</div>
                         </div>
                       )}
 
                       {order.specialInstructions&&(
                         <div className="p-3 rounded-xl" style={{background:'rgba(201,162,39,0.1)',border:'1px solid rgba(201,162,39,0.2)'}}>
-                          <p className="text-xs font-black mb-1" style={{color:'#C9A227'}}>📝 Special Instructions</p>
+                          <p className="text-xs font-black mb-1 flex items-center gap-1" style={{color:'#C9A227'}}><Pencil className="w-3 h-3"/> Special Instructions</p>
                           <p className="text-white text-sm">{order.specialInstructions}</p>
                         </div>
                       )}
 
                       <div className="flex gap-2" onClick={e=>e.stopPropagation()}>
                         <select value={order.orderStatus||'new'} onChange={e=>updateOrderStatus(order.id,e.target.value)} className="omf-select flex-1" style={{padding:'9px 12px',fontSize:13,borderRadius:12}}>
-                          <option value="new">🆕 New</option><option value="preparing">👨‍🍳 Preparing</option><option value="completed">✅ Done</option><option value="cancelled">❌ Cancelled</option>
+                          <option value="new">New</option>
+                          <option value="preparing">Preparing</option>
+                          <option value="completed">Done</option>
+                          <option value="cancelled">Cancelled</option>
                         </select>
                         <select value={order.paymentStatus||'pending'} onChange={e=>updatePaymentStatus(order.id,e.target.value)} className="omf-select flex-1" style={{padding:'9px 12px',fontSize:13,borderRadius:12}}>
-                          <option value="pending">⏳ Pending</option><option value="paid">💰 Paid</option>
+                          <option value="pending">Pending</option>
+                          <option value="paid">Paid</option>
                         </select>
                       </div>
 
                       <div className="flex gap-2" onClick={e=>e.stopPropagation()}>
                         <button onClick={e=>handleViewInvoice(order.id,e)} disabled={invoiceLoading===order.id} className="omf-btn omf-btn-yellow flex-1 justify-center py-2.5" style={{borderRadius:12}}>
-                          <Eye className="w-4 h-4"/>{invoiceLoading===order.id?'⏳ Loading…':'🧾 View Bill'}
+                          <Eye className="w-4 h-4"/>{invoiceLoading===order.id?'Loading…':'View Bill'}
                         </button>
                         <button onClick={e=>handleDownloadInvoice(order.id,e)} disabled={invoiceLoading===order.id} className="omf-btn omf-btn-ghost flex-1 justify-center py-2.5" style={{borderRadius:12}}>
-                          <FileText className="w-4 h-4"/>📄 PDF
+                          <FileText className="w-4 h-4"/> PDF
                         </button>
                       </div>
                       {order.customerPhone&&(
                         <div onClick={e=>e.stopPropagation()}>
                           <button onClick={e=>handleSendInvoiceWA(order,e)} className="omf-btn omf-btn-green w-full justify-center py-2.5" style={{borderRadius:12}}>
-                            <MessageSquare className="w-4 h-4"/>💬 Send via WhatsApp
+                            <MessageSquare className="w-4 h-4"/> Send via WhatsApp
                           </button>
                         </div>
                       )}
                       {order.orderStatus!=='completed'&&order.orderStatus!=='cancelled'&&(
                         <div onClick={e=>e.stopPropagation()}>
                           <button onClick={()=>setAddItemsOrder(order)} data-testid={`add-items-mobile-${order.id}`} className="omf-btn omf-btn-blue w-full justify-center py-2.5" style={{borderRadius:12}}>
-                            <Plus className="w-4 h-4"/>➕ Add Items to Order
+                            <Plus className="w-4 h-4"/> Add Items to Order
                           </button>
                         </div>
                       )}
                       <div onClick={e=>e.stopPropagation()}>
                         {deleteConfirmId===order.id?(
                           <div className="flex gap-2">
-                            <button onClick={()=>handleSoftDelete(order.id)} disabled={deleting} className="omf-btn flex-1 justify-center py-2.5" style={{background:'#dc2626',color:'#fff',border:'none',borderRadius:12}}>{deleting?'⏳ Removing…':'🗑️ Yes, Remove'}</button>
-                            <button onClick={()=>setDeleteConfirmId(null)} className="omf-btn omf-btn-ghost flex-1 justify-center py-2.5" style={{borderRadius:12}}>✗ Cancel</button>
+                            <button onClick={()=>handleSoftDelete(order.id)} disabled={deleting} className="omf-btn flex-1 justify-center py-2.5" style={{background:'#dc2626',color:'#fff',border:'none',borderRadius:12}}>{deleting?'Removing…':'Yes, Remove'}</button>
+                            <button onClick={()=>setDeleteConfirmId(null)} className="omf-btn omf-btn-ghost flex-1 justify-center py-2.5" style={{borderRadius:12}}>Cancel</button>
                           </div>
                         ):(
                           <button onClick={()=>setDeleteConfirmId(order.id)} className="omf-btn omf-btn-ghost w-full justify-center py-2.5" style={{borderRadius:12,color:'#5a4a1a'}}>
-                            <Trash2 className="w-3.5 h-3.5"/>🗑️ Remove Order
+                            <Trash2 className="w-3.5 h-3.5"/> Remove Order
                           </button>
                         )}
                       </div>
@@ -1058,9 +1117,9 @@ const OrdersManagement = () => {
             })}
           </div>
 
-          {/* Footer — UNCHANGED */}
+          {/* Footer */}
           <div className="flex items-center justify-center gap-2 py-2">
-            <span>🍽️</span>
+            <Utensils className="w-4 h-4" style={{color:'#7a6a3a'}}/>
             <p className="text-xs font-bold" style={{color:'#7a6a3a'}}>
               {filteredOrders.length} order{filteredOrders.length!==1?'s':''} · Live kitchen feed active
             </p>
