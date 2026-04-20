@@ -3,7 +3,13 @@ import { useAuth } from '../../contexts/AuthContext';
 import { useCollection, useDocument } from '../../hooks/useFirestore';
 import { where, addDoc, collection, doc, updateDoc, deleteDoc } from 'firebase/firestore';
 import { db } from '../../lib/firebase';
-import { Plus, Edit, Trash2, X, RefreshCw, Search } from 'lucide-react';
+import {
+  Plus, Edit, Trash2, X, RefreshCw, Search,
+  Utensils, ChefHat, Tag, FolderOpen, Image, Eye, EyeOff,
+  Sparkles, Star, Flame, Dumbbell, Wheat, Package,
+  Pill, Ruler, CheckCircle, Leaf, Beef,
+  Coffee, CupSoda, GlassWater, Save,
+} from 'lucide-react';
 import { toast } from 'sonner';
 import MediaUpload, { MediaPreview } from '../MediaUpload';
 import AddOnEditor from './AddOnEditor';
@@ -179,7 +185,7 @@ const MenuManagement = () => {
       transition={{ type: 'spring', damping: 24, stiffness: 280 }} className="mm-sheet rounded-2xl mt-3 overflow-hidden">
       <div className="flex items-center justify-between px-6 py-4 flex-shrink-0" style={{ borderBottom: '1px solid rgba(201,162,39,0.14)' }}>
         <div className="flex items-center gap-3">
-          <span className="text-3xl">{editingItem ? '✏️' : '🍽️'}</span>
+          {editingItem ? <Edit className="w-8 h-8" style={{ color: '#C9A227' }} /> : <Utensils className="w-8 h-8" style={{ color: '#C9A227' }} />}
           <div>
             <h3 className="mm-title text-white font-bold text-lg">{editingItem ? 'Edit Menu Item' : 'Add New Menu Item'}</h3>
             <p className="text-xs mt-0.5" style={{ color: '#7a6a55' }}>{editingItem ? `Editing: ${editingItem.name}` : 'Fill in details to add to your menu'}</p>
@@ -191,31 +197,31 @@ const MenuManagement = () => {
       </div>
       <form onSubmit={handleSubmit} className="px-6 py-5 space-y-5 mm-scroll overflow-y-auto" style={{ maxHeight: '80vh' }}>
         <div>
-          <label className="mm-label">🏷️ Item Name</label>
+          <label className="mm-label"><Tag className="inline w-3 h-3 mr-1" />Item Name</label>
           <input type="text" value={formData.name} onChange={(e) => setFormData(prev => ({ ...prev, name: e.target.value }))} className="mm-input" placeholder="e.g., Espresso, Butter Chicken…" required disabled={saving} />
         </div>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
-            <label className="mm-label">💰 Price ({CUR})</label>
+            <label className="mm-label">Price ({CUR})</label>
             <div className="relative">
               <span className="absolute left-3.5 top-1/2 -translate-y-1/2 font-black text-sm" style={{ color: '#C9A227' }}>{CUR}</span>
               <input type="number" step="0.01" value={formData.price} onChange={(e) => setFormData(prev => ({ ...prev, price: e.target.value }))} className="mm-input" style={{ paddingLeft: '2rem' }} placeholder="99" required disabled={saving} />
             </div>
           </div>
           <div>
-            <label className="mm-label">🗂️ Category</label>
+            <label className="mm-label"><FolderOpen className="inline w-3 h-3 mr-1" />Category</label>
             <input type="text" value={formData.category} onChange={(e) => setFormData(prev => ({ ...prev, category: e.target.value }))} className="mm-input" placeholder="e.g., Coffee, Starters…" disabled={saving} />
           </div>
         </div>
         <div>
-          <label className="mm-label">🖼️ Item Media (Image / GIF / Video)</label>
+          <label className="mm-label"><Image className="inline w-3 h-3 mr-1" />Item Media (Image / GIF / Video)</label>
           <div className="rounded-xl overflow-hidden" style={{ border: '1.5px solid rgba(201,162,39,0.14)', background: 'rgba(201,162,39,0.03)' }}>
             <MediaUpload label="" value={formData.image} onChange={(url) => setFormData(prev => ({ ...prev, image: url }))} storagePath={`menu/${cafeId}`} maxSizeMB={20} disabled={saving} />
           </div>
         </div>
         <div className="flex items-center justify-between px-4 py-3 rounded-xl" style={{ background: 'rgba(255,255,255,0.03)', border: '1.5px solid rgba(255,255,255,0.07)' }}>
           <div>
-            <p className="text-white font-bold text-sm">👁️ Available for Order</p>
+            <p className="text-white font-bold text-sm flex items-center gap-1.5"><Eye className="w-4 h-4" /> Available for Order</p>
             <p className="text-xs mt-0.5" style={{ color: '#7a6a55' }}>Customers can see and order this item</p>
           </div>
           <button type="button" disabled={saving} onClick={() => setFormData(prev => ({ ...prev, available: !prev.available }))} className="mm-toggle-track disabled:opacity-50" style={{ background: formData.available ? '#C9A227' : '#2a2018' }}>
@@ -223,7 +229,7 @@ const MenuManagement = () => {
           </button>
         </div>
         <div>
-          <label className="mm-label">✨ Add-ons &amp; Extras</label>
+          <label className="mm-label"><Sparkles className="inline w-3 h-3 mr-1" />Add-ons &amp; Extras</label>
           <div className="mm-form-section">
             <AddOnEditor addons={formData.addons || []} onChange={(updated) => setFormData(prev => ({ ...prev, addons: updated }))} currencySymbol={CUR} disabled={saving} />
           </div>
@@ -231,7 +237,7 @@ const MenuManagement = () => {
         <div className="mm-form-section space-y-3">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-white font-bold text-sm">📏 Size Pricing (S / M / L)</p>
+              <p className="text-white font-bold text-sm flex items-center gap-1.5"><Ruler className="w-4 h-4" /> Size Pricing (S / M / L)</p>
               <p className="text-xs mt-0.5" style={{ color: '#7a6a55' }}>Enable to set different prices per size</p>
             </div>
             <button type="button" disabled={saving} onClick={() => setFormData(prev => ({ ...prev, sizePricing: { ...prev.sizePricing, enabled: !prev.sizePricing?.enabled } }))} className="mm-toggle-track disabled:opacity-50" style={{ background: formData.sizePricing?.enabled ? '#C9A227' : '#2a2018' }}>
@@ -240,9 +246,13 @@ const MenuManagement = () => {
           </div>
           {formData.sizePricing?.enabled && (
             <div className="grid grid-cols-3 gap-3 pt-1">
-              {[{ key: 'small', emoji: '☕', label: `Small ${CUR}` }, { key: 'medium', emoji: '🥤', label: `Medium ${CUR}` }, { key: 'large', emoji: '🧋', label: `Large ${CUR}` }].map(({ key, emoji, label }) => (
+              {[
+                { key: 'small',  icon: Coffee,     label: `Small ${CUR}`  },
+                { key: 'medium', icon: CupSoda,    label: `Medium ${CUR}` },
+                { key: 'large',  icon: GlassWater, label: `Large ${CUR}`  },
+              ].map(({ key, icon: SizeIcon, label }) => (
                 <div key={key}>
-                  <label className="mm-label">{emoji} {key.charAt(0).toUpperCase() + key.slice(1)}</label>
+                  <label className="mm-label"><SizeIcon className="inline w-3 h-3 mr-1" />{key.charAt(0).toUpperCase() + key.slice(1)}</label>
                   <input type="number" min="0" step="0.01" placeholder={label} value={formData.sizePricing?.[key] || ''} onChange={(e) => setFormData(prev => ({ ...prev, sizePricing: { ...prev.sizePricing, [key]: e.target.value } }))} disabled={saving} className="mm-input" style={{ fontSize: 13 }} />
                 </div>
               ))}
@@ -250,30 +260,41 @@ const MenuManagement = () => {
           )}
         </div>
         <div className="mm-form-section space-y-4">
-          <div><p className="mm-sec mb-1">🥗 Food Details</p><p className="text-xs" style={{ color: '#7a6a55' }}>Optional — shown in customer menu</p></div>
           <div>
-            <label className="mm-label">🌿 Ingredients (comma separated)</label>
+            <p className="mm-sec mb-1"><Utensils className="w-3.5 h-3.5" />Food Details</p>
+            <p className="text-xs" style={{ color: '#7a6a55' }}>Optional — shown in customer menu</p>
+          </div>
+          <div>
+            <label className="mm-label"><Leaf className="inline w-3 h-3 mr-1" />Ingredients (comma separated)</label>
             <input type="text" value={formData.ingredients} onChange={e => setFormData(prev => ({ ...prev, ingredients: e.target.value }))} placeholder="e.g. Espresso, Oat Milk, Cinnamon" disabled={saving} className="mm-input" />
           </div>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-            {[{ key: 'calories', emoji: '🔥', label: 'Calories (kcal)' }, { key: 'protein', emoji: '💪', label: 'Protein (g)' }, { key: 'carbs', emoji: '🌾', label: 'Carbs (g)' }, { key: 'fats', emoji: '🫙', label: 'Fats (g)' }].map(({ key, emoji, label }) => (
+            {[
+              { key: 'calories', icon: Flame,    label: 'Calories (kcal)' },
+              { key: 'protein',  icon: Dumbbell, label: 'Protein (g)'     },
+              { key: 'carbs',    icon: Wheat,    label: 'Carbs (g)'       },
+              { key: 'fats',     icon: Package,  label: 'Fats (g)'        },
+            ].map(({ key, icon: NutrIcon, label }) => (
               <div key={key}>
-                <label className="mm-label">{emoji} {label}</label>
+                <label className="mm-label"><NutrIcon className="inline w-3 h-3 mr-1" />{label}</label>
                 <input type="number" min="0" step="any" value={formData[key]} onChange={e => setFormData(prev => ({ ...prev, [key]: e.target.value }))} placeholder="0" disabled={saving} className="mm-input" style={{ fontSize: 13 }} />
               </div>
             ))}
           </div>
           <div>
-            <label className="mm-label">💊 Micronutrients (optional)</label>
+            <label className="mm-label"><Pill className="inline w-3 h-3 mr-1" />Micronutrients (optional)</label>
             <input type="text" value={formData.micros} onChange={e => setFormData(prev => ({ ...prev, micros: e.target.value }))} placeholder="e.g. Vitamin C 15mg, Iron 2mg" disabled={saving} className="mm-input" />
           </div>
         </div>
         <div className="mm-form-section space-y-3">
-          <div><p className="mm-sec mb-1">🏷️ Item Tags</p><p className="text-xs" style={{ color: '#7a6a55' }}>Optional — shown on customer menu. Veg &amp; Non-Veg are mutually exclusive.</p></div>
+          <div>
+            <p className="mm-sec mb-1"><Tag className="w-3.5 h-3.5" />Item Tags</p>
+            <p className="text-xs" style={{ color: '#7a6a55' }}>Optional — shown on customer menu. Veg &amp; Non-Veg are mutually exclusive.</p>
+          </div>
           <div className="grid grid-cols-2 gap-3">
             {[
-              { key: 'veg',    active: formData.isVeg,        color: '#16a34a', dotColor: '#16a34a', text: 'Veg 🌱',       sub: 'Green dot mark',     textColor: '#4ade80' },
-              { key: 'nonveg', active: formData.isNonVeg,     color: '#dc2626', dotColor: '#dc2626', text: 'Non-Veg 🍗',   sub: 'Red dot mark',       textColor: '#f87171' },
+              { key: 'veg',    active: formData.isVeg,    color: '#16a34a', dotColor: '#16a34a', text: 'Veg',     sub: 'Green dot mark', textColor: '#4ade80' },
+              { key: 'nonveg', active: formData.isNonVeg, color: '#dc2626', dotColor: '#dc2626', text: 'Non-Veg', sub: 'Red dot mark',   textColor: '#f87171' },
             ].map(({ key, active, color, dotColor, text, sub, textColor }) => (
               <button key={key} type="button" disabled={saving} onClick={() => handleVegToggle(key)}
                 className="flex items-center gap-3 p-3 rounded-xl border transition-all text-left disabled:opacity-50"
@@ -282,19 +303,22 @@ const MenuManagement = () => {
                   <div className="w-2.5 h-2.5 rounded-full" style={{ background: active ? dotColor : '#555' }} />
                 </div>
                 <div>
-                  <p className="text-sm font-black leading-tight" style={{ color: active ? textColor : '#7a6a55' }}>{text}</p>
+                  <p className="text-sm font-black leading-tight flex items-center gap-1" style={{ color: active ? textColor : '#7a6a55' }}>
+                    {key === 'veg' ? <Leaf className="w-3.5 h-3.5" /> : <Beef className="w-3.5 h-3.5" />}
+                    {text}
+                  </p>
                   <p className="text-xs mt-0.5" style={{ color: '#4a3f35' }}>{sub}</p>
                 </div>
               </button>
             ))}
             {[
-              { field: 'isNew', emoji: '✨', label: 'Newly Arrived', sub: 'Shows in "New" section', activeColor: '#fbbf24', activeBg: 'rgba(255,190,11,0.1)', activeBorder: 'rgba(255,190,11,0.35)' },
-              { field: 'isBestSeller', emoji: '⭐', label: 'Best Seller', sub: 'Shows in "Best Sellers"', activeColor: '#C9A227', activeBg: 'rgba(201,162,39,0.1)', activeBorder: 'rgba(201,162,39,0.35)' },
-            ].map(({ field, emoji, label, sub, activeColor, activeBg, activeBorder }) => (
+              { field: 'isNew',        icon: Sparkles, label: 'Newly Arrived', sub: 'Shows in "New" section',  activeColor: '#fbbf24', activeBg: 'rgba(255,190,11,0.1)',  activeBorder: 'rgba(255,190,11,0.35)'  },
+              { field: 'isBestSeller', icon: Star,     label: 'Best Seller',   sub: 'Shows in "Best Sellers"', activeColor: '#C9A227', activeBg: 'rgba(201,162,39,0.1)', activeBorder: 'rgba(201,162,39,0.35)'  },
+            ].map(({ field, icon: TagIcon, label, sub, activeColor, activeBg, activeBorder }) => (
               <button key={field} type="button" disabled={saving} onClick={() => setFormData(prev => ({ ...prev, [field]: !prev[field] }))}
                 className="flex items-center gap-3 p-3 rounded-xl border transition-all text-left disabled:opacity-50"
                 style={{ background: formData[field] ? activeBg : 'rgba(255,255,255,0.03)', border: `1.5px solid ${formData[field] ? activeBorder : 'rgba(255,255,255,0.08)'}` }}>
-                <span className="text-xl leading-none flex-shrink-0">{emoji}</span>
+                <TagIcon className="w-5 h-5 flex-shrink-0" style={{ color: formData[field] ? activeColor : '#7a6a55' }} />
                 <div>
                   <p className="text-sm font-black leading-tight" style={{ color: formData[field] ? activeColor : '#7a6a55' }}>{label}</p>
                   <p className="text-xs mt-0.5" style={{ color: '#4a3f35' }}>{sub}</p>
@@ -305,9 +329,11 @@ const MenuManagement = () => {
         </div>
         <div className="flex gap-3 pt-2 pb-4">
           <motion.button type="submit" disabled={saving} whileHover={{ scale: 1.01 }} whileTap={{ scale: 0.97 }} className="mm-btn mm-btn-orange flex-1 justify-center disabled:opacity-60" style={{ padding: '12px 20px', fontSize: 14, borderRadius: 12 }}>
-            {saving ? <><RefreshCw className="w-4 h-4 animate-spin" />Saving…</> : editingItem ? <>💾 Update Item</> : <>🚀 Add to Menu</>}
+            {saving ? <><RefreshCw className="w-4 h-4 animate-spin" />Saving…</> : editingItem ? <><Save className="w-4 h-4" /> Update Item</> : <><Plus className="w-4 h-4" /> Add to Menu</>}
           </motion.button>
-          <button type="button" onClick={resetForm} disabled={saving} className="mm-btn mm-btn-ghost disabled:opacity-50" style={{ padding: '12px 20px', fontSize: 14, borderRadius: 12 }}>✗ Cancel</button>
+          <button type="button" onClick={resetForm} disabled={saving} className="mm-btn mm-btn-ghost disabled:opacity-50" style={{ padding: '12px 20px', fontSize: 14, borderRadius: 12 }}>
+            <X className="w-4 h-4" /> Cancel
+          </button>
         </div>
       </form>
     </motion.div>
@@ -317,7 +343,7 @@ const MenuManagement = () => {
     <div className="mm space-y-5 relative">
       <div className="flex flex-wrap justify-between items-center gap-3">
         <div className="flex items-center gap-3">
-          <div className="text-4xl">🍽️</div>
+          <Utensils className="w-10 h-10" style={{ color: '#C9A227' }} />
           <div>
             <h2 className="mm-title text-2xl font-black text-white">Menu Management</h2>
             <p className="text-xs mt-0.5 flex items-center gap-1.5" style={{ color: '#7a6a55' }}>
@@ -328,11 +354,11 @@ const MenuManagement = () => {
         </div>
         <div className="flex items-center gap-2.5">
           <motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.96 }} onClick={() => { resetForm(); setShowForm(true); }} className="mm-btn mm-btn-orange" style={{ padding: '10px 18px', fontSize: 13, borderRadius: 12 }}>
-            <Plus className="w-4 h-4" />🍳 Add Menu Item
+            <Plus className="w-4 h-4" /><ChefHat className="w-4 h-4" /> Add Menu Item
           </motion.button>
           {menuItems && menuItems.length > 0 && (
             <motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.96 }} onClick={handleDeleteAll} disabled={deletingAll} className="mm-btn mm-btn-red disabled:opacity-50" style={{ padding: '10px 16px', fontSize: 13, borderRadius: 12 }}>
-              {deletingAll ? <><RefreshCw className="w-3.5 h-3.5 animate-spin" />Deleting…</> : <><Trash2 className="w-3.5 h-3.5" />🗑️ Delete All</>}
+              {deletingAll ? <><RefreshCw className="w-3.5 h-3.5 animate-spin" />Deleting…</> : <><Trash2 className="w-3.5 h-3.5" /> Delete All</>}
             </motion.button>
           )}
         </div>
@@ -341,13 +367,13 @@ const MenuManagement = () => {
       {menuItems && menuItems.length > 0 && (
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
           {[
-            { emoji: '🍽️', label: 'Total Items',   value: stats.total,     color: '#C9A227' },
-            { emoji: '✅', label: 'Available',      value: stats.available, color: '#34d399' },
-            { emoji: '🙈', label: 'Hidden',         value: stats.hidden,    color: '#fbbf24' },
-            { emoji: '🗂️', label: 'Categories',    value: stats.cats,      color: '#a78bfa' },
+            { icon: Utensils,    label: 'Total Items',  value: stats.total,     color: '#C9A227' },
+            { icon: CheckCircle, label: 'Available',    value: stats.available, color: '#34d399' },
+            { icon: EyeOff,      label: 'Hidden',       value: stats.hidden,    color: '#fbbf24' },
+            { icon: FolderOpen,  label: 'Categories',   value: stats.cats,      color: '#a78bfa' },
           ].map((s, i) => (
             <motion.div key={i} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.06 }} className="mm-stat">
-              <div className="text-2xl">{s.emoji}</div>
+              <s.icon className="w-6 h-6 flex-shrink-0" style={{ color: s.color }} />
               <div>
                 <p className="mm-title font-black text-2xl" style={{ color: s.color }}>{s.value}</p>
                 <p className="text-xs font-bold" style={{ color: '#7a6a55' }}>{s.label}</p>
@@ -361,14 +387,14 @@ const MenuManagement = () => {
 
       {menuItems && menuItems.length > 0 && (
         <div className="relative">
-          <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-base">🔍</span>
+          <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4" style={{ color: '#7a6a55' }} />
           <input type="text" value={searchQuery} onChange={e => setSearchQuery(e.target.value)} placeholder="Search by name or category…" className="mm-input" style={{ paddingLeft: '2.4rem', height: '44px' }} />
         </div>
       )}
 
       {loading ? (
         <div className="flex flex-col items-center justify-center py-16 gap-3">
-          <div className="text-5xl animate-bounce">👨‍🍳</div>
+          <ChefHat className="w-12 h-12 animate-bounce" style={{ color: '#C9A227' }} />
           <p className="text-sm font-bold" style={{ color: '#7a6a55' }}>Loading your menu…</p>
         </div>
       ) : menuItems && menuItems.length > 0 ? (
@@ -376,8 +402,10 @@ const MenuManagement = () => {
           <>
             {searchQuery.trim() && (
               <div className="flex items-center gap-2">
-                <span className="text-sm font-bold" style={{ color: '#7a6a55' }}>🔎 {filteredItems.length} result{filteredItems.length !== 1 ? 's' : ''} for &quot;{searchQuery}&quot;</span>
-                <button onClick={() => setSearchQuery('')} className="mm-btn mm-btn-ghost" style={{ padding: '3px 10px', fontSize: 11 }}>✗ Clear</button>
+                <span className="text-sm font-bold flex items-center gap-1" style={{ color: '#7a6a55' }}>
+                  <Search className="inline w-3.5 h-3.5" /> {filteredItems.length} result{filteredItems.length !== 1 ? 's' : ''} for &quot;{searchQuery}&quot;
+                </span>
+                <button onClick={() => setSearchQuery('')} className="mm-btn mm-btn-ghost" style={{ padding: '3px 10px', fontSize: 11 }}><X className="w-3 h-3" /> Clear</button>
               </div>
             )}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
@@ -386,53 +414,55 @@ const MenuManagement = () => {
                   {item.image ? (
                     <div className="mm-img-wrap" style={{ aspectRatio: '16/9' }}><MediaPreview url={item.image} alt={item.name} className="w-full h-full" /></div>
                   ) : (
-                    <div className="flex items-center justify-center" style={{ aspectRatio: '16/9', background: 'linear-gradient(135deg, #1a1208, #0f0a04)', fontSize: 48 }}>🍽️</div>
+                    <div className="flex items-center justify-center" style={{ aspectRatio: '16/9', background: 'linear-gradient(135deg, #1a1208, #0f0a04)' }}>
+                      <Utensils className="w-12 h-12" style={{ color: '#3a2e1a' }} />
+                    </div>
                   )}
                   <div className="p-5 space-y-3">
                     <div className="flex justify-between items-start gap-2">
                       <div className="min-w-0 flex-1">
                         <h3 className="mm-title font-black text-white text-lg leading-tight truncate">{item.name}</h3>
-                        {item.category && <p className="text-xs mt-0.5 font-bold" style={{ color: '#7a6a55' }}>🗂️ {item.category}</p>}
+                        {item.category && <p className="text-xs mt-0.5 font-bold flex items-center gap-1" style={{ color: '#7a6a55' }}><FolderOpen className="w-3 h-3" />{item.category}</p>}
                       </div>
                       <div className="text-right flex-shrink-0">
                         {item.sizePricing?.enabled ? (
                           <div className="space-y-0.5">
-                            {item.sizePricing.small  && <p className="mm-price font-black text-sm">☕ S {CUR}{parseFloat(item.sizePricing.small).toFixed(2)}</p>}
-                            {item.sizePricing.medium && <p className="mm-price font-black text-sm">🥤 M {CUR}{parseFloat(item.sizePricing.medium).toFixed(2)}</p>}
-                            {item.sizePricing.large  && <p className="mm-price font-black text-sm">🧋 L {CUR}{parseFloat(item.sizePricing.large).toFixed(2)}</p>}
+                            {item.sizePricing.small  && <p className="mm-price font-black text-sm flex items-center justify-end gap-1"><Coffee className="w-3 h-3" /> S {CUR}{parseFloat(item.sizePricing.small).toFixed(2)}</p>}
+                            {item.sizePricing.medium && <p className="mm-price font-black text-sm flex items-center justify-end gap-1"><CupSoda className="w-3 h-3" /> M {CUR}{parseFloat(item.sizePricing.medium).toFixed(2)}</p>}
+                            {item.sizePricing.large  && <p className="mm-price font-black text-sm flex items-center justify-end gap-1"><GlassWater className="w-3 h-3" /> L {CUR}{parseFloat(item.sizePricing.large).toFixed(2)}</p>}
                           </div>
                         ) : <span className="mm-price font-black text-xl">{CUR}{item.price.toFixed(2)}</span>}
                       </div>
                     </div>
                     {(item.isVeg || item.isNonVeg || item.isNew || item.isBestSeller) && (
                       <div className="flex flex-wrap gap-1.5">
-                        {item.isVeg && <span className="mm-badge" style={{ background: 'rgba(22,163,74,0.15)', color: '#4ade80', borderColor: 'rgba(22,163,74,0.3)' }}><span className="w-2 h-2 rounded-full bg-green-500 inline-block" />🌱 Veg</span>}
-                        {item.isNonVeg && <span className="mm-badge" style={{ background: 'rgba(220,38,38,0.15)', color: '#f87171', borderColor: 'rgba(220,38,38,0.3)' }}><span className="w-2 h-2 rounded-full bg-red-500 inline-block" />🍗 Non-Veg</span>}
-                        {item.isNew && <span className="mm-badge" style={{ background: 'rgba(255,190,11,0.15)', color: '#fbbf24', borderColor: 'rgba(255,190,11,0.3)' }}>✨ New</span>}
-                        {item.isBestSeller && <span className="mm-badge" style={{ background: 'rgba(201,162,39,0.15)', color: '#C9A227', borderColor: 'rgba(201,162,39,0.3)' }}>⭐ Best Seller</span>}
+                        {item.isVeg && <span className="mm-badge" style={{ background: 'rgba(22,163,74,0.15)', color: '#4ade80', borderColor: 'rgba(22,163,74,0.3)' }}><span className="w-2 h-2 rounded-full bg-green-500 inline-block" /><Leaf className="w-3 h-3" /> Veg</span>}
+                        {item.isNonVeg && <span className="mm-badge" style={{ background: 'rgba(220,38,38,0.15)', color: '#f87171', borderColor: 'rgba(220,38,38,0.3)' }}><span className="w-2 h-2 rounded-full bg-red-500 inline-block" /><Beef className="w-3 h-3" /> Non-Veg</span>}
+                        {item.isNew && <span className="mm-badge" style={{ background: 'rgba(255,190,11,0.15)', color: '#fbbf24', borderColor: 'rgba(255,190,11,0.3)' }}><Sparkles className="w-3 h-3" /> New</span>}
+                        {item.isBestSeller && <span className="mm-badge" style={{ background: 'rgba(201,162,39,0.15)', color: '#C9A227', borderColor: 'rgba(201,162,39,0.3)' }}><Star className="w-3 h-3" /> Best Seller</span>}
                       </div>
                     )}
                     {(item.calories > 0 || item.protein > 0 || item.carbs > 0 || item.fats > 0) && (
                       <div className="flex flex-wrap gap-1.5">
-                        {item.calories > 0 && <span className="text-xs font-bold px-2 py-0.5 rounded-lg" style={{ background: 'rgba(255,255,255,0.04)', color: '#7a6a55', border: '1px solid rgba(255,255,255,0.07)' }}>🔥 {item.calories}kcal</span>}
-                        {item.protein > 0 && <span className="text-xs font-bold px-2 py-0.5 rounded-lg" style={{ background: 'rgba(255,255,255,0.04)', color: '#7a6a55', border: '1px solid rgba(255,255,255,0.07)' }}>💪 {item.protein}g protein</span>}
-                        {item.carbs > 0 && <span className="text-xs font-bold px-2 py-0.5 rounded-lg" style={{ background: 'rgba(255,255,255,0.04)', color: '#7a6a55', border: '1px solid rgba(255,255,255,0.07)' }}>🌾 {item.carbs}g carbs</span>}
-                        {item.fats > 0 && <span className="text-xs font-bold px-2 py-0.5 rounded-lg" style={{ background: 'rgba(255,255,255,0.04)', color: '#7a6a55', border: '1px solid rgba(255,255,255,0.07)' }}>🫙 {item.fats}g fats</span>}
+                        {item.calories > 0 && <span className="text-xs font-bold px-2 py-0.5 rounded-lg flex items-center gap-1" style={{ background: 'rgba(255,255,255,0.04)', color: '#7a6a55', border: '1px solid rgba(255,255,255,0.07)' }}><Flame className="w-3 h-3" /> {item.calories}kcal</span>}
+                        {item.protein > 0 && <span className="text-xs font-bold px-2 py-0.5 rounded-lg flex items-center gap-1" style={{ background: 'rgba(255,255,255,0.04)', color: '#7a6a55', border: '1px solid rgba(255,255,255,0.07)' }}><Dumbbell className="w-3 h-3" /> {item.protein}g protein</span>}
+                        {item.carbs > 0 && <span className="text-xs font-bold px-2 py-0.5 rounded-lg flex items-center gap-1" style={{ background: 'rgba(255,255,255,0.04)', color: '#7a6a55', border: '1px solid rgba(255,255,255,0.07)' }}><Wheat className="w-3 h-3" /> {item.carbs}g carbs</span>}
+                        {item.fats > 0 && <span className="text-xs font-bold px-2 py-0.5 rounded-lg flex items-center gap-1" style={{ background: 'rgba(255,255,255,0.04)', color: '#7a6a55', border: '1px solid rgba(255,255,255,0.07)' }}><Package className="w-3 h-3" /> {item.fats}g fats</span>}
                       </div>
                     )}
                     <div>
-                      <span className="mm-badge" style={item.available ? { background: 'rgba(16,185,129,0.12)', color: '#34d399', borderColor: 'rgba(16,185,129,0.22)' } : { background: 'rgba(220,50,50,0.12)', color: '#f87171', borderColor: 'rgba(220,50,50,0.22)' }}>
-                        {item.available ? '✅ Available' : '🙈 Hidden'}
+                      <span className="mm-badge flex items-center gap-1" style={item.available ? { background: 'rgba(16,185,129,0.12)', color: '#34d399', borderColor: 'rgba(16,185,129,0.22)' } : { background: 'rgba(220,50,50,0.12)', color: '#f87171', borderColor: 'rgba(220,50,50,0.22)' }}>
+                        {item.available ? <><CheckCircle className="w-3 h-3" /> Available</> : <><EyeOff className="w-3 h-3" /> Hidden</>}
                       </span>
                     </div>
-                    {item.addons?.length > 0 && <p className="text-xs font-bold" style={{ color: '#4a3f35' }}>✨ {item.addons.length} add-on{item.addons.length !== 1 ? 's' : ''} available</p>}
+                    {item.addons?.length > 0 && <p className="text-xs font-bold flex items-center gap-1" style={{ color: '#4a3f35' }}><Sparkles className="w-3 h-3" /> {item.addons.length} add-on{item.addons.length !== 1 ? 's' : ''} available</p>}
                     <div className="flex gap-2 pt-1">
                       <button onClick={() => { const opening = editingItemId !== item.id; setEditingItemId(opening ? item.id : null); if (opening) handleEdit(item); else resetForm(); }}
                         className={`mm-btn flex-1 justify-center ${editingItemId === item.id ? 'mm-btn-yellow' : 'mm-btn-ghost'}`} style={{ padding: '7px 12px', fontSize: 12, borderRadius: 10 }}>
-                        <Edit className="w-3.5 h-3.5" />{editingItemId === item.id ? '✗ Close' : '✏️ Edit'}
+                        <Edit className="w-3.5 h-3.5" />{editingItemId === item.id ? <><X className="w-3 h-3" /> Close</> : 'Edit'}
                       </button>
                       <button onClick={() => toggleAvailability(item.id, item.available)} className={`mm-btn ${item.available ? 'mm-btn-ghost' : 'mm-btn-green'}`} style={{ padding: '7px 12px', fontSize: 12, borderRadius: 10 }}>
-                        {item.available ? '🙈 Hide' : '👁️ Show'}
+                        {item.available ? <><EyeOff className="w-3.5 h-3.5" /> Hide</> : <><Eye className="w-3.5 h-3.5" /> Show</>}
                       </button>
                       <button onClick={() => handleDelete(item.id)} className="mm-btn mm-btn-red" style={{ padding: '7px 12px', fontSize: 12, borderRadius: 10 }}><Trash2 className="w-3.5 h-3.5" /></button>
                     </div>
@@ -442,26 +472,26 @@ const MenuManagement = () => {
               ))}
             </div>
             <div className="flex items-center justify-center gap-2 py-2">
-              <span>🍽️</span>
+              <Utensils className="w-4 h-4" style={{ color: '#7a6a55' }} />
               <p className="text-xs font-bold" style={{ color: '#7a6a55' }}>{filteredItems.length} item{filteredItems.length !== 1 ? 's' : ''}{searchQuery.trim() ? ` matching "${searchQuery}"` : ' in your menu'}</p>
               <span className="inline-block w-1.5 h-1.5 rounded-full animate-pulse" style={{ background: '#34d399' }} />
             </div>
           </>
         ) : (
           <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="mm-card flex flex-col items-center justify-center py-16 gap-3 text-center">
-            <div className="text-6xl mb-1">🫙</div>
+            <Package className="w-14 h-14 mb-1" style={{ color: '#3a2e1a' }} />
             <p className="mm-title font-black text-white text-lg">No items match &quot;{searchQuery}&quot;</p>
             <p className="text-sm" style={{ color: '#7a6a55' }}>Try a different name or category</p>
-            <button onClick={() => setSearchQuery('')} className="mm-btn mm-btn-orange mt-2" style={{ borderRadius: 12, padding: '10px 20px' }}>✗ Clear Search</button>
+            <button onClick={() => setSearchQuery('')} className="mm-btn mm-btn-orange mt-2" style={{ borderRadius: 12, padding: '10px 20px' }}><X className="w-4 h-4" /> Clear Search</button>
           </motion.div>
         )
       ) : (
         <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="mm-card flex flex-col items-center justify-center py-20 gap-3 text-center">
-          <div className="text-7xl mb-2">🍽️</div>
+          <Utensils className="w-16 h-16 mb-2" style={{ color: '#3a2e1a' }} />
           <p className="mm-title font-black text-white text-xl">Your menu is empty!</p>
-          <p className="text-sm" style={{ color: '#7a6a55' }}>Add your first dish to start taking orders 🚀</p>
+          <p className="text-sm" style={{ color: '#7a6a55' }}>Add your first dish to start taking orders</p>
           <motion.button whileHover={{ scale: 1.03 }} whileTap={{ scale: 0.96 }} onClick={() => { resetForm(); setShowForm(true); }} className="mm-btn mm-btn-orange mt-3" style={{ borderRadius: 12, padding: '12px 24px', fontSize: 14 }}>
-            <Plus className="w-4 h-4" />🍳 Add First Item
+            <Plus className="w-4 h-4" /><ChefHat className="w-4 h-4" /> Add First Item
           </motion.button>
         </motion.div>
       )}
