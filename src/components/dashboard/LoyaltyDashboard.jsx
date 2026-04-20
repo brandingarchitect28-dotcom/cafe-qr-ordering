@@ -439,12 +439,14 @@ const LoyaltyDashboard = () => {
     );
   }, [cafeMenuUrl, cafeId]);
 
-  const openLoyaltyCardModal = useCallback((customer) => {
+  // prefillValidity — optional string pre-filled into the Validity field
+  // skipSave       — true when customer already has a loyalty card (avoids duplicate write)
+  const openLoyaltyCardModal = useCallback((customer, prefillValidity = '', skipSave = false) => {
     setLcDiscount(String(customer.currentDiscount || 10));
-    setLcValidity('');
+    setLcValidity(prefillValidity);
     setLcMessage('');
     setLcEditMode(false);
-    setLoyaltyCardModal({ customer });
+    setLoyaltyCardModal({ customer, skipSave });
   }, []);
 
   const closeLoyaltyCardModal = useCallback(() => {
@@ -473,7 +475,9 @@ const LoyaltyDashboard = () => {
 
     // ── STEP 2: Save loyalty card to Firestore (same schema as handleAddCustomer)
     // Only save if cafeId is available; never block WA send if save fails.
-    if (cafeId) {
+    // skipSave=true when customer already has a loyalty card (e.g. opened from card WA button)
+    const skipSave = loyaltyCardModal?.skipSave;
+    if (cafeId && !skipSave) {
       try {
         // Check for existing loyalty card with same phone to avoid duplicates
         const existingCard = customers?.find(c => c.phone === customer.phone.trim());
@@ -500,7 +504,8 @@ const LoyaltyDashboard = () => {
         toast.error(`WhatsApp opened but card save failed: ${err.message || 'Unknown error'}`);
       }
     } else {
-      toast.success(`Loyalty card sent to ${customer.name} via WhatsApp`);
+      // Either cafeId missing, or this is an existing loyalty card (skipSave=true)
+      toast.success(`Loyalty card sent to ${customer.name} via WhatsApp ✓`);
     }
 
     closeLoyaltyCardModal();
@@ -1136,7 +1141,18 @@ const LoyaltyDashboard = () => {
                         {marking ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <Coffee className="w-3.5 h-3.5" />}
                         {marking ? 'Marking…' : 'Mark Visit'}
                       </button>
-                      <button onClick={() => handleSendWA(customer)}
+                      <button onClick={() => {
+                          // Derive a human-readable validity string from the card's expiryDate
+                          let validityStr = '';
+                          if (customer.expiryDate) {
+                            const exp = customer.expiryDate?.toDate
+                              ? customer.expiryDate.toDate()
+                              : new Date(customer.expiryDate);
+                            validityStr = exp.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
+                          }
+                          // skipSave=true — this card already exists in loyalty list
+                          openLoyaltyCardModal(customer, validityStr, true);
+                        }}
                         className="loy-btn loy-btn-green"
                         data-testid={`wa-loyalty-${customer.id}`}>
                         <MessageSquare className="w-3.5 h-3.5" />WhatsApp
