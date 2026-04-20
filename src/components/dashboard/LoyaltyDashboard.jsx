@@ -180,10 +180,17 @@ const buildWAMessage = (customer) => {
 };
 
 // ── Rank medal helper ─────────────────────────────────────────────────────────
+// Colors: #1 gold = existing brand gold; #2 silver = muted cool gray; #3 bronze = warm muted brown
+// All at reduced opacity to stay premium/subtle, not flashy
+const RANK_COLORS = {
+  1: { icon: '#C9A227', bg: 'rgba(201,162,39,0.12)',  border: 'rgba(201,162,39,0.25)'  }, // gold — existing brand color
+  2: { icon: '#9ca3af', bg: 'rgba(156,163,175,0.08)', border: 'rgba(156,163,175,0.18)' }, // silver — neutral light gray
+  3: { icon: '#a07850', bg: 'rgba(160,120,80,0.08)',  border: 'rgba(160,120,80,0.18)'  }, // bronze — warm muted brown
+};
 const RankBadge = ({ rank }) => {
-  if (rank === 1) return <Crown className="w-3.5 h-3.5 flex-shrink-0" style={{ color: '#FFD700' }} />;
-  if (rank === 2) return <Crown className="w-3.5 h-3.5 flex-shrink-0" style={{ color: '#C0C0C0' }} />;
-  if (rank === 3) return <Crown className="w-3.5 h-3.5 flex-shrink-0" style={{ color: '#CD7F32' }} />;
+  if (rank === 1) return <Crown className="w-3.5 h-3.5 flex-shrink-0" style={{ color: RANK_COLORS[1].icon }} />;
+  if (rank === 2) return <Crown className="w-3.5 h-3.5 flex-shrink-0" style={{ color: RANK_COLORS[2].icon }} />;
+  if (rank === 3) return <Crown className="w-3.5 h-3.5 flex-shrink-0" style={{ color: RANK_COLORS[3].icon }} />;
   return <span className="text-xs font-black flex-shrink-0" style={{ color: '#3d3020', minWidth: 14, textAlign: 'center' }}>#{rank}</span>;
 };
 
@@ -194,6 +201,14 @@ const LoyaltyDashboard = () => {
 
   const { data: customers, loading } = useCollection(
     'loyaltyCustomers',
+    cafeId ? [where('cafeId', '==', cafeId)] : []
+  );
+
+  // ── Orders data: used ONLY for Top Customers frequency calculation ────────
+  // No new APIs — same useCollection hook, same pattern as loyaltyCustomers above.
+  // This data is READ-ONLY here. Zero writes. Zero side effects.
+  const { data: orders } = useCollection(
+    'orders',
     cafeId ? [where('cafeId', '==', cafeId)] : []
   );
 
@@ -219,6 +234,8 @@ const LoyaltyDashboard = () => {
   const [showNameDropdown,    setShowNameDropdown   ] = useState(false);
   const [showPhoneDropdown,   setShowPhoneDropdown  ] = useState(false);
   const [showAllTopCustomers, setShowAllTopCustomers] = useState(false);
+  // Visual limit for loyalty card list: show 5 by default, expand on demand
+  const [showAllCustomers,    setShowAllCustomers   ] = useState(false);
 
   const nameDropdownRef  = useRef(null);
   const phoneDropdownRef = useRef(null);
@@ -270,14 +287,54 @@ const LoyaltyDashboard = () => {
     });
   }, [customers, newName]);
 
-  // Customers sorted by visit frequency (descending)
+  // ── CORRECTED: Top Customers derived from ORDERS data ────────────────────
+  //
+  // How it works:
+  //   1. Filter out deleted orders (isDeleted === true)
+  //   2. Group by composite key: normalised(customerName) + "|" + normalised(customerPhone)
+  //      — normalisation: trim + lowercase for grouping, but we preserve original
+  //        casing for display (first occurrence wins)
+  //   3. Count occurrences = visit count
+  //   4. Sort descending by count
+  //   5. Slice top 5 for default view; full list for "View All"
+  //
   const sortedByFrequency = useMemo(() => {
-    if (!customers || customers.length === 0) return [];
-    return [...customers]
-      .sort((a, b) => (b.visits || 0) - (a.visits || 0));
-  }, [customers]);
+    if (!orders || orders.length === 0) return [];
 
-  const topCustomers = sortedByFrequency.slice(0, 5);
+    const map = new Map(); // key → { name, phone, orderCount }
+
+    for (const order of orders) {
+      // Skip soft-deleted orders
+      if (order.isDeleted) continue;
+
+      const rawName  = (order.customerName  || '').trim();
+      const rawPhone = (order.customerPhone || '').trim();
+
+      // Skip orders with no identifying info
+      if (!rawName && !rawPhone) continue;
+
+      // Composite key: normalise to lowercase for consistent grouping
+      const key = `${rawName.toLowerCase()}|${rawPhone.toLowerCase()}`;
+
+      if (map.has(key)) {
+        map.get(key).orderCount += 1;
+      } else {
+        // Preserve original casing from first occurrence
+        map.set(key, {
+          name:       rawName  || '(No Name)',
+          phone:      rawPhone || '(No Phone)',
+          orderCount: 1,
+          // Synthetic id for React key — stable per unique customer
+          id: key,
+        });
+      }
+    }
+
+    // Sort descending by order count
+    return [...map.values()].sort((a, b) => b.orderCount - a.orderCount);
+  }, [orders]);
+
+  const topCustomers = sortedByFrequency.slice(0, 3);
   const displayedTopCustomers = showAllTopCustomers ? sortedByFrequency : topCustomers;
 
   // ── Copy handler ──────────────────────────────────────────────────────────
@@ -651,7 +708,7 @@ const LoyaltyDashboard = () => {
       {/* ═══════════════════════════════════════════════════════════════════ */}
       {/* ── FEATURE 3: Top Customers Insight Panel ─────────────────────── */}
       {/* ═══════════════════════════════════════════════════════════════════ */}
-      {!loading && customers && customers.length > 0 && (
+      {!loading && sortedByFrequency.length > 0 && (
         <div className="loy-insight-card">
           {/* Panel header */}
           <div className="flex items-center justify-between px-5 py-4"
@@ -663,7 +720,7 @@ const LoyaltyDashboard = () => {
               </div>
               <div>
                 <h3 className="text-white font-black text-sm loy-title">Top Customers</h3>
-                <p className="text-xs font-bold" style={{ color: '#5a4a35' }}>Ranked by visit frequency</p>
+                <p className="text-xs font-bold" style={{ color: '#5a4a35' }}>Based on order history</p>
               </div>
             </div>
             <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-xl"
@@ -679,13 +736,13 @@ const LoyaltyDashboard = () => {
           <div>
             <AnimatePresence initial={false}>
               {displayedTopCustomers.map((customer, idx) => {
-                const rank   = idx + 1;
-                const visits = customer.visits || 0;
-                const disc   = customer.currentDiscount || 10;
-                const isFree = disc >= 30;
-                // Visit bar width capped at max visits in list
-                const maxVisits = sortedByFrequency[0]?.visits || 1;
-                const barPct    = Math.max(8, Math.round((visits / maxVisits) * 100));
+                const rank       = idx + 1;
+                const orderCount = customer.orderCount;
+                // Visit bar width proportional to #1 customer
+                const maxCount = sortedByFrequency[0]?.orderCount || 1;
+                const barPct   = Math.max(8, Math.round((orderCount / maxCount) * 100));
+                // Rank accent: subtle left border + avatar tint for top 3 only
+                const rankStyle = RANK_COLORS[rank];
 
                 return (
                   <motion.div
@@ -695,19 +752,20 @@ const LoyaltyDashboard = () => {
                     exit={{ opacity: 0, y: -4 }}
                     transition={{ duration: 0.18, delay: idx * 0.03 }}
                     className="loy-rank-row"
+                    style={rankStyle ? { borderLeft: `2px solid ${rankStyle.border}` } : {}}
                   >
                     {/* Rank badge */}
                     <div className="flex-shrink-0 w-5 flex justify-center">
                       <RankBadge rank={rank} />
                     </div>
 
-                    {/* Avatar */}
+                    {/* Avatar — rank-tinted for top 3, default for rest */}
                     <div className="w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0"
-                      style={{
-                        background: isFree ? 'rgba(16,185,129,0.1)' : 'rgba(201,162,39,0.08)',
-                        border: isFree ? '1px solid rgba(16,185,129,0.2)' : '1px solid rgba(201,162,39,0.15)',
-                      }}>
-                      <User className="w-4 h-4" style={{ color: isFree ? '#34d399' : '#C9A227' }} />
+                      style={rankStyle
+                        ? { background: rankStyle.bg, border: `1px solid ${rankStyle.border}` }
+                        : { background: 'rgba(201,162,39,0.06)', border: '1px solid rgba(255,255,255,0.07)' }
+                      }>
+                      <User className="w-4 h-4" style={{ color: rankStyle ? rankStyle.icon : '#5a4a35' }} />
                     </div>
 
                     {/* Name + phone + bar */}
@@ -716,37 +774,33 @@ const LoyaltyDashboard = () => {
                         <p className="text-white font-black text-sm truncate" style={{ maxWidth: 120 }}>
                           {customer.name}
                         </p>
-                        <span className="text-xs font-bold flex-shrink-0"
-                          style={{ color: isFree ? '#34d399' : '#C9A227' }}>
-                          {isFree ? '🎁 Free' : `${disc}%`}
-                        </span>
                       </div>
                       <div className="flex items-center gap-2 mt-0.5">
                         <Phone className="w-2.5 h-2.5 flex-shrink-0" style={{ color: '#3d3020' }} />
                         <span className="text-xs font-bold" style={{ color: '#5a4a35' }}>{customer.phone}</span>
                       </div>
-                      {/* Visit frequency bar */}
+                      {/* Order frequency bar */}
                       <div className="mt-1.5 h-1 rounded-full overflow-hidden"
                         style={{ background: 'rgba(255,255,255,0.05)', width: '100%' }}>
                         <div
                           className="h-full rounded-full transition-all duration-500"
                           style={{
                             width: `${barPct}%`,
-                            background: isFree
-                              ? 'linear-gradient(90deg,#34d399,#059669)'
-                              : 'linear-gradient(90deg,#C9A227,#A67C00)',
+                            background: rankStyle
+                              ? `linear-gradient(90deg,${rankStyle.icon},${rankStyle.border})`
+                              : 'linear-gradient(90deg,#3d3020,#2a2010)',
                           }}
                         />
                       </div>
                     </div>
 
-                    {/* Visit count pill */}
+                    {/* Order count pill */}
                     <div className="flex items-center gap-1 px-2 py-1 rounded-lg flex-shrink-0"
                       style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.06)' }}>
                       <Coffee className="w-2.5 h-2.5" style={{ color: '#5a4a35' }} />
-                      <span className="text-xs font-black text-white">{visits}</span>
+                      <span className="text-xs font-black text-white">{orderCount}</span>
                       <span className="text-xs font-bold hidden sm:inline" style={{ color: '#5a4a35' }}>
-                        visit{visits !== 1 ? 's' : ''}
+                        visit{orderCount !== 1 ? 's' : ''}
                       </span>
                     </div>
 
@@ -768,7 +822,7 @@ const LoyaltyDashboard = () => {
           </div>
 
           {/* View More / See Less footer */}
-          {sortedByFrequency.length > 5 && (
+          {sortedByFrequency.length > 3 && (
             <button
               type="button"
               onClick={() => setShowAllTopCustomers(v => !v)}
@@ -794,7 +848,7 @@ const LoyaltyDashboard = () => {
         </div>
       )}
 
-      {/* ── Customer list (UNCHANGED) ──────────────────────────────────────── */}
+      {/* ── Customer list ──────────────────────────────────────────────────── */}
       {loading ? (
         <div className="flex flex-col items-center justify-center py-12 gap-2">
           <Star className="w-10 h-10 animate-bounce" style={{ color: '#C9A227' }} />
@@ -808,8 +862,10 @@ const LoyaltyDashboard = () => {
           </p>
         </div>
       ) : (
+        <>
         <div className="space-y-2">
-          {filtered.map(customer => {
+          {/* Slice to 5 by default; show all when expanded */}
+          {(showAllCustomers ? filtered : filtered.slice(0, 5)).map(customer => {
             const disc    = customer.currentDiscount || 10;
             const visits  = customer.visits || 0;
             const isFree  = disc >= 30;
@@ -989,6 +1045,30 @@ const LoyaltyDashboard = () => {
             );
           })}
         </div>
+
+        {/* Load More / Show Less — only shown when list exceeds 5 */}
+        {filtered.length > 5 && (
+          <button
+            type="button"
+            onClick={() => setShowAllCustomers(v => !v)}
+            className="w-full flex items-center justify-center gap-2 py-2.5 text-xs font-black rounded-xl transition-colors"
+            style={{
+              background: 'rgba(255,255,255,0.03)',
+              border: '1.5px solid rgba(255,255,255,0.07)',
+              color: '#7a6a55',
+              cursor: 'pointer',
+            }}
+            onMouseEnter={e => { e.currentTarget.style.borderColor = 'rgba(201,162,39,0.2)'; e.currentTarget.style.color = '#C9A227'; }}
+            onMouseLeave={e => { e.currentTarget.style.borderColor = 'rgba(255,255,255,0.07)'; e.currentTarget.style.color = '#7a6a55'; }}
+            data-testid="loyalty-list-load-more"
+          >
+            {showAllCustomers
+              ? <><ChevronUp className="w-3.5 h-3.5" /> Show Less</>
+              : <><ChevronDown className="w-3.5 h-3.5" /> Load More · {filtered.length - 5} remaining</>
+            }
+          </button>
+        )}
+        </>
       )}
 
       {/* Footer (UNCHANGED) */}
