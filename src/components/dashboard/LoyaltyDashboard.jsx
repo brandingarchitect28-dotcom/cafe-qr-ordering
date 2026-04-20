@@ -280,6 +280,8 @@ const LoyaltyDashboard = () => {
   const [loyaltyCardModal, setLoyaltyCardModal] = useState(null); // null | { customer }
   const [lcDiscount,       setLcDiscount      ] = useState('');
   const [lcValidity,       setLcValidity      ] = useState('');
+  const [lcMessage,        setLcMessage       ] = useState(''); // editable message text
+  const [lcEditMode,       setLcEditMode      ] = useState(false); // toggle edit textarea
 
   const nameDropdownRef  = useRef(null);
   const phoneDropdownRef = useRef(null);
@@ -422,9 +424,26 @@ const LoyaltyDashboard = () => {
 
   // ── NEW: Send Loyalty Card via WhatsApp ──────────────────────────────────
   // Opens modal; on confirm builds WA message with discount, validity, menu link.
+
+  // Helper — pure function, builds auto message from parts
+  const buildLoyaltyMessage = useCallback((name, discount, validity) => {
+    const menuLink = cafeMenuUrl || `${window.location.origin}/cafe/${cafeId}`;
+    return (
+      `Hello ${name},\n\n` +
+      `🎉 You've received a special loyalty reward!\n` +
+      `Get ${discount}% OFF on your next visit.\n` +
+      `🗓 Valid till: ${validity}\n\n` +
+      `Order now and enjoy your food without waiting.\n` +
+      `👉 ${menuLink}\n\n` +
+      `We look forward to serving you!`
+    );
+  }, [cafeMenuUrl, cafeId]);
+
   const openLoyaltyCardModal = useCallback((customer) => {
     setLcDiscount(String(customer.currentDiscount || 10));
     setLcValidity('');
+    setLcMessage('');
+    setLcEditMode(false);
     setLoyaltyCardModal({ customer });
   }, []);
 
@@ -432,33 +451,61 @@ const LoyaltyDashboard = () => {
     setLoyaltyCardModal(null);
     setLcDiscount('');
     setLcValidity('');
+    setLcMessage('');
+    setLcEditMode(false);
   }, []);
 
-  const handleSendLoyaltyCardWA = useCallback(() => {
+  const handleSendLoyaltyCardWA = useCallback(async () => {
     const customer = loyaltyCardModal?.customer;
     if (!customer) return;
     if (!lcDiscount.trim()) { toast.error('Please enter a discount percentage'); return; }
     if (!lcValidity.trim())  { toast.error('Please enter a validity date / description'); return; }
     if (!customer.phone)     { toast.error('No phone number for this customer'); return; }
 
-    // Build WA message — menu link from cafeMenuUrl (same source as QRGenerator)
-    const menuLink = cafeMenuUrl || `${window.location.origin}/cafe/${cafeId}`;
-    const message =
-      `Hello ${customer.name},\n\n` +
-      `🎉 You've received a special loyalty reward!\n` +
-      `Get ${lcDiscount}% OFF on your next visit.\n` +
-      `🗓 Valid till: ${lcValidity}\n\n` +
-      `Order now and enjoy your food without waiting.\n` +
-      `👉 ${menuLink}\n\n` +
-      `We look forward to serving you!`;
+    // Use edited message if user changed it; fall back to auto-generated
+    const autoMsg = buildLoyaltyMessage(customer.name, lcDiscount, lcValidity);
+    const finalMessage = lcEditMode && lcMessage.trim() ? lcMessage : autoMsg;
 
-    // Build WA URL — normalise phone to digits only, prepend 91 if 10-digit Indian number
+    // ── STEP 1: Open WhatsApp ─────────────────────────────────────────────
     const digits = customer.phone.replace(/\D/g, '');
     const waNum  = digits.length === 10 ? `91${digits}` : digits;
-    window.open(`https://wa.me/${waNum}?text=${encodeURIComponent(message)}`, '_blank');
-    toast.success(`Loyalty card sent to ${customer.name} via WhatsApp`);
+    window.open(`https://wa.me/${waNum}?text=${encodeURIComponent(finalMessage)}`, '_blank');
+
+    // ── STEP 2: Save loyalty card to Firestore (same schema as handleAddCustomer)
+    // Only save if cafeId is available; never block WA send if save fails.
+    if (cafeId) {
+      try {
+        // Check for existing loyalty card with same phone to avoid duplicates
+        const existingCard = customers?.find(c => c.phone === customer.phone.trim());
+        if (existingCard) {
+          toast.success(`Loyalty card sent to ${customer.name} ✓  (card already exists in list)`);
+        } else {
+          const discountToUse = Number(lcDiscount) || 10;
+          await addDoc(collection(db, 'loyaltyCustomers'), {
+            cafeId,
+            name:            customer.name.trim(),
+            phone:           customer.phone.trim(),
+            visits:          1,                    // same default as handleAddCustomer
+            currentDiscount: discountToUse,
+            validityDays:    0,                    // text validity used in WA; days not enforced
+            expiryDate:      null,
+            createdAt:       serverTimestamp(),
+            lastVisit:       serverTimestamp(),
+          });
+          toast.success(`Loyalty card sent & saved for ${customer.name} ✓`);
+        }
+      } catch (err) {
+        // WA already opened — just notify, don't block
+        console.error('[Loyalty] Failed to save loyalty card after send:', err);
+        toast.error(`WhatsApp opened but card save failed: ${err.message || 'Unknown error'}`);
+      }
+    } else {
+      toast.success(`Loyalty card sent to ${customer.name} via WhatsApp`);
+    }
+
     closeLoyaltyCardModal();
-  }, [loyaltyCardModal, lcDiscount, lcValidity, cafeMenuUrl, cafeId, closeLoyaltyCardModal]);
+  }, [loyaltyCardModal, lcDiscount, lcValidity, lcMessage, lcEditMode,
+      buildLoyaltyMessage, cafeMenuUrl, cafeId, customers, closeLoyaltyCardModal]);
 
   // ── Existing handlers (ALL UNCHANGED) ────────────────────────────────────
   const handleAddCustomer = async (e) => {
@@ -1297,23 +1344,80 @@ const LoyaltyDashboard = () => {
                   />
                 </div>
 
-                {/* Message preview */}
-                {lcDiscount && lcValidity && (
-                  <div className="rounded-xl p-3 text-xs font-bold leading-relaxed"
-                    style={{
-                      background: 'rgba(37,211,102,0.06)',
-                      border: '1px solid rgba(37,211,102,0.15)',
-                      color: 'rgba(255,255,255,0.55)',
-                      whiteSpace: 'pre-line',
-                    }}
-                    data-testid="lc-message-preview"
-                  >
-                    <span className="block text-xs font-black uppercase tracking-widest mb-1.5" style={{ color: '#25D366' }}>
-                      Message Preview
-                    </span>
-                    {`Hello ${loyaltyCardModal.customer.name},\n\n🎉 You've received a special loyalty reward!\nGet ${lcDiscount}% OFF on your next visit.\n🗓 Valid till: ${lcValidity}\n\nOrder now and enjoy your food without waiting.\n👉 ${cafeMenuUrl || `${window.location.origin}/cafe/${cafeId}`}\n\nWe look forward to serving you!`}
-                  </div>
-                )}
+                {/* Message preview — editable (FEATURE 1 + FEATURE 2 Edit button) */}
+                {lcDiscount && lcValidity && (() => {
+                  const autoMsg = buildLoyaltyMessage(
+                    loyaltyCardModal.customer.name, lcDiscount, lcValidity
+                  );
+                  // If not in edit mode yet, keep lcMessage in sync with auto
+                  const displayMsg = lcEditMode ? lcMessage : autoMsg;
+                  return (
+                    <div className="rounded-xl overflow-hidden"
+                      style={{ border: '1px solid rgba(37,211,102,0.15)' }}
+                      data-testid="lc-message-preview"
+                    >
+                      {/* Preview header row */}
+                      <div className="flex items-center justify-between px-3 py-2"
+                        style={{ background: 'rgba(37,211,102,0.08)', borderBottom: '1px solid rgba(37,211,102,0.1)' }}>
+                        <span className="text-xs font-black uppercase tracking-widest" style={{ color: '#25D366' }}>
+                          Message Preview
+                        </span>
+                        <button
+                          type="button"
+                          className="loy-copy-btn"
+                          style={{ width: 'auto', padding: '3px 9px', gap: 4 }}
+                          onClick={() => {
+                            if (!lcEditMode) {
+                              // Entering edit: pre-fill with current auto message
+                              setLcMessage(autoMsg);
+                              setLcEditMode(true);
+                            } else {
+                              // Exiting edit: revert to auto
+                              setLcMessage('');
+                              setLcEditMode(false);
+                            }
+                          }}
+                          data-testid="lc-edit-toggle-btn"
+                          title={lcEditMode ? 'Revert to auto message' : 'Edit message before sending'}
+                        >
+                          {lcEditMode
+                            ? <><RotateCcw className="w-2.5 h-2.5" /><span style={{ fontSize: 11, fontWeight: 700 }}>Reset</span></>
+                            : <><Edit className="w-2.5 h-2.5"    /><span style={{ fontSize: 11, fontWeight: 700 }}>Edit</span></>
+                          }
+                        </button>
+                      </div>
+
+                      {/* Message body — read-only OR editable textarea */}
+                      {lcEditMode ? (
+                        <textarea
+                          value={lcMessage}
+                          onChange={e => setLcMessage(e.target.value)}
+                          rows={9}
+                          className="loy-input"
+                          style={{
+                            borderRadius: 0, border: 'none', resize: 'vertical',
+                            fontSize: 12, lineHeight: 1.7, padding: '10px 12px',
+                            background: 'rgba(37,211,102,0.04)', color: 'rgba(255,255,255,0.75)',
+                            width: '100%', display: 'block',
+                          }}
+                          data-testid="lc-message-textarea"
+                        />
+                      ) : (
+                        <div style={{
+                          padding: '10px 12px',
+                          background: 'rgba(37,211,102,0.04)',
+                          fontSize: 12, lineHeight: 1.7,
+                          color: 'rgba(255,255,255,0.55)',
+                          whiteSpace: 'pre-line',
+                          fontFamily: 'DM Sans, system-ui, sans-serif',
+                          fontWeight: 600,
+                        }}>
+                          {displayMsg}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })()}
               </div>
 
               {/* Modal footer — action buttons */}
