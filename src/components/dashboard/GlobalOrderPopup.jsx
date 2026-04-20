@@ -9,7 +9,7 @@
 
 import React, { useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X } from 'lucide-react';
+import { X, Bell, Armchair, Bike, Utensils, Wallet } from 'lucide-react';
 
 const GlobalOrderPopup = ({ order, onClose, onNavigateToOrders }) => {
 
@@ -65,12 +65,12 @@ const GlobalOrderPopup = ({ order, onClose, onNavigateToOrders }) => {
 
           <div className="flex items-start gap-4">
 
-            {/* Bell icon — exact match to OrdersManagement */}
+            {/* 🔔 → Bell */}
             <div
-              className="w-12 h-12 rounded-2xl flex items-center justify-center text-2xl flex-shrink-0"
+              className="w-12 h-12 rounded-2xl flex items-center justify-center flex-shrink-0"
               style={{ background: 'rgba(0,0,0,0.15)' }}
             >
-              🔔
+              <Bell className="w-6 h-6 text-white" />
             </div>
 
             {/* Content — exact match to OrdersManagement */}
@@ -92,19 +92,23 @@ const GlobalOrderPopup = ({ order, onClose, onNavigateToOrders }) => {
               )}
 
               {order.orderType === 'dine-in' && order.tableNumber && (
-                <p className="font-bold text-sm text-white/80">🪑 Table {order.tableNumber}</p>
+                /* 🪑 → Armchair */
+                <p className="font-bold text-sm text-white/80 flex items-center gap-1"><Armchair className="w-3.5 h-3.5" /> Table {order.tableNumber}</p>
               )}
 
               {order.orderType === 'delivery' && (
-                <p className="text-sm text-white/70">🛵 Delivery</p>
+                /* 🛵 → Bike */
+                <p className="text-sm text-white/70 flex items-center gap-1"><Bike className="w-3.5 h-3.5" /> Delivery</p>
               )}
 
-              <p className="text-sm text-white/70">
-                🍽️ {itemCount(order.items)}
+              {/* 🍽️ → Utensils */}
+              <p className="text-sm text-white/70 flex items-center gap-1">
+                <Utensils className="w-3.5 h-3.5" /> {itemCount(order.items)}
               </p>
 
-              <p className="font-black text-xl text-white mt-1">
-                💰 {fmtTotal(order)}
+              {/* 💰 → Wallet */}
+              <p className="font-black text-xl text-white mt-1 flex items-center gap-1">
+                <Wallet className="w-4 h-4" /> {fmtTotal(order)}
               </p>
             </div>
           </div>

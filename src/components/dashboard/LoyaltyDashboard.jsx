@@ -29,6 +29,7 @@ import { toast } from 'sonner';
 import {
   Search, UserPlus, Star, MessageSquare, Phone, User,
   Award, TrendingUp, RefreshCw, Gift, Undo2, Trash2, Repeat, Calendar, Pencil, Check, ChevronDown,
+  Users, Trophy, RotateCcw, Coffee, Edit,
 } from 'lucide-react';
 import GoogleReviewSettings from './GoogleReviewSettings';
 
@@ -280,16 +281,17 @@ const LoyaltyDashboard = () => {
       {/* ── Stats row ─────────────────────────────────────────────────────── */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         {[
-          { label: 'Total Members',   value: totalCustomers,  emoji: '👥', color: '#C9A227' },
-          { label: 'Total Visits',    value: totalVisits,     emoji: '⭐', color: '#60a5fa' },
-          { label: 'Loyal (3+)',      value: loyalCustomers,  emoji: '🏆', color: '#34d399' },
-          { label: 'Repeat Visits',   value: repeatedVisits,  emoji: '🔄', color: '#a78bfa' },
-        ].map(({ label, value, emoji, color }) => (
+          { label: 'Total Members',   value: totalCustomers,  icon: Users,       color: '#C9A227' },
+          { label: 'Total Visits',    value: totalVisits,     icon: Star,        color: '#60a5fa' },
+          { label: 'Loyal (3+)',      value: loyalCustomers,  icon: Trophy,      color: '#34d399' },
+          { label: 'Repeat Visits',   value: repeatedVisits,  icon: RotateCcw,   color: '#a78bfa' },
+        ].map(({ label, value, icon: StatIcon, color }) => (
           <div key={label} className="loy-card p-4 flex items-center gap-3"
             style={{ borderLeft: `3px solid ${color}` }}>
-            <div className="w-10 h-10 rounded-xl flex items-center justify-center text-xl flex-shrink-0"
+            {/* 👥 ⭐ 🏆 🔄 → Users Star Trophy RotateCcw */}
+            <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0"
               style={{ background: color + '18' }}>
-              {emoji}
+              <StatIcon className="w-5 h-5" style={{ color }} />
             </div>
             <div>
               <p className="text-2xl font-black text-white">{value}</p>
@@ -302,7 +304,8 @@ const LoyaltyDashboard = () => {
       {/* ── Search + Add ───────────────────────────────────────────────────── */}
       <div className="flex flex-col sm:flex-row gap-3">
         <div className="relative flex-1">
-          <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm">🔍</span>
+          {/* 🔍 → Search */}
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4" style={{ color: '#7a6a55' }} />
           <input type="text" value={search} onChange={e => setSearch(e.target.value)}
             placeholder="Search by name or phone…"
             className="loy-input" style={{ paddingLeft: '2.2rem' }} />
@@ -311,7 +314,8 @@ const LoyaltyDashboard = () => {
           className="loy-btn loy-btn-orange"
           data-testid="add-loyalty-customer-btn">
           <UserPlus className="w-4 h-4" />
-          ➕ Add Customer
+          {/* ➕ → Plus already covered by UserPlus icon in button */}
+          Add Customer
         </button>
       </div>
 
@@ -326,7 +330,8 @@ const LoyaltyDashboard = () => {
             style={{ border: '1.5px solid rgba(201,162,39,0.2)' }}
           >
             <div className="flex items-center gap-2 mb-4">
-              <span className="text-xl">👤</span>
+              {/* 👤 → User */}
+              <User className="w-5 h-5" style={{ color: '#C9A227' }} />
               <h3 className="text-white font-black loy-title text-lg">Add New Loyalty Customer</h3>
             </div>
             <form onSubmit={handleAddCustomer} className="space-y-4">
@@ -377,11 +382,13 @@ const LoyaltyDashboard = () => {
           { label: '2 visits',  disc: '15%' },
           { label: '3 visits',  disc: '20%' },
           { label: '4 visits',  disc: '25%' },
-          { label: '5+ visits', disc: '30% / Free Item 🎁' },
+          { label: '5+ visits', disc: '30% / Free Item' },
         ].map(({ label, disc }) => (
-          <span key={label} className="text-xs px-3 py-1.5 rounded-xl font-black"
+          <span key={label} className="text-xs px-3 py-1.5 rounded-xl font-black flex items-center gap-1"
             style={{ background: 'rgba(201,162,39,0.07)', color: '#7a6a55', border: '1px solid rgba(201,162,39,0.15)' }}>
             {label} → <span style={{ color: '#C9A227' }}>{disc}</span>
+            {/* 🎁 in the last ladder item text — kept inline with Gift icon for the last one */}
+            {label === '5+ visits' && <Gift className="w-3 h-3 ml-0.5" style={{ color: '#C9A227' }} />}
           </span>
         ))}
       </div>
@@ -389,12 +396,14 @@ const LoyaltyDashboard = () => {
       {/* ── Customer list ──────────────────────────────────────────────────── */}
       {loading ? (
         <div className="flex flex-col items-center justify-center py-12 gap-2">
-          <div className="text-4xl animate-bounce">⭐</div>
+          {/* ⭐ → Star */}
+          <Star className="w-10 h-10 animate-bounce" style={{ color: '#C9A227' }} />
           <p className="text-sm font-bold" style={{ color: '#7a6a55' }}>Loading customers…</p>
         </div>
       ) : filtered.length === 0 ? (
         <div className="loy-card p-12 text-center">
-          <div className="text-5xl mb-3">🎁</div>
+          {/* 🎁 → Gift */}
+          <Gift className="w-12 h-12 mb-3 mx-auto" style={{ color: '#3a2e1a' }} />
           <p className="font-bold" style={{ color: '#7a6a55' }}>
             {search ? 'No customers match your search.' : 'No loyalty customers yet. Add your first one!'}
           </p>
@@ -427,14 +436,16 @@ const LoyaltyDashboard = () => {
                   aria-expanded={isOpen}
                   data-testid={`loyalty-toggle-${customer.id}`}
                 >
-                  <div className="w-9 h-9 rounded-xl flex items-center justify-center text-lg flex-shrink-0"
+                  {/* 👤 → User */}
+                  <div className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0"
                     style={{ background: 'rgba(201,162,39,0.1)', border: '1.5px solid rgba(201,162,39,0.18)' }}>
-                    👤
+                    <User className="w-5 h-5" style={{ color: '#C9A227' }} />
                   </div>
                   <div className="min-w-0 flex-1">
                     <p className="text-white font-black text-sm truncate">{customer.name}</p>
                     <div className="flex items-center gap-1.5 mt-0.5">
-                      <span className="text-xs">📞</span>
+                      {/* 📞 → Phone */}
+                      <Phone className="w-3 h-3 flex-shrink-0" style={{ color: '#7a6a55' }} />
                       <p className="text-xs font-bold truncate" style={{ color: '#7a6a55' }}>{customer.phone}</p>
                     </div>
                   </div>
@@ -442,7 +453,8 @@ const LoyaltyDashboard = () => {
                   {/* Visit count */}
                   <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-xl flex-shrink-0"
                     style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.07)' }}>
-                    <span className="text-xs">☕</span>
+                    {/* ☕ → Coffee */}
+                    <Coffee className="w-3 h-3" style={{ color: '#7a6a55' }} />
                     <span className="text-white text-xs font-black">{visits}</span>
                     <span className="text-xs font-bold hidden sm:inline" style={{ color: '#7a6a55' }}>visit{visits !== 1 ? 's' : ''}</span>
                   </div>
@@ -453,7 +465,8 @@ const LoyaltyDashboard = () => {
                       background: isFree ? 'rgba(16,185,129,0.12)' : 'rgba(201,162,39,0.2)',
                       border: isFree ? '1px solid rgba(16,185,129,0.3)' : '1px solid rgba(201,162,39,0.2)',
                     }}>
-                    <span className="text-xs">{isFree ? '🎁' : '⭐'}</span>
+                    {/* 🎁 → Gift, ⭐ → Star */}
+                    {isFree ? <Gift className="w-3 h-3" style={{ color: '#34d399' }} /> : <Star className="w-3 h-3" style={{ color: '#C9A227' }} />}
                     <span className="text-xs font-black" style={{ color: isFree ? '#34d399' : '#C9A227' }}>
                       {isFree ? 'Free!' : `${disc}%`}
                     </span>
@@ -486,7 +499,8 @@ const LoyaltyDashboard = () => {
                             background: isExpired ? 'rgba(220,50,50,0.08)' : 'rgba(255,255,255,0.04)',
                             border: isExpired ? '1px solid rgba(220,50,50,0.25)' : '1px solid rgba(255,255,255,0.08)',
                           }}>
-                          <span className="text-xs">📅</span>
+                          {/* 📅 → Calendar */}
+                          <Calendar className="w-3 h-3" style={{ color: isExpired ? '#f87171' : '#7a6a55' }} />
                           <span className="text-xs font-bold" style={{ color: isExpired ? '#f87171' : '#7a6a55' }}>
                             {isExpired ? 'Expired ' : 'Valid till '}
                             {exp.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}
@@ -500,7 +514,8 @@ const LoyaltyDashboard = () => {
                       <button onClick={() => handleMarkVisit(customer)} disabled={marking}
                         className="loy-btn loy-btn-orange disabled:opacity-50"
                         data-testid={`mark-visit-${customer.id}`}>
-                        {marking ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <span>☕</span>}
+                        {/* ☕ → Coffee */}
+                        {marking ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <Coffee className="w-3.5 h-3.5" />}
                         {marking ? 'Marking…' : 'Mark Visit'}
                       </button>
                       <button onClick={() => handleSendWA(customer)}
@@ -540,8 +555,9 @@ const LoyaltyDashboard = () => {
                     {editingCustomerId === customer.id && (
                       <div className="mt-2 pt-3 space-y-3" style={{ borderTop: '1px solid rgba(201,162,39,0.2)' }}
                         data-testid={`edit-panel-${customer.id}`}>
-                        <p className="text-xs font-black uppercase tracking-widest" style={{ color: '#C9A227' }}>
-                          ✏️ Edit Loyalty Card
+                        {/* ✏️ → Pencil */}
+                        <p className="text-xs font-black uppercase tracking-widest flex items-center gap-1" style={{ color: '#C9A227' }}>
+                          <Edit className="w-3 h-3" /> Edit Loyalty Card
                         </p>
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                           <div>
@@ -585,7 +601,8 @@ const LoyaltyDashboard = () => {
 
       {/* Footer */}
       <div className="flex items-center justify-center gap-2 py-2">
-        <span>⭐</span>
+        {/* ⭐ → Star */}
+        <Star className="w-4 h-4" style={{ color: '#7a6a55' }} />
         <p className="text-xs font-bold" style={{ color: '#7a6a55' }}>
           {totalCustomers} member{totalCustomers !== 1 ? 's' : ''} · {totalVisits} total visits
         </p>
