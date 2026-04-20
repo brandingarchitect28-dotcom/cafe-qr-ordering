@@ -8,6 +8,7 @@ import {
   Plus, Pencil, Trash2, X, Search, AlertTriangle,
   Package, RefreshCw, ChevronDown, CheckCircle2,
   BarChart2, Filter, Save, Boxes, FlaskConical,
+  FolderOpen, Coffee, Utensils, Calendar, Settings,
 } from 'lucide-react';
 import {
   subscribeToInventory, addInventoryItem, updateInventoryItem,
@@ -79,8 +80,14 @@ const InventoryForm = ({ initial, onSave, onClose, saving, T }) => {
         style={{ background: 'linear-gradient(180deg,#1e1408 0%,#150f06 100%)', border: '1.5px solid rgba(201,162,39,0.18)' }}>
         <div className="flex items-center justify-between px-6 py-4" style={{ borderBottom: '1px solid rgba(201,162,39,0.1)' }}>
           <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-xl flex items-center justify-center text-lg" style={{ background: 'rgba(201,162,39,0.1)', border: '1.5px solid rgba(201,162,39,0.2)' }}>📦</div>
-            <h3 className="font-black text-white imv-title text-lg">{initial ? '✏️ Edit Item' : '➕ Add Inventory Item'}</h3>
+            {/* 📦 → Package */}
+            <div className="w-9 h-9 rounded-xl flex items-center justify-center" style={{ background: 'rgba(201,162,39,0.1)', border: '1.5px solid rgba(201,162,39,0.2)' }}>
+              <Package className="w-5 h-5" style={{ color: '#C9A227' }} />
+            </div>
+            {/* ✏️ → Pencil, ➕ → Plus */}
+            <h3 className="font-black text-white imv-title text-lg flex items-center gap-1.5">
+              {initial ? <><Pencil className="w-4 h-4" /> Edit Item</> : <><Plus className="w-4 h-4" /> Add Inventory Item</>}
+            </h3>
           </div>
           <button onClick={onClose} className="p-1.5 rounded-xl transition-all" style={{ color: '#7a6a55' }}
             onMouseEnter={e => e.currentTarget.style.color = '#fff'} onMouseLeave={e => e.currentTarget.style.color = '#7a6a55'}>
@@ -226,7 +233,8 @@ const InventoryManagement = () => {
           <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }}
             className="rounded-2xl p-4" style={{ background: 'rgba(220,50,50,0.08)', border: '1.5px solid rgba(220,50,50,0.22)' }} data-testid="low-stock-banner">
             <div className="flex items-start gap-3">
-              <span className="text-xl flex-shrink-0 mt-0.5">⚠️</span>
+              {/* ⚠️ → AlertTriangle */}
+              <AlertTriangle className="w-5 h-5 flex-shrink-0 mt-0.5" style={{ color: '#f87171' }} />
               <div className="flex-1 min-w-0">
                 <p className="font-black text-sm mb-2" style={{ color: '#f87171' }}>Low Stock Warning — {lowStockItems.length} item{lowStockItems.length !== 1 ? 's' : ''} below threshold</p>
                 <div className="flex flex-wrap gap-2">
@@ -245,32 +253,40 @@ const InventoryManagement = () => {
 
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
         <div className="flex items-center gap-3">
-          <div className="w-11 h-11 rounded-2xl flex items-center justify-center text-xl flex-shrink-0" style={{ background: 'rgba(201,162,39,0.1)', border: '1.5px solid rgba(201,162,39,0.2)' }}>📦</div>
+          {/* 📦 → Package */}
+          <div className="w-11 h-11 rounded-2xl flex items-center justify-center flex-shrink-0" style={{ background: 'rgba(201,162,39,0.1)', border: '1.5px solid rgba(201,162,39,0.2)' }}>
+            <Package className="w-6 h-6" style={{ color: '#C9A227' }} />
+          </div>
           <div>
             <h2 className="text-2xl font-black text-white imv-title">Inventory</h2>
             <p className="text-xs font-bold mt-0.5" style={{ color: '#7a6a55' }}>
               {inventory.length} item{inventory.length !== 1 ? 's' : ''} tracked
-              {lowStockItems.length > 0 && <span className="ml-2" style={{ color: '#f87171' }}>· {lowStockItems.length} low stock ⚠️</span>}
+              {/* ⚠️ → AlertTriangle inline */}
+              {lowStockItems.length > 0 && <span className="ml-2 inline-flex items-center gap-1" style={{ color: '#f87171' }}>· {lowStockItems.length} low stock <AlertTriangle className="inline w-3 h-3" /></span>}
             </p>
           </div>
         </div>
         <div className="flex items-center gap-2 flex-wrap">
           <button onClick={() => setShowRecipeManager(true)} className="imv-btn imv-btn-ghost">
-            <FlaskConical className="w-4 h-4" style={{ color: '#C9A227' }} />🧪 Manage Recipes
+            {/* 🧪 → FlaskConical (already imported) */}
+            <FlaskConical className="w-4 h-4" style={{ color: '#C9A227' }} /> Manage Recipes
           </button>
           <button onClick={openAddForm} data-testid="add-inventory-btn" className="imv-btn imv-btn-orange">
-            <Plus className="w-4 h-4" />➕ Add Item
+            {/* ➕ → Plus (already imported) */}
+            <Plus className="w-4 h-4" /> Add Item
           </button>
         </div>
       </div>
 
       <div className="flex flex-col sm:flex-row gap-3">
         <div className="relative flex-1">
-          <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm">🔍</span>
+          {/* 🔍 → Search */}
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4" style={{ color: '#7a6a55' }} />
           <input type="text" value={search} onChange={e => setSearch(e.target.value)} placeholder="Search items or categories…" data-testid="inv-search" className="imv-input" style={{ paddingLeft: '2.2rem' }} />
         </div>
         <div className="flex items-center gap-2">
-          <span className="text-sm">🗂️</span>
+          {/* 🗂️ → FolderOpen */}
+          <FolderOpen className="w-4 h-4 flex-shrink-0" style={{ color: '#7a6a55' }} />
           <select value={catFilter} onChange={e => setCatFilter(e.target.value)} data-testid="inv-cat-filter" className="imv-select" style={{ width: 'auto', minWidth: 140 }}>
             {categories.map(c => <option key={c} value={c}>{c === 'all' ? 'All Categories' : c}</option>)}
           </select>
@@ -279,13 +295,16 @@ const InventoryManagement = () => {
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
         {[
-          { label: 'Total Items',  value: inventory.length,                        color: '#C9A227', emoji: '📦' },
-          { label: 'Categories',   value: categories.length - 1,                   color: '#60a5fa', emoji: '🗂️' },
-          { label: 'Low Stock',    value: lowStockItems.length,                    color: '#f87171', emoji: '⚠️' },
-          { label: 'Stock OK',     value: inventory.length - lowStockItems.length, color: '#34d399', emoji: '✅' },
+          { label: 'Total Items',  value: inventory.length,                        color: '#C9A227', icon: Package       },
+          { label: 'Categories',   value: categories.length - 1,                   color: '#60a5fa', icon: FolderOpen    },
+          { label: 'Low Stock',    value: lowStockItems.length,                    color: '#f87171', icon: AlertTriangle },
+          { label: 'Stock OK',     value: inventory.length - lowStockItems.length, color: '#34d399', icon: CheckCircle2  },
         ].map(stat => (
           <div key={stat.label} className="imv-card p-4 flex items-center gap-3" style={{ borderLeft: `3px solid ${stat.color}` }}>
-            <div className="w-9 h-9 rounded-xl flex items-center justify-center text-lg flex-shrink-0" style={{ background: stat.color + '18' }}>{stat.emoji}</div>
+            {/* 📦 🗂️ ⚠️ ✅ → icon components */}
+            <div className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0" style={{ background: stat.color + '18' }}>
+              <stat.icon className="w-5 h-5" style={{ color: stat.color }} />
+            </div>
             <div>
               <p className="text-xl font-black text-white leading-none">{stat.value}</p>
               <p className="text-xs font-bold mt-0.5" style={{ color: '#7a6a55' }}>{stat.label}</p>
@@ -295,24 +314,43 @@ const InventoryManagement = () => {
       </div>
 
       {invLoading ? (
-        <div className="flex flex-col items-center justify-center py-16 gap-3"><div className="text-4xl animate-bounce">📦</div><p className="text-sm font-bold" style={{ color: '#7a6a55' }}>Loading inventory…</p></div>
+        <div className="flex flex-col items-center justify-center py-16 gap-3">
+          {/* 📦 → Package */}
+          <Package className="w-10 h-10 animate-bounce" style={{ color: '#C9A227' }} />
+          <p className="text-sm font-bold" style={{ color: '#7a6a55' }}>Loading inventory…</p>
+        </div>
       ) : inventory.length === 0 ? (
         <div className="imv-card p-14 text-center">
-          <div className="text-5xl mb-4">📦</div>
+          {/* 📦 → Package */}
+          <Package className="w-12 h-12 mb-4 mx-auto" style={{ color: '#3a2e1a' }} />
           <p className="font-black text-lg text-white mb-1">No inventory items yet</p>
           <p className="text-sm mb-6 font-bold" style={{ color: '#7a6a55' }}>Start tracking your ingredients and supplies.</p>
           <button onClick={openAddForm} className="imv-btn imv-btn-orange mx-auto"><Plus className="w-4 h-4" />Add Your First Item</button>
         </div>
       ) : filtered.length === 0 ? (
-        <div className="imv-card p-10 text-center"><div className="text-4xl mb-3">🔍</div><p className="font-bold" style={{ color: '#7a6a55' }}>No items match your search or filter.</p></div>
+        <div className="imv-card p-10 text-center">
+          {/* 🔍 → Search */}
+          <Search className="w-10 h-10 mb-3 mx-auto" style={{ color: '#3a2e1a' }} />
+          <p className="font-bold" style={{ color: '#7a6a55' }}>No items match your search or filter.</p>
+        </div>
       ) : (
         <div className="imv-card overflow-hidden">
           <div className="overflow-x-auto">
             <table className="w-full">
               <thead>
                 <tr style={{ borderBottom: '1px solid rgba(201,162,39,0.1)', background: 'rgba(201,162,39,0.04)' }}>
-                  {['🍴 Item Name', '🗂️ Category', '📊 Stock', '⚠️ Threshold', '🟢 Status', '📅 Updated', '⚙️ Actions'].map(h => (
-                    <th key={h} className="text-left px-4 py-3.5 text-xs font-black uppercase tracking-wide whitespace-nowrap" style={{ color: '#C9A227' }}>{h}</th>
+                  {[
+                    { label: 'Item Name',  icon: Utensils      },
+                    { label: 'Category',   icon: FolderOpen    },
+                    { label: 'Stock',      icon: BarChart2     },
+                    { label: 'Threshold',  icon: AlertTriangle },
+                    { label: 'Status',     icon: CheckCircle2  },
+                    { label: 'Updated',    icon: Calendar      },
+                    { label: 'Actions',    icon: Settings      },
+                  ].map(h => (
+                    <th key={h.label} className="text-left px-4 py-3.5 text-xs font-black uppercase tracking-wide whitespace-nowrap" style={{ color: '#C9A227' }}>
+                      <span className="flex items-center gap-1"><h.icon className="w-3.5 h-3.5" /> {h.label}</span>
+                    </th>
                   ))}
                 </tr>
               </thead>
@@ -329,8 +367,9 @@ const InventoryManagement = () => {
                         <td className="px-4 py-3.5 text-sm font-bold" style={{ color: '#7a6a55' }}>{item.lowStockThreshold} {item.unit}</td>
                         <td className="px-4 py-3.5">
                           {low
-                            ? <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-black" style={{ background: 'rgba(220,50,50,0.12)', color: '#f87171', border: '1px solid rgba(220,50,50,0.25)' }}>⚠️ Low Stock</span>
-                            : <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-black" style={{ background: 'rgba(16,185,129,0.1)', color: '#34d399', border: '1px solid rgba(16,185,129,0.2)' }}>✅ Stock OK</span>}
+                            /* ⚠️ → AlertTriangle, ✅ → CheckCircle2 */
+                            ? <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-black" style={{ background: 'rgba(220,50,50,0.12)', color: '#f87171', border: '1px solid rgba(220,50,50,0.25)' }}><AlertTriangle className="w-3 h-3" /> Low Stock</span>
+                            : <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-black" style={{ background: 'rgba(16,185,129,0.1)', color: '#34d399', border: '1px solid rgba(16,185,129,0.2)' }}><CheckCircle2 className="w-3 h-3" /> Stock OK</span>}
                         </td>
                         <td className="px-4 py-3.5 text-xs font-bold whitespace-nowrap" style={{ color: '#4a3f35' }}>{fmtDate(item.lastUpdated || item.createdAt)}</td>
                         <td className="px-4 py-3.5">
@@ -348,7 +387,8 @@ const InventoryManagement = () => {
           </div>
           <div className="px-4 py-3 flex items-center gap-2" style={{ borderTop: '1px solid rgba(255,255,255,0.04)' }}>
             <span className="w-1.5 h-1.5 rounded-full bg-green-400 animate-pulse" />
-            <span className="text-xs font-bold" style={{ color: '#4a3f35' }}>Showing {filtered.length} of {inventory.length} items · Real-time updates active ☕</span>
+            {/* ☕ → Coffee */}
+            <span className="text-xs font-bold flex items-center gap-1" style={{ color: '#4a3f35' }}>Showing {filtered.length} of {inventory.length} items · Real-time updates active <Coffee className="inline w-3 h-3" /></span>
           </div>
         </div>
       )}
@@ -369,13 +409,17 @@ const InventoryManagement = () => {
               onClick={e => e.stopPropagation()} className="w-full max-w-sm rounded-2xl p-6 shadow-2xl"
               style={{ background: 'linear-gradient(180deg,#1e1408 0%,#150f06 100%)', border: '1.5px solid rgba(220,50,50,0.25)' }}>
               <div className="flex items-center gap-3 mb-4">
-                <div className="w-10 h-10 rounded-xl flex items-center justify-center text-xl" style={{ background: 'rgba(220,50,50,0.1)' }}>🗑️</div>
+                {/* 🗑️ → Trash2 */}
+                <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ background: 'rgba(220,50,50,0.1)' }}>
+                  <Trash2 className="w-5 h-5" style={{ color: '#f87171' }} />
+                </div>
                 <div><p className="font-black text-white">Delete Item?</p><p className="text-xs font-bold" style={{ color: '#7a6a55' }}>This cannot be undone.</p></div>
               </div>
               <div className="flex gap-3">
                 <button onClick={() => setDeleteId(null)} className="imv-btn imv-btn-ghost flex-1 justify-center">Cancel</button>
                 <button onClick={handleDelete} disabled={deleting} className="imv-btn flex-1 justify-center disabled:opacity-50" style={{ background: '#dc2626', color: '#fff', border: 'none' }}>
-                  {deleting ? <><RefreshCw className="w-4 h-4 animate-spin" />Deleting…</> : <>🗑️ Delete</>}
+                  {/* 🗑️ → Trash2 */}
+                  {deleting ? <><RefreshCw className="w-4 h-4 animate-spin" />Deleting…</> : <><Trash2 className="w-4 h-4" /> Delete</>}
                 </button>
               </div>
             </motion.div>

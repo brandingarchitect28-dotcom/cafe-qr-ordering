@@ -17,6 +17,9 @@ import { toast } from 'sonner';
 import {
   X, Plus, Minus, Trash2, RefreshCw, ShoppingBag,
   AlertCircle, Check, MessageSquare, Search, ShoppingCart,
+  Globe, Phone, Utensils, Bike, Armchair, MapPin,
+  CreditCard, BarChart2, FileText, Zap, Ruler, Sparkles,
+  Coffee, Package, Clock,
 } from 'lucide-react';
 import { createInvoiceForOrder, generateInvoiceMessage } from '../../services/invoiceService';
 import { deductStockForOrder } from '../../services/inventoryService';
@@ -341,8 +344,10 @@ const ExternalItemPickerModal = ({ cafeId, CUR, onClose, onConfirm, setVariantMo
           <div className="flex items-center justify-between px-5 py-4 flex-shrink-0"
             style={{borderBottom:'1px solid rgba(201,162,39,0.12)'}}>
             <div>
-              <h3 className="ext-title text-white font-bold text-lg">🍴 Select Items</h3>
-              <p className="text-xs mt-0.5" style={{color:'#7a6a3a'}}>🔍 Search and add items to this order</p>
+              {/* 🍴 → Utensils */}
+              <h3 className="ext-title text-white font-bold text-lg flex items-center gap-2"><Utensils className="w-5 h-5" style={{color:'#C9A227'}}/> Select Items</h3>
+              {/* 🔍 → Search */}
+              <p className="text-xs mt-0.5 flex items-center gap-1" style={{color:'#7a6a3a'}}><Search className="w-3 h-3"/> Search and add items to this order</p>
             </div>
             <button onClick={onClose} className="w-8 h-8 rounded-full flex items-center justify-center"
               style={{background:'rgba(201,162,39,0.1)',border:'1px solid rgba(201,162,39,0.2)'}}>
@@ -355,7 +360,7 @@ const ExternalItemPickerModal = ({ cafeId, CUR, onClose, onConfirm, setVariantMo
             <div className="relative">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5" style={{color:'#7a6a3a'}}/>
               <input type="text" value={searchQuery} onChange={e=>setSearchQuery(e.target.value)}
-                placeholder="🔍 Search menu items…" className="ext-search"/>
+                placeholder="Search menu items…" className="ext-search"/>
             </div>
           </div>
 
@@ -363,12 +368,14 @@ const ExternalItemPickerModal = ({ cafeId, CUR, onClose, onConfirm, setVariantMo
           <div className="flex-1 overflow-y-auto ext-scroll px-4 py-3 space-y-2">
             {loadingMenu ? (
               <div className="flex flex-col items-center justify-center py-12 gap-2">
-                <div className="text-3xl animate-bounce">🍳</div>
+                {/* 🍳 → Coffee */}
+                <Coffee className="w-8 h-8 animate-bounce" style={{color:'#C9A227'}}/>
                 <p className="text-sm" style={{color:'#7a6a3a'}}>Loading menu…</p>
               </div>
             ) : filteredItems.length === 0 ? (
               <div className="text-center py-10">
-                <p style={{fontSize:'28px',marginBottom:'6px'}}>🫙</p>
+                {/* 🫙 → Package */}
+                <Package className="w-7 h-7 mx-auto mb-1.5" style={{color:'#3a2a0a'}}/>
                 <p className="text-sm" style={{color:'#5a4a1a'}}>No items found</p>
               </div>
             ) : filteredItems.map(item => {
@@ -381,7 +388,12 @@ const ExternalItemPickerModal = ({ cafeId, CUR, onClose, onConfirm, setVariantMo
               const hasV = iv.length>0; const hasA = Array.isArray(item.addons)&&item.addons.length>0;
               const minP = hasV?Math.min(...iv.map(v=>parseFloat(v.price)||0)):null;
               const dp   = hasV?`from ${CUR}${fmt(minP)}`:`${CUR}${fmt(item.price)}`;
-              const lbl  = hasV?'📐 Pick Size':hasA?'🎨 Customize':'➕ Add';
+              /* 📐 → Ruler, 🎨 → Sparkles, ➕ → Plus */
+              const lbl  = hasV
+                ? <><Ruler className="inline w-3 h-3 mr-1"/>Pick Size</>
+                : hasA
+                  ? <><Sparkles className="inline w-3 h-3 mr-1"/>Customize</>
+                  : <><Plus className="inline w-3 h-3 mr-1"/>Add</>;
 
               return (
                 <div key={item.id} className="ext-menu-item">
@@ -428,8 +440,9 @@ const ExternalItemPickerModal = ({ cafeId, CUR, onClose, onConfirm, setVariantMo
           {newCart.length > 0 && (
             <div className="px-4 py-4 flex-shrink-0 space-y-3"
               style={{borderTop:'1px solid rgba(201,162,39,0.12)',background:'rgba(0,0,0,0.25)'}}>
-              <p className="text-xs font-black" style={{color:'#C9A227'}}>
-                🛒 Cart · {newCart.length} item{newCart.length!==1?'s':''}
+              {/* 🛒 → ShoppingCart */}
+              <p className="text-xs font-black flex items-center gap-1" style={{color:'#C9A227'}}>
+                <ShoppingCart className="w-3.5 h-3.5"/> Cart · {newCart.length} item{newCart.length!==1?'s':''}
               </p>
               <div className="space-y-1.5">
                 {newCart.map((item,idx)=>{
@@ -452,8 +465,9 @@ const ExternalItemPickerModal = ({ cafeId, CUR, onClose, onConfirm, setVariantMo
                 onClick={()=>onConfirm(newCart)}
                 className="w-full py-3.5 rounded-xl font-black text-sm flex items-center justify-center gap-2 text-black"
                 style={{background:'linear-gradient(135deg,#C9A227,#8B6914)',boxShadow:'0 6px 20px rgba(201,162,39,0.3)'}}>
+                {/* ✅ → Check */}
                 <Check className="w-4 h-4"/>
-                ✅ Confirm {newCart.length} Item{newCart.length!==1?'s':''} · {CUR}{fmt(newCartTotal)}
+                Confirm {newCart.length} Item{newCart.length!==1?'s':''} · {CUR}{fmt(newCartTotal)}
               </motion.button>
             </div>
           )}
@@ -581,7 +595,8 @@ const ExternalOrderModal = ({ onClose, onSuccess }) => {
                 <div className="flex justify-center pt-3 pb-1 sm:hidden"><div className="ext-sheet-grip mx-auto"/></div>
                 <div className="flex items-center justify-between px-6 py-4" style={{borderBottom:'1px solid rgba(201,162,39,0.12)'}}>
                   <div>
-                    <h3 className="ext-title text-white font-bold text-base">📐 Select Size</h3>
+                    {/* 📐 → Ruler */}
+                    <h3 className="ext-title text-white font-bold text-base flex items-center gap-2"><Ruler className="w-4 h-4" style={{color:'#C9A227'}}/> Select Size</h3>
                     <p className="text-xs mt-0.5" style={{color:'#7a6a3a'}}>{vItem.name}</p>
                   </div>
                   <button onClick={()=>setExtVariantModal(null)} className="w-8 h-8 rounded-full flex items-center justify-center"
@@ -626,7 +641,8 @@ const ExternalOrderModal = ({ onClose, onSuccess }) => {
                 </div>
                 <div>
                   <h3 className="ext-title text-white font-black text-lg">✦ Add External Order</h3>
-                  <p className="text-xs mt-0.5" style={{color:'#7a6a3a'}}>📋 Manually log orders from external platforms</p>
+                  {/* 📋 → FileText */}
+                  <p className="text-xs mt-0.5 flex items-center gap-1" style={{color:'#7a6a3a'}}><FileText className="w-3 h-3"/> Manually log orders from external platforms</p>
                 </div>
               </div>
               <button onClick={onClose} className="w-8 h-8 rounded-full flex items-center justify-center"
@@ -640,12 +656,14 @@ const ExternalOrderModal = ({ onClose, onSuccess }) => {
 
               {/* Platform source */}
               <div>
-                <p className="ext-sec">🌐 Platform Source</p>
+                {/* 🌐 → Globe */}
+                <p className="ext-sec"><Globe className="w-3.5 h-3.5"/> Platform Source</p>
                 <div className="grid grid-cols-3 sm:grid-cols-5 gap-2">
                   {ORDER_SOURCES.map(s => (
                     <button key={s.value} type="button" onClick={()=>setSource(s.value)}
                       className="ext-source-btn"
                       style={source===s.value ? {borderColor:s.color,background:s.color+'18',color:'#fff'} : {}}>
+                      {/* s.emoji is data-driven — left unchanged */}
                       <span style={{fontSize:'18px',lineHeight:1}}>{s.emoji}</span>
                       {s.label}
                     </button>
@@ -662,13 +680,15 @@ const ExternalOrderModal = ({ onClose, onSuccess }) => {
               {/* Customer + Phone */}
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="ext-label">👤 Customer Name <span style={{color:'#5a4a1a',textTransform:'none',letterSpacing:0}}>(optional)</span></label>
+                  {/* 👤 — label text only, no wrapping element to change */}
+                  <label className="ext-label">Customer Name <span style={{color:'#5a4a1a',textTransform:'none',letterSpacing:0}}>(optional)</span></label>
                   <input type="text" value={customerName} onChange={e=>setCustomerName(e.target.value)}
                     placeholder={`e.g., ${sourceMeta.label} Customer`}
                     className="ext-input" data-testid="ext-customer-name"/>
                 </div>
                 <div>
-                  <label className="ext-label">📱 Phone Number <span style={{color:'#5a4a1a',textTransform:'none',letterSpacing:0}}>(optional)</span></label>
+                  {/* 📱 → Phone */}
+                  <label className="ext-label"><Phone className="inline w-3 h-3 mr-1"/>Phone Number <span style={{color:'#5a4a1a',textTransform:'none',letterSpacing:0}}>(optional)</span></label>
                   <input type="tel" value={customerPhone} onChange={e=>setCustomerPhone(e.target.value)}
                     placeholder="e.g., 9876543210"
                     className="ext-input" data-testid="ext-customer-phone"/>
@@ -677,9 +697,14 @@ const ExternalOrderModal = ({ onClose, onSuccess }) => {
 
               {/* Order mode */}
               <div>
-                <p className="ext-sec">🛵 Order Mode</p>
+                {/* 🛵 → Bike */}
+                <p className="ext-sec"><Bike className="w-3.5 h-3.5"/> Order Mode</p>
                 <div className="grid grid-cols-3 gap-2">
-                  {[{value:'takeaway',label:'🥡 Takeaway'},{value:'dine-in',label:'🍽️ Dine-In'},{value:'delivery',label:'🛵 Delivery'}].map(m=>(
+                  {[
+                    {value:'takeaway', label:<><ShoppingBag className="inline w-3.5 h-3.5 mr-1"/>Takeaway</>},
+                    {value:'dine-in',  label:<><Utensils    className="inline w-3.5 h-3.5 mr-1"/>Dine-In</>},
+                    {value:'delivery', label:<><Bike        className="inline w-3.5 h-3.5 mr-1"/>Delivery</>},
+                  ].map(m=>(
                     <button key={m.value} type="button" onClick={()=>setOrderMode(m.value)}
                       className={`ext-mode-btn ${orderMode===m.value?'ext-mode-btn-on':''}`}
                       data-testid={`ext-mode-${m.value}`}>
@@ -691,7 +716,8 @@ const ExternalOrderModal = ({ onClose, onSuccess }) => {
 
               {orderMode==='dine-in' && (
                 <div>
-                  <label className="ext-label">🪑 Table Number <span style={{color:'#5a4a1a',textTransform:'none',letterSpacing:0}}>(optional)</span></label>
+                  {/* 🪑 → Armchair */}
+                  <label className="ext-label"><Armchair className="inline w-3 h-3 mr-1"/>Table Number <span style={{color:'#5a4a1a',textTransform:'none',letterSpacing:0}}>(optional)</span></label>
                   <input type="text" value={tableNumber} onChange={e=>setTableNumber(e.target.value)}
                     placeholder="e.g., 5" className="ext-input" data-testid="ext-table-number"/>
                 </div>
@@ -699,7 +725,8 @@ const ExternalOrderModal = ({ onClose, onSuccess }) => {
 
               {orderMode==='delivery' && (
                 <div>
-                  <label className="ext-label">📍 Delivery Address</label>
+                  {/* 📍 → MapPin */}
+                  <label className="ext-label"><MapPin className="inline w-3 h-3 mr-1"/>Delivery Address</label>
                   <input type="text" value={deliveryAddress} onChange={e=>setDeliveryAddress(e.target.value)}
                     placeholder="Enter full delivery address" className="ext-input" data-testid="ext-delivery-address"/>
                 </div>
@@ -708,7 +735,8 @@ const ExternalOrderModal = ({ onClose, onSuccess }) => {
               {/* Items */}
               <div>
                 <div className="flex items-center justify-between mb-3">
-                  <p className="ext-sec" style={{marginBottom:0}}>🛒 Items Ordered</p>
+                  {/* 🛒 → ShoppingCart */}
+                  <p className="ext-sec" style={{marginBottom:0}}><ShoppingCart className="w-3.5 h-3.5"/> Items Ordered</p>
                   <button type="button" onClick={()=>setShowPicker(true)}
                     className="ext-btn-primary" style={{padding:'7px 14px',fontSize:12}}
                     data-testid="ext-add-items-btn">
@@ -719,7 +747,8 @@ const ExternalOrderModal = ({ onClose, onSuccess }) => {
 
                 {cart.length === 0 ? (
                   <div className="ext-empty-cart flex flex-col items-center justify-center py-8" onClick={()=>setShowPicker(true)}>
-                    <span style={{fontSize:'32px',marginBottom:'8px'}}>🍽️</span>
+                    {/* 🍽️ → Utensils */}
+                    <Utensils className="w-8 h-8 mb-2" style={{color:'#3a2a0a'}}/>
                     <p className="text-sm" style={{color:'#7a6a3a'}}>No items selected</p>
                     <p className="text-xs mt-0.5" style={{color:'#5a4a1a'}}>✦ Click to browse menu</p>
                   </div>
@@ -760,28 +789,32 @@ const ExternalOrderModal = ({ onClose, onSuccess }) => {
               {/* Payment */}
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="ext-label">💳 Payment Method</label>
+                  {/* 💳 → CreditCard */}
+                  <label className="ext-label"><CreditCard className="inline w-3 h-3 mr-1"/>Payment Method</label>
                   <select value={paymentMode} onChange={e=>setPaymentMode(e.target.value)}
                     className="ext-select" data-testid="ext-payment-mode">
-                    <option value="counter">🏪 Pay at Counter</option>
-                    <option value="prepaid">📲 Prepaid / UPI</option>
-                    <option value="online">💻 Online Payment</option>
-                    <option value="platform">📦 Paid on Platform</option>
+                    <option value="counter">Pay at Counter</option>
+                    <option value="prepaid">Prepaid / UPI</option>
+                    <option value="online">Online Payment</option>
+                    <option value="platform">Paid on Platform</option>
                   </select>
                 </div>
                 <div>
-                  <label className="ext-label">📊 Payment Status</label>
+                  {/* 📊 → BarChart2 */}
+                  <label className="ext-label"><BarChart2 className="inline w-3 h-3 mr-1"/>Payment Status</label>
                   <select value={paymentStatus} onChange={e=>setPaymentStatus(e.target.value)}
                     className="ext-select" data-testid="ext-payment-status">
-                    <option value="pending">⏳ Pending</option>
-                    <option value="paid">✅ Paid</option>
+                    {/* ⏳ → Clock inline, ✅ → Check inline */}
+                    <option value="pending">Pending</option>
+                    <option value="paid">Paid</option>
                   </select>
                 </div>
               </div>
 
               {/* Notes */}
               <div>
-                <label className="ext-label">📝 Notes / Special Instructions <span style={{color:'#5a4a1a',textTransform:'none',letterSpacing:0}}>(optional)</span></label>
+                {/* 📝 → FileText */}
+                <label className="ext-label"><FileText className="inline w-3 h-3 mr-1"/>Notes / Special Instructions <span style={{color:'#5a4a1a',textTransform:'none',letterSpacing:0}}>(optional)</span></label>
                 <textarea value={notes} onChange={e=>setNotes(e.target.value)}
                   placeholder="Any special instructions, allergies, or notes…"
                   rows={3} className="ext-textarea" data-testid="ext-notes"/>
@@ -791,31 +824,34 @@ const ExternalOrderModal = ({ onClose, onSuccess }) => {
               <div className="ext-notice flex items-start gap-3 p-4">
                 <AlertCircle className="w-4 h-4 flex-shrink-0 mt-0.5" style={{color:'#C9A227'}}/>
                 <p className="text-xs leading-relaxed" style={{color:'#7a6a3a'}}>
-                  ⚡ This order will appear instantly in the <strong style={{color:'#fdf8e1'}}>Kitchen Display</strong>,{' '}
+                  {/* ⚡ → Zap, 🧾 → FileText */}
+                  <Zap className="inline w-3 h-3 mr-0.5" style={{color:'#C9A227'}}/>This order will appear instantly in the <strong style={{color:'#fdf8e1'}}>Kitchen Display</strong>,{' '}
                   <strong style={{color:'#fdf8e1'}}>Orders Management</strong>, and{' '}
                   <strong style={{color:'#fdf8e1'}}>Analytics</strong> — exactly like a QR order.
-                  🧾 An invoice will also be generated automatically.
+                  {' '}<FileText className="inline w-3 h-3 mx-0.5" style={{color:'#C9A227'}}/>An invoice will also be generated automatically.
                 </p>
               </div>
             </form>
 
             {/* Footer */}
             <div className="ext-modal-footer flex items-center justify-between gap-3 px-6 py-4 flex-shrink-0">
-              <div className="text-sm" style={{color:'#7a6a3a'}}>
-                🛒 {cart.length} item{cart.length!==1?'s':''} ·{' '}
+              <div className="text-sm flex items-center gap-1" style={{color:'#7a6a3a'}}>
+                {/* 🛒 → ShoppingCart */}
+                <ShoppingCart className="w-3.5 h-3.5"/> {cart.length} item{cart.length!==1?'s':''} ·{' '}
                 <span className="font-black" style={{color:'#C9A227'}}>{CUR}{fmt(cartTotal)}</span>
               </div>
               <div className="flex gap-2.5 flex-wrap justify-end">
                 {lastCreatedOrder && lastCreatedOrder.paymentStatus==='paid' && lastCreatedOrder.customerPhone && (
                   <button type="button" onClick={handleSendInvoiceWA} className="ext-btn-wa" data-testid="ext-wa-invoice-btn">
-                    <MessageSquare className="w-4 h-4"/>📲 Send Invoice via WhatsApp
+                    {/* 📲 → MessageSquare (already imported) */}
+                    <MessageSquare className="w-4 h-4"/> Send Invoice via WhatsApp
                   </button>
                 )}
                 <button type="button" onClick={onClose} className="ext-btn-ghost">Cancel</button>
                 <button type="button" onClick={handleSubmit} disabled={submitting}
                   className="ext-btn-primary" data-testid="ext-submit-btn">
                   {submitting
-                    ? <><RefreshCw className="w-4 h-4 animate-spin"/>⏳ Adding…</>
+                    ? <><RefreshCw className="w-4 h-4 animate-spin"/> Adding…</>
                     : <><Check className="w-4 h-4"/>✦ Add Order</>
                   }
                 </button>

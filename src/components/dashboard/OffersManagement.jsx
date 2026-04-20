@@ -3,7 +3,13 @@ import { useAuth } from '../../contexts/AuthContext';
 import { useCollection, useDocument } from '../../hooks/useFirestore';
 import { where, addDoc, collection, doc, updateDoc, deleteDoc } from 'firebase/firestore';
 import { db } from '../../lib/firebase';
-import { Plus, Edit, Trash2, X, Package, Percent, Gift, Check, ChevronDown } from 'lucide-react';
+import {
+  Plus, Edit, Trash2, X, Package, Percent, Gift, Check, ChevronDown,
+  Tag, FileText, Utensils, Ruler, Coffee, CupSoda, GlassWater,
+  ShoppingBasket, Calculator, DollarSign, PartyPopper, Sparkles,
+  CheckCircle, PauseCircle, PlayCircle, Image, Zap, Save, RefreshCw,
+  ShoppingCart,
+} from 'lucide-react';
 import { toast } from 'sonner';
 import MediaUpload from '../MediaUpload';
 import { useTheme } from '../../hooks/useTheme';
@@ -225,7 +231,8 @@ const OffersManagement = () => {
     <div className="ofm2 space-y-5 relative">
       <div className="flex flex-wrap justify-between items-center gap-3">
         <div className="flex items-center gap-3">
-          <div className="text-4xl">🏷️</div>
+          {/* 🏷️ → Tag */}
+          <Tag className="w-10 h-10" style={{ color: '#C9A227' }} />
           <div>
             <h2 className="ofm2-title text-2xl font-black text-white">Offers &amp; Deals</h2>
             <p className="text-xs mt-0.5 flex items-center gap-1.5" style={{ color: '#7a6a55' }}>
@@ -236,20 +243,22 @@ const OffersManagement = () => {
         </div>
         <motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.96 }} data-testid="add-offer-btn"
           onClick={() => setShowForm(true)} className="ofm2-btn ofm2-btn-orange" style={{ padding: '10px 18px', fontSize: 13, borderRadius: 12 }}>
-          <Plus className="w-4 h-4" />🎊 Create Offer
+          {/* 🎊 → PartyPopper */}
+          <Plus className="w-4 h-4" /><PartyPopper className="inline w-4 h-4 mr-1" /> Create Offer
         </motion.button>
       </div>
 
       {offers && offers.length > 0 && (
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
           {[
-            { emoji: '🏷️', label: 'Total Offers',  value: stats.total,  color: '#C9A227' },
-            { emoji: '✅', label: 'Active Now',     value: stats.active, color: '#34d399' },
-            { emoji: '🍱', label: 'Combo Deals',    value: stats.combos, color: '#fbbf24' },
-            { emoji: '🎁', label: 'Buy X Get Y',    value: stats.bogo,   color: '#a78bfa' },
+            { icon: Tag,         label: 'Total Offers',  value: stats.total,  color: '#C9A227' },
+            { icon: CheckCircle, label: 'Active Now',     value: stats.active, color: '#34d399' },
+            { icon: Package,     label: 'Combo Deals',    value: stats.combos, color: '#fbbf24' },
+            { icon: Gift,        label: 'Buy X Get Y',    value: stats.bogo,   color: '#a78bfa' },
           ].map((s, i) => (
             <motion.div key={i} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.06 }} className="ofm2-stat">
-              <div className="text-2xl">{s.emoji}</div>
+              {/* 🏷️ ✅ 🍱 🎁 → icon components */}
+              <s.icon className="w-6 h-6 flex-shrink-0" style={{ color: s.color }} />
               <div>
                 <p className="ofm2-title font-black text-2xl" style={{ color: s.color }}>{s.value}</p>
                 <p className="text-xs font-bold" style={{ color: '#7a6a55' }}>{s.label}</p>
@@ -265,10 +274,12 @@ const OffersManagement = () => {
             transition={{ type: 'spring', damping: 24, stiffness: 280 }} className="ofm2-sheet rounded-2xl overflow-hidden">
             <div className="flex items-center justify-between px-6 py-5 flex-shrink-0" style={{ borderBottom: '1px solid rgba(201,162,39,0.14)' }}>
               <div className="flex items-center gap-3">
-                <span className="text-3xl">{editingOffer ? '✏️' : '🎊'}</span>
+                {/* ✏️ → Edit, 🎊 → PartyPopper */}
+                {editingOffer ? <Edit className="w-8 h-8" style={{ color: '#C9A227' }} /> : <PartyPopper className="w-8 h-8" style={{ color: '#C9A227' }} />}
                 <div>
                   <h3 className="ofm2-title text-white font-bold text-xl">{editingOffer ? 'Edit Offer' : 'Create New Offer'}</h3>
-                  <p className="text-xs mt-0.5" style={{ color: '#7a6a55' }}>{editingOffer ? `Editing: ${editingOffer.title}` : 'Set up a new deal for your customers 🚀'}</p>
+                  {/* 🚀 removed from subtitle string — it's inside a string literal, left unchanged */}
+                  <p className="text-xs mt-0.5" style={{ color: '#7a6a55' }}>{editingOffer ? `Editing: ${editingOffer.title}` : 'Set up a new deal for your customers'}</p>
                 </div>
               </div>
               <button onClick={resetForm} className="w-8 h-8 rounded-full flex items-center justify-center transition-all"
@@ -278,7 +289,8 @@ const OffersManagement = () => {
             </div>
             <form onSubmit={handleSubmit} className="px-6 py-5 space-y-6 ofm2-scroll overflow-y-auto" style={{ maxHeight: '82vh' }}>
               <div>
-                <label className="ofm2-label">🎯 Offer Type</label>
+                {/* 🎯 → Tag */}
+                <label className="ofm2-label"><Tag className="inline w-3 h-3 mr-1" />Offer Type</label>
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                   {OFFER_TYPES.map((type) => {
                     const Icon = type.icon;
@@ -287,7 +299,8 @@ const OffersManagement = () => {
                       <button key={type.id} type="button" onClick={() => setFormData(prev => ({ ...prev, type: type.id }))}
                         className={`ofm2-type-btn${isActive ? ' ofm2-type-btn-active' : ''}`}>
                         <div className="flex items-center gap-2.5 mb-2">
-                          <span className="text-2xl">{type.emoji}</span>
+                          {/* type.emoji → Icon (the icon is already in the data, just render it bigger) */}
+                          <Icon className="w-6 h-6" style={{ color: isActive ? '#C9A227' : '#7a6a55' }} />
                           <Icon className="w-4 h-4" style={{ color: isActive ? '#C9A227' : '#7a6a55' }} />
                           <span className="font-black text-sm" style={{ color: isActive ? '#C9A227' : '#fff8ee' }}>{type.label}</span>
                         </div>
@@ -299,31 +312,37 @@ const OffersManagement = () => {
               </div>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
-                  <label className="ofm2-label">🏷️ Offer Title</label>
+                  {/* 🏷️ → Tag */}
+                  <label className="ofm2-label"><Tag className="inline w-3 h-3 mr-1" />Offer Title</label>
                   <input type="text" data-testid="offer-title" value={formData.title} onChange={(e) => setFormData(prev => ({ ...prev, title: e.target.value }))} className="ofm2-input" placeholder="e.g., Breakfast Combo Deal" required />
                 </div>
                 <div>
-                  <label className="ofm2-label">📝 Description</label>
+                  {/* 📝 → FileText */}
+                  <label className="ofm2-label"><FileText className="inline w-3 h-3 mr-1" />Description</label>
                   <input type="text" data-testid="offer-description" value={formData.description} onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))} className="ofm2-input" placeholder="Coffee + Sandwich at special price" required />
                 </div>
               </div>
               <div>
-                <label className="ofm2-label">🍽️ {formData.type === 'buy_x_get_y' ? 'Items Customer Must Buy' : 'Select Menu Items'}</label>
-                <p className="text-xs mb-3" style={{ color: '#7a6a55' }}>Tap to add items. Items with S/M/L sizes will ask for size. 📏</p>
+                {/* 🍽️ → Utensils */}
+                <label className="ofm2-label"><Utensils className="inline w-3 h-3 mr-1" />{formData.type === 'buy_x_get_y' ? 'Items Customer Must Buy' : 'Select Menu Items'}</label>
+                {/* 📏 → Ruler */}
+                <p className="text-xs mb-3 flex items-center gap-1" style={{ color: '#7a6a55' }}>Tap to add items. Items with S/M/L sizes will ask for size. <Ruler className="inline w-3 h-3" /></p>
                 <AnimatePresence>
                   {pendingSizeItem && !pendingSizeItem.forFreeSlot && (
                     <motion.div initial={{ opacity: 0, y: -6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -6 }}
                       className="mb-3 p-4 rounded-xl" style={{ background: 'rgba(201,162,39,0.07)', border: '1.5px solid rgba(201,162,39,0.3)' }}>
                       <div className="flex items-center justify-between mb-3">
-                        <p className="text-white text-sm font-black">📏 Select size for: <span style={{ color: '#C9A227' }}>{pendingSizeItem.item.name}</span></p>
+                        {/* 📏 → Ruler */}
+                        <p className="text-white text-sm font-black flex items-center gap-1"><Ruler className="w-4 h-4" /> Select size for: <span style={{ color: '#C9A227' }}>{pendingSizeItem.item.name}</span></p>
                         <button type="button" onClick={() => setPendingSizeItem(null)} className="w-6 h-6 rounded-full flex items-center justify-center" style={{ background: 'rgba(201,162,39,0.1)', border: '1px solid rgba(201,162,39,0.2)' }}>
                           <X className="w-3.5 h-3.5" style={{ color: '#C9A227' }} />
                         </button>
                       </div>
                       <div className="flex flex-wrap gap-2">
                         {getSizeOptions(pendingSizeItem.item).map(sz => (
-                          <button key={sz.key} type="button" onClick={() => confirmSizeSelection(sz)} className="ofm2-size-btn">
-                            {sz.key === 'small' ? '☕' : sz.key === 'medium' ? '🥤' : '🧋'} {sz.label} — {CUR}{fmtP(sz.price)}
+                          <button key={sz.key} type="button" onClick={() => confirmSizeSelection(sz)} className="ofm2-size-btn flex items-center gap-1">
+                            {/* ☕ → Coffee, 🥤 → CupSoda, 🧋 → GlassWater */}
+                            {sz.key === 'small' ? <Coffee className="w-3.5 h-3.5" /> : sz.key === 'medium' ? <CupSoda className="w-3.5 h-3.5" /> : <GlassWater className="w-3.5 h-3.5" />} {sz.label} — {CUR}{fmtP(sz.price)}
                           </button>
                         ))}
                       </div>
@@ -340,18 +359,21 @@ const OffersManagement = () => {
                           <span className="text-sm font-bold truncate" style={{ color: isSelected ? '#C9A227' : '#fff8ee' }}>{item.name}</span>
                           {isSelected && <Check className="w-3.5 h-3.5 flex-shrink-0" style={{ color: '#C9A227' }} />}
                         </div>
-                        {hasSizes ? <span className="text-xs flex items-center gap-1" style={{ color: '#7a6a55' }}><ChevronDown className="w-3 h-3" />📏 Sizes available</span>
+                        {/* 📏 → Ruler */}
+                        {hasSizes ? <span className="text-xs flex items-center gap-1" style={{ color: '#7a6a55' }}><ChevronDown className="w-3 h-3" /><Ruler className="w-3 h-3" /> Sizes available</span>
                           : <span className="text-sm font-black" style={{ color: '#C9A227' }}>{CUR}{fmtP(item.price)}</span>}
                       </button>
                     );
                   })}
-                  {(!menuItems || menuItems.length === 0) && <p className="col-span-full text-center py-6 text-sm" style={{ color: '#7a6a55' }}>🍽️ No menu items available yet</p>}
+                  {/* 🍽️ → Utensils */}
+                  {(!menuItems || menuItems.length === 0) && <p className="col-span-full text-center py-6 text-sm flex items-center justify-center gap-1" style={{ color: '#7a6a55' }}><Utensils className="w-4 h-4" /> No menu items available yet</p>}
                 </div>
               </div>
               <AnimatePresence>
                 {formData.items.length > 0 && (
                   <motion.div initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}>
-                    <label className="ofm2-label">🧺 Selected Items ({formData.items.length})</label>
+                    {/* 🧺 → ShoppingBasket */}
+                    <label className="ofm2-label"><ShoppingBasket className="inline w-3 h-3 mr-1" />Selected Items ({formData.items.length})</label>
                     <div className="ofm2-section space-y-2">
                       {formData.items.map((item) => {
                         const key = itemKey(item.itemId, item.selectedSizeKey);
@@ -360,7 +382,10 @@ const OffersManagement = () => {
                             <div className="min-w-0 flex-1">
                               <div className="flex items-center gap-2 flex-wrap">
                                 <span className="font-black text-sm" style={{ color: '#fff8ee' }}>{item.itemName}</span>
-                                {item.selectedSize && <span className="text-xs px-2 py-0.5 rounded-lg font-bold" style={{ background: 'rgba(201,162,39,0.15)', color: '#C9A227', border: '1px solid rgba(201,162,39,0.3)' }}>{item.selectedSize === 'Small' ? '☕' : item.selectedSize === 'Medium' ? '🥤' : '🧋'} {item.selectedSize}</span>}
+                                {item.selectedSize && <span className="text-xs px-2 py-0.5 rounded-lg font-bold flex items-center gap-1" style={{ background: 'rgba(201,162,39,0.15)', color: '#C9A227', border: '1px solid rgba(201,162,39,0.3)' }}>
+                                  {/* ☕ → Coffee, 🥤 → CupSoda, 🧋 → GlassWater */}
+                                  {item.selectedSize === 'Small' ? <Coffee className="w-3 h-3" /> : item.selectedSize === 'Medium' ? <CupSoda className="w-3 h-3" /> : <GlassWater className="w-3 h-3" />} {item.selectedSize}
+                                </span>}
                                 <span className="text-xs" style={{ color: '#7a6a55' }}>{CUR}{fmtP(item.itemPrice)} each</span>
                               </div>
                             </div>
@@ -376,7 +401,8 @@ const OffersManagement = () => {
                         );
                       })}
                       <div className="flex justify-between items-center pt-3 mt-1" style={{ borderTop: '1px solid rgba(201,162,39,0.12)' }}>
-                        <span className="text-sm font-bold" style={{ color: '#7a6a55' }}>🧮 Original Price</span>
+                        {/* 🧮 → Calculator */}
+                        <span className="text-sm font-bold flex items-center gap-1" style={{ color: '#7a6a55' }}><Calculator className="w-4 h-4" /> Original Price</span>
                         <span className="ofm2-title font-black text-lg" style={{ color: '#C9A227' }}>{CUR}{fmtP(originalPrice)}</span>
                       </div>
                     </div>
@@ -385,7 +411,8 @@ const OffersManagement = () => {
               </AnimatePresence>
               {formData.type === 'combo' && formData.items.length > 0 && (
                 <div>
-                  <label className="ofm2-label">💰 Combo Price</label>
+                  {/* 💰 → DollarSign */}
+                  <label className="ofm2-label"><DollarSign className="inline w-3 h-3 mr-1" />Combo Price</label>
                   <div className="flex items-center gap-4">
                     <div className="relative w-44">
                       <span className="absolute left-3.5 top-1/2 -translate-y-1/2 font-black text-sm" style={{ color: '#C9A227' }}>{CUR}</span>
@@ -393,7 +420,8 @@ const OffersManagement = () => {
                     </div>
                     {savings > 0 && (
                       <motion.div initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl font-black text-sm" style={{ background: 'rgba(16,185,129,0.14)', color: '#34d399', border: '1.5px solid rgba(16,185,129,0.25)' }}>
-                        🎉 Customer saves {CUR}{fmtP(savings)}!
+                        {/* 🎉 → PartyPopper */}
+                        <PartyPopper className="w-4 h-4" /> Customer saves {CUR}{fmtP(savings)}!
                       </motion.div>
                     )}
                   </div>
@@ -402,14 +430,15 @@ const OffersManagement = () => {
               {formData.type === 'discount' && (
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
-                    <label className="ofm2-label">📊 Discount Type</label>
+                    {/* 📊 → BarChart2 — but BarChart2 not imported, use Percent */}
+                    <label className="ofm2-label"><Percent className="inline w-3 h-3 mr-1" />Discount Type</label>
                     <select value={formData.discountType} onChange={(e) => setFormData(prev => ({ ...prev, discountType: e.target.value }))} className="ofm2-select">
-                      <option value="percentage">📊 Percentage (%)</option>
-                      <option value="flat">💰 Flat Amount ({CUR})</option>
+                      <option value="percentage">Percentage (%)</option>
+                      <option value="flat">Flat Amount ({CUR})</option>
                     </select>
                   </div>
                   <div>
-                    <label className="ofm2-label">{formData.discountType === 'percentage' ? '📊 Discount (%)' : `💰 Discount Amount (${CUR})`}</label>
+                    <label className="ofm2-label">{formData.discountType === 'percentage' ? 'Discount (%)' : `Discount Amount (${CUR})`}</label>
                     <div className="relative">
                       <span className="absolute left-3.5 top-1/2 -translate-y-1/2 font-black text-sm" style={{ color: '#C9A227' }}>{formData.discountType === 'percentage' ? '%' : CUR}</span>
                       <input type="number" value={formData.discountAmount} onChange={(e) => setFormData(prev => ({ ...prev, discountAmount: e.target.value }))} className="ofm2-input" style={{ paddingLeft: '1.8rem' }} placeholder={formData.discountType === 'percentage' ? '10' : '50'} min="0" max={formData.discountType === 'percentage' ? '100' : undefined} />
@@ -420,16 +449,20 @@ const OffersManagement = () => {
               {formData.type === 'buy_x_get_y' && (
                 <div className="space-y-4">
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div><label className="ofm2-label">🛒 Buy Quantity</label><input type="number" value={formData.buyQuantity} onChange={(e) => setFormData(prev => ({ ...prev, buyQuantity: e.target.value }))} className="ofm2-input" min="1" /></div>
-                    <div><label className="ofm2-label">🎁 Get Free Quantity</label><input type="number" value={formData.getQuantity} onChange={(e) => setFormData(prev => ({ ...prev, getQuantity: e.target.value }))} className="ofm2-input" min="1" /></div>
+                    {/* 🛒 → ShoppingCart */}
+                    <div><label className="ofm2-label"><ShoppingCart className="inline w-3 h-3 mr-1" />Buy Quantity</label><input type="number" value={formData.buyQuantity} onChange={(e) => setFormData(prev => ({ ...prev, buyQuantity: e.target.value }))} className="ofm2-input" min="1" /></div>
+                    {/* 🎁 → Gift */}
+                    <div><label className="ofm2-label"><Gift className="inline w-3 h-3 mr-1" />Get Free Quantity</label><input type="number" value={formData.getQuantity} onChange={(e) => setFormData(prev => ({ ...prev, getQuantity: e.target.value }))} className="ofm2-input" min="1" /></div>
                   </div>
                   <div>
-                    <label className="ofm2-label">🎁 Get Free Item</label>
+                    {/* 🎁 → Gift */}
+                    <label className="ofm2-label"><Gift className="inline w-3 h-3 mr-1" />Get Free Item</label>
                     {formData.getItemId && (
                       <div className="mb-2 flex items-center gap-3 p-3 rounded-xl" style={{ background: 'rgba(201,162,39,0.07)', border: '1.5px solid rgba(201,162,39,0.28)' }}>
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-2 flex-wrap">
-                            <span className="text-white font-black text-sm">🎁 {formData.getItemName}</span>
+                            {/* 🎁 → Gift */}
+                            <span className="text-white font-black text-sm flex items-center gap-1"><Gift className="w-4 h-4" /> {formData.getItemName}</span>
                             {formData.getItemSize && <span className="text-xs px-2 py-0.5 rounded-lg font-bold" style={{ background: 'rgba(201,162,39,0.15)', color: '#C9A227', border: '1px solid rgba(201,162,39,0.3)' }}>{formData.getItemSize}</span>}
                             <span className="text-xs" style={{ color: '#7a6a55' }}>({CUR}{fmtP(formData.getItemPrice)} — given free)</span>
                           </div>
@@ -441,12 +474,16 @@ const OffersManagement = () => {
                       {pendingSizeItem && pendingSizeItem.forFreeSlot && (
                         <motion.div initial={{ opacity: 0, y: -6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -6 }} className="mb-2 p-4 rounded-xl" style={{ background: 'rgba(201,162,39,0.07)', border: '1.5px solid rgba(201,162,39,0.3)' }}>
                           <div className="flex items-center justify-between mb-3">
-                            <p className="text-white text-sm font-black">📏 Select size for free item: <span style={{ color: '#C9A227' }}>{pendingSizeItem.item.name}</span></p>
+                            {/* 📏 → Ruler */}
+                            <p className="text-white text-sm font-black flex items-center gap-1"><Ruler className="w-4 h-4" /> Select size for free item: <span style={{ color: '#C9A227' }}>{pendingSizeItem.item.name}</span></p>
                             <button type="button" onClick={() => setPendingSizeItem(null)} className="w-6 h-6 rounded-full flex items-center justify-center" style={{ background: 'rgba(201,162,39,0.1)', border: '1px solid rgba(201,162,39,0.2)' }}><X className="w-3.5 h-3.5" style={{ color: '#C9A227' }} /></button>
                           </div>
                           <div className="flex flex-wrap gap-2">
                             {getSizeOptions(pendingSizeItem.item).map(sz => (
-                              <button key={sz.key} type="button" onClick={() => confirmSizeSelection(sz)} className="ofm2-size-btn">{sz.key === 'small' ? '☕' : sz.key === 'medium' ? '🥤' : '🧋'} {sz.label} — {CUR}{fmtP(sz.price)}</button>
+                              <button key={sz.key} type="button" onClick={() => confirmSizeSelection(sz)} className="ofm2-size-btn flex items-center gap-1">
+                                {/* ☕ → Coffee, 🥤 → CupSoda, 🧋 → GlassWater */}
+                                {sz.key === 'small' ? <Coffee className="w-3.5 h-3.5" /> : sz.key === 'medium' ? <CupSoda className="w-3.5 h-3.5" /> : <GlassWater className="w-3.5 h-3.5" />} {sz.label} — {CUR}{fmtP(sz.price)}
+                              </button>
                             ))}
                           </div>
                         </motion.div>
@@ -459,7 +496,8 @@ const OffersManagement = () => {
                           return (
                             <button key={item.id} type="button" onClick={() => addItemToOffer(item, true)} className="ofm2-picker-item">
                               <p className="text-sm font-bold truncate" style={{ color: '#fff8ee' }}>{item.name}</p>
-                              {hasSizes ? <span className="text-xs flex items-center gap-1 mt-0.5" style={{ color: '#7a6a55' }}><ChevronDown className="w-3 h-3" />📏 Sizes available</span>
+                              {/* 📏 → Ruler */}
+                              {hasSizes ? <span className="text-xs flex items-center gap-1 mt-0.5" style={{ color: '#7a6a55' }}><ChevronDown className="w-3 h-3" /><Ruler className="w-3 h-3" /> Sizes available</span>
                                 : <span className="text-sm font-black mt-0.5 block" style={{ color: '#C9A227' }}>{CUR}{fmtP(item.price)}</span>}
                             </button>
                           );
@@ -470,14 +508,16 @@ const OffersManagement = () => {
                 </div>
               )}
               <div>
-                <label className="ofm2-label">🖼️ Banner Image / GIF / Video (Optional)</label>
+                {/* 🖼️ → Image */}
+                <label className="ofm2-label"><Image className="inline w-3 h-3 mr-1" />Banner Image / GIF / Video (Optional)</label>
                 <div className="rounded-xl overflow-hidden" style={{ border: '1.5px solid rgba(201,162,39,0.14)', background: 'rgba(201,162,39,0.03)' }}>
                   <MediaUpload label="" value={formData.bannerImage} onChange={handleBannerChange} storagePath={`offers/${cafeId}`} maxSizeMB={20} disabled={uploading} />
                 </div>
               </div>
               <div className="flex items-center justify-between px-4 py-3 rounded-xl" style={{ background: 'rgba(255,255,255,0.03)', border: '1.5px solid rgba(255,255,255,0.07)' }}>
                 <div>
-                  <p className="text-white font-black text-sm">⚡ Active Offer</p>
+                  {/* ⚡ → Zap */}
+                  <p className="text-white font-black text-sm flex items-center gap-1"><Zap className="w-4 h-4" /> Active Offer</p>
                   <p className="text-xs mt-0.5" style={{ color: '#7a6a55' }}>Visible to customers right now</p>
                 </div>
                 <div className="flex items-center gap-2">
@@ -489,9 +529,11 @@ const OffersManagement = () => {
               </div>
               <div className="flex gap-3 pt-1 pb-4">
                 <motion.button type="submit" data-testid="save-offer-btn" disabled={uploading || formData.items.length === 0} whileHover={{ scale: 1.01 }} whileTap={{ scale: 0.97 }} className="ofm2-btn ofm2-btn-orange flex-1 justify-center disabled:opacity-50 disabled:cursor-not-allowed" style={{ padding: '12px 20px', fontSize: 14, borderRadius: 12 }}>
-                  {uploading ? '⏳ Uploading…' : editingOffer ? '💾 Update Offer' : '🚀 Create Offer'}
+                  {/* ⏳ → RefreshCw, 💾 → Save, 🚀 → Plus */}
+                  {uploading ? <><RefreshCw className="w-4 h-4 animate-spin" /> Uploading…</> : editingOffer ? <><Save className="w-4 h-4" /> Update Offer</> : <><Plus className="w-4 h-4" /> Create Offer</>}
                 </motion.button>
-                <button type="button" onClick={resetForm} className="ofm2-btn ofm2-btn-ghost" style={{ padding: '12px 20px', fontSize: 14, borderRadius: 12 }}>✗ Cancel</button>
+                {/* ✗ → X */}
+                <button type="button" onClick={resetForm} className="ofm2-btn ofm2-btn-ghost" style={{ padding: '12px 20px', fontSize: 14, borderRadius: 12 }}><X className="w-4 h-4" /> Cancel</button>
               </div>
             </form>
           </motion.div>
@@ -500,7 +542,8 @@ const OffersManagement = () => {
 
       {loading ? (
         <div className="flex flex-col items-center justify-center py-16 gap-3">
-          <div className="text-5xl animate-bounce">🏷️</div>
+          {/* 🏷️ → Tag */}
+          <Tag className="w-12 h-12 animate-bounce" style={{ color: '#C9A227' }} />
           <p className="text-sm font-bold" style={{ color: '#7a6a55' }}>Loading your offers…</p>
         </div>
       ) : offers && offers.length > 0 ? (
@@ -511,29 +554,34 @@ const OffersManagement = () => {
             return (
               <motion.div key={offer.id} data-testid={`offer-${offer.id}`} initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: idx * 0.05 }} className="ofm2-card">
                 {offer.bannerImage && <div className="overflow-hidden" style={{ aspectRatio: '16/7' }}><img src={offer.bannerImage} alt={offer.title} className="w-full h-full object-cover" onMouseEnter={e => e.currentTarget.style.transform = 'scale(1.04)'} onMouseLeave={e => e.currentTarget.style.transform = 'scale(1)'} /></div>}
+                {/* typeEmoji fallback in banner: data-driven, left as-is since changing requires logic change */}
                 {!offer.bannerImage && <div className="flex items-center justify-center" style={{ aspectRatio: '16/5', background: 'linear-gradient(135deg, #1a1208, #0f0a04)', fontSize: 40 }}>{typeEmoji}</div>}
                 <div className="p-5 space-y-3">
                   <div className="flex items-start justify-between gap-2">
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center gap-2 mb-1 flex-wrap">
+                        {/* typeEmoji inline: data-driven, left as-is */}
                         <span className="text-lg">{typeEmoji}</span>
                         <TypeIcon className="w-4 h-4" style={{ color: '#C9A227' }} />
                         <span className="ofm2-sec text-xs">{getOfferTypeLabel(offer.type)}</span>
                       </div>
                       <h3 className="ofm2-title font-black text-white text-lg leading-tight">{offer.title}</h3>
                     </div>
-                    <span className="ofm2-badge flex-shrink-0" style={offer.active ? { background: 'rgba(16,185,129,0.12)', color: '#34d399', borderColor: 'rgba(16,185,129,0.22)' } : { background: 'rgba(100,100,100,0.12)', color: '#888', borderColor: 'rgba(100,100,100,0.22)' }}>
-                      {offer.active ? '✅ Active' : '⏸️ Inactive'}
+                    <span className="ofm2-badge flex-shrink-0 flex items-center gap-1" style={offer.active ? { background: 'rgba(16,185,129,0.12)', color: '#34d399', borderColor: 'rgba(16,185,129,0.22)' } : { background: 'rgba(100,100,100,0.12)', color: '#888', borderColor: 'rgba(100,100,100,0.22)' }}>
+                      {/* ✅ → CheckCircle, ⏸️ → PauseCircle */}
+                      {offer.active ? <><CheckCircle className="w-3 h-3" /> Active</> : <><PauseCircle className="w-3 h-3" /> Inactive</>}
                     </span>
                   </div>
                   {offer.description && <p className="text-sm" style={{ color: '#7a6a55' }}>{offer.description}</p>}
                   {offer.items && offer.items.length > 0 && (
                     <div className="ofm2-section space-y-2">
-                      <p className="ofm2-sec text-xs mb-2">🧺 Includes</p>
+                      {/* 🧺 → ShoppingBasket */}
+                      <p className="ofm2-sec text-xs mb-2"><ShoppingBasket className="w-3.5 h-3.5" /> Includes</p>
                       <div className="flex flex-wrap gap-2">
                         {offer.items.map((item, i) => (
-                          <span key={i} className="ofm2-badge" style={{ background: 'rgba(201,162,39,0.10)', color: '#C9A227', borderColor: 'rgba(201,162,39,0.22)' }}>
-                            🍽️ {item.itemName}{item.selectedSize && <span style={{ color: '#fbbf24' }}> ({item.selectedSize})</span>} ×{item.quantity}
+                          <span key={i} className="ofm2-badge flex items-center gap-1" style={{ background: 'rgba(201,162,39,0.10)', color: '#C9A227', borderColor: 'rgba(201,162,39,0.22)' }}>
+                            {/* 🍽️ → Utensils */}
+                            <Utensils className="w-3 h-3" /> {item.itemName}{item.selectedSize && <span style={{ color: '#fbbf24' }}> ({item.selectedSize})</span>} ×{item.quantity}
                             <span style={{ color: '#7a6a55', fontSize: 10 }}> {CUR}{fmtP(item.itemPrice)}</span>
                           </span>
                         ))}
@@ -542,16 +590,27 @@ const OffersManagement = () => {
                         <div className="flex items-center gap-3 pt-2" style={{ borderTop: '1px solid rgba(201,162,39,0.12)' }}>
                           <span className="text-sm line-through" style={{ color: '#4a3f35' }}>{CUR}{fmtP(offer.originalPrice)}</span>
                           <span className="ofm2-title font-black text-xl" style={{ color: '#C9A227' }}>{CUR}{fmtP(offer.comboPrice)}</span>
-                          {offer.savings > 0 && <span className="ofm2-badge" style={{ background: 'rgba(16,185,129,0.12)', color: '#34d399', borderColor: 'rgba(16,185,129,0.22)' }}>🎉 Save {CUR}{fmtP(offer.savings)}</span>}
+                          {/* 🎉 → PartyPopper */}
+                          {offer.savings > 0 && <span className="ofm2-badge flex items-center gap-1" style={{ background: 'rgba(16,185,129,0.12)', color: '#34d399', borderColor: 'rgba(16,185,129,0.22)' }}><PartyPopper className="w-3 h-3" /> Save {CUR}{fmtP(offer.savings)}</span>}
                         </div>
                       )}
-                      {offer.type === 'discount' && <div className="pt-2" style={{ borderTop: '1px solid rgba(201,162,39,0.12)' }}><span className="ofm2-title font-black text-lg" style={{ color: '#C9A227' }}>🏷️ {offer.discountType === 'percentage' ? `${offer.discountAmount}% OFF` : `${CUR}${fmtP(offer.discountAmount)} OFF`}</span></div>}
-                      {offer.type === 'buy_x_get_y' && offer.getItemName && <div className="pt-2" style={{ borderTop: '1px solid rgba(201,162,39,0.12)' }}><span className="ofm2-title font-black text-base" style={{ color: '#C9A227' }}>🎁 Buy {offer.buyQuantity}, Get {offer.getQuantity} {offer.getItemName}{offer.getItemSize ? ` (${offer.getItemSize})` : ''} FREE!</span></div>}
+                      {offer.type === 'discount' && <div className="pt-2" style={{ borderTop: '1px solid rgba(201,162,39,0.12)' }}>
+                        {/* 🏷️ → Tag */}
+                        <span className="ofm2-title font-black text-lg flex items-center gap-1" style={{ color: '#C9A227' }}><Tag className="w-4 h-4" /> {offer.discountType === 'percentage' ? `${offer.discountAmount}% OFF` : `${CUR}${fmtP(offer.discountAmount)} OFF`}</span>
+                      </div>}
+                      {offer.type === 'buy_x_get_y' && offer.getItemName && <div className="pt-2" style={{ borderTop: '1px solid rgba(201,162,39,0.12)' }}>
+                        {/* 🎁 → Gift */}
+                        <span className="ofm2-title font-black text-base flex items-center gap-1" style={{ color: '#C9A227' }}><Gift className="w-4 h-4" /> Buy {offer.buyQuantity}, Get {offer.getQuantity} {offer.getItemName}{offer.getItemSize ? ` (${offer.getItemSize})` : ''} FREE!</span>
+                      </div>}
                     </div>
                   )}
                   <div className="flex gap-2 pt-1">
-                    <button data-testid={`edit-offer-${offer.id}`} onClick={() => handleEdit(offer)} className="ofm2-btn ofm2-btn-ghost flex-1 justify-center" style={{ padding: '8px 12px', fontSize: 12, borderRadius: 10 }}><Edit className="w-3.5 h-3.5" />✏️ Edit</button>
-                    <button data-testid={`toggle-offer-${offer.id}`} onClick={() => toggleActive(offer.id, offer.active)} className={`ofm2-btn ${offer.active ? 'ofm2-btn-yellow' : 'ofm2-btn-green'}`} style={{ padding: '8px 12px', fontSize: 12, borderRadius: 10 }}>{offer.active ? '⏸️ Pause' : '▶️ Activate'}</button>
+                    {/* ✏️ → Edit (already imported) */}
+                    <button data-testid={`edit-offer-${offer.id}`} onClick={() => handleEdit(offer)} className="ofm2-btn ofm2-btn-ghost flex-1 justify-center" style={{ padding: '8px 12px', fontSize: 12, borderRadius: 10 }}><Edit className="w-3.5 h-3.5" /> Edit</button>
+                    {/* ⏸️ → PauseCircle, ▶️ → PlayCircle */}
+                    <button data-testid={`toggle-offer-${offer.id}`} onClick={() => toggleActive(offer.id, offer.active)} className={`ofm2-btn ${offer.active ? 'ofm2-btn-yellow' : 'ofm2-btn-green'}`} style={{ padding: '8px 12px', fontSize: 12, borderRadius: 10 }}>
+                      {offer.active ? <><PauseCircle className="w-3.5 h-3.5" /> Pause</> : <><PlayCircle className="w-3.5 h-3.5" /> Activate</>}
+                    </button>
                     <button data-testid={`delete-offer-${offer.id}`} onClick={() => handleDelete(offer.id)} className="ofm2-btn ofm2-btn-red" style={{ padding: '8px 12px', fontSize: 12, borderRadius: 10 }}><Trash2 className="w-3.5 h-3.5" /></button>
                   </div>
                 </div>
@@ -561,11 +620,13 @@ const OffersManagement = () => {
         </div>
       ) : (
         <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="ofm2-flat flex flex-col items-center justify-center py-20 gap-3 text-center">
-          <div className="text-7xl mb-2">🏷️</div>
+          {/* 🏷️ → Tag */}
+          <Tag className="w-16 h-16 mb-2" style={{ color: '#3a2e1a' }} />
           <p className="ofm2-title font-black text-white text-xl">No offers yet!</p>
-          <p className="text-sm" style={{ color: '#7a6a55' }}>Create your first combo, discount, or Buy X Get Y deal 🚀</p>
+          <p className="text-sm" style={{ color: '#7a6a55' }}>Create your first combo, discount, or Buy X Get Y deal</p>
           <motion.button whileHover={{ scale: 1.03 }} whileTap={{ scale: 0.96 }} onClick={() => setShowForm(true)} className="ofm2-btn ofm2-btn-orange mt-3" style={{ borderRadius: 12, padding: '12px 24px', fontSize: 14 }}>
-            <Plus className="w-4 h-4" />🎊 Create First Offer
+            {/* 🎊 → PartyPopper */}
+            <Plus className="w-4 h-4" /><PartyPopper className="inline w-4 h-4 mr-1" /> Create First Offer
           </motion.button>
         </motion.div>
       )}
