@@ -11,7 +11,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import { doc, updateDoc, onSnapshot } from 'firebase/firestore';
 import { db } from '../../lib/firebase';
 import { uploadImage } from '../../utils/uploadImage';
-import { Save, Sun, Moon, ShoppingCart, Plus, Coffee, CreditCard, Eye, EyeOff, ShieldCheck } from 'lucide-react';
+import { Save, Sun, Moon, ShoppingCart, Plus, Coffee, CreditCard, Eye, EyeOff, ShieldCheck, Settings as SettingsIcon, Phone, Receipt, ArrowLeftRight, Landmark, BellRing, Monitor, Palette, ScanEye, Lock, Smartphone, Loader, Upload } from 'lucide-react';
 import { toast } from 'sonner';
 import ChangePassword from './ChangePassword';
 
@@ -283,7 +283,7 @@ const Settings = () => {
   if (loading) {
     return (
       <div className="set flex flex-col items-center justify-center py-20 gap-3">
-        <div className="text-4xl animate-bounce">⚙️</div>
+        <div className="text-4xl animate-bounce"><SettingsIcon className="w-9 h-9" style={{ color: '#7a6a55' }} /></div>
         <p className="text-sm font-bold" style={{ color: '#7a6a55' }}>Loading settings…</p>
       </div>
     );
@@ -294,7 +294,7 @@ const Settings = () => {
 
       {/* ── Café Information ──────────────────────────────────────────────── */}
       <div className="set-card">
-        <h3 className="set-section-title">☕ Café Information</h3>
+        <h3 className="set-section-title"><Coffee className="w-5 h-5" /> Café Information</h3>
         <div className="space-y-4">
           <div>
             <label className="set-label">Café Name</label>
@@ -327,14 +327,14 @@ const Settings = () => {
 
       {/* ── Contact & Payment ─────────────────────────────────────────────── */}
       <div className="set-card">
-        <h3 className="set-section-title">📞 Contact & Payment</h3>
+        <h3 className="set-section-title"><Phone className="w-5 h-5" /> Contact & Payment</h3>
         <div className="space-y-4">
           <div>
             <label className="set-label">WhatsApp Number</label>
             <input type="tel" data-testid="settings-whatsapp" value={settings.whatsappNumber}
               onChange={e => setSettings(prev => ({ ...prev, whatsappNumber: e.target.value }))}
               className="set-input" placeholder="+919876543210 (with country code)" />
-            <p className="set-hint">📲 Orders will be sent to this WhatsApp number</p>
+            <p className="set-hint"><Smartphone className="inline w-3 h-3 mr-1" />Orders will be sent to this WhatsApp number</p>
           </div>
           <div>
             <label className="set-label">UPI ID (for prepaid orders)</label>
@@ -347,7 +347,7 @@ const Settings = () => {
 
       {/* ── Billing / GST ─────────────────────────────────────────────────── */}
       <div className="set-card">
-        <h3 className="set-section-title">🧾 Billing Settings</h3>
+        <h3 className="set-section-title"><Receipt className="w-5 h-5" /> Billing Settings</h3>
         <div className="space-y-4">
           <div className="set-toggle-row">
             <div>
@@ -378,7 +378,7 @@ const Settings = () => {
 
       {/* ── Currency ──────────────────────────────────────────────────────── */}
       <div className="set-card">
-        <h3 className="set-section-title">💱 Currency Settings</h3>
+        <h3 className="set-section-title"><ArrowLeftRight className="w-5 h-5" /> Currency Settings</h3>
         <div>
           <label className="set-label">Currency</label>
           <select value={settings.currencyCode}
@@ -400,7 +400,7 @@ const Settings = () => {
 
       {/* ── Tax Settings ──────────────────────────────────────────────────── */}
       <div className="set-card">
-        <h3 className="set-section-title">🏛️ Tax Settings</h3>
+        <h3 className="set-section-title"><Landmark className="w-5 h-5" /> Tax Settings</h3>
         <div className="space-y-4">
           <div className="set-toggle-row">
             <div>
@@ -430,7 +430,7 @@ const Settings = () => {
 
       {/* ── Service Charge ────────────────────────────────────────────────── */}
       <div className="set-card">
-        <h3 className="set-section-title">🛎️ Service Charge</h3>
+        <h3 className="set-section-title"><BellRing className="w-5 h-5" /> Service Charge</h3>
         <div className="space-y-4">
           <div className="set-toggle-row">
             <div>
@@ -452,7 +452,7 @@ const Settings = () => {
 
       {/* ── Platform Fee — FIX: restored ─────────────────────────────────── */}
       <div className="set-card">
-        <h3 className="set-section-title">💻 Platform Fee</h3>
+        <h3 className="set-section-title"><Monitor className="w-5 h-5" /> Platform Fee</h3>
         <div className="space-y-4">
           <div className="set-toggle-row">
             <div>
@@ -474,7 +474,7 @@ const Settings = () => {
 
       {/* ── Appearance ────────────────────────────────────────────────────── */}
       <div className="set-card">
-        <h3 className="set-section-title">🎨 Appearance Settings</h3>
+        <h3 className="set-section-title"><Palette className="w-5 h-5" /> Appearance Settings</h3>
         <div className="space-y-6">
 
           {/* Mode */}
@@ -487,7 +487,7 @@ const Settings = () => {
                 style={settings.mode === 'light'
                   ? { borderColor: '#C9A227', background: 'rgba(201,162,39,0.1)', color: '#C9A227' }
                   : { borderColor: 'rgba(255,255,255,0.1)', color: 'rgba(255,255,255,0.5)' }}>
-                <Sun className="w-5 h-5" />☀️ Light Mode
+                <Sun className="w-5 h-5" /> Light Mode
               </button>
               <button type="button" data-testid="mode-dark"
                 onClick={() => setSettings(prev => ({ ...prev, mode: 'dark' }))}
@@ -495,7 +495,7 @@ const Settings = () => {
                 style={settings.mode === 'dark'
                   ? { borderColor: '#C9A227', background: 'rgba(201,162,39,0.1)', color: '#C9A227' }
                   : { borderColor: 'rgba(255,255,255,0.1)', color: 'rgba(255,255,255,0.5)' }}>
-                <Moon className="w-5 h-5" />🌙 Dark Mode
+                <Moon className="w-5 h-5" /> Dark Mode
               </button>
             </div>
           </div>
@@ -545,7 +545,7 @@ const Settings = () => {
 
       {/* ── Live Preview ──────────────────────────────────────────────────── */}
       <div className="set-card">
-        <h3 className="set-section-title">👁️ Live Preview</h3>
+        <h3 className="set-section-title"><ScanEye className="w-5 h-5" /> Live Preview</h3>
         <p className="set-hint mb-4">This is how your ordering page will look to customers.</p>
         <div className="rounded-2xl overflow-hidden" style={{ backgroundColor: colors.background, border: `2px solid ${colors.border}` }}>
           <div className="p-6 text-center border-b" style={{ borderColor: colors.border, backgroundColor: colors.backgroundSecondary }}>
@@ -592,7 +592,7 @@ const Settings = () => {
 
       {/* ── Online Payment Settings ───────────────────────────────────────── */}
       <div className="set-card">
-        <h3 className="set-section-title">💳 Online Payment Settings</h3>
+        <h3 className="set-section-title"><CreditCard className="w-5 h-5" /> Online Payment Settings</h3>
         <div className="space-y-5">
 
           {/* Enable toggle */}
@@ -683,7 +683,7 @@ const Settings = () => {
             <div className="flex items-start gap-3 p-4 rounded-xl" style={{ background: 'rgba(16,185,129,0.06)', border: '1px solid rgba(16,185,129,0.18)' }}>
               <ShieldCheck className="w-4 h-4 flex-shrink-0 mt-0.5" style={{ color: '#34d399' }} />
               <div>
-                <p className="text-xs font-black" style={{ color: '#34d399' }}>🔒 Secured via Render Backend</p>
+                <p className="text-xs font-black flex items-center gap-1" style={{ color: '#34d399' }}><Lock className="inline w-3 h-3" /> Secured via Render Backend</p>
                 <p className="text-xs mt-0.5 leading-relaxed" style={{ color: '#7a6a55' }}>
                   Payment processing happens server-side on your Render backend. API keys are used by the server — never exposed to customers.
                 </p>
@@ -702,7 +702,7 @@ const Settings = () => {
           data-testid="save-settings-btn"
           className="set-save-btn">
           <Save className="w-5 h-5" />
-          {saving ? '⏳ Saving…' : uploading ? '📤 Uploading…' : '💾 Save Settings'}
+          {saving ? <><Loader className="w-4 h-4 animate-spin" /> Saving…</> : uploading ? <><Upload className="w-4 h-4" /> Uploading…</> : 'Save Settings'}
         </button>
       </div>
 
