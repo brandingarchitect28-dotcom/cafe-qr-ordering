@@ -12,12 +12,17 @@
  *  - Mark Visit + Upgrade (increments visits, escalates discount)
  *  - Send loyalty reward via WhatsApp
  *
+ * NEW ADDITIONS (zero existing logic changed):
+ *  - Customer Name dropdown (tap to select from existing customers)
+ *  - Phone Number dropdown (filtered by selected name, or all)
+ *  - Top Customers insight panel (sorted by frequency, copy button)
+ *
  * Discount ladder:
  *  Visit 1  → 10%   Visit 2  → 15%   Visit 3  → 20%
  *  Visit 4  → 25%   Visit ≥5 → 30%
  */
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useRef, useEffect, useCallback } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
 import {
   collection, addDoc, updateDoc, deleteDoc, doc, serverTimestamp, query, where,
@@ -29,7 +34,7 @@ import { toast } from 'sonner';
 import {
   Search, UserPlus, Star, MessageSquare, Phone, User,
   Award, TrendingUp, RefreshCw, Gift, Undo2, Trash2, Repeat, Calendar, Pencil, Check, ChevronDown,
-  Users, Trophy, RotateCcw, Coffee, Edit,
+  Users, Trophy, RotateCcw, Coffee, Edit, Copy, ChevronUp, Flame, Crown,
 } from 'lucide-react';
 import GoogleReviewSettings from './GoogleReviewSettings';
 
@@ -79,6 +84,68 @@ if (typeof document !== 'undefined' && !document.getElementById('loy-cafe-css'))
     .loy-btn-gold:hover   { background: rgba(212,175,55,0.22); }
     @keyframes loyIn { from { opacity:0; transform:translateY(8px); } to { opacity:1; transform:translateY(0); } }
     .loy-in { animation: loyIn 280ms ease forwards; }
+
+    /* ── Dropdown styles ── */
+    .loy-dropdown {
+      position: absolute; top: calc(100% + 6px); left: 0; right: 0;
+      background: #1a1208;
+      border: 1.5px solid rgba(201,162,39,0.25);
+      border-radius: 12px;
+      z-index: 999;
+      max-height: 200px;
+      overflow-y: auto;
+      box-shadow: 0 12px 40px rgba(0,0,0,0.6), 0 0 0 1px rgba(201,162,39,0.08);
+      scrollbar-width: thin;
+      scrollbar-color: rgba(201,162,39,0.2) transparent;
+    }
+    .loy-dropdown::-webkit-scrollbar { width: 4px; }
+    .loy-dropdown::-webkit-scrollbar-track { background: transparent; }
+    .loy-dropdown::-webkit-scrollbar-thumb { background: rgba(201,162,39,0.2); border-radius: 4px; }
+    .loy-dropdown-item {
+      display: flex; align-items: center; gap-8px;
+      width: 100%; text-align: left;
+      padding: 9px 14px;
+      font-family: 'DM Sans', system-ui, sans-serif;
+      font-size: 13px; font-weight: 600;
+      color: #fff8ee;
+      background: transparent;
+      border: none; cursor: pointer;
+      transition: background 140ms;
+      border-bottom: 1px solid rgba(255,255,255,0.04);
+    }
+    .loy-dropdown-item:last-child { border-bottom: none; }
+    .loy-dropdown-item:hover { background: rgba(201,162,39,0.1); color: #fff; }
+    .loy-dropdown-item:first-child { border-radius: 10px 10px 0 0; }
+    .loy-dropdown-item:last-child  { border-radius: 0 0 10px 10px; }
+    .loy-dropdown-item:only-child  { border-radius: 10px; }
+
+    /* ── Top Customers Panel ── */
+    .loy-insight-card {
+      background: linear-gradient(135deg, #16100a 0%, #1a1208 100%);
+      border: 1.5px solid rgba(201,162,39,0.18);
+      border-radius: 16px;
+      overflow: hidden;
+    }
+    .loy-rank-row {
+      display: flex; align-items: center; gap: 10px;
+      padding: 10px 14px;
+      border-bottom: 1px solid rgba(255,255,255,0.04);
+      transition: background 150ms;
+    }
+    .loy-rank-row:last-child { border-bottom: none; }
+    .loy-rank-row:hover { background: rgba(201,162,39,0.05); }
+    .loy-copy-btn {
+      display: inline-flex; align-items: center; gap: 4px;
+      padding: 4px 9px; border-radius: 7px;
+      font-family: 'DM Sans', system-ui, sans-serif;
+      font-size: 11px; font-weight: 700;
+      background: rgba(255,255,255,0.05);
+      color: #7a6a55;
+      border: 1px solid rgba(255,255,255,0.07);
+      cursor: pointer; transition: all 150ms; white-space: nowrap; flex-shrink: 0;
+    }
+    .loy-copy-btn:hover { background: rgba(201,162,39,0.12); color: #C9A227; border-color: rgba(201,162,39,0.25); transform: translateY(-1px); }
+    .loy-copy-btn:active { transform: scale(0.95); }
   `;
   document.head.appendChild(el);
 }
@@ -112,6 +179,14 @@ const buildWAMessage = (customer) => {
   );
 };
 
+// ── Rank medal helper ─────────────────────────────────────────────────────────
+const RankBadge = ({ rank }) => {
+  if (rank === 1) return <Crown className="w-3.5 h-3.5 flex-shrink-0" style={{ color: '#FFD700' }} />;
+  if (rank === 2) return <Crown className="w-3.5 h-3.5 flex-shrink-0" style={{ color: '#C0C0C0' }} />;
+  if (rank === 3) return <Crown className="w-3.5 h-3.5 flex-shrink-0" style={{ color: '#CD7F32' }} />;
+  return <span className="text-xs font-black flex-shrink-0" style={{ color: '#3d3020', minWidth: 14, textAlign: 'center' }}>#{rank}</span>;
+};
+
 // ══════════════════════════════════════════════════════════════════════════════
 const LoyaltyDashboard = () => {
   const { user } = useAuth();
@@ -122,6 +197,7 @@ const LoyaltyDashboard = () => {
     cafeId ? [where('cafeId', '==', cafeId)] : []
   );
 
+  // ── Existing state (UNCHANGED) ────────────────────────────────────────────
   const [search,       setSearch      ] = useState('');
   const [showAddForm,  setShowAddForm  ] = useState(false);
   const [saving,       setSaving       ] = useState(false);
@@ -139,6 +215,25 @@ const LoyaltyDashboard = () => {
   const [expandedCustomerId, setExpandedCustomerId] = useState(null);
   const toggleCard = (id) => setExpandedCustomerId(prev => prev === id ? null : id);
 
+  // ── NEW state: dropdowns + insight panel ─────────────────────────────────
+  const [showNameDropdown,    setShowNameDropdown   ] = useState(false);
+  const [showPhoneDropdown,   setShowPhoneDropdown  ] = useState(false);
+  const [showAllTopCustomers, setShowAllTopCustomers] = useState(false);
+
+  const nameDropdownRef  = useRef(null);
+  const phoneDropdownRef = useRef(null);
+
+  // Close dropdowns on outside click
+  useEffect(() => {
+    const handler = (e) => {
+      if (nameDropdownRef.current  && !nameDropdownRef.current.contains(e.target))  setShowNameDropdown(false);
+      if (phoneDropdownRef.current && !phoneDropdownRef.current.contains(e.target)) setShowPhoneDropdown(false);
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, []);
+
+  // ── Existing memo (UNCHANGED) ─────────────────────────────────────────────
   const filtered = useMemo(() => {
     if (!customers) return [];
     const q = search.trim().toLowerCase();
@@ -146,7 +241,73 @@ const LoyaltyDashboard = () => {
     return customers.filter(c => c.name?.toLowerCase().includes(q) || c.phone?.includes(q));
   }, [customers, search]);
 
-  // ── Add new customer ──────────────────────────────────────────────────────
+  // ── NEW memos ─────────────────────────────────────────────────────────────
+
+  // Unique sorted names for name dropdown
+  const uniqueNames = useMemo(() => {
+    if (!customers || customers.length === 0) return [];
+    const names = customers
+      .map(c => c.name?.trim())
+      .filter(Boolean);
+    return [...new Set(names)].sort((a, b) => a.localeCompare(b));
+  }, [customers]);
+
+  // Phone dropdown: filtered by selected name, or all
+  const filteredPhones = useMemo(() => {
+    if (!customers || customers.length === 0) return [];
+    const pool = newName.trim()
+      ? customers.filter(c => c.name?.trim().toLowerCase() === newName.trim().toLowerCase())
+      : customers;
+    const phones = pool
+      .map(c => ({ name: c.name?.trim(), phone: c.phone?.trim() }))
+      .filter(x => x.phone);
+    // Deduplicate by phone
+    const seen = new Set();
+    return phones.filter(x => {
+      if (seen.has(x.phone)) return false;
+      seen.add(x.phone);
+      return true;
+    });
+  }, [customers, newName]);
+
+  // Customers sorted by visit frequency (descending)
+  const sortedByFrequency = useMemo(() => {
+    if (!customers || customers.length === 0) return [];
+    return [...customers]
+      .sort((a, b) => (b.visits || 0) - (a.visits || 0));
+  }, [customers]);
+
+  const topCustomers = sortedByFrequency.slice(0, 5);
+  const displayedTopCustomers = showAllTopCustomers ? sortedByFrequency : topCustomers;
+
+  // ── Copy handler ──────────────────────────────────────────────────────────
+  const handleCopy = useCallback((customer) => {
+    const text = `${customer.name} - ${customer.phone}`;
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(text)
+        .then(() => toast.success(`Copied: ${text}`))
+        .catch(() => {
+          // Fallback
+          const el = document.createElement('textarea');
+          el.value = text;
+          document.body.appendChild(el);
+          el.select();
+          document.execCommand('copy');
+          document.body.removeChild(el);
+          toast.success(`Copied: ${text}`);
+        });
+    } else {
+      const el = document.createElement('textarea');
+      el.value = text;
+      document.body.appendChild(el);
+      el.select();
+      document.execCommand('copy');
+      document.body.removeChild(el);
+      toast.success(`Copied: ${text}`);
+    }
+  }, []);
+
+  // ── Existing handlers (ALL UNCHANGED) ────────────────────────────────────
   const handleAddCustomer = async (e) => {
     e.preventDefault();
     console.log('[Loyalty] DB instance:', db);
@@ -270,15 +431,17 @@ const LoyaltyDashboard = () => {
     window.open(`https://wa.me/${waNum}?text=${encodeURIComponent(msg)}`, '_blank');
   };
 
+  // ── Existing derived values (UNCHANGED) ──────────────────────────────────
   const totalCustomers = customers?.length || 0;
   const totalVisits    = customers?.reduce((s, c) => s + (c.visits || 0), 0) || 0;
   const loyalCustomers = customers?.filter(c => (c.visits || 0) >= 3).length || 0;
   const repeatedVisits = customers?.reduce((s, c) => s + ((c.visits || 0) > 1 ? (c.visits - 1) : 0), 0) || 0;
 
+  // ─────────────────────────────────────────────────────────────────────────
   return (
     <div className="loy space-y-5">
 
-      {/* ── Stats row ─────────────────────────────────────────────────────── */}
+      {/* ── Stats row (UNCHANGED) ─────────────────────────────────────────── */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         {[
           { label: 'Total Members',   value: totalCustomers,  icon: Users,       color: '#C9A227' },
@@ -288,7 +451,6 @@ const LoyaltyDashboard = () => {
         ].map(({ label, value, icon: StatIcon, color }) => (
           <div key={label} className="loy-card p-4 flex items-center gap-3"
             style={{ borderLeft: `3px solid ${color}` }}>
-            {/* 👥 ⭐ 🏆 🔄 → Users Star Trophy RotateCcw */}
             <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0"
               style={{ background: color + '18' }}>
               <StatIcon className="w-5 h-5" style={{ color }} />
@@ -301,10 +463,9 @@ const LoyaltyDashboard = () => {
         ))}
       </div>
 
-      {/* ── Search + Add ───────────────────────────────────────────────────── */}
+      {/* ── Search + Add (UNCHANGED) ───────────────────────────────────────── */}
       <div className="flex flex-col sm:flex-row gap-3">
         <div className="relative flex-1">
-          {/* 🔍 → Search */}
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4" style={{ color: '#7a6a55' }} />
           <input type="text" value={search} onChange={e => setSearch(e.target.value)}
             placeholder="Search by name or phone…"
@@ -314,12 +475,11 @@ const LoyaltyDashboard = () => {
           className="loy-btn loy-btn-orange"
           data-testid="add-loyalty-customer-btn">
           <UserPlus className="w-4 h-4" />
-          {/* ➕ → Plus already covered by UserPlus icon in button */}
           Add Customer
         </button>
       </div>
 
-      {/* ── Add customer form ──────────────────────────────────────────────── */}
+      {/* ── Add customer form with NEW dropdowns ──────────────────────────── */}
       <AnimatePresence>
         {showAddForm && (
           <motion.div
@@ -330,23 +490,116 @@ const LoyaltyDashboard = () => {
             style={{ border: '1.5px solid rgba(201,162,39,0.2)' }}
           >
             <div className="flex items-center gap-2 mb-4">
-              {/* 👤 → User */}
               <User className="w-5 h-5" style={{ color: '#C9A227' }} />
               <h3 className="text-white font-black loy-title text-lg">Add New Loyalty Customer</h3>
             </div>
             <form onSubmit={handleAddCustomer} className="space-y-4">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+
+                {/* ── FEATURE 1: Customer Name with dropdown ── */}
                 <div>
                   <label className="block text-xs font-black uppercase tracking-widest mb-1.5" style={{ color: '#C9A227' }}>Customer Name</label>
-                  <input type="text" value={newName} onChange={e => setNewName(e.target.value)}
-                    placeholder="e.g. Priya Sharma" className="loy-input" disabled={saving} data-testid="loyalty-name-input" />
+                  <div className="relative" ref={nameDropdownRef}>
+                    <input
+                      type="text"
+                      value={newName}
+                      onChange={e => { setNewName(e.target.value); setShowNameDropdown(true); }}
+                      onFocus={() => setShowNameDropdown(true)}
+                      placeholder="e.g. Priya Sharma"
+                      className="loy-input"
+                      disabled={saving}
+                      data-testid="loyalty-name-input"
+                      autoComplete="off"
+                    />
+                    {/* Name dropdown */}
+                    <AnimatePresence>
+                      {showNameDropdown && uniqueNames.length > 0 && (
+                        <motion.div
+                          initial={{ opacity: 0, y: -4 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          exit={{ opacity: 0, y: -4 }}
+                          transition={{ duration: 0.12 }}
+                          className="loy-dropdown"
+                        >
+                          {uniqueNames
+                            .filter(n => !newName.trim() || n.toLowerCase().includes(newName.trim().toLowerCase()))
+                            .map(name => (
+                              <button
+                                key={name}
+                                type="button"
+                                className="loy-dropdown-item"
+                                onMouseDown={e => {
+                                  e.preventDefault();
+                                  setNewName(name);
+                                  setShowNameDropdown(false);
+                                }}
+                              >
+                                <span className="flex items-center gap-2">
+                                  <User className="w-3 h-3 flex-shrink-0" style={{ color: '#C9A227' }} />
+                                  {name}
+                                </span>
+                              </button>
+                            ))}
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
+                  </div>
                 </div>
+
+                {/* ── FEATURE 2: Phone Number with dropdown ── */}
                 <div>
                   <label className="block text-xs font-black uppercase tracking-widest mb-1.5" style={{ color: '#C9A227' }}>Phone Number</label>
-                  <input type="tel" value={newPhone} onChange={e => setNewPhone(e.target.value)}
-                    placeholder="e.g. 9876543210" className="loy-input" disabled={saving} data-testid="loyalty-phone-input" />
+                  <div className="relative" ref={phoneDropdownRef}>
+                    <input
+                      type="tel"
+                      value={newPhone}
+                      onChange={e => { setNewPhone(e.target.value); setShowPhoneDropdown(true); }}
+                      onFocus={() => setShowPhoneDropdown(true)}
+                      placeholder="e.g. 9876543210"
+                      className="loy-input"
+                      disabled={saving}
+                      data-testid="loyalty-phone-input"
+                      autoComplete="off"
+                    />
+                    {/* Phone dropdown */}
+                    <AnimatePresence>
+                      {showPhoneDropdown && filteredPhones.length > 0 && (
+                        <motion.div
+                          initial={{ opacity: 0, y: -4 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          exit={{ opacity: 0, y: -4 }}
+                          transition={{ duration: 0.12 }}
+                          className="loy-dropdown"
+                        >
+                          {filteredPhones
+                            .filter(x => !newPhone.trim() || x.phone.includes(newPhone.trim()))
+                            .map(({ name, phone }) => (
+                              <button
+                                key={phone}
+                                type="button"
+                                className="loy-dropdown-item"
+                                onMouseDown={e => {
+                                  e.preventDefault();
+                                  setNewPhone(phone);
+                                  setShowPhoneDropdown(false);
+                                }}
+                              >
+                                <span className="flex items-center gap-2">
+                                  <Phone className="w-3 h-3 flex-shrink-0" style={{ color: '#7a6a55' }} />
+                                  <span style={{ color: '#fff8ee' }}>{phone}</span>
+                                  {name && <span style={{ color: '#5a4a35', fontSize: 11 }}>· {name}</span>}
+                                </span>
+                              </button>
+                            ))}
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
+                  </div>
                 </div>
+
               </div>
+
+              {/* Validity (UNCHANGED) */}
               <div>
                 <label className="block text-xs font-black uppercase tracking-widest mb-1.5" style={{ color: '#C9A227' }}>
                   Validity (days) <span className="font-normal normal-case" style={{ color: '#7a6a55' }}>(optional)</span>
@@ -354,6 +607,8 @@ const LoyaltyDashboard = () => {
                 <input type="number" min="0" value={validityDays} onChange={e => setValidityDays(e.target.value)}
                   placeholder="e.g. 30" className="loy-input" disabled={saving} data-testid="loyalty-validity-input" />
               </div>
+
+              {/* Custom discount (UNCHANGED) */}
               <div>
                 <label className="block text-xs font-black uppercase tracking-widest mb-1.5" style={{ color: '#C9A227' }}>
                   Custom Discount (%) <span className="font-normal normal-case" style={{ color: '#7a6a55' }}>(optional — overrides default 10%)</span>
@@ -361,6 +616,7 @@ const LoyaltyDashboard = () => {
                 <input type="number" min="0" max="100" value={customDiscount} onChange={e => setCustomDiscount(e.target.value)}
                   placeholder="e.g. 20" className="loy-input" disabled={saving} data-testid="loyalty-discount-input" />
               </div>
+
               <p className="text-xs font-bold" style={{ color: '#7a6a55' }}>
                 First visit will be recorded automatically. Customer starts with <span style={{ color: '#C9A227' }}>10% OFF</span>.
               </p>
@@ -375,7 +631,7 @@ const LoyaltyDashboard = () => {
         )}
       </AnimatePresence>
 
-      {/* ── Discount ladder ────────────────────────────────────────────────── */}
+      {/* ── Discount ladder (UNCHANGED) ───────────────────────────────────── */}
       <div className="flex gap-2 flex-wrap">
         {[
           { label: '1 visit',   disc: '10%' },
@@ -387,22 +643,165 @@ const LoyaltyDashboard = () => {
           <span key={label} className="text-xs px-3 py-1.5 rounded-xl font-black flex items-center gap-1"
             style={{ background: 'rgba(201,162,39,0.07)', color: '#7a6a55', border: '1px solid rgba(201,162,39,0.15)' }}>
             {label} → <span style={{ color: '#C9A227' }}>{disc}</span>
-            {/* 🎁 in the last ladder item text — kept inline with Gift icon for the last one */}
             {label === '5+ visits' && <Gift className="w-3 h-3 ml-0.5" style={{ color: '#C9A227' }} />}
           </span>
         ))}
       </div>
 
-      {/* ── Customer list ──────────────────────────────────────────────────── */}
+      {/* ═══════════════════════════════════════════════════════════════════ */}
+      {/* ── FEATURE 3: Top Customers Insight Panel ─────────────────────── */}
+      {/* ═══════════════════════════════════════════════════════════════════ */}
+      {!loading && customers && customers.length > 0 && (
+        <div className="loy-insight-card">
+          {/* Panel header */}
+          <div className="flex items-center justify-between px-5 py-4"
+            style={{ borderBottom: '1px solid rgba(201,162,39,0.12)' }}>
+            <div className="flex items-center gap-2.5">
+              <div className="w-8 h-8 rounded-xl flex items-center justify-center"
+                style={{ background: 'rgba(201,162,39,0.12)', border: '1px solid rgba(201,162,39,0.2)' }}>
+                <Flame className="w-4 h-4" style={{ color: '#C9A227' }} />
+              </div>
+              <div>
+                <h3 className="text-white font-black text-sm loy-title">Top Customers</h3>
+                <p className="text-xs font-bold" style={{ color: '#5a4a35' }}>Ranked by visit frequency</p>
+              </div>
+            </div>
+            <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-xl"
+              style={{ background: 'rgba(201,162,39,0.07)', border: '1px solid rgba(201,162,39,0.12)' }}>
+              <Users className="w-3 h-3" style={{ color: '#C9A227' }} />
+              <span className="text-xs font-black" style={{ color: '#C9A227' }}>
+                {sortedByFrequency.length}
+              </span>
+            </div>
+          </div>
+
+          {/* Customer rows */}
+          <div>
+            <AnimatePresence initial={false}>
+              {displayedTopCustomers.map((customer, idx) => {
+                const rank   = idx + 1;
+                const visits = customer.visits || 0;
+                const disc   = customer.currentDiscount || 10;
+                const isFree = disc >= 30;
+                // Visit bar width capped at max visits in list
+                const maxVisits = sortedByFrequency[0]?.visits || 1;
+                const barPct    = Math.max(8, Math.round((visits / maxVisits) * 100));
+
+                return (
+                  <motion.div
+                    key={customer.id}
+                    initial={{ opacity: 0, y: 6 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -4 }}
+                    transition={{ duration: 0.18, delay: idx * 0.03 }}
+                    className="loy-rank-row"
+                  >
+                    {/* Rank badge */}
+                    <div className="flex-shrink-0 w-5 flex justify-center">
+                      <RankBadge rank={rank} />
+                    </div>
+
+                    {/* Avatar */}
+                    <div className="w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0"
+                      style={{
+                        background: isFree ? 'rgba(16,185,129,0.1)' : 'rgba(201,162,39,0.08)',
+                        border: isFree ? '1px solid rgba(16,185,129,0.2)' : '1px solid rgba(201,162,39,0.15)',
+                      }}>
+                      <User className="w-4 h-4" style={{ color: isFree ? '#34d399' : '#C9A227' }} />
+                    </div>
+
+                    {/* Name + phone + bar */}
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2">
+                        <p className="text-white font-black text-sm truncate" style={{ maxWidth: 120 }}>
+                          {customer.name}
+                        </p>
+                        <span className="text-xs font-bold flex-shrink-0"
+                          style={{ color: isFree ? '#34d399' : '#C9A227' }}>
+                          {isFree ? '🎁 Free' : `${disc}%`}
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-2 mt-0.5">
+                        <Phone className="w-2.5 h-2.5 flex-shrink-0" style={{ color: '#3d3020' }} />
+                        <span className="text-xs font-bold" style={{ color: '#5a4a35' }}>{customer.phone}</span>
+                      </div>
+                      {/* Visit frequency bar */}
+                      <div className="mt-1.5 h-1 rounded-full overflow-hidden"
+                        style={{ background: 'rgba(255,255,255,0.05)', width: '100%' }}>
+                        <div
+                          className="h-full rounded-full transition-all duration-500"
+                          style={{
+                            width: `${barPct}%`,
+                            background: isFree
+                              ? 'linear-gradient(90deg,#34d399,#059669)'
+                              : 'linear-gradient(90deg,#C9A227,#A67C00)',
+                          }}
+                        />
+                      </div>
+                    </div>
+
+                    {/* Visit count pill */}
+                    <div className="flex items-center gap-1 px-2 py-1 rounded-lg flex-shrink-0"
+                      style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.06)' }}>
+                      <Coffee className="w-2.5 h-2.5" style={{ color: '#5a4a35' }} />
+                      <span className="text-xs font-black text-white">{visits}</span>
+                      <span className="text-xs font-bold hidden sm:inline" style={{ color: '#5a4a35' }}>
+                        visit{visits !== 1 ? 's' : ''}
+                      </span>
+                    </div>
+
+                    {/* Copy button */}
+                    <button
+                      type="button"
+                      className="loy-copy-btn"
+                      onClick={() => handleCopy(customer)}
+                      title={`Copy: ${customer.name} - ${customer.phone}`}
+                      data-testid={`copy-customer-${customer.id}`}
+                    >
+                      <Copy className="w-3 h-3" />
+                      <span className="hidden sm:inline">Copy</span>
+                    </button>
+                  </motion.div>
+                );
+              })}
+            </AnimatePresence>
+          </div>
+
+          {/* View More / See Less footer */}
+          {sortedByFrequency.length > 5 && (
+            <button
+              type="button"
+              onClick={() => setShowAllTopCustomers(v => !v)}
+              className="w-full flex items-center justify-center gap-2 py-3 text-xs font-black transition-colors"
+              style={{
+                borderTop: '1px solid rgba(255,255,255,0.04)',
+                color: '#7a6a55',
+                background: 'transparent',
+                border: 'none',
+                borderTop: '1px solid rgba(255,255,255,0.04)',
+                cursor: 'pointer',
+              }}
+              onMouseEnter={e => { e.currentTarget.style.color = '#C9A227'; e.currentTarget.style.background = 'rgba(201,162,39,0.04)'; }}
+              onMouseLeave={e => { e.currentTarget.style.color = '#7a6a55'; e.currentTarget.style.background = 'transparent'; }}
+              data-testid="top-customers-view-more"
+            >
+              {showAllTopCustomers
+                ? <><ChevronUp className="w-3.5 h-3.5" /> See Less</>
+                : <><ChevronDown className="w-3.5 h-3.5" /> View All {sortedByFrequency.length} Customers</>
+              }
+            </button>
+          )}
+        </div>
+      )}
+
+      {/* ── Customer list (UNCHANGED) ──────────────────────────────────────── */}
       {loading ? (
         <div className="flex flex-col items-center justify-center py-12 gap-2">
-          {/* ⭐ → Star */}
           <Star className="w-10 h-10 animate-bounce" style={{ color: '#C9A227' }} />
           <p className="text-sm font-bold" style={{ color: '#7a6a55' }}>Loading customers…</p>
         </div>
       ) : filtered.length === 0 ? (
         <div className="loy-card p-12 text-center">
-          {/* 🎁 → Gift */}
           <Gift className="w-12 h-12 mb-3 mx-auto" style={{ color: '#3a2e1a' }} />
           <p className="font-bold" style={{ color: '#7a6a55' }}>
             {search ? 'No customers match your search.' : 'No loyalty customers yet. Add your first one!'}
@@ -436,7 +835,6 @@ const LoyaltyDashboard = () => {
                   aria-expanded={isOpen}
                   data-testid={`loyalty-toggle-${customer.id}`}
                 >
-                  {/* 👤 → User */}
                   <div className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0"
                     style={{ background: 'rgba(201,162,39,0.1)', border: '1.5px solid rgba(201,162,39,0.18)' }}>
                     <User className="w-5 h-5" style={{ color: '#C9A227' }} />
@@ -444,7 +842,6 @@ const LoyaltyDashboard = () => {
                   <div className="min-w-0 flex-1">
                     <p className="text-white font-black text-sm truncate">{customer.name}</p>
                     <div className="flex items-center gap-1.5 mt-0.5">
-                      {/* 📞 → Phone */}
                       <Phone className="w-3 h-3 flex-shrink-0" style={{ color: '#7a6a55' }} />
                       <p className="text-xs font-bold truncate" style={{ color: '#7a6a55' }}>{customer.phone}</p>
                     </div>
@@ -453,7 +850,6 @@ const LoyaltyDashboard = () => {
                   {/* Visit count */}
                   <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-xl flex-shrink-0"
                     style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.07)' }}>
-                    {/* ☕ → Coffee */}
                     <Coffee className="w-3 h-3" style={{ color: '#7a6a55' }} />
                     <span className="text-white text-xs font-black">{visits}</span>
                     <span className="text-xs font-bold hidden sm:inline" style={{ color: '#7a6a55' }}>visit{visits !== 1 ? 's' : ''}</span>
@@ -465,7 +861,6 @@ const LoyaltyDashboard = () => {
                       background: isFree ? 'rgba(16,185,129,0.12)' : 'rgba(201,162,39,0.2)',
                       border: isFree ? '1px solid rgba(16,185,129,0.3)' : '1px solid rgba(201,162,39,0.2)',
                     }}>
-                    {/* 🎁 → Gift, ⭐ → Star */}
                     {isFree ? <Gift className="w-3 h-3" style={{ color: '#34d399' }} /> : <Star className="w-3 h-3" style={{ color: '#C9A227' }} />}
                     <span className="text-xs font-black" style={{ color: isFree ? '#34d399' : '#C9A227' }}>
                       {isFree ? 'Free!' : `${disc}%`}
@@ -499,7 +894,6 @@ const LoyaltyDashboard = () => {
                             background: isExpired ? 'rgba(220,50,50,0.08)' : 'rgba(255,255,255,0.04)',
                             border: isExpired ? '1px solid rgba(220,50,50,0.25)' : '1px solid rgba(255,255,255,0.08)',
                           }}>
-                          {/* 📅 → Calendar */}
                           <Calendar className="w-3 h-3" style={{ color: isExpired ? '#f87171' : '#7a6a55' }} />
                           <span className="text-xs font-bold" style={{ color: isExpired ? '#f87171' : '#7a6a55' }}>
                             {isExpired ? 'Expired ' : 'Valid till '}
@@ -514,7 +908,6 @@ const LoyaltyDashboard = () => {
                       <button onClick={() => handleMarkVisit(customer)} disabled={marking}
                         className="loy-btn loy-btn-orange disabled:opacity-50"
                         data-testid={`mark-visit-${customer.id}`}>
-                        {/* ☕ → Coffee */}
                         {marking ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <Coffee className="w-3.5 h-3.5" />}
                         {marking ? 'Marking…' : 'Mark Visit'}
                       </button>
@@ -555,7 +948,6 @@ const LoyaltyDashboard = () => {
                     {editingCustomerId === customer.id && (
                       <div className="mt-2 pt-3 space-y-3" style={{ borderTop: '1px solid rgba(201,162,39,0.2)' }}
                         data-testid={`edit-panel-${customer.id}`}>
-                        {/* ✏️ → Pencil */}
                         <p className="text-xs font-black uppercase tracking-widest flex items-center gap-1" style={{ color: '#C9A227' }}>
                           <Edit className="w-3 h-3" /> Edit Loyalty Card
                         </p>
@@ -599,9 +991,8 @@ const LoyaltyDashboard = () => {
         </div>
       )}
 
-      {/* Footer */}
+      {/* Footer (UNCHANGED) */}
       <div className="flex items-center justify-center gap-2 py-2">
-        {/* ⭐ → Star */}
         <Star className="w-4 h-4" style={{ color: '#7a6a55' }} />
         <p className="text-xs font-bold" style={{ color: '#7a6a55' }}>
           {totalCustomers} member{totalCustomers !== 1 ? 's' : ''} · {totalVisits} total visits
@@ -609,7 +1000,7 @@ const LoyaltyDashboard = () => {
         <span className="inline-block w-1.5 h-1.5 rounded-full animate-pulse" style={{ background: '#34d399' }} />
       </div>
 
-      {/* ── Google Review Link setting ──────────────────────────────────────── */}
+      {/* ── Google Review Link setting (UNCHANGED) ──────────────────────────── */}
       <GoogleReviewSettings />
     </div>
   );
