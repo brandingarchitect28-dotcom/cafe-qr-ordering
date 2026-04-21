@@ -123,6 +123,75 @@ if (typeof document !== 'undefined' && !document.getElementById('dash-cafe-css')
       -webkit-font-smoothing: antialiased;
       display: block;
     }
+
+    /* ─── MAIN CONTENT AREA — light/dark theming ─── */
+
+    /* Dark mode: main content */
+    .dash-main-dark {
+      background: #050505;
+      color: #e8d9c0;
+    }
+    .dash-main-dark .dash-card {
+      background: #0f0c07;
+      border: 1.5px solid rgba(201,162,39,0.1);
+      color: #e8d9c0;
+    }
+    .dash-main-dark .dash-card-title  { color: #f0e0c0; }
+    .dash-main-dark .dash-card-value  { color: #ffffff; }
+    .dash-main-dark .dash-card-label  { color: #7a6a55; }
+    .dash-main-dark .dash-text-primary   { color: #f0e0c0; }
+    .dash-main-dark .dash-text-secondary { color: #9a8a70; }
+    .dash-main-dark .dash-text-muted     { color: #6a5a45; }
+    .dash-main-dark .dash-divider  { border-color: rgba(201,162,39,0.08); }
+    .dash-main-dark .dash-input {
+      background: #0f0c07;
+      border: 1.5px solid rgba(201,162,39,0.15);
+      color: #f0e0c0;
+    }
+    .dash-main-dark .dash-input::placeholder { color: #5a4a35; }
+    .dash-main-dark .dash-badge {
+      background: rgba(201,162,39,0.12);
+      color: #C9A227;
+    }
+    .dash-main-dark .dash-table-row:hover { background: rgba(201,162,39,0.04); }
+    .dash-main-dark .dash-section-bg {
+      background: #0a0702;
+      border: 1.5px solid rgba(201,162,39,0.08);
+    }
+
+    /* Light mode: main content */
+    .dash-main-light {
+      background: #F5F5F5;
+      color: #1a1208;
+    }
+    .dash-main-light .dash-card {
+      background: #ffffff;
+      border: 1.5px solid rgba(201,162,39,0.15);
+      color: #1a1208;
+      box-shadow: 0 1px 8px rgba(0,0,0,0.06);
+    }
+    .dash-main-light .dash-card-title  { color: #2a1e08; }
+    .dash-main-light .dash-card-value  { color: #1a1208; }
+    .dash-main-light .dash-card-label  { color: #7a6040; }
+    .dash-main-light .dash-text-primary   { color: #1a1208; }
+    .dash-main-light .dash-text-secondary { color: #5a4530; }
+    .dash-main-light .dash-text-muted     { color: #9a7a50; }
+    .dash-main-light .dash-divider  { border-color: rgba(201,162,39,0.15); }
+    .dash-main-light .dash-input {
+      background: #ffffff;
+      border: 1.5px solid rgba(201,162,39,0.25);
+      color: #1a1208;
+    }
+    .dash-main-light .dash-input::placeholder { color: #b0956a; }
+    .dash-main-light .dash-badge {
+      background: rgba(201,162,39,0.1);
+      color: #8a6200;
+    }
+    .dash-main-light .dash-table-row:hover { background: rgba(201,162,39,0.05); }
+    .dash-main-light .dash-section-bg {
+      background: #fdfaf4;
+      border: 1.5px solid rgba(201,162,39,0.12);
+    }
   `;
   document.head.appendChild(el);
 }
@@ -161,15 +230,16 @@ const LockedFeature = ({ label, icon: Icon }) => {
     <div
       className="dash rounded-2xl p-16 text-center"
       style={{
-        background: isLight ? '#FDF8EE' : '#141008',
-        border: `1.5px solid ${isLight ? 'rgba(0,0,0,0.1)' : 'rgba(255,255,255,0.07)'}`,
+        background: isLight ? '#ffffff' : '#141008',
+        border: `1.5px solid ${isLight ? 'rgba(201,162,39,0.18)' : 'rgba(255,255,255,0.07)'}`,
+        boxShadow: isLight ? '0 1px 8px rgba(0,0,0,0.06)' : 'none',
       }}
     >
       <div className="text-5xl mb-4">🔒</div>
-      <p className="font-black text-lg mb-2" style={{ color: isLight ? '#1A1A1A' : '#FFFFFF' }}>
+      <p className="font-black text-lg mb-2" style={{ color: isLight ? '#1a1208' : '#FFFFFF' }}>
         {label}
       </p>
-      <p className="text-sm font-semibold" style={{ color: isLight ? '#7a6a55' : '#7a6a55' }}>
+      <p className="text-sm font-semibold" style={{ color: isLight ? '#5a4530' : '#7a6a55' }}>
         This feature is not enabled for your account. Contact your administrator to unlock it.
       </p>
     </div>
@@ -217,35 +287,39 @@ const Dashboard = () => {
     { id: 'settings',  label: 'Settings',    icon: SettingsIcon    },
   ];
 
-  // Theme-adaptive page and header backgrounds
-  const pageBg       = isLight ? 'bg-[#F5F5F5]' : 'bg-[#050505]';
+  // ── Sidebar theme ──
   const sidebarClass = isLight ? 'dash-sidebar-light dash-light' : 'dash-sidebar-dark dash-dark';
-  const headerBg     = isLight
-    ? 'rgba(245,245,245,0.92)'
-    : 'rgba(5,5,5,0.88)';
-  const headerBorder = isLight
-    ? '1px solid rgba(201,162,39,0.18)'
-    : '1px solid rgba(201,162,39,0.1)';
-  const headerTitleColor = isLight ? '#1A1A1A' : '#FFFFFF';
-  const userEmailColor   = isLight ? '#3a2a10'  : '#FFFFFF';
-  const userLabelColor   = isLight ? '#8a7060'  : '#4a3f35';
-  const userBg           = isLight
-    ? 'rgba(201,162,39,0.08)'
-    : 'rgba(201,162,39,0.05)';
-  const userBorderColor  = isLight
-    ? 'rgba(201,162,39,0.15)'
-    : 'rgba(201,162,39,0.08)';
-  const footerBorder = isLight
-    ? '1px solid rgba(201,162,39,0.15)'
-    : '1px solid rgba(201,162,39,0.08)';
-  const closeBtnColor        = isLight ? '#8a7060' : '#5a4a3a';
-  const closeBtnHoverColor   = isLight ? '#1A1A1A' : '#fff';
-  const closeBtnHoverBg      = isLight ? 'rgba(0,0,0,0.06)' : 'rgba(255,255,255,0.05)';
+
+  // ── Main content theme class (NEW — governs all child components) ──
+  const mainClass = isLight ? 'dash-main-light' : 'dash-main-dark';
+
+  // ── Header ──
+  const headerBg     = isLight ? 'rgba(245,245,245,0.96)' : 'rgba(5,5,5,0.88)';
+  const headerBorder = isLight ? '1px solid rgba(201,162,39,0.18)' : '1px solid rgba(201,162,39,0.1)';
+  const headerTitleColor = isLight ? '#1a1208' : '#FFFFFF';
+
+  // ── Sidebar footer ──
+  const userEmailColor  = isLight ? '#2a1e08' : '#FFFFFF';
+  const userLabelColor  = isLight ? '#7a6040' : '#7a6a55';
+  const userBg          = isLight ? 'rgba(201,162,39,0.07)' : 'rgba(201,162,39,0.05)';
+  const userBorderColor = isLight ? 'rgba(201,162,39,0.18)' : 'rgba(201,162,39,0.08)';
+  const footerBorder    = isLight ? '1px solid rgba(201,162,39,0.15)' : '1px solid rgba(201,162,39,0.08)';
+
+  // ── Close button ──
+  const closeBtnColor      = isLight ? '#5a4530' : '#5a4a3a';
+  const closeBtnHoverColor = isLight ? '#1a1208' : '#fff';
+  const closeBtnHoverBg    = isLight ? 'rgba(0,0,0,0.06)' : 'rgba(255,255,255,0.05)';
+
+  // ── Overlay ──
+  const overlayBg = isLight ? 'rgba(0,0,0,0.3)' : 'rgba(0,0,0,0.7)';
 
   if (cafe && cafe.isActive === false) return <CafeDisabled isAdmin={true} />;
 
   return (
-    <div className={`min-h-screen ${pageBg} dash`} style={{ fontFamily: "'DM Sans', system-ui, sans-serif" }}>
+    <div
+      className={`min-h-screen dash ${mainClass}`}
+      style={{ fontFamily: "'DM Sans', system-ui, sans-serif" }}
+    >
       <GlobalOrderPopup
         order={newOrder}
         onClose={clearNewOrder}
@@ -254,7 +328,7 @@ const Dashboard = () => {
       {sidebarOpen && (
         <div
           className="fixed inset-0 z-40"
-          style={{ background: isLight ? 'rgba(0,0,0,0.3)' : 'rgba(0,0,0,0.7)', backdropFilter: 'blur(4px)' }}
+          style={{ background: overlayBg, backdropFilter: 'blur(4px)' }}
           onClick={() => setSidebarOpen(false)}
         />
       )}
@@ -321,7 +395,7 @@ const Dashboard = () => {
         </div>
       </aside>
 
-      {/* ── Main content — UNCHANGED ── */}
+      {/* ── Main content ── */}
       <div>
         <header
           className="sticky top-0 z-30 h-16 px-5 flex items-center justify-between"
