@@ -41,7 +41,7 @@ if (typeof document !== 'undefined' && !document.getElementById('dash-cafe-css')
     .dash { font-family: 'DM Sans', system-ui, sans-serif; }
     .dash-title { font-family: 'Playfair Display', serif !important; }
 
-    /* Nav items — high contrast, visible, professional */
+    /* Nav items — high contrast, visible in both dark and light mode */
     .dash-nav-item {
       width: 100%;
       display: flex; align-items: center; gap: 11px;
@@ -50,25 +50,43 @@ if (typeof document !== 'undefined' && !document.getElementById('dash-cafe-css')
       font-weight: 500; font-size: 15px;
       cursor: pointer; transition: all 160ms;
       border: none; background: transparent;
-      color: #a89880; text-align: left;
+      text-align: left;
       letter-spacing: 0.015em;
       -webkit-font-smoothing: antialiased;
     }
-    .dash-nav-item:hover { background: rgba(201,162,39,0.07); color: #f0e0c0; }
-    .dash-nav-item.active {
+
+    /* Dark mode nav */
+    .dash-dark .dash-nav-item { color: #a89880; }
+    .dash-dark .dash-nav-item:hover { background: rgba(201,162,39,0.07); color: #f0e0c0; }
+    .dash-dark .dash-nav-item.active {
       background: linear-gradient(135deg,#C9A227,#A67C00);
       color: #fff; font-weight: 700;
       box-shadow: 0 3px 14px rgba(201,162,39,0.32);
     }
+
+    /* Light mode nav */
+    .dash-light .dash-nav-item { color: #5a4530; }
+    .dash-light .dash-nav-item:hover { background: rgba(201,162,39,0.1); color: #3a2a10; }
+    .dash-light .dash-nav-item.active {
+      background: linear-gradient(135deg,#C9A227,#A67C00);
+      color: #fff; font-weight: 700;
+      box-shadow: 0 3px 14px rgba(201,162,39,0.32);
+    }
+
     .dash-nav-icon { opacity: 0.5; flex-shrink: 0; transition: opacity 160ms; }
     .dash-nav-item:hover .dash-nav-icon  { opacity: 0.9; }
     .dash-nav-item.active .dash-nav-icon { opacity: 1; }
 
     /* Sidebar */
-    .dash-sidebar {
+    .dash-sidebar-dark {
       background: #0a0702;
       border-right: 1.5px solid rgba(201,162,39,0.1);
     }
+    .dash-sidebar-light {
+      background: #FDFAF4;
+      border-right: 1.5px solid rgba(201,162,39,0.2);
+    }
+
     .dash-nav-scroll {
       flex: 1;
       overflow-y: auto;
@@ -80,7 +98,7 @@ if (typeof document !== 'undefined' && !document.getElementById('dash-cafe-css')
     .dash-nav-scroll::-webkit-scrollbar-track { background: transparent; }
     .dash-nav-scroll::-webkit-scrollbar-thumb { background: rgba(201,162,39,0.18); border-radius: 3px; }
 
-    /* Branding — Playfair Display bold serif, Title Case, premium weight */
+    /* Branding */
     .dash-brand-name {
       font-family: 'Playfair Display', Georgia, serif;
       font-size: 24px;
@@ -109,7 +127,7 @@ if (typeof document !== 'undefined' && !document.getElementById('dash-cafe-css')
   document.head.appendChild(el);
 }
 
-// TASK 4: Lucide icons mapped per nav id — replaces all emojis
+// Lucide icons mapped per nav id
 const NAV_ICON = {
   overview:  LayoutDashboard,
   orders:    ShoppingBag,
@@ -130,7 +148,6 @@ const NAV_ICON = {
   settings:  SettingsIcon,
 };
 
-// Keep NAV_EMOJI for the header label emoji (used in <header> activeTab display only)
 const NAV_EMOJI = {
   overview:  '🏠', orders:    '🧾', invoices:  '📄', menu:      '🍽️',
   offers:    '🎁', analytics: '📊', advanced:  '📈', marketing: '💬',
@@ -139,12 +156,20 @@ const NAV_EMOJI = {
 };
 
 const LockedFeature = ({ label, icon: Icon }) => {
-  const { T } = useTheme();
+  const { T, isLight } = useTheme();
   return (
-    <div className="dash rounded-2xl p-16 text-center" style={{ background: '#141008', border: '1.5px solid rgba(255,255,255,0.07)' }}>
+    <div
+      className="dash rounded-2xl p-16 text-center"
+      style={{
+        background: isLight ? '#FDF8EE' : '#141008',
+        border: `1.5px solid ${isLight ? 'rgba(0,0,0,0.1)' : 'rgba(255,255,255,0.07)'}`,
+      }}
+    >
       <div className="text-5xl mb-4">🔒</div>
-      <p className="font-black text-lg text-white mb-2">{label}</p>
-      <p className="text-sm font-semibold" style={{ color: '#7a6a55' }}>
+      <p className="font-black text-lg mb-2" style={{ color: isLight ? '#1A1A1A' : '#FFFFFF' }}>
+        {label}
+      </p>
+      <p className="text-sm font-semibold" style={{ color: isLight ? '#7a6a55' : '#7a6a55' }}>
         This feature is not enabled for your account. Contact your administrator to unlock it.
       </p>
     </div>
@@ -192,7 +217,31 @@ const Dashboard = () => {
     { id: 'settings',  label: 'Settings',    icon: SettingsIcon    },
   ];
 
-  const pageBg = isLight ? 'bg-[#F5F5F5]' : 'bg-[#050505]';
+  // Theme-adaptive page and header backgrounds
+  const pageBg       = isLight ? 'bg-[#F5F5F5]' : 'bg-[#050505]';
+  const sidebarClass = isLight ? 'dash-sidebar-light dash-light' : 'dash-sidebar-dark dash-dark';
+  const headerBg     = isLight
+    ? 'rgba(245,245,245,0.92)'
+    : 'rgba(5,5,5,0.88)';
+  const headerBorder = isLight
+    ? '1px solid rgba(201,162,39,0.18)'
+    : '1px solid rgba(201,162,39,0.1)';
+  const headerTitleColor = isLight ? '#1A1A1A' : '#FFFFFF';
+  const userEmailColor   = isLight ? '#3a2a10'  : '#FFFFFF';
+  const userLabelColor   = isLight ? '#8a7060'  : '#4a3f35';
+  const userBg           = isLight
+    ? 'rgba(201,162,39,0.08)'
+    : 'rgba(201,162,39,0.05)';
+  const userBorderColor  = isLight
+    ? 'rgba(201,162,39,0.15)'
+    : 'rgba(201,162,39,0.08)';
+  const footerBorder = isLight
+    ? '1px solid rgba(201,162,39,0.15)'
+    : '1px solid rgba(201,162,39,0.08)';
+  const closeBtnColor        = isLight ? '#8a7060' : '#5a4a3a';
+  const closeBtnHoverColor   = isLight ? '#1A1A1A' : '#fff';
+  const closeBtnHoverBg      = isLight ? 'rgba(0,0,0,0.06)' : 'rgba(255,255,255,0.05)';
+
   if (cafe && cafe.isActive === false) return <CafeDisabled isAdmin={true} />;
 
   return (
@@ -203,12 +252,17 @@ const Dashboard = () => {
         onNavigateToOrders={() => { setActiveTab('orders'); clearNewOrder(); }}
       />
       {sidebarOpen && (
-        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-40" onClick={() => setSidebarOpen(false)} />
+        <div
+          className="fixed inset-0 z-40"
+          style={{ background: isLight ? 'rgba(0,0,0,0.3)' : 'rgba(0,0,0,0.7)', backdropFilter: 'blur(4px)' }}
+          onClick={() => setSidebarOpen(false)}
+        />
       )}
 
       {/* ── Sidebar ── */}
-      <aside className={`fixed top-0 left-0 h-screen w-64 dash-sidebar flex flex-col z-50 transform transition-transform ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'}`}>
-
+      <aside
+        className={`fixed top-0 left-0 h-screen w-64 flex flex-col z-50 transform transition-transform ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'} ${sidebarClass}`}
+      >
         {/* Branding header */}
         <div className="flex items-start justify-between px-4 pt-6 pb-5 flex-shrink-0">
           <div>
@@ -216,12 +270,12 @@ const Dashboard = () => {
             <span className="dash-brand-sub">Your Smart OS</span>
           </div>
           <button
-            className="transition-colors p-1.5 rounded-xl hover:bg-white/5 mt-1"
-            style={{ color: '#5a4a3a' }}
+            className="transition-colors p-1.5 rounded-xl mt-1"
+            style={{ color: closeBtnColor, background: 'transparent', border: 'none', cursor: 'pointer' }}
             onClick={() => setSidebarOpen(false)}
             aria-label="Close sidebar"
-            onMouseEnter={e => e.currentTarget.style.color = '#fff'}
-            onMouseLeave={e => e.currentTarget.style.color = '#5a4a3a'}
+            onMouseEnter={e => { e.currentTarget.style.color = closeBtnHoverColor; e.currentTarget.style.background = closeBtnHoverBg; }}
+            onMouseLeave={e => { e.currentTarget.style.color = closeBtnColor; e.currentTarget.style.background = 'transparent'; }}
           >
             <X className="w-4 h-4" />
           </button>
@@ -229,15 +283,9 @@ const Dashboard = () => {
 
         <div className="mx-4 mb-1 flex-shrink-0" />
 
-        {/*
-          TASK 5 & 6: Nav scroll container is flex-1 with overflow-y auto.
-          Footer is flex-shrink-0 OUTSIDE the scroll container,
-          so it always stays visible at the bottom regardless of scroll position.
-        */}
         <nav className="dash-nav-scroll px-3 py-2 space-y-0.5">
           {menuItems.map((item) => {
             const isActive = activeTab === item.id;
-            // TASK 3 & 4: Use Lucide icon component — no emojis in nav
             const IconComponent = NAV_ICON[item.id] || LayoutDashboard;
             return (
               <button
@@ -253,11 +301,11 @@ const Dashboard = () => {
           })}
         </nav>
 
-        {/* TASK 5: Sticky footer — always visible, outside scroll area */}
-        <div className="flex-shrink-0 px-3 pb-4 pt-2" style={{ borderTop: '1px solid rgba(201,162,39,0.08)' }}>
-          <div className="px-3 py-2 rounded-xl mb-1" style={{ background: 'rgba(201,162,39,0.05)' }}>
-            <p className="text-xs font-semibold" style={{ color: '#4a3f35', letterSpacing: '0.02em' }}>Logged in as</p>
-            <p className="text-white text-sm font-bold truncate" style={{ letterSpacing: '0.01em' }}>{user?.email}</p>
+        {/* Sticky footer */}
+        <div className="flex-shrink-0 px-3 pb-4 pt-2" style={{ borderTop: footerBorder }}>
+          <div className="px-3 py-2 rounded-xl mb-1" style={{ background: userBg, border: `1px solid ${userBorderColor}` }}>
+            <p className="text-xs font-semibold" style={{ color: userLabelColor, letterSpacing: '0.02em' }}>Logged in as</p>
+            <p className="text-sm font-bold truncate" style={{ color: userEmailColor, letterSpacing: '0.01em' }}>{user?.email}</p>
           </div>
           <button
             data-testid="logout-btn"
@@ -275,15 +323,21 @@ const Dashboard = () => {
 
       {/* ── Main content — UNCHANGED ── */}
       <div>
-        <header className="sticky top-0 z-30 h-16 px-5 flex items-center justify-between"
-          style={{ background: 'rgba(5,5,5,0.88)', backdropFilter: 'blur(16px)', borderBottom: '1px solid rgba(201,162,39,0.1)' }}>
-          <button className="transition-opacity hover:opacity-70" style={{ color: '#C9A227' }}
-            onClick={() => setSidebarOpen(prev => !prev)} aria-label="Toggle sidebar">
+        <header
+          className="sticky top-0 z-30 h-16 px-5 flex items-center justify-between"
+          style={{ background: headerBg, backdropFilter: 'blur(16px)', borderBottom: headerBorder }}
+        >
+          <button
+            className="transition-opacity hover:opacity-70"
+            style={{ color: '#C9A227', background: 'transparent', border: 'none', cursor: 'pointer' }}
+            onClick={() => setSidebarOpen(prev => !prev)}
+            aria-label="Toggle sidebar"
+          >
             <MenuIcon className="w-6 h-6" />
           </button>
           <div className="flex items-center gap-2">
             <span className="text-lg">{NAV_EMOJI[activeTab] || '·'}</span>
-            <h2 className="text-xl font-black text-white dash-title">
+            <h2 className="text-xl font-black dash-title" style={{ color: headerTitleColor }}>
               {menuItems.find(item => item.id === activeTab)?.label}
             </h2>
           </div>
