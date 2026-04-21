@@ -1,14 +1,12 @@
 /**
- * SalaryDashboard.jsx
+ * SalaryDashboard.jsx  — THEME-FIXED
  *
- * Main salary management tab.
- * - Month picker
- * - "Calculate All Salaries" — reads attendance from Firestore, runs salaryEngine
- * - SalaryCard per staff member (expandable)
- * - Bonus / advance overrides
- * - Save all sheets to Firestore
+ * Month picker input and search bar now use T.input / T.search tokens.
+ * Summary strip cards use T.card / T.heading / T.muted.
+ * Action ghost button uses T.btnGhost.
+ * Empty state uses T.card / T.heading / T.muted / T.faint.
  *
- * ADD: salary calculation logic
+ * Nothing structural changed — only colour/class strings.
  */
 
 import React, { useState, useCallback } from 'react';
@@ -50,7 +48,7 @@ const SalaryDashboard = ({ staffList = [] }) => {
   const [sheets,      setSheets     ] = useState([]);
   const [calculating, setCalculating] = useState(false);
   const [saving,      setSaving     ] = useState(false);
-  const [overrides,   setOverrides  ] = useState({}); // { [staffId]: { bonus, advance } }
+  const [overrides,   setOverrides  ] = useState({});
 
   // ── Search ───────────────────────────────────────────────────────────────────
   const [searchQuery, setSearchQuery] = useState('');
@@ -107,8 +105,6 @@ const SalaryDashboard = ({ staffList = [] }) => {
     }
     setCalculating(true);
     try {
-      // Query by cafeId only, then filter by month in JS
-      // (avoids requiring a cafeId+month composite index on 'attendance')
       const attSnap = await getDocs(
         query(
           collection(db, 'attendance'),
@@ -119,21 +115,16 @@ const SalaryDashboard = ({ staffList = [] }) => {
         .map(d => d.data())
         .filter(a => a.month === yearMonth);
 
-      // Group by staffId
       const attByStaff = {};
       allAtt.forEach(a => {
         if (!attByStaff[a.staffId]) attByStaff[a.staffId] = [];
         attByStaff[a.staffId].push(a);
       });
 
-      // ADD: run salary engine for all staff
       const results = calculateAllSalaries(
         staffList, attByStaff, yearMonth, currentOverrides
       );
 
-      // Merge paid status from existing Firestore salary docs
-      // Query by cafeId only, then filter by month in JS
-      // (avoids requiring a cafeId+month composite index on 'salary')
       const salarySnap = await getDocs(
         query(
           collection(db, 'salary'),
@@ -161,9 +152,8 @@ const SalaryDashboard = ({ staffList = [] }) => {
     }
   };
 
-  const calculateAll = () => runCalculation(overrides);
-
-  const recalculate = async () => {
+  const calculateAll  = () => runCalculation(overrides);
+  const recalculate   = async () => {
     if (!sheets.length) { await calculateAll(); return; }
     await runCalculation(overrides);
   };
@@ -198,36 +188,36 @@ const SalaryDashboard = ({ staffList = [] }) => {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
           <h2
-            className={`${T?.heading || 'text-white'} font-bold text-2xl`}
+            className={`${T.heading} font-bold text-2xl`}
             style={{ fontFamily: 'Playfair Display, serif' }}
           >
             Salary Management
           </h2>
-          <p className={`${T?.muted || 'text-[#A3A3A3]'} text-sm mt-1`}>
+          <p className={`${T.muted} text-sm mt-1`}>
             {staffList.length} staff · {monthLabel(yearMonth)}
           </p>
         </div>
 
-        {/* Month picker */}
+        {/* Month picker — uses T.input for full theme support */}
         <input
           type="month"
           value={yearMonth}
           max={todayYM()}
           onChange={e => { setYearMonth(e.target.value); setSheets([]); }}
-          className="bg-black/20 border border-white/10 text-white rounded-lg px-3 py-2 text-sm h-9 outline-none focus:border-[#D4AF37]"
+          className={`${T.input} rounded-lg px-3 py-2 text-sm h-9 outline-none`}
         />
       </div>
 
-      {/* ── Search bar ── */}
+      {/* ── Search bar — uses T.search ── */}
       {sheets.length > 0 && (
         <div className="relative">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[#555] pointer-events-none" />
+          <Search className={`absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 ${T.faint} pointer-events-none`} />
           <input
             type="text"
             value={searchQuery}
             onChange={e => setSearchQuery(e.target.value)}
             placeholder="Search employee..."
-            className="w-full bg-black/20 border border-white/10 text-white placeholder:text-[#555] rounded-xl pl-9 pr-4 py-2.5 text-sm outline-none focus:border-[#D4AF37] transition-all"
+            className={`w-full ${T.search} rounded-xl pl-9 pr-4 py-2.5 text-sm outline-none focus:border-[#D4AF37] transition-all`}
           />
         </div>
       )}
@@ -259,9 +249,9 @@ const SalaryDashboard = ({ staffList = [] }) => {
               color: '#10B981',
             },
           ].map((s, i) => (
-            <div key={i} className={`${T?.card || 'bg-[#0F0F0F]'} rounded-xl p-4`}>
+            <div key={i} className={`${T.card} rounded-xl p-4`}>
               <div className="flex items-center justify-between mb-2">
-                <p className={`${T?.muted || 'text-[#A3A3A3]'} text-xs`}>{s.label}</p>
+                <p className={`${T.muted} text-xs`}>{s.label}</p>
                 <s.icon className="w-4 h-4" style={{ color: s.color }} />
               </div>
               <p className="font-black text-lg" style={{ color: s.color }}>{s.val}</p>
@@ -272,7 +262,6 @@ const SalaryDashboard = ({ staffList = [] }) => {
 
       {/* ── Action buttons ── */}
       <div className="flex gap-2 flex-wrap">
-        {/* ADD: calculate all salaries button */}
         <button
           onClick={calculateAll}
           disabled={calculating}
@@ -293,7 +282,7 @@ const SalaryDashboard = ({ staffList = [] }) => {
             <button
               onClick={recalculate}
               disabled={calculating}
-              className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold border ${T?.borderMd || 'border-white/10'} ${T?.subCard || 'bg-white/5'} ${T?.muted || 'text-[#A3A3A3]'} hover:text-white transition-all disabled:opacity-50`}
+              className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold ${T.btnGhost} transition-all disabled:opacity-50`}
             >
               <RefreshCw className="w-3.5 h-3.5" />
               Apply Overrides
@@ -319,20 +308,20 @@ const SalaryDashboard = ({ staffList = [] }) => {
 
       {/* ── Empty state ── */}
       {sheets.length === 0 && !calculating && (
-        <div className={`${T?.card || 'bg-[#0F0F0F]'} rounded-xl p-12 text-center`}>
+        <div className={`${T.card} rounded-xl p-12 text-center`}>
           <Calculator
             className="w-12 h-12 mx-auto mb-4"
             style={{ color: 'rgba(212,175,55,0.3)' }}
           />
-          <p className={`${T?.heading || 'text-white'} font-semibold mb-1`}>
+          <p className={`${T.heading} font-semibold mb-1`}>
             No salary data yet
           </p>
-          <p className={`${T?.muted || 'text-[#A3A3A3]'} text-sm`}>
+          <p className={`${T.muted} text-sm`}>
             Click{' '}
             <strong style={{ color: '#D4AF37' }}>Calculate All Salaries</strong>{' '}
             to generate salary sheets for {monthLabel(yearMonth)}.
           </p>
-          <p className={`${T?.faint || 'text-[#555]'} text-xs mt-2`}>
+          <p className={`${T.faint} text-xs mt-2`}>
             Attendance data is read automatically — no manual entry needed.
           </p>
         </div>
@@ -342,7 +331,7 @@ const SalaryDashboard = ({ staffList = [] }) => {
       {sheets.length > 0 && (
         <div className="space-y-3">
           {filteredSheets.length === 0 ? (
-            <p className={`${T?.muted || 'text-[#A3A3A3]'} text-sm text-center py-6`}>
+            <p className={`${T.muted} text-sm text-center py-6`}>
               No staff match "{searchQuery}"
             </p>
           ) : filteredSheets.map(sheet => {

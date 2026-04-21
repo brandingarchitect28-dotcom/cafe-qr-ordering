@@ -1,11 +1,11 @@
 /**
- * StaffList.jsx
+ * StaffList.jsx  — THEME-FIXED
  *
- * Displays all active staff for a cafe.
- * Features: Add, Edit, Delete staff; view attendance QR code.
- * Clicking a staff card opens their full profile (AttendanceCalendar).
+ * All hardcoded dark colours replaced with T.* tokens from useTheme.
+ * StaffFormModal and QRModal now receive T as a prop so every surface
+ * (inputs, labels, borders, backgrounds, text) adapts to light/dark mode.
  *
- * ADD: staff profile page
+ * Nothing structural changed — only colour/class strings.
  */
 
 import React, { useState, useEffect } from 'react';
@@ -34,13 +34,6 @@ const EMPTY = {
   shiftEnd: '', latePenalty: '50',
 };
 
-const inputCls =
-  'w-full bg-black/20 border border-white/10 text-white placeholder:text-neutral-600 ' +
-  'focus:border-[#D4AF37] focus:ring-1 focus:ring-[#D4AF37] rounded-lg h-11 px-4 text-sm outline-none transition-all';
-
-const labelCls =
-  'block text-[#A3A3A3] text-xs font-semibold uppercase tracking-wide mb-1.5';
-
 const ROLE_COLORS = {
   Manager:  '#D4AF37',
   Chef:     '#EF4444',
@@ -53,14 +46,20 @@ const ROLE_COLORS = {
 
 // ── Staff Form Modal ───────────────────────────────────────────────────────────
 
-const StaffFormModal = ({ initial, onSave, onClose, saving }) => {
+const StaffFormModal = ({ initial, onSave, onClose, saving, T }) => {
   const [form, setForm] = useState(initial || EMPTY);
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
 
+  const inputCls =
+    `w-full ${T.input} rounded-lg h-11 px-4 text-sm outline-none transition-all`;
+
+  const labelCls =
+    `block ${T.muted} text-xs font-semibold uppercase tracking-wide mb-1.5`;
+
   const handleSubmit = (e) => {
     e.preventDefault();
-    if (!form.name.trim())                      { toast.error('Name is required');              return; }
-    if (!form.salaryAmount || isNaN(form.salaryAmount)) { toast.error('Valid salary amount required'); return; }
+    if (!form.name.trim())                               { toast.error('Name is required');              return; }
+    if (!form.salaryAmount || isNaN(form.salaryAmount))  { toast.error('Valid salary amount required'); return; }
     onSave(form);
   };
 
@@ -71,18 +70,18 @@ const StaffFormModal = ({ initial, onSave, onClose, saving }) => {
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
     >
-      <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" onClick={onClose} />
+      <div className={`absolute inset-0 ${T.overlay} backdrop-blur-sm`} onClick={onClose} />
       <motion.div
-        className="relative bg-[#0F0F0F] border border-white/10 rounded-2xl w-full max-w-lg p-6 space-y-5 overflow-y-auto max-h-[90vh]"
+        className={`relative ${T.modal} rounded-2xl w-full max-w-lg p-6 space-y-5 overflow-y-auto max-h-[90vh]`}
         initial={{ scale: 0.95, y: 20 }}
         animate={{ scale: 1, y: 0 }}
       >
         {/* Header */}
         <div className="flex items-center justify-between">
-          <h3 className="text-white font-bold text-lg" style={{ fontFamily: 'Playfair Display, serif' }}>
+          <h3 className={`${T.heading} font-bold text-lg`} style={{ fontFamily: 'Playfair Display, serif' }}>
             {initial?.id ? 'Edit Staff' : 'Add Staff Member'}
           </h3>
-          <button onClick={onClose} className="p-2 rounded-lg hover:bg-white/10 text-[#A3A3A3] transition-all">
+          <button onClick={onClose} className={`p-2 rounded-lg hover:bg-black/10 ${T.muted} transition-all`}>
             <X className="w-4 h-4" />
           </button>
         </div>
@@ -104,12 +103,12 @@ const StaffFormModal = ({ initial, onSave, onClose, saving }) => {
             <div>
               <label className={labelCls}>Role</label>
               <select
-                className={inputCls + ' cursor-pointer'}
+                className={`${inputCls} cursor-pointer`}
                 value={form.role}
                 onChange={e => set('role', e.target.value)}
               >
                 {ROLES.map(r => (
-                  <option key={r} value={r} className="bg-[#0F0F0F]">{r}</option>
+                  <option key={r} value={r} className={T.option}>{r}</option>
                 ))}
               </select>
             </div>
@@ -163,12 +162,12 @@ const StaffFormModal = ({ initial, onSave, onClose, saving }) => {
             <div>
               <label className={labelCls}>Salary Type</label>
               <select
-                className={inputCls + ' cursor-pointer'}
+                className={`${inputCls} cursor-pointer`}
                 value={form.salaryType}
                 onChange={e => set('salaryType', e.target.value)}
               >
                 {SALARY_TYPES.map(t => (
-                  <option key={t} value={t} className="bg-[#0F0F0F]">
+                  <option key={t} value={t} className={T.option}>
                     {t.charAt(0).toUpperCase() + t.slice(1)}
                   </option>
                 ))}
@@ -207,7 +206,7 @@ const StaffFormModal = ({ initial, onSave, onClose, saving }) => {
             <button
               type="button"
               onClick={onClose}
-              className="flex-1 py-2.5 border border-white/10 text-[#A3A3A3] hover:text-white rounded-lg text-sm font-semibold transition-all"
+              className={`flex-1 py-2.5 ${T.btnGhost} rounded-lg text-sm font-semibold transition-all`}
             >
               Cancel
             </button>
@@ -230,7 +229,7 @@ const StaffFormModal = ({ initial, onSave, onClose, saving }) => {
 
 // ── QR Code Modal ──────────────────────────────────────────────────────────────
 
-const QRModal = ({ staff, cafeId, onClose }) => {
+const QRModal = ({ staff, cafeId, onClose, T }) => {
   const qrValue = `STAFF_ATTENDANCE|${cafeId}|${staff.id}`;
   return (
     <motion.div
@@ -239,25 +238,25 @@ const QRModal = ({ staff, cafeId, onClose }) => {
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
     >
-      <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" onClick={onClose} />
+      <div className={`absolute inset-0 ${T.overlay} backdrop-blur-sm`} onClick={onClose} />
       <motion.div
-        className="relative bg-[#0F0F0F] border border-white/10 rounded-2xl p-8 text-center space-y-5"
+        className={`relative ${T.modal} rounded-2xl p-8 text-center space-y-5`}
         initial={{ scale: 0.9 }}
         animate={{ scale: 1 }}
       >
-        <button onClick={onClose} className="absolute top-4 right-4 p-2 rounded-lg hover:bg-white/10 text-[#A3A3A3]">
+        <button onClick={onClose} className={`absolute top-4 right-4 p-2 rounded-lg hover:bg-black/10 ${T.muted}`}>
           <X className="w-4 h-4" />
         </button>
         <div>
-          <h3 className="text-white font-bold text-xl" style={{ fontFamily: 'Playfair Display, serif' }}>
+          <h3 className={`${T.heading} font-bold text-xl`} style={{ fontFamily: 'Playfair Display, serif' }}>
             {staff.name}
           </h3>
-          <p className="text-[#A3A3A3] text-sm">{staff.role} · Attendance QR</p>
+          <p className={`${T.muted} text-sm`}>{staff.role} · Attendance QR</p>
         </div>
-        <div className="bg-white p-5 rounded-2xl inline-block">
+        <div className="bg-white p-5 rounded-2xl inline-block shadow-md">
           <QRCodeSVG value={qrValue} size={200} />
         </div>
-        <p className="text-[#555] text-xs">Staff scans this QR to mark attendance</p>
+        <p className={`${T.faint} text-xs`}>Staff scans this QR to mark attendance</p>
       </motion.div>
     </motion.div>
   );
@@ -274,7 +273,6 @@ const StaffList = ({ cafeId }) => {
   const [saving,      setSaving     ] = useState(false);
   const [qrTarget,    setQrTarget   ] = useState(null);
   const [deleteId,    setDeleteId   ] = useState(null);
-  // ADD: staff profile — holds staff object whose calendar is open
   const [profileStaff, setProfileStaff] = useState(null);
 
   // Real-time staff list
@@ -341,6 +339,7 @@ const StaffList = ({ cafeId }) => {
             onSave={handleSave}
             onClose={() => { setShowForm(false); setEditTarget(null); }}
             saving={saving}
+            T={T}
           />
         )}
         {qrTarget && (
@@ -348,9 +347,9 @@ const StaffList = ({ cafeId }) => {
             staff={qrTarget}
             cafeId={cafeId}
             onClose={() => setQrTarget(null)}
+            T={T}
           />
         )}
-        {/* ADD: staff profile — attendance calendar overlay */}
         {profileStaff && (
           <AttendanceCalendar
             staff={profileStaff}
@@ -363,7 +362,7 @@ const StaffList = ({ cafeId }) => {
 
       {/* ── List header ── */}
       <div className="flex items-center justify-between mb-4">
-        <p className="text-[#555] text-sm">{staff.length} team member{staff.length !== 1 ? 's' : ''}</p>
+        <p className={`${T.faint} text-sm`}>{staff.length} team member{staff.length !== 1 ? 's' : ''}</p>
         <motion.button
           whileTap={{ scale: 0.97 }}
           onClick={() => setShowForm(true)}
@@ -379,15 +378,15 @@ const StaffList = ({ cafeId }) => {
           {[...Array(3)].map((_, i) => (
             <div
               key={i}
-              className="h-20 rounded-xl bg-white/3 animate-pulse"
+              className={`h-20 rounded-xl ${T.subCard} animate-pulse`}
               style={{ animationDelay: `${i * 80}ms` }}
             />
           ))}
         </div>
       ) : staff.length === 0 ? (
-        <div className="bg-[#0F0F0F] border border-white/5 rounded-2xl p-12 text-center">
-          <User className="w-12 h-12 text-[#333] mx-auto mb-3" />
-          <p className="text-[#A3A3A3]">No staff added yet</p>
+        <div className={`${T.card} rounded-2xl p-12 text-center`}>
+          <User className={`w-12 h-12 ${T.faint} mx-auto mb-3`} />
+          <p className={T.muted}>No staff added yet</p>
           <button
             onClick={() => setShowForm(true)}
             className="mt-4 text-[#D4AF37] text-sm underline underline-offset-2"
@@ -405,11 +404,10 @@ const StaffList = ({ cafeId }) => {
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, scale: 0.95 }}
                 transition={{ delay: i * 0.04 }}
-                className="bg-[#0F0F0F] border border-white/5 rounded-2xl p-5 hover:border-white/10 transition-colors"
+                className={`${T.card} ${T.cardHover} rounded-2xl p-5 transition-colors`}
               >
                 {/* Card top: avatar + name + action buttons */}
                 <div className="flex items-start justify-between mb-3">
-                  {/* ADD: clicking avatar/name opens attendance calendar profile */}
                   <button
                     className="flex items-center gap-3 text-left flex-1 min-w-0 mr-2"
                     onClick={() => setProfileStaff(s)}
@@ -418,18 +416,18 @@ const StaffList = ({ cafeId }) => {
                     <div
                       className="w-10 h-10 rounded-xl flex items-center justify-center font-black text-base flex-shrink-0"
                       style={{
-                        background: `${ROLE_COLORS[s.role] || '#A3A3A3'}18`,
+                        background: `${ROLE_COLORS[s.role] || '#A3A3A3'}22`,
                         color: ROLE_COLORS[s.role] || '#A3A3A3',
                       }}
                     >
                       {s.name.charAt(0).toUpperCase()}
                     </div>
                     <div className="min-w-0">
-                      <p className="text-white font-semibold text-sm truncate">{s.name}</p>
+                      <p className={`${T.heading} font-semibold text-sm truncate`}>{s.name}</p>
                       <span
                         className="text-xs font-semibold px-2 py-0.5 rounded-full"
                         style={{
-                          background: `${ROLE_COLORS[s.role] || '#A3A3A3'}18`,
+                          background: `${ROLE_COLORS[s.role] || '#A3A3A3'}22`,
                           color: ROLE_COLORS[s.role] || '#A3A3A3',
                         }}
                       >
@@ -440,31 +438,30 @@ const StaffList = ({ cafeId }) => {
 
                   {/* Action buttons */}
                   <div className="flex gap-1 flex-shrink-0">
-                    {/* ADD: calendar icon opens attendance profile */}
                     <button
                       onClick={() => setProfileStaff(s)}
-                      className="p-2 rounded-lg hover:bg-white/10 text-[#555] hover:text-[#D4AF37] transition-all"
+                      className={`p-2 rounded-lg hover:bg-black/10 ${T.faint} hover:text-[#D4AF37] transition-all`}
                       title="View attendance calendar"
                     >
                       <CalendarDays className="w-3.5 h-3.5" />
                     </button>
                     <button
                       onClick={() => setQrTarget(s)}
-                      className="p-2 rounded-lg hover:bg-white/10 text-[#555] hover:text-[#D4AF37] transition-all"
+                      className={`p-2 rounded-lg hover:bg-black/10 ${T.faint} hover:text-[#D4AF37] transition-all`}
                       title="View QR"
                     >
                       <QrCode className="w-3.5 h-3.5" />
                     </button>
                     <button
                       onClick={() => setEditTarget(s)}
-                      className="p-2 rounded-lg hover:bg-white/10 text-[#555] hover:text-white transition-all"
+                      className={`p-2 rounded-lg hover:bg-black/10 ${T.faint} hover:${T.heading} transition-all`}
                       title="Edit staff"
                     >
                       <Edit2 className="w-3.5 h-3.5" />
                     </button>
                     <button
                       onClick={() => setDeleteId(s.id)}
-                      className="p-2 rounded-lg hover:bg-red-500/10 text-[#555] hover:text-red-400 transition-all"
+                      className={`p-2 rounded-lg hover:bg-red-500/10 ${T.faint} hover:text-red-400 transition-all`}
                       title="Remove staff"
                     >
                       <Trash2 className="w-3.5 h-3.5" />
@@ -473,7 +470,7 @@ const StaffList = ({ cafeId }) => {
                 </div>
 
                 {/* Staff details */}
-                <div className="space-y-1.5 text-xs text-[#555]">
+                <div className={`space-y-1.5 text-xs ${T.faint}`}>
                   {s.phone && (
                     <div className="flex items-center gap-1.5">
                       <Phone className="w-3 h-3" />{s.phone}
@@ -490,8 +487,8 @@ const StaffList = ({ cafeId }) => {
                 </div>
 
                 {/* Salary summary */}
-                <div className="mt-3 pt-3 border-t border-white/5 flex justify-between items-center">
-                  <span className="text-[#555] text-xs capitalize">{s.salaryType} salary</span>
+                <div className={`mt-3 pt-3 border-t ${T.border} flex justify-between items-center`}>
+                  <span className={`${T.faint} text-xs capitalize`}>{s.salaryType} salary</span>
                   <span className="text-[#D4AF37] font-black text-sm">
                     ₹{(s.salaryAmount || 0).toLocaleString('en-IN')}
                   </span>
@@ -510,7 +507,7 @@ const StaffList = ({ cafeId }) => {
                       <div className="flex gap-2">
                         <button
                           onClick={() => setDeleteId(null)}
-                          className="flex-1 py-1.5 border border-white/10 text-[#A3A3A3] rounded-lg text-xs"
+                          className={`flex-1 py-1.5 ${T.btnGhost} rounded-lg text-xs`}
                         >
                           Cancel
                         </button>

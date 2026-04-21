@@ -1,14 +1,19 @@
 /**
- * AttendanceCalendar.jsx
+ * AttendanceCalendar.jsx  — THEME-FIXED
  *
- * Opens when owner clicks any staff member.
- * Shows a monthly calendar with colour-coded attendance status per day.
- * Clicking a day shows check-in time, late minutes, and note.
- * Owner can override any day's status and add a note.
+ * Calendar day cell inline styles previously used rgba(255,255,255,*) values
+ * which became invisible on light backgrounds.
  *
- * No redesign — uses same dark card theme via T prop.
+ * Now uses isLight-conditional values for:
+ * - Unrecorded day cells (background + text colour)
+ * - Sunday cells (background + text colour)
+ * - Modal overlay and panel border
+ * - Section divider borders
+ * - Day detail panel backgrounds
+ * - Edit mode input field
  *
- * ADD: staff profile page (attendance calendar view)
+ * T prop usage extended to cover all remaining hardcoded class strings.
+ * Nothing structural changed — only colour/class strings.
  */
 
 import React, { useState, useMemo, useEffect } from 'react';
@@ -40,7 +45,6 @@ const DAY_LABELS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 // ── Helpers ────────────────────────────────────────────────────────────────────
 const fmtTime = (iso) => {
   if (!iso) return '—';
-  // Handle both 'HH:MM' strings and ISO timestamps
   if (typeof iso === 'string' && /^\d{2}:\d{2}$/.test(iso)) return iso;
   try {
     return new Date(iso).toLocaleTimeString('en-IN', {
@@ -71,9 +75,15 @@ const nextMonth = (ym) => {
 const todayYM = () => toDateKey(new Date()).slice(0, 7);
 
 // ── Main component ─────────────────────────────────────────────────────────────
-const AttendanceCalendar = ({ staff, cafeId, onClose, T }) => {
+const AttendanceCalendar = ({ staff, cafeId, onClose, T, isLight: isLightProp }) => {
+  // isLight may come from parent (T is always passed), but we also derive locally
+  // so this component works even if parent doesn't pass isLight explicitly.
+  const isLight = isLightProp !== undefined
+    ? isLightProp
+    : (typeof T?.page === 'string' && T.page.includes('F5F3'));
+
   const [yearMonth,    setYearMonth   ] = useState(todayYM());
-  const [records,      setRecords     ] = useState({}); // { 'YYYY-MM-DD': doc }
+  const [records,      setRecords     ] = useState({});
   const [loading,      setLoading     ] = useState(false);
   const [selectedDate, setSelectedDate] = useState(null);
   const [editMode,     setEditMode    ] = useState(false);
@@ -109,7 +119,7 @@ const AttendanceCalendar = ({ staff, cafeId, onClose, T }) => {
   // ── Build calendar grid ──────────────────────────────────────────────────────
   const calendarDays = useMemo(() => {
     const days     = daysInMonth(yearMonth);
-    const firstDOW = new Date(yearMonth + '-01').getDay(); // 0=Sun
+    const firstDOW = new Date(yearMonth + '-01').getDay();
     const blanks   = Array(firstDOW).fill(null);
     return [...blanks, ...days];
   }, [yearMonth]);
@@ -120,7 +130,7 @@ const AttendanceCalendar = ({ staff, cafeId, onClose, T }) => {
       const d   = new Date(date);
       const now = new Date(); now.setHours(0, 0, 0, 0);
       if (d > now) return null;
-      if (d.getDay() === 0) return 'off'; // Sunday
+      if (d.getDay() === 0) return 'off';
       return STATUS.ABSENT;
     }
     return rec.status || deriveStatus(rec);
@@ -195,13 +205,23 @@ const AttendanceCalendar = ({ staff, cafeId, onClose, T }) => {
   const selectedStatus = selectedDate ? (getStatus(selectedDate) || STATUS.ABSENT) : null;
   const SC             = selectedStatus && STATUS_CONFIG[selectedStatus];
 
+  // ── Theme-aware inline style values ──────────────────────────────────────────
+  const overlayBg       = isLight ? 'rgba(0,0,0,0.45)'          : 'rgba(0,0,0,0.75)';
+  const modalBorder     = isLight ? '1px solid rgba(0,0,0,0.10)': '1px solid rgba(255,255,255,0.08)';
+  const dividerColor    = isLight ? 'rgba(0,0,0,0.08)'          : 'rgba(255,255,255,0.05)';
+  const unrecordedBg    = isLight ? 'rgba(0,0,0,0.04)'          : 'rgba(255,255,255,0.04)';
+  const unrecordedText  = isLight ? '#888888'                    : 'rgba(255,255,255,0.3)';
+  const sundayBg        = isLight ? 'rgba(0,0,0,0.025)'         : 'rgba(255,255,255,0.02)';
+  const sundayText      = isLight ? '#BBBBBB'                    : 'rgba(255,255,255,0.15)';
+  const detailBoxBg     = isLight ? 'rgba(0,0,0,0.04)'          : 'rgba(0,0,0,0.20)';
+
   return (
     <motion.div
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
       className="fixed inset-0 z-50 flex items-center justify-center p-4"
-      style={{ background: 'rgba(0,0,0,0.75)', backdropFilter: 'blur(4px)' }}
+      style={{ background: overlayBg, backdropFilter: 'blur(4px)' }}
       onClick={(e) => e.target === e.currentTarget && onClose()}
     >
       <motion.div
@@ -209,7 +229,7 @@ const AttendanceCalendar = ({ staff, cafeId, onClose, T }) => {
         animate={{ scale: 1, y: 0 }}
         exit={{ scale: 0.96, y: 20 }}
         className={`${T?.card || 'bg-[#0F0F0F]'} rounded-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto`}
-        style={{ border: '1px solid rgba(255,255,255,0.08)' }}
+        style={{ border: modalBorder }}
         onClick={e => e.stopPropagation()}
       >
         {/* ── Header ── */}
@@ -222,7 +242,7 @@ const AttendanceCalendar = ({ staff, cafeId, onClose, T }) => {
           </div>
           <button
             onClick={onClose}
-            className={`w-8 h-8 rounded-lg ${T?.subCard || 'bg-white/5'} flex items-center justify-center ${T?.muted || 'text-[#A3A3A3]'} hover:text-white transition-colors`}
+            className={`w-8 h-8 rounded-lg ${T?.subCard || 'bg-white/5'} flex items-center justify-center ${T?.muted || 'text-[#A3A3A3]'} hover:text-black/70 transition-colors`}
           >
             <X className="w-4 h-4" />
           </button>
@@ -234,7 +254,7 @@ const AttendanceCalendar = ({ staff, cafeId, onClose, T }) => {
           <div className="flex items-center justify-between">
             <button
               onClick={() => { setYearMonth(prevMonth(yearMonth)); setSelectedDate(null); }}
-              className={`w-8 h-8 rounded-lg ${T?.subCard || 'bg-white/5'} flex items-center justify-center ${T?.muted || 'text-[#A3A3A3]'} hover:text-white transition-colors`}
+              className={`w-8 h-8 rounded-lg ${T?.subCard || 'bg-white/5'} flex items-center justify-center ${T?.muted || 'text-[#A3A3A3]'} hover:text-[#D4AF37] transition-colors`}
             >
               <ChevronLeft className="w-4 h-4" />
             </button>
@@ -244,7 +264,7 @@ const AttendanceCalendar = ({ staff, cafeId, onClose, T }) => {
             <button
               onClick={() => { setYearMonth(nextMonth(yearMonth)); setSelectedDate(null); }}
               disabled={yearMonth >= todayYM()}
-              className={`w-8 h-8 rounded-lg ${T?.subCard || 'bg-white/5'} flex items-center justify-center ${T?.muted || 'text-[#A3A3A3]'} hover:text-white transition-colors disabled:opacity-30`}
+              className={`w-8 h-8 rounded-lg ${T?.subCard || 'bg-white/5'} flex items-center justify-center ${T?.muted || 'text-[#A3A3A3]'} hover:text-[#D4AF37] transition-colors disabled:opacity-30`}
             >
               <ChevronRight className="w-4 h-4" />
             </button>
@@ -305,16 +325,20 @@ const AttendanceCalendar = ({ staff, cafeId, onClose, T }) => {
                         : cfg
                           ? cfg.bg
                           : dow === 0
-                            ? 'rgba(255,255,255,0.02)'
-                            : 'rgba(255,255,255,0.04)',
+                            ? sundayBg
+                            : isToday
+                              ? 'rgba(212,175,55,0.1)'
+                              : unrecordedBg,
                       color: isSel
                         ? '#000'
                         : cfg
                           ? cfg.color
                           : dow === 0
-                            ? 'rgba(255,255,255,0.15)'
-                            : 'rgba(255,255,255,0.3)',
-                      border:  isToday ? '1.5px solid #D4AF37' : '1px solid transparent',
+                            ? sundayText
+                            : isToday
+                              ? '#D4AF37'
+                              : unrecordedText,
+                      border:  isToday && !isSel ? '1.5px solid #D4AF37' : '1px solid transparent',
                       cursor:  isFuture || dow === 0 ? 'default' : 'pointer',
                     }}
                   >
@@ -334,7 +358,7 @@ const AttendanceCalendar = ({ staff, cafeId, onClose, T }) => {
               </div>
             ))}
             <div className="flex items-center gap-1.5">
-              <div className="w-3 h-3 rounded-full" style={{ background: 'rgba(255,255,255,0.15)' }} />
+              <div className="w-3 h-3 rounded-full" style={{ background: isLight ? '#CCCCCC' : 'rgba(255,255,255,0.15)' }} />
               <span className={`${T?.faint || 'text-[#555]'} text-xs`}>Sunday (Off)</span>
             </div>
           </div>
@@ -383,7 +407,11 @@ const AttendanceCalendar = ({ staff, cafeId, onClose, T }) => {
                       { label: 'Check Out', val: fmtTime(selectedRec?.checkOut) },
                       { label: 'Late By',   val: selectedRec?.lateMinutes ? `${selectedRec.lateMinutes} min` : '—' },
                     ].map(item => (
-                      <div key={item.label} className="bg-black/20 rounded-lg p-3">
+                      <div
+                        key={item.label}
+                        className="rounded-lg p-3"
+                        style={{ background: detailBoxBg }}
+                      >
                         <p className={`${T?.faint || 'text-[#555]'} text-xs mb-1`}>{item.label}</p>
                         <p className={`${T?.heading || 'text-white'} text-sm font-bold`}>{item.val}</p>
                       </div>
@@ -425,7 +453,7 @@ const AttendanceCalendar = ({ staff, cafeId, onClose, T }) => {
                           value={editNote}
                           onChange={e => setEditNote(e.target.value)}
                           placeholder="e.g. Medical leave, Personal emergency..."
-                          className="w-full bg-black/20 border border-white/10 text-white rounded-lg px-3 py-2 text-sm outline-none focus:border-[#D4AF37]"
+                          className={`w-full ${T?.input || 'bg-black/20 border border-white/10 text-white'} rounded-lg px-3 py-2 text-sm outline-none`}
                         />
                       </div>
                       <button
