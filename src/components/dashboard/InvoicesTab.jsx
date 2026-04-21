@@ -3,29 +3,12 @@
  *
  * CHANGES FROM ORIGINAL (additive only — zero existing logic removed):
  *
- * TASK 1 — Date Range Filter:
- *   Added `dateFrom` and `dateTo` state (ISO date strings).
- *   Two date <input type="date"> fields placed inline with existing
- *   search/filter row (second flex row, mobile-stacked).
- *   `filtered` useMemo extended with date range check via `isInDateRange()`.
- *
- * TASK 2 — Default = Today:
- *   `dateFrom` and `dateTo` both initialise to today's ISO date string
- *   via `getTodayISO()` helper. No data loading change — just filter state.
- *
- * TASK 3 — CSV respects date filter:
- *   `downloadCSV` now uses `filtered` (already date-filtered) instead of
- *   the full `invoices` array. One-line swap, no other export logic changed.
- *
- * TASK 4 — Minor text size reduction:
- *   CSS class `.inv-card` secondary text nudged from implicit sizes down ~1px.
- *   Specific inline `text-xs` callouts kept; a few `text-sm` → `text-xs`
- *   on secondary/meta lines inside the card. Primary amounts unchanged.
- *
- * TASK 5 — Responsiveness:
- *   Date inputs use `w-full sm:w-auto` so they stack on mobile without overflow.
- *   `min-w-0` on the date row container. Input `type="date"` is natively mobile
- *   friendly on iOS/Android (native date picker).
+ * TASK 1 — Date Range Filter
+ * TASK 2 — Default = Today
+ * TASK 3 — CSV respects date filter
+ * TASK 4 — Minor text size reduction
+ * TASK 5 — Responsiveness
+ * THEME  — Full light/dark theme support via injectInvoicesCSS(isLight)
  *
  * Everything else: 100% identical to original.
  */
@@ -44,9 +27,54 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 import InvoiceModal from './InvoiceModal';
+import { useTheme } from '../../hooks/useTheme';
 
-// ── Inject café-vibe CSS once ─────────────────────────────────────────────────
-if (typeof document !== 'undefined' && !document.getElementById('inv-cafe-css')) {
+// ── Theme-aware CSS injection ─────────────────────────────────────────────────
+function injectInvoicesCSS(isLight) {
+  if (typeof document === 'undefined') return;
+  const existing = document.getElementById('inv-cafe-css');
+  if (existing) existing.remove();
+
+  const C = isLight ? {
+    cardBg:       '#FFFFFF',
+    cardBorder:   'rgba(0,0,0,0.10)',
+    cardHover:    'rgba(201,162,39,0.22)',
+    inputBg:      '#FFFFFF',
+    inputBorder:  'rgba(0,0,0,0.15)',
+    inputColor:   '#111111',
+    inputPH:      '#999999',
+    dateBg:       '#FFFFFF',
+    dateBorder:   'rgba(0,0,0,0.15)',
+    dateColor:    '#111111',
+    dateCS:       'light',
+    dateLabelC:   '#555555',
+    btnGoldBg:    'rgba(201,162,39,0.12)',
+    btnGoldColor: '#8B6914',
+    btnGoldBd:    'rgba(201,162,39,0.30)',
+    btnGreenBg:   'rgba(37,211,102,0.1)',
+    btnGreenColor:'#1a9e4e',
+    btnGreenBd:   'rgba(37,211,102,0.30)',
+  } : {
+    cardBg:       '#141008',
+    cardBorder:   'rgba(255,255,255,0.07)',
+    cardHover:    'rgba(201,162,39,0.22)',
+    inputBg:      '#1c1509',
+    inputBorder:  'rgba(255,255,255,0.08)',
+    inputColor:   '#fff8ee',
+    inputPH:      '#3d3020',
+    dateBg:       '#1c1509',
+    dateBorder:   'rgba(255,255,255,0.08)',
+    dateColor:    '#fff8ee',
+    dateCS:       'dark',
+    dateLabelC:   '#7a6a55',
+    btnGoldBg:    'rgba(212,175,55,0.12)',
+    btnGoldColor: '#D4AF37',
+    btnGoldBd:    'rgba(212,175,55,0.25)',
+    btnGreenBg:   'rgba(37,211,102,0.1)',
+    btnGreenColor:'#25D366',
+    btnGreenBd:   'rgba(37,211,102,0.25)',
+  };
+
   const el = document.createElement('style');
   el.id = 'inv-cafe-css';
   el.textContent = `
@@ -54,13 +82,13 @@ if (typeof document !== 'undefined' && !document.getElementById('inv-cafe-css'))
     .inv { font-family: 'DM Sans', system-ui, sans-serif; }
     .inv-title { font-family: 'Playfair Display', serif !important; }
     .inv-card {
-      background: #141008;
-      border: 1.5px solid rgba(255,255,255,0.07);
+      background: ${C.cardBg};
+      border: 1.5px solid ${C.cardBorder};
       border-radius: 16px;
       overflow: hidden;
       transition: border-color 200ms;
     }
-    .inv-card:hover { border-color: rgba(201,162,39,0.22); }
+    .inv-card:hover { border-color: ${C.cardHover}; }
     .inv-btn {
       display: inline-flex; align-items: center; gap: 5px;
       font-family: 'DM Sans', system-ui, sans-serif;
@@ -72,38 +100,33 @@ if (typeof document !== 'undefined' && !document.getElementById('inv-cafe-css'))
     }
     .inv-btn:hover { transform: translateY(-1px); filter: brightness(1.1); }
     .inv-btn:active { transform: scale(0.96); }
-    .inv-btn-gold   { background: rgba(212,175,55,0.12); color: #D4AF37; border-color: rgba(212,175,55,0.25); }
-    .inv-btn-gold:hover { background: rgba(212,175,55,0.22); }
-    .inv-btn-green  { background: rgba(37,211,102,0.1); color: #25D366; border-color: rgba(37,211,102,0.25); }
-    .inv-btn-green:hover { background: rgba(37,211,102,0.18); }
+    .inv-btn-gold   { background: ${C.btnGoldBg}; color: ${C.btnGoldColor}; border-color: ${C.btnGoldBd}; }
+    .inv-btn-gold:hover { background: ${isLight ? 'rgba(201,162,39,0.20)' : 'rgba(212,175,55,0.22)'}; }
+    .inv-btn-green  { background: ${C.btnGreenBg}; color: ${C.btnGreenColor}; border-color: ${C.btnGreenBd}; }
+    .inv-btn-green:hover { background: ${isLight ? 'rgba(37,211,102,0.15)' : 'rgba(37,211,102,0.18)'}; }
     .inv-input {
-      background: #1c1509; border: 1.5px solid rgba(255,255,255,0.08); border-radius: 12px;
-      color: #fff8ee; padding: 10px 14px; font-size: 13px; font-weight: 600;
+      background: ${C.inputBg}; border: 1.5px solid ${C.inputBorder}; border-radius: 12px;
+      color: ${C.inputColor}; padding: 10px 14px; font-size: 13px; font-weight: 600;
       font-family: 'DM Sans', system-ui, sans-serif;
       outline: none; width: 100%; transition: border-color 180ms, box-shadow 180ms;
     }
     .inv-input:focus { border-color: rgba(201,162,39,0.55); box-shadow: 0 0 0 3px rgba(201,162,39,0.1); }
-    .inv-input::placeholder { color: #3d3020; }
-
-    /* TASK 1+5 — date inputs: match inv-input style, mobile-safe */
+    .inv-input::placeholder { color: ${C.inputPH}; }
     .inv-date {
-      background: #1c1509; border: 1.5px solid rgba(255,255,255,0.08); border-radius: 12px;
-      color: #fff8ee; padding: 9px 12px; font-size: 12px; font-weight: 600;
+      background: ${C.dateBg}; border: 1.5px solid ${C.dateBorder}; border-radius: 12px;
+      color: ${C.dateColor}; padding: 9px 12px; font-size: 12px; font-weight: 600;
       font-family: 'DM Sans', system-ui, sans-serif;
       outline: none; transition: border-color 180ms, box-shadow 180ms;
       cursor: pointer;
-      /* Prevent iOS overflow */
       min-width: 0; max-width: 100%;
-      /* Style the calendar icon to match theme */
-      color-scheme: dark;
+      color-scheme: ${C.dateCS};
     }
     .inv-date:focus { border-color: rgba(201,162,39,0.55); box-shadow: 0 0 0 3px rgba(201,162,39,0.1); }
     .inv-date-label {
       font-size: 10px; font-weight: 900; text-transform: uppercase; letter-spacing: 0.06em;
-      color: #7a6a55; margin-bottom: 4px; display: block;
+      color: ${C.dateLabelC}; margin-bottom: 4px; display: block;
       font-family: 'DM Sans', system-ui, sans-serif;
     }
-
     @keyframes invIn { from { opacity:0; transform:translateY(8px); } to { opacity:1; transform:translateY(0); } }
     .inv-in { animation: invIn 280ms ease forwards; }
   `;
@@ -112,10 +135,8 @@ if (typeof document !== 'undefined' && !document.getElementById('inv-cafe-css'))
 
 const fmt = (n) => (parseFloat(n) || 0).toFixed(2);
 
-// ── TASK 2: helper to get today's date as YYYY-MM-DD ─────────────────────────
 const getTodayISO = () => new Date().toISOString().slice(0, 10);
 
-// ── TASK 1: helper — check if invoice timestamp falls within [from, to] ───────
 const isInDateRange = (createdAt, from, to) => {
   if (!from && !to) return true;
   try {
@@ -125,32 +146,11 @@ const isInDateRange = (createdAt, from, to) => {
         ? new Date(createdAt.seconds * 1000)
         : null;
     if (!d) return false;
-    // Compare date strings only (YYYY-MM-DD) so we include full day boundaries
     const dStr = d.toISOString().slice(0, 10);
     if (from && dStr < from) return false;
     if (to   && dStr > to)   return false;
     return true;
-  } catch {
-    return false;
-  }
-};
-
-const StatusBadge = ({ status }) => {
-  const isPaid = status === 'paid';
-  return (
-    <span
-      className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full font-black"
-      style={{
-        fontSize: '11px',
-        background: isPaid ? 'rgba(16,185,129,0.12)' : 'rgba(245,158,11,0.12)',
-        color:      isPaid ? '#34d399'               : '#fbbf24',
-        border:     `1.5px solid ${isPaid ? 'rgba(16,185,129,0.22)' : 'rgba(245,158,11,0.22)'}`,
-      }}
-    >
-      {/* 💰 → Wallet, ⏳ → Clock */}
-      {isPaid ? <><Wallet className="w-3 h-3" /> Paid</> : <><Clock className="w-3 h-3" /> Pending</>}
-    </span>
-  );
+  } catch { return false; }
 };
 
 const InvoicesTab = () => {
@@ -159,7 +159,52 @@ const InvoicesTab = () => {
   const { data: cafe } = useDocument('cafes', cafeId);
   const CUR = cafe?.currencySymbol || '₹';
 
-  // ── Real Firestore invoice documents ─────────────────────────────────────
+  // ── Theme ─────────────────────────────────────────────────────────────────
+  const { isLight } = useTheme();
+  useEffect(() => { injectInvoicesCSS(isLight); }, [isLight]);
+
+  // ── Color tokens ──────────────────────────────────────────────────────────
+  const text        = isLight ? '#111111' : '#ffffff';
+  const muted       = isLight ? '#555555' : '#7a6a55';
+  const faint       = isLight ? '#666666' : '#4a3f35';
+  const vfaint      = isLight ? '#AAAAAA' : '#3a2e1a';
+  const custName    = isLight ? '#111111' : '#fff8ee';  // was hardcoded #fff8ee — white on white = invisible
+  const custPhone   = isLight ? '#555555' : '#4a3f35';
+  const custDate    = isLight ? '#555555' : '#4a3f35';
+  const gstLine     = isLight ? '#555555' : '#4a3f35';
+  const orderNumC   = isLight ? '#666666' : '#4a3f35';
+  const itemTagBg   = isLight ? 'rgba(0,0,0,0.04)'  : 'rgba(201,162,39,0.08)';
+  const itemTagTxt  = isLight ? '#444444'             : '#7a6a55';
+  const itemTagBd   = isLight ? 'rgba(0,0,0,0.09)'   : 'rgba(201,162,39,0.15)';
+  const itemSepBd   = isLight ? 'rgba(0,0,0,0.07)'   : 'rgba(255,255,255,0.04)';
+  const moreItemsC  = isLight ? '#666666'             : '#4a3f35';
+  const resultC     = isLight ? '#666666'             : '#4a3f35';
+  const todayBtnC   = isLight ? '#666666'             : '#7a6a55';
+  const filterOffBg = isLight ? 'rgba(0,0,0,0.05)'   : 'rgba(255,255,255,0.04)';
+  const filterOffC  = isLight ? '#444444'             : '#7a6a55';
+  const filterOffBd = isLight ? 'rgba(0,0,0,0.10)'   : 'rgba(255,255,255,0.07)';
+  const csvBtnBg    = isLight ? 'rgba(0,0,0,0.05)'   : 'rgba(255,255,255,0.04)';
+  const csvBtnC     = isLight ? '#444444'             : '#7a6a55';
+  const csvBtnBd    = isLight ? 'rgba(0,0,0,0.10)'   : 'rgba(255,255,255,0.07)';
+  // ─────────────────────────────────────────────────────────────────────────
+
+  // StatusBadge with isLight-aware colors
+  const StatusBadge = ({ status }) => {
+    const isPaid = status === 'paid';
+    return (
+      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full font-black"
+        style={{
+          fontSize: '11px',
+          background: isPaid ? 'rgba(16,185,129,0.12)' : 'rgba(245,158,11,0.12)',
+          color:      isPaid ? '#34d399'               : (isLight ? '#B45309' : '#fbbf24'),
+          border:     `1.5px solid ${isPaid ? 'rgba(16,185,129,0.22)' : 'rgba(245,158,11,0.22)'}`,
+        }}>
+        {isPaid ? <><Wallet className="w-3 h-3" /> Paid</> : <><Clock className="w-3 h-3" /> Pending</>}
+      </span>
+    );
+  };
+
+  // ── Firestore invoice documents ───────────────────────────────────────────
   const [firestoreInvoices, setFirestoreInvoices] = useState([]);
   const [invoicesLoading,   setInvoicesLoading  ] = useState(true);
 
@@ -234,7 +279,6 @@ const InvoicesTab = () => {
         createdAt:            o.createdAt,
         cafeName:             cafe?.name       || '',
       }));
-
     return [...firestoreInvoices, ...syntheticInvoices].sort((a, b) => {
       const ta = a.createdAt?.toDate?.() || new Date(0);
       const tb = b.createdAt?.toDate?.() || new Date(0);
@@ -246,12 +290,9 @@ const InvoicesTab = () => {
   const [viewingInvoice, setViewingInvoice] = useState(null);
   const [search,         setSearch        ] = useState('');
   const [statusFilter,   setStatusFilter  ] = useState('all');
-
-  // TASK 1 + 2: date range state — defaults to today
   const [dateFrom, setDateFrom] = useState(getTodayISO);
   const [dateTo,   setDateTo  ] = useState(getTodayISO);
 
-  // TASK 1: extend filtered with date range check
   const filtered = useMemo(() => {
     return invoices.filter(inv => {
       const matchStatus = statusFilter === 'all' || inv.paymentStatus === statusFilter;
@@ -261,22 +302,21 @@ const InvoicesTab = () => {
         String(inv.orderNumber   || '').toLowerCase().includes(q) ||
         (inv.customerName  || '').toLowerCase().includes(q) ||
         (inv.customerPhone || '').includes(q);
-      // TASK 1: date range filter
       const matchDate = isInDateRange(inv.createdAt, dateFrom, dateTo);
       return matchStatus && matchSearch && matchDate;
     });
   }, [invoices, search, statusFilter, dateFrom, dateTo]);
 
-  // ── Stats (based on full unfiltered invoices list — unchanged) ───────────
+  // ── Stats ─────────────────────────────────────────────────────────────────
   const paidInvoices  = invoices.filter(i => i.paymentStatus === 'paid');
   const pendingOrders = rawOrders.filter(o => !isPaidOrder(o) && !o.isDeleted).length;
   const totalRevenue  = paidInvoices.reduce((s, i) => s + (i.totalAmount || 0), 0);
 
-  // ── TASK 3: CSV now uses `filtered` (respects date range) ─────────────────
+  // ── CSV ───────────────────────────────────────────────────────────────────
   const downloadCSV = () => {
     if (filtered.length === 0) { toast.error('No invoices to export for selected range'); return; }
     try {
-      const rows = filtered.map(o => ({   // ← was `invoices`, now `filtered`
+      const rows = filtered.map(o => ({
         invoiceNumber: o.invoiceNumber || '',
         orderId:       o.orderId || o.id || '',
         orderNumber:   o.orderNumber || '',
@@ -305,7 +345,7 @@ const InvoicesTab = () => {
       const url  = URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.setAttribute('href', url);
-      link.setAttribute('download', `invoices_${dateFrom}_to_${dateTo}.csv`);  // filename reflects range
+      link.setAttribute('download', `invoices_${dateFrom}_to_${dateTo}.csv`);
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
@@ -317,7 +357,7 @@ const InvoicesTab = () => {
     }
   };
 
-  // ── WhatsApp send — UNCHANGED ─────────────────────────────────────────────
+  // ── WhatsApp ──────────────────────────────────────────────────────────────
   const handleSendWA = (inv) => {
     const phone = (inv.customerPhone || '').replace(/\D/g, '');
     if (!phone) { toast.error('No customer phone number on this invoice'); return; }
@@ -352,29 +392,26 @@ const InvoicesTab = () => {
         <InvoiceModal invoice={viewingInvoice} onClose={() => setViewingInvoice(null)} />
       )}
 
-      {/* Header — UNCHANGED */}
+      {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div className="flex items-center gap-3">
-          {/* 🧾 → Receipt */}
           <div className="w-11 h-11 rounded-2xl flex items-center justify-center flex-shrink-0"
             style={{ background: 'rgba(201,162,39,0.1)', border: '1.5px solid rgba(201,162,39,0.2)' }}>
             <Receipt className="w-5 h-5" style={{ color: '#C9A227' }} />
           </div>
           <div>
-            <h2 className="text-white font-black text-2xl inv-title">Invoices</h2>
-            {/* TASK 4: secondary text slightly smaller */}
-            <p className="font-bold mt-0.5" style={{ color: '#7a6a55', fontSize: '11px' }}>
+            <h2 className="font-black text-2xl inv-title" style={{ color: text }}>Invoices</h2>
+            <p className="font-bold mt-0.5" style={{ color: muted, fontSize: '11px' }}>
               {invoices.length} total · {paidInvoices.length} paid
             </p>
           </div>
         </div>
       </div>
 
-      {/* TASK 1+5: Date range row — placed above search, mobile-stacked */}
+      {/* Date range row */}
       <div className="flex flex-col sm:flex-row gap-3 min-w-0">
         <div className="flex items-end gap-2 flex-wrap min-w-0">
           <div className="min-w-0">
-            {/* 📅 → Calendar inline in label */}
             <label className="inv-date-label"><Calendar className="inline w-3 h-3 mr-1" />From</label>
             <input
               type="date"
@@ -396,31 +433,27 @@ const InvoicesTab = () => {
               style={{ width: '100%', maxWidth: '160px' }}
             />
           </div>
-          {/* Quick-clear: reset to today */}
           {(dateFrom !== getTodayISO() || dateTo !== getTodayISO()) && (
             <button
               onClick={() => { setDateFrom(getTodayISO()); setDateTo(getTodayISO()); }}
               className="self-end pb-0.5"
-              style={{ fontSize: '11px', color: '#7a6a55', fontWeight: 700, background: 'none', border: 'none', cursor: 'pointer', whiteSpace: 'nowrap' }}
+              style={{ fontSize: '11px', color: todayBtnC, fontWeight: 700, background: 'none', border: 'none', cursor: 'pointer', whiteSpace: 'nowrap' }}
             >
               ↩ Today
             </button>
           )}
         </div>
-
-        {/* TASK 4: result count for current date range */}
         <div className="flex items-end pb-1 min-w-0">
-          <span style={{ fontSize: '11px', color: '#4a3f35', fontWeight: 700 }}>
+          <span style={{ fontSize: '11px', color: resultC, fontWeight: 700 }}>
             {filtered.length} result{filtered.length !== 1 ? 's' : ''} in range
           </span>
         </div>
       </div>
 
-      {/* Filters + CSV — UNCHANGED structure, TASK 4: font sizes slightly tighter */}
+      {/* Search + filter row */}
       <div className="flex flex-col sm:flex-row gap-3">
         <div className="relative flex-1">
-          {/* 🔍 → Search */}
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4" style={{ color: '#7a6a55' }} />
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4" style={{ color: muted }} />
           <input
             type="text"
             value={search}
@@ -438,10 +471,9 @@ const InvoicesTab = () => {
                 fontSize: '12px',
                 ...(statusFilter === s
                   ? { background: 'linear-gradient(135deg,#C9A227,#A67C00)', color: '#fff', boxShadow: '0 3px 12px rgba(201,162,39,0.3)' }
-                  : { background: 'rgba(255,255,255,0.04)', color: '#7a6a55', border: '1.5px solid rgba(255,255,255,0.07)' }
+                  : { background: filterOffBg, color: filterOffC, border: `1.5px solid ${filterOffBd}` }
                 )
               }}>
-              {/* 📋 → ClipboardList, 💰 → Wallet, ⏳ → Clock */}
               {s === 'all'
                 ? <><ClipboardList className="w-3.5 h-3.5" /> All</>
                 : s === 'paid'
@@ -452,32 +484,29 @@ const InvoicesTab = () => {
           <button
             onClick={downloadCSV}
             className="flex items-center gap-1.5 px-3 h-10 rounded-xl font-black transition-all"
-            style={{ fontSize: '12px', background: 'rgba(255,255,255,0.04)', color: '#7a6a55', border: '1.5px solid rgba(255,255,255,0.07)' }}
+            style={{ fontSize: '12px', background: csvBtnBg, color: csvBtnC, border: `1.5px solid ${csvBtnBd}` }}
           >
-            {/* 📥 → Download (already imported) */}
             <Download className="w-3.5 h-3.5" />
-            <span className="hidden sm:inline"><Download className="inline w-3 h-3 mr-1" /> Export CSV</span>
+            <span className="hidden sm:inline">Export CSV</span>
             <span className="sm:hidden">CSV</span>
           </button>
         </div>
       </div>
 
-      {/* Stats row — UNCHANGED */}
+      {/* Stats row */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         {[
-          { label: 'Total Invoices', val: invoices.length,              color: '#C9A227', icon: Receipt      },
-          { label: 'Paid',           val: paidInvoices.length,          color: '#34d399', icon: Wallet       },
-          { label: 'Pending',        val: pendingOrders,                 color: '#fbbf24', icon: Clock        },
-          { label: 'Total Revenue',  val: `${CUR}${fmt(totalRevenue)}`, color: '#60a5fa', icon: BarChart2    },
+          { label: 'Total Invoices', val: invoices.length,              color: '#C9A227', icon: Receipt   },
+          { label: 'Paid',           val: paidInvoices.length,          color: '#34d399', icon: Wallet    },
+          { label: 'Pending',        val: pendingOrders,                 color: isLight ? '#B45309' : '#fbbf24', icon: Clock },
+          { label: 'Total Revenue',  val: `${CUR}${fmt(totalRevenue)}`, color: '#60a5fa', icon: BarChart2 },
         ].map(s => (
           <motion.div key={s.label} whileHover={{ y: -2 }}
             className="inv-card p-4"
             style={{ borderLeft: `3px solid ${s.color}` }}>
-            {/* 🧾 → Receipt, 💰 → Wallet, ⏳ → Clock, 📊 → BarChart2 */}
             <s.icon className="w-6 h-6 mb-0.5" style={{ color: s.color }} />
             <p className="font-black text-xl" style={{ color: s.color }}>{s.val}</p>
-            {/* TASK 4: label slightly smaller */}
-            <p className="font-bold mt-0.5" style={{ color: '#7a6a55', fontSize: '11px' }}>{s.label}</p>
+            <p className="font-bold mt-0.5" style={{ color: muted, fontSize: '11px' }}>{s.label}</p>
           </motion.div>
         ))}
       </div>
@@ -486,16 +515,14 @@ const InvoicesTab = () => {
       {loading ? (
         <div className="space-y-3">
           {[...Array(4)].map((_, i) => (
-            <div key={i} className="h-20 rounded-2xl bg-white/3 animate-pulse"
-              style={{ animationDelay: `${i * 80}ms` }} />
+            <div key={i} className="h-20 rounded-2xl animate-pulse"
+              style={{ background: isLight ? 'rgba(0,0,0,0.05)' : 'rgba(255,255,255,0.03)', animationDelay: `${i * 80}ms` }} />
           ))}
         </div>
       ) : filtered.length === 0 ? (
         <div className="inv-card p-12 text-center">
-          {/* 🧾 → Receipt */}
-          <Receipt className="w-12 h-12 mb-3 mx-auto" style={{ color: '#3a2e1a' }} />
-          {/* TASK 4: slightly smaller secondary text */}
-          <p className="font-bold" style={{ color: '#7a6a55', fontSize: '13px' }}>
+          <Receipt className="w-12 h-12 mb-3 mx-auto" style={{ color: isLight ? '#AAAAAA' : '#3a2e1a' }} />
+          <p className="font-bold" style={{ color: muted, fontSize: '13px' }}>
             {invoices.length === 0
               ? 'No paid invoices yet. Invoices appear automatically when orders are marked as paid.'
               : dateFrom || dateTo
@@ -513,66 +540,63 @@ const InvoicesTab = () => {
                 transition={{ delay: i * 0.03 }}
                 className="inv-card"
               >
-                {/* Top accent bar — UNCHANGED */}
+                {/* Top accent bar */}
                 <div style={{ height: 2, background: inv.paymentStatus === 'paid' ? 'linear-gradient(90deg,#34d399,transparent)' : 'linear-gradient(90deg,#fbbf24,transparent)' }} />
 
                 <div className="flex items-center justify-between px-5 py-3 gap-4">
                   {/* Left */}
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-2 flex-wrap">
-                      {/* TASK 4: invoice number slightly smaller */}
                       <span className="font-black inv-title" style={{ color: '#C9A227', fontSize: '13px' }}>
                         {inv.invoiceNumber || `ORD-${String(inv.orderNumber||'').padStart(4,'0')}`}
                       </span>
-                      <span className="font-bold" style={{ color: '#4a3f35', fontSize: '11px' }}>
+                      <span className="font-bold" style={{ color: orderNumC, fontSize: '11px' }}>
                         Order #{String(inv.orderNumber||'').padStart(3,'0')}
                       </span>
                       <StatusBadge status={inv.paymentStatus} />
                     </div>
                     <div className="flex items-center gap-2 mt-1 flex-wrap">
-                      {/* 👤 → User, 📞 → Phone, 📅 → Calendar */}
                       {inv.customerName && (
-                        <span className="font-semibold flex items-center gap-1" style={{ color: '#fff8ee', fontSize: '12px' }}><User className="w-3 h-3" /> {inv.customerName}</span>
+                        <span className="font-semibold flex items-center gap-1" style={{ color: custName, fontSize: '12px' }}>
+                          <User className="w-3 h-3" /> {inv.customerName}
+                        </span>
                       )}
                       {inv.customerPhone && (
-                        <span className="font-bold flex items-center gap-1" style={{ color: '#4a3f35', fontSize: '11px' }}><Phone className="w-3 h-3" /> {inv.customerPhone}</span>
+                        <span className="font-bold flex items-center gap-1" style={{ color: custPhone, fontSize: '11px' }}>
+                          <Phone className="w-3 h-3" /> {inv.customerPhone}
+                        </span>
                       )}
-                      <span className="font-bold flex items-center gap-1" style={{ color: '#4a3f35', fontSize: '11px' }}><Calendar className="w-3 h-3" /> {formatDate(inv.createdAt)}</span>
+                      <span className="font-bold flex items-center gap-1" style={{ color: custDate, fontSize: '11px' }}>
+                        <Calendar className="w-3 h-3" /> {formatDate(inv.createdAt)}
+                      </span>
                     </div>
                     {inv?.orderType === 'delivery' && (
-                      <div className="mt-1 font-semibold flex items-center gap-1" style={{ color: '#7a6a55', fontSize: '11px' }}>
-                        {/* 🛵 → Truck */}
+                      <div className="mt-1 font-semibold flex items-center gap-1" style={{ color: muted, fontSize: '11px' }}>
                         <Truck className="w-3 h-3" /> {inv?.deliveryAddress || 'N/A'}
                       </div>
                     )}
                   </div>
 
-                  {/* Right: amounts + actions — UNCHANGED structure */}
+                  {/* Right: amounts + actions */}
                   <div className="flex items-center gap-3 flex-shrink-0">
                     <div className="text-right hidden sm:block">
                       {inv.gstAmount > 0 && (
-                        <p className="font-bold" style={{ color: '#4a3f35', fontSize: '11px' }}>GST: {CUR}{fmt(inv.gstAmount)}</p>
+                        <p className="font-bold" style={{ color: gstLine, fontSize: '11px' }}>GST: {CUR}{fmt(inv.gstAmount)}</p>
                       )}
                       {inv.serviceChargeAmount > 0 && (
-                        <p className="font-bold" style={{ color: '#4a3f35', fontSize: '11px' }}>SC: {CUR}{fmt(inv.serviceChargeAmount)}</p>
+                        <p className="font-bold" style={{ color: gstLine, fontSize: '11px' }}>SC: {CUR}{fmt(inv.serviceChargeAmount)}</p>
                       )}
-                      {/* 💵 → Wallet inline */}
-                      <p className="font-black flex items-center justify-end gap-1" style={{ color: '#C9A227', fontSize: '14px' }}><Wallet className="w-3.5 h-3.5" /> {CUR}{fmt(inv.totalAmount)}</p>
+                      <p className="font-black flex items-center justify-end gap-1" style={{ color: '#C9A227', fontSize: '14px' }}>
+                        <Wallet className="w-3.5 h-3.5" /> {CUR}{fmt(inv.totalAmount)}
+                      </p>
                     </div>
                     <div className="flex gap-2">
-                      <button
-                        onClick={() => setViewingInvoice(inv)}
-                        className="inv-btn inv-btn-gold"
-                      >
+                      <button onClick={() => setViewingInvoice(inv)} className="inv-btn inv-btn-gold">
                         <Eye className="w-3 h-3" />
                         <span className="hidden sm:inline">View</span>
                       </button>
                       {inv.customerPhone && (
-                        <button
-                          onClick={() => handleSendWA(inv)}
-                          className="inv-btn inv-btn-green"
-                          title="Send Invoice via WhatsApp"
-                        >
+                        <button onClick={() => handleSendWA(inv)} className="inv-btn inv-btn-green" title="Send Invoice via WhatsApp">
                           <MessageSquare className="w-3 h-3" />
                           <span className="hidden sm:inline">WhatsApp</span>
                         </button>
@@ -581,23 +605,24 @@ const InvoicesTab = () => {
                   </div>
                 </div>
 
-                {/* Items summary — UNCHANGED structure, TASK 4: tag text tighter */}
+                {/* Items summary */}
                 {inv.items?.length > 0 && (
-                  <div className="px-5 pb-3 pt-2" style={{ borderTop: '1px solid rgba(255,255,255,0.04)' }}>
+                  <div className="px-5 pb-3 pt-2" style={{ borderTop: `1px solid ${itemSepBd}` }}>
                     <div className="flex flex-wrap gap-1.5">
                       {inv.items.slice(0, 4).map((item, j) => (
                         <span key={j} className="px-2 py-0.5 rounded-full font-bold flex items-center gap-1"
-                          style={{ fontSize: '11px', background: 'rgba(201,162,39,0.08)', color: '#7a6a55', border: '1px solid rgba(201,162,39,0.15)' }}>
-                          {/* 🍴 → Utensils */}
+                          style={{ fontSize: '11px', background: itemTagBg, color: itemTagTxt, border: `1px solid ${itemTagBd}` }}>
                           <Utensils className="w-3 h-3" /> {item.name} ×{item.quantity}
                         </span>
                       ))}
                       {inv.items.length > 4 && (
-                        <span className="font-bold" style={{ color: '#4a3f35', fontSize: '11px' }}>+{inv.items.length - 4} more</span>
+                        <span className="font-bold" style={{ color: moreItemsC, fontSize: '11px' }}>
+                          +{inv.items.length - 4} more
+                        </span>
                       )}
                     </div>
                     <div className="flex items-center justify-between mt-1.5 sm:hidden">
-                      <span className="font-bold" style={{ color: '#4a3f35', fontSize: '11px' }}>
+                      <span className="font-bold" style={{ color: gstLine, fontSize: '11px' }}>
                         {inv.gstAmount > 0 ? `GST: ${CUR}${fmt(inv.gstAmount)}` : ''}
                         {inv.serviceChargeAmount > 0 ? ` · SC: ${CUR}${fmt(inv.serviceChargeAmount)}` : ''}
                       </span>
@@ -611,11 +636,10 @@ const InvoicesTab = () => {
         </div>
       )}
 
-      {/* Footer — UNCHANGED */}
+      {/* Footer */}
       <div className="flex items-center justify-center gap-2 py-2">
-        {/* ☕ → Coffee */}
-        <Coffee className="w-4 h-4" style={{ color: '#7a6a55' }} />
-        <p className="font-bold" style={{ color: '#7a6a55', fontSize: '11px' }}>
+        <Coffee className="w-4 h-4" style={{ color: muted }} />
+        <p className="font-bold" style={{ color: muted, fontSize: '11px' }}>
           {filtered.length} invoice{filtered.length !== 1 ? 's' : ''} · Real-time sync active
         </p>
         <span className="inline-block w-1.5 h-1.5 rounded-full animate-pulse" style={{ background: '#34d399' }} />
