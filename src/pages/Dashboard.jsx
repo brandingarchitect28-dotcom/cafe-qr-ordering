@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { signOut } from 'firebase/auth';
 import { auth } from '../lib/firebase';
@@ -33,170 +33,197 @@ import StaffManagement     from '../components/dashboard/StaffManagement';
 import Settings            from '../components/dashboard/Settings';
 import CafeDisabled        from './CafeDisabled';
 
-if (typeof document !== 'undefined' && !document.getElementById('dash-cafe-css')) {
+// ── Theme-aware CSS injection (mirrors QRGenerator pattern exactly) ───────────
+function injectDashCSS(isLight) {
+  if (typeof document === 'undefined') return;
+  const existing = document.getElementById('dash-cafe-css');
+  if (existing) existing.remove();
+
+  // Sidebar palette
+  const S = isLight ? {
+    sidebarBg:      '#FDFAF4',
+    sidebarBorder:  'rgba(201,162,39,0.2)',
+    navItemColor:   '#5a4530',
+    navItemHoverBg: 'rgba(201,162,39,0.1)',
+    navItemHoverC:  '#3a2a10',
+    scrollThumb:    'rgba(201,162,39,0.25)',
+  } : {
+    sidebarBg:      '#0a0702',
+    sidebarBorder:  'rgba(201,162,39,0.1)',
+    navItemColor:   '#a89880',
+    navItemHoverBg: 'rgba(201,162,39,0.07)',
+    navItemHoverC:  '#f0e0c0',
+    scrollThumb:    'rgba(201,162,39,0.18)',
+  };
+
+  // Main content palette
+  const M = isLight ? {
+    pageBg:       '#F5F5F5',
+    cardBg:       '#FFFFFF',
+    cardBorder:   'rgba(201,162,39,0.15)',
+    cardShadow:   '0 1px 8px rgba(0,0,0,0.07)',
+    textPrimary:  '#1a1208',
+    textSecond:   '#4a3520',
+    textMuted:    '#7a6040',
+    divider:      'rgba(201,162,39,0.15)',
+    inputBg:      '#FFFFFF',
+    inputBorder:  'rgba(201,162,39,0.28)',
+    inputColor:   '#1a1208',
+    inputPH:      '#b0956a',
+    badgeBg:      'rgba(201,162,39,0.10)',
+    badgeColor:   '#7a5500',
+    rowHover:     'rgba(201,162,39,0.05)',
+    sectionBg:    '#FDFAF4',
+    sectionBd:    'rgba(201,162,39,0.12)',
+    tableBorder:  'rgba(0,0,0,0.07)',
+    tableHeadBg:  'rgba(201,162,39,0.06)',
+    tableHeadC:   '#5a4020',
+    emptyIconC:   '#c9a865',
+    emptyTextC:   '#5a4530',
+  } : {
+    pageBg:       '#050505',
+    cardBg:       '#0f0c07',
+    cardBorder:   'rgba(201,162,39,0.10)',
+    cardShadow:   'none',
+    textPrimary:  '#f0e0c0',
+    textSecond:   '#9a8a70',
+    textMuted:    '#6a5a45',
+    divider:      'rgba(201,162,39,0.08)',
+    inputBg:      '#0f0c07',
+    inputBorder:  'rgba(201,162,39,0.15)',
+    inputColor:   '#f0e0c0',
+    inputPH:      '#5a4a35',
+    badgeBg:      'rgba(201,162,39,0.12)',
+    badgeColor:   '#C9A227',
+    rowHover:     'rgba(201,162,39,0.04)',
+    sectionBg:    '#0a0702',
+    sectionBd:    'rgba(201,162,39,0.08)',
+    tableBorder:  'rgba(255,255,255,0.05)',
+    tableHeadBg:  'rgba(201,162,39,0.06)',
+    tableHeadC:   '#a89060',
+    emptyIconC:   '#4a3a20',
+    emptyTextC:   '#6a5a45',
+  };
+
   const el = document.createElement('style');
   el.id = 'dash-cafe-css';
   el.textContent = `
     @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700;800&family=Playfair+Display:ital,wght@0,700;0,800;0,900;1,700&display=swap');
-    .dash { font-family: 'DM Sans', system-ui, sans-serif; }
+
+    .dash       { font-family: 'DM Sans', system-ui, sans-serif; }
     .dash-title { font-family: 'Playfair Display', serif !important; }
 
-    /* Nav items — high contrast, visible in both dark and light mode */
+    /* ── Page ── */
+    .dash-page { background: ${M.pageBg}; color: ${M.textPrimary}; }
+
+    /* ── Sidebar ── */
+    .dash-sidebar {
+      background: ${S.sidebarBg};
+      border-right: 1.5px solid ${S.sidebarBorder};
+    }
+
+    /* ── Nav items ── */
     .dash-nav-item {
-      width: 100%;
-      display: flex; align-items: center; gap: 11px;
+      width: 100%; display: flex; align-items: center; gap: 11px;
       padding: 11px 14px; border-radius: 10px;
       font-family: 'DM Sans', system-ui, sans-serif;
       font-weight: 500; font-size: 15px;
       cursor: pointer; transition: all 160ms;
       border: none; background: transparent;
-      text-align: left;
-      letter-spacing: 0.015em;
+      text-align: left; letter-spacing: 0.015em;
       -webkit-font-smoothing: antialiased;
+      color: ${S.navItemColor};
     }
-
-    /* Dark mode nav */
-    .dash-dark .dash-nav-item { color: #a89880; }
-    .dash-dark .dash-nav-item:hover { background: rgba(201,162,39,0.07); color: #f0e0c0; }
-    .dash-dark .dash-nav-item.active {
+    .dash-nav-item:hover  { background: ${S.navItemHoverBg}; color: ${S.navItemHoverC}; }
+    .dash-nav-item.active {
       background: linear-gradient(135deg,#C9A227,#A67C00);
       color: #fff; font-weight: 700;
       box-shadow: 0 3px 14px rgba(201,162,39,0.32);
     }
-
-    /* Light mode nav */
-    .dash-light .dash-nav-item { color: #5a4530; }
-    .dash-light .dash-nav-item:hover { background: rgba(201,162,39,0.1); color: #3a2a10; }
-    .dash-light .dash-nav-item.active {
-      background: linear-gradient(135deg,#C9A227,#A67C00);
-      color: #fff; font-weight: 700;
-      box-shadow: 0 3px 14px rgba(201,162,39,0.32);
-    }
-
     .dash-nav-icon { opacity: 0.5; flex-shrink: 0; transition: opacity 160ms; }
     .dash-nav-item:hover .dash-nav-icon  { opacity: 0.9; }
     .dash-nav-item.active .dash-nav-icon { opacity: 1; }
 
-    /* Sidebar */
-    .dash-sidebar-dark {
-      background: #0a0702;
-      border-right: 1.5px solid rgba(201,162,39,0.1);
-    }
-    .dash-sidebar-light {
-      background: #FDFAF4;
-      border-right: 1.5px solid rgba(201,162,39,0.2);
-    }
-
+    /* ── Scrollbar ── */
     .dash-nav-scroll {
-      flex: 1;
-      overflow-y: auto;
-      overflow-x: hidden;
-      overscroll-behavior: contain;
-      -webkit-overflow-scrolling: touch;
+      flex: 1; overflow-y: auto; overflow-x: hidden;
+      overscroll-behavior: contain; -webkit-overflow-scrolling: touch;
     }
     .dash-nav-scroll::-webkit-scrollbar { width: 3px; }
     .dash-nav-scroll::-webkit-scrollbar-track { background: transparent; }
-    .dash-nav-scroll::-webkit-scrollbar-thumb { background: rgba(201,162,39,0.18); border-radius: 3px; }
+    .dash-nav-scroll::-webkit-scrollbar-thumb { background: ${S.scrollThumb}; border-radius: 3px; }
 
-    /* Branding */
+    /* ── Branding ── */
     .dash-brand-name {
       font-family: 'Playfair Display', Georgia, serif;
-      font-size: 24px;
-      font-weight: 900;
-      font-style: normal;
-      letter-spacing: 0.02em;
-      text-transform: uppercase;
-      color: #C9A227;
-      line-height: 1.08;
-      -webkit-font-smoothing: antialiased;
-      display: block;
+      font-size: 24px; font-weight: 900; letter-spacing: 0.02em;
+      text-transform: uppercase; color: #C9A227; line-height: 1.08;
+      -webkit-font-smoothing: antialiased; display: block;
     }
     .dash-brand-sub {
       font-family: 'DM Sans', system-ui, sans-serif;
-      font-size: 9px;
-      font-weight: 700;
-      letter-spacing: 0.2em;
-      text-transform: uppercase;
-      color: #C9A227;
-      opacity: 0.4;
-      margin-top: 6px;
-      -webkit-font-smoothing: antialiased;
-      display: block;
+      font-size: 9px; font-weight: 700; letter-spacing: 0.2em;
+      text-transform: uppercase; color: #C9A227; opacity: 0.4;
+      margin-top: 6px; -webkit-font-smoothing: antialiased; display: block;
     }
 
-    /* ─── MAIN CONTENT AREA — light/dark theming ─── */
+    /* ── Cards ── */
+    .dash-card {
+      background: ${M.cardBg};
+      border: 1.5px solid ${M.cardBorder};
+      border-radius: 16px;
+      box-shadow: ${M.cardShadow};
+      color: ${M.textPrimary};
+    }
+    .dash-card-title { color: ${M.textPrimary}; }
+    .dash-card-value { color: ${M.textPrimary}; }
+    .dash-card-label { color: ${M.textMuted};   }
 
-    /* Dark mode: main content */
-    .dash-main-dark {
-      background: #050505;
-      color: #e8d9c0;
+    /* ── Typography ── */
+    .dash-text-primary   { color: ${M.textPrimary} !important; }
+    .dash-text-secondary { color: ${M.textSecond}  !important; }
+    .dash-text-muted     { color: ${M.textMuted}   !important; }
+
+    /* ── Divider ── */
+    .dash-divider { border-color: ${M.divider} !important; background: ${M.divider}; height: 1px; }
+
+    /* ── Inputs ── */
+    .dash-input {
+      background: ${M.inputBg}     !important;
+      border: 1.5px solid ${M.inputBorder} !important;
+      color: ${M.inputColor}       !important;
+      border-radius: 10px;
     }
-    .dash-main-dark .dash-card {
-      background: #0f0c07;
-      border: 1.5px solid rgba(201,162,39,0.1);
-      color: #e8d9c0;
-    }
-    .dash-main-dark .dash-card-title  { color: #f0e0c0; }
-    .dash-main-dark .dash-card-value  { color: #ffffff; }
-    .dash-main-dark .dash-card-label  { color: #7a6a55; }
-    .dash-main-dark .dash-text-primary   { color: #f0e0c0; }
-    .dash-main-dark .dash-text-secondary { color: #9a8a70; }
-    .dash-main-dark .dash-text-muted     { color: #6a5a45; }
-    .dash-main-dark .dash-divider  { border-color: rgba(201,162,39,0.08); }
-    .dash-main-dark .dash-input {
-      background: #0f0c07;
-      border: 1.5px solid rgba(201,162,39,0.15);
-      color: #f0e0c0;
-    }
-    .dash-main-dark .dash-input::placeholder { color: #5a4a35; }
-    .dash-main-dark .dash-badge {
-      background: rgba(201,162,39,0.12);
-      color: #C9A227;
-    }
-    .dash-main-dark .dash-table-row:hover { background: rgba(201,162,39,0.04); }
-    .dash-main-dark .dash-section-bg {
-      background: #0a0702;
-      border: 1.5px solid rgba(201,162,39,0.08);
+    .dash-input::placeholder { color: ${M.inputPH} !important; }
+    .dash-input:focus { border-color: rgba(201,162,39,0.55) !important; outline: none; }
+
+    /* ── Badges ── */
+    .dash-badge {
+      background: ${M.badgeBg}; color: ${M.badgeColor};
+      border-radius: 6px; padding: 2px 8px;
+      font-size: 11px; font-weight: 700;
     }
 
-    /* Light mode: main content */
-    .dash-main-light {
-      background: #F5F5F5;
-      color: #1a1208;
+    /* ── Tables ── */
+    .dash-table-row:hover { background: ${M.rowHover}; }
+    .dash-table-border    { border-color: ${M.tableBorder} !important; }
+    .dash-table-head      { background: ${M.tableHeadBg}; color: ${M.tableHeadC}; }
+
+    /* ── Section containers ── */
+    .dash-section-bg {
+      background: ${M.sectionBg};
+      border: 1.5px solid ${M.sectionBd};
+      border-radius: 14px;
     }
-    .dash-main-light .dash-card {
-      background: #ffffff;
-      border: 1.5px solid rgba(201,162,39,0.15);
-      color: #1a1208;
-      box-shadow: 0 1px 8px rgba(0,0,0,0.06);
-    }
-    .dash-main-light .dash-card-title  { color: #2a1e08; }
-    .dash-main-light .dash-card-value  { color: #1a1208; }
-    .dash-main-light .dash-card-label  { color: #7a6040; }
-    .dash-main-light .dash-text-primary   { color: #1a1208; }
-    .dash-main-light .dash-text-secondary { color: #5a4530; }
-    .dash-main-light .dash-text-muted     { color: #9a7a50; }
-    .dash-main-light .dash-divider  { border-color: rgba(201,162,39,0.15); }
-    .dash-main-light .dash-input {
-      background: #ffffff;
-      border: 1.5px solid rgba(201,162,39,0.25);
-      color: #1a1208;
-    }
-    .dash-main-light .dash-input::placeholder { color: #b0956a; }
-    .dash-main-light .dash-badge {
-      background: rgba(201,162,39,0.1);
-      color: #8a6200;
-    }
-    .dash-main-light .dash-table-row:hover { background: rgba(201,162,39,0.05); }
-    .dash-main-light .dash-section-bg {
-      background: #fdfaf4;
-      border: 1.5px solid rgba(201,162,39,0.12);
-    }
+
+    /* ── Empty states ── */
+    .dash-empty-icon { color: ${M.emptyIconC}; }
+    .dash-empty-text { color: ${M.emptyTextC}; }
   `;
   document.head.appendChild(el);
 }
+// ─────────────────────────────────────────────────────────────────────────────
 
-// Lucide icons mapped per nav id
 const NAV_ICON = {
   overview:  LayoutDashboard,
   orders:    ShoppingBag,
@@ -225,21 +252,12 @@ const NAV_EMOJI = {
 };
 
 const LockedFeature = ({ label, icon: Icon }) => {
-  const { T, isLight } = useTheme();
+  const { isLight } = useTheme();
   return (
-    <div
-      className="dash rounded-2xl p-16 text-center"
-      style={{
-        background: isLight ? '#ffffff' : '#141008',
-        border: `1.5px solid ${isLight ? 'rgba(201,162,39,0.18)' : 'rgba(255,255,255,0.07)'}`,
-        boxShadow: isLight ? '0 1px 8px rgba(0,0,0,0.06)' : 'none',
-      }}
-    >
+    <div className="dash-card p-16 text-center" style={{ maxWidth: 480, margin: '0 auto' }}>
       <div className="text-5xl mb-4">🔒</div>
-      <p className="font-black text-lg mb-2" style={{ color: isLight ? '#1a1208' : '#FFFFFF' }}>
-        {label}
-      </p>
-      <p className="text-sm font-semibold" style={{ color: isLight ? '#5a4530' : '#7a6a55' }}>
+      <p className="font-black text-lg mb-2 dash-text-primary">{label}</p>
+      <p className="text-sm font-semibold dash-text-secondary">
         This feature is not enabled for your account. Contact your administrator to unlock it.
       </p>
     </div>
@@ -255,6 +273,10 @@ const Dashboard = () => {
   const { data: cafe } = useDocument('cafes', cafeId);
   const [activeTab,   setActiveTab  ] = useState('overview');
   const [sidebarOpen, setSidebarOpen] = useState(false);
+
+  // ── Re-inject CSS on every theme change — same pattern as QRGenerator ──
+  useEffect(() => { injectDashCSS(isLight); }, [isLight]);
+  // ───────────────────────────────────────────────────────────────────────
 
   const features = {
     marketing:   cafe?.features?.marketingWhatsappEnabled !== false,
@@ -287,37 +309,28 @@ const Dashboard = () => {
     { id: 'settings',  label: 'Settings',    icon: SettingsIcon    },
   ];
 
-  // ── Sidebar theme ──
-  const sidebarClass = isLight ? 'dash-sidebar-light dash-light' : 'dash-sidebar-dark dash-dark';
-
-  // ── Main content theme class (NEW — governs all child components) ──
-  const mainClass = isLight ? 'dash-main-light' : 'dash-main-dark';
-
-  // ── Header ──
-  const headerBg     = isLight ? 'rgba(245,245,245,0.96)' : 'rgba(5,5,5,0.88)';
-  const headerBorder = isLight ? '1px solid rgba(201,162,39,0.18)' : '1px solid rgba(201,162,39,0.1)';
+  // ── Inline styles (values that must remain JS-driven) ──────────────────
+  const headerBg         = isLight ? 'rgba(245,245,245,0.96)' : 'rgba(5,5,5,0.88)';
+  const headerBorder     = isLight ? '1px solid rgba(201,162,39,0.18)' : '1px solid rgba(201,162,39,0.1)';
   const headerTitleColor = isLight ? '#1a1208' : '#FFFFFF';
 
-  // ── Sidebar footer ──
-  const userEmailColor  = isLight ? '#2a1e08' : '#FFFFFF';
-  const userLabelColor  = isLight ? '#7a6040' : '#7a6a55';
+  const userEmailColor  = isLight ? '#2a1e08'               : '#FFFFFF';
+  const userLabelColor  = isLight ? '#7a6040'               : '#7a6a55';
   const userBg          = isLight ? 'rgba(201,162,39,0.07)' : 'rgba(201,162,39,0.05)';
   const userBorderColor = isLight ? 'rgba(201,162,39,0.18)' : 'rgba(201,162,39,0.08)';
   const footerBorder    = isLight ? '1px solid rgba(201,162,39,0.15)' : '1px solid rgba(201,162,39,0.08)';
 
-  // ── Close button ──
-  const closeBtnColor      = isLight ? '#5a4530' : '#5a4a3a';
-  const closeBtnHoverColor = isLight ? '#1a1208' : '#fff';
+  const closeBtnColor      = isLight ? '#5a4530'          : '#5a4a3a';
+  const closeBtnHoverColor = isLight ? '#1a1208'          : '#fff';
   const closeBtnHoverBg    = isLight ? 'rgba(0,0,0,0.06)' : 'rgba(255,255,255,0.05)';
-
-  // ── Overlay ──
-  const overlayBg = isLight ? 'rgba(0,0,0,0.3)' : 'rgba(0,0,0,0.7)';
+  const overlayBg          = isLight ? 'rgba(0,0,0,0.28)' : 'rgba(0,0,0,0.7)';
+  // ───────────────────────────────────────────────────────────────────────
 
   if (cafe && cafe.isActive === false) return <CafeDisabled isAdmin={true} />;
 
   return (
     <div
-      className={`min-h-screen dash ${mainClass}`}
+      className="min-h-screen dash dash-page"
       style={{ fontFamily: "'DM Sans', system-ui, sans-serif" }}
     >
       <GlobalOrderPopup
@@ -325,6 +338,7 @@ const Dashboard = () => {
         onClose={clearNewOrder}
         onNavigateToOrders={() => { setActiveTab('orders'); clearNewOrder(); }}
       />
+
       {sidebarOpen && (
         <div
           className="fixed inset-0 z-40"
@@ -335,9 +349,9 @@ const Dashboard = () => {
 
       {/* ── Sidebar ── */}
       <aside
-        className={`fixed top-0 left-0 h-screen w-64 flex flex-col z-50 transform transition-transform ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'} ${sidebarClass}`}
+        className={`dash-sidebar fixed top-0 left-0 h-screen w-64 flex flex-col z-50 transform transition-transform ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'}`}
       >
-        {/* Branding header */}
+        {/* Branding */}
         <div className="flex items-start justify-between px-4 pt-6 pb-5 flex-shrink-0">
           <div>
             <span className="dash-brand-name">Branding<br/>Architect</span>
@@ -375,7 +389,7 @@ const Dashboard = () => {
           })}
         </nav>
 
-        {/* Sticky footer */}
+        {/* Footer */}
         <div className="flex-shrink-0 px-3 pb-4 pt-2" style={{ borderTop: footerBorder }}>
           <div className="px-3 py-2 rounded-xl mb-1" style={{ background: userBg, border: `1px solid ${userBorderColor}` }}>
             <p className="text-xs font-semibold" style={{ color: userLabelColor, letterSpacing: '0.02em' }}>Logged in as</p>
@@ -417,6 +431,7 @@ const Dashboard = () => {
           </div>
           <div className="w-6" />
         </header>
+
         <main className="p-5">
           {activeTab === 'overview'   && <Overview />}
           {activeTab === 'orders'     && <OrdersManagement />}
