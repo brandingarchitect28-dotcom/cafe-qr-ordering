@@ -58,28 +58,28 @@ function injectDashCSS(isLight) {
 
   // Main content palette
   const M = isLight ? {
-    pageBg:       '#F5F5F5',
+    pageBg:       '#F5F3EE',
     cardBg:       '#FFFFFF',
     cardBorder:   'rgba(201,162,39,0.15)',
     cardShadow:   '0 1px 8px rgba(0,0,0,0.07)',
-    textPrimary:  '#1a1208',
-    textSecond:   '#4a3520',
-    textMuted:    '#7a6040',
-    divider:      'rgba(201,162,39,0.15)',
+    textPrimary:  '#111111',
+    textSecond:   '#444444',
+    textMuted:    '#666666',
+    divider:      'rgba(0,0,0,0.08)',
     inputBg:      '#FFFFFF',
-    inputBorder:  'rgba(201,162,39,0.28)',
-    inputColor:   '#1a1208',
-    inputPH:      '#b0956a',
+    inputBorder:  'rgba(0,0,0,0.15)',
+    inputColor:   '#111111',
+    inputPH:      '#999999',
     badgeBg:      'rgba(201,162,39,0.10)',
     badgeColor:   '#7a5500',
     rowHover:     'rgba(201,162,39,0.05)',
-    sectionBg:    '#FDFAF4',
-    sectionBd:    'rgba(201,162,39,0.12)',
+    sectionBg:    '#F5F3EE',
+    sectionBd:    'rgba(0,0,0,0.08)',
     tableBorder:  'rgba(0,0,0,0.07)',
-    tableHeadBg:  'rgba(201,162,39,0.06)',
-    tableHeadC:   '#5a4020',
+    tableHeadBg:  'rgba(0,0,0,0.04)',
+    tableHeadC:   '#555555',
     emptyIconC:   '#c9a865',
-    emptyTextC:   '#5a4530',
+    emptyTextC:   '#555555',
   } : {
     pageBg:       '#050505',
     cardBg:       '#0f0c07',
@@ -113,14 +113,20 @@ function injectDashCSS(isLight) {
     .dash       { font-family: 'DM Sans', system-ui, sans-serif; }
     .dash-title { font-family: 'Playfair Display', serif !important; }
 
-    /* ── Page ── */
-    .dash-page { background: ${M.pageBg}; color: ${M.textPrimary}; }
+    /* ── Page background ── */
+    .dash-page { background: ${M.pageBg} !important; color: ${M.textPrimary} !important; }
 
-    /* ── Sidebar ── */
+    /* ── Sidebar — must beat index.css aside { !important } ── */
     .dash-sidebar {
-      background: ${S.sidebarBg};
-      border-right: 1.5px solid ${S.sidebarBorder};
+      background: ${S.sidebarBg} !important;
+      background-image: none !important;
+      border-right: 1.5px solid ${S.sidebarBorder} !important;
+      backdrop-filter: none !important;
+      -webkit-backdrop-filter: none !important;
+      box-shadow: ${isLight ? '2px 0 12px rgba(0,0,0,0.06)' : '4px 0 24px rgba(0,0,0,0.3)'} !important;
     }
+    /* Remove the gold stripe pseudo-element in light mode */
+    ${isLight ? '.dash-sidebar::before { display: none !important; }' : ''}
 
     /* ── Nav items ── */
     .dash-nav-item {
@@ -132,13 +138,13 @@ function injectDashCSS(isLight) {
       border: none; background: transparent;
       text-align: left; letter-spacing: 0.015em;
       -webkit-font-smoothing: antialiased;
-      color: ${S.navItemColor};
+      color: ${S.navItemColor} !important;
     }
-    .dash-nav-item:hover  { background: ${S.navItemHoverBg}; color: ${S.navItemHoverC}; }
+    .dash-nav-item:hover  { background: ${S.navItemHoverBg} !important; color: ${S.navItemHoverC} !important; }
     .dash-nav-item.active {
-      background: linear-gradient(135deg,#C9A227,#A67C00);
-      color: #fff; font-weight: 700;
-      box-shadow: 0 3px 14px rgba(201,162,39,0.32);
+      background: linear-gradient(135deg,#C9A227,#A67C00) !important;
+      color: #fff !important; font-weight: 700 !important;
+      box-shadow: 0 3px 14px rgba(201,162,39,0.32) !important;
     }
     .dash-nav-icon { opacity: 0.5; flex-shrink: 0; transition: opacity 160ms; }
     .dash-nav-item:hover .dash-nav-icon  { opacity: 0.9; }
@@ -169,15 +175,15 @@ function injectDashCSS(isLight) {
 
     /* ── Cards ── */
     .dash-card {
-      background: ${M.cardBg};
-      border: 1.5px solid ${M.cardBorder};
+      background: ${M.cardBg} !important;
+      border: 1.5px solid ${M.cardBorder} !important;
       border-radius: 16px;
-      box-shadow: ${M.cardShadow};
-      color: ${M.textPrimary};
+      box-shadow: ${M.cardShadow} !important;
+      color: ${M.textPrimary} !important;
     }
-    .dash-card-title { color: ${M.textPrimary}; }
-    .dash-card-value { color: ${M.textPrimary}; }
-    .dash-card-label { color: ${M.textMuted};   }
+    .dash-card-title { color: ${M.textPrimary} !important; }
+    .dash-card-value { color: ${M.textPrimary} !important; }
+    .dash-card-label { color: ${M.textMuted}   !important; }
 
     /* ── Typography ── */
     .dash-text-primary   { color: ${M.textPrimary} !important; }
@@ -185,13 +191,13 @@ function injectDashCSS(isLight) {
     .dash-text-muted     { color: ${M.textMuted}   !important; }
 
     /* ── Divider ── */
-    .dash-divider { border-color: ${M.divider} !important; background: ${M.divider}; height: 1px; }
+    .dash-divider { border-color: ${M.divider} !important; background: ${M.divider} !important; height: 1px; }
 
     /* ── Inputs ── */
     .dash-input {
-      background: ${M.inputBg}     !important;
+      background: ${M.inputBg}    !important;
       border: 1.5px solid ${M.inputBorder} !important;
-      color: ${M.inputColor}       !important;
+      color: ${M.inputColor}      !important;
       border-radius: 10px;
     }
     .dash-input::placeholder { color: ${M.inputPH} !important; }
@@ -199,26 +205,26 @@ function injectDashCSS(isLight) {
 
     /* ── Badges ── */
     .dash-badge {
-      background: ${M.badgeBg}; color: ${M.badgeColor};
+      background: ${M.badgeBg} !important; color: ${M.badgeColor} !important;
       border-radius: 6px; padding: 2px 8px;
       font-size: 11px; font-weight: 700;
     }
 
     /* ── Tables ── */
-    .dash-table-row:hover { background: ${M.rowHover}; }
+    .dash-table-row:hover { background: ${M.rowHover} !important; }
     .dash-table-border    { border-color: ${M.tableBorder} !important; }
-    .dash-table-head      { background: ${M.tableHeadBg}; color: ${M.tableHeadC}; }
+    .dash-table-head      { background: ${M.tableHeadBg} !important; color: ${M.tableHeadC} !important; }
 
     /* ── Section containers ── */
     .dash-section-bg {
-      background: ${M.sectionBg};
-      border: 1.5px solid ${M.sectionBd};
+      background: ${M.sectionBg} !important;
+      border: 1.5px solid ${M.sectionBd} !important;
       border-radius: 14px;
     }
 
     /* ── Empty states ── */
-    .dash-empty-icon { color: ${M.emptyIconC}; }
-    .dash-empty-text { color: ${M.emptyTextC}; }
+    .dash-empty-icon { color: ${M.emptyIconC} !important; }
+    .dash-empty-text { color: ${M.emptyTextC} !important; }
   `;
   document.head.appendChild(el);
 }
@@ -274,9 +280,21 @@ const Dashboard = () => {
   const [activeTab,   setActiveTab  ] = useState('overview');
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
-  // ── Re-inject CSS on every theme change — same pattern as QRGenerator ──
-  useEffect(() => { injectDashCSS(isLight); }, [isLight]);
-  // ───────────────────────────────────────────────────────────────────────
+  // ── THE KEY FIX ──────────────────────────────────────────────────────────
+  // 1. Toggles  html.light-mode  class → activates ALL of index.css light rules
+  // 2. Re-injects dash CSS          → updates sidebar + dash-* classes
+  // 3. Cleanup on unmount           → removes class when leaving dashboard
+  useEffect(() => {
+    // Bridge the JS boolean → CSS class that index.css listens to
+    document.documentElement.classList.toggle('light-mode', isLight);
+    // Re-inject component-level CSS with correct palette
+    injectDashCSS(isLight);
+    // Cleanup: remove light-mode class when component unmounts
+    return () => {
+      document.documentElement.classList.remove('light-mode');
+    };
+  }, [isLight]);
+  // ─────────────────────────────────────────────────────────────────────────
 
   const features = {
     marketing:   cafe?.features?.marketingWhatsappEnabled !== false,
@@ -309,22 +327,27 @@ const Dashboard = () => {
     { id: 'settings',  label: 'Settings',    icon: SettingsIcon    },
   ];
 
-  // ── Inline styles (values that must remain JS-driven) ──────────────────
-  const headerBg         = isLight ? 'rgba(245,245,245,0.96)' : 'rgba(5,5,5,0.88)';
-  const headerBorder     = isLight ? '1px solid rgba(201,162,39,0.18)' : '1px solid rgba(201,162,39,0.1)';
-  const headerTitleColor = isLight ? '#1a1208' : '#FFFFFF';
+  // ── Inline styles (JS-driven, beat index.css where needed) ─────────────
+  const headerBg         = isLight ? 'rgba(245,243,238,0.96)' : 'rgba(5,5,5,0.88)';
+  const headerBorder     = isLight ? '1px solid rgba(0,0,0,0.07)'        : '1px solid rgba(201,162,39,0.1)';
+  const headerTitleColor = isLight ? '#111111'                            : '#FFFFFF';
 
-  const userEmailColor  = isLight ? '#2a1e08'               : '#FFFFFF';
-  const userLabelColor  = isLight ? '#7a6040'               : '#7a6a55';
-  const userBg          = isLight ? 'rgba(201,162,39,0.07)' : 'rgba(201,162,39,0.05)';
-  const userBorderColor = isLight ? 'rgba(201,162,39,0.18)' : 'rgba(201,162,39,0.08)';
-  const footerBorder    = isLight ? '1px solid rgba(201,162,39,0.15)' : '1px solid rgba(201,162,39,0.08)';
+  const userEmailColor  = isLight ? '#111111'               : '#FFFFFF';
+  const userLabelColor  = isLight ? '#666666'               : '#7a6a55';
+  const userBg          = isLight ? 'rgba(0,0,0,0.04)'      : 'rgba(201,162,39,0.05)';
+  const userBorderColor = isLight ? 'rgba(0,0,0,0.09)'      : 'rgba(201,162,39,0.08)';
+  const footerBorder    = isLight ? '1px solid rgba(0,0,0,0.08)'         : '1px solid rgba(201,162,39,0.08)';
 
-  const closeBtnColor      = isLight ? '#5a4530'          : '#5a4a3a';
-  const closeBtnHoverColor = isLight ? '#1a1208'          : '#fff';
+  const closeBtnColor      = isLight ? '#555555'          : '#5a4a3a';
+  const closeBtnHoverColor = isLight ? '#111111'          : '#fff';
   const closeBtnHoverBg    = isLight ? 'rgba(0,0,0,0.06)' : 'rgba(255,255,255,0.05)';
   const overlayBg          = isLight ? 'rgba(0,0,0,0.28)' : 'rgba(0,0,0,0.7)';
-  // ───────────────────────────────────────────────────────────────────────
+
+  // Sidebar bg as inline style — beats index.css `aside { !important }`
+  // because inline styles have higher specificity than any stylesheet rule
+  const sidebarBg = isLight ? '#FDFAF4' : '#0a0702';
+  const sidebarBorderColor = isLight ? 'rgba(201,162,39,0.2)' : 'rgba(201,162,39,0.1)';
+  // ─────────────────────────────────────────────────────────────────────────
 
   if (cafe && cafe.isActive === false) return <CafeDisabled isAdmin={true} />;
 
@@ -347,9 +370,18 @@ const Dashboard = () => {
         />
       )}
 
-      {/* ── Sidebar ── */}
+      {/* ── Sidebar ──
+          inline style background beats index.css `aside { background: !important }`
+          because inline styles always win over stylesheet rules regardless of !important
+      ── */}
       <aside
         className={`dash-sidebar fixed top-0 left-0 h-screen w-64 flex flex-col z-50 transform transition-transform ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'}`}
+        style={{
+          background:   sidebarBg,
+          borderRight:  `1.5px solid ${sidebarBorderColor}`,
+          backdropFilter: 'none',
+          WebkitBackdropFilter: 'none',
+        }}
       >
         {/* Branding */}
         <div className="flex items-start justify-between px-4 pt-6 pb-5 flex-shrink-0">
@@ -411,9 +443,17 @@ const Dashboard = () => {
 
       {/* ── Main content ── */}
       <div>
+        {/* Header inline style beats index.css `header { background: !important }` */}
         <header
           className="sticky top-0 z-30 h-16 px-5 flex items-center justify-between"
-          style={{ background: headerBg, backdropFilter: 'blur(16px)', borderBottom: headerBorder }}
+          style={{
+            background:     headerBg,
+            backdropFilter: 'blur(16px)',
+            borderBottom:   headerBorder,
+            boxShadow:      isLight
+              ? '0 1px 0 rgba(212,175,55,0.08), 0 4px 16px rgba(0,0,0,0.05)'
+              : '0 1px 0 rgba(212,175,55,0.06), 0 4px 16px rgba(0,0,0,0.2)',
+          }}
         >
           <button
             className="transition-opacity hover:opacity-70"
