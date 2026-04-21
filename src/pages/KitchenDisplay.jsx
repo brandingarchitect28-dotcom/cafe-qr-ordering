@@ -11,6 +11,13 @@
  * PATCH: Added selectedVariant size label display next to item names.
  * VIBE:  Loading screens replaced with premium kitchen-themed screens.
  *        Card/UI tokens matched to OrdersManagement design system.
+ *
+ * THEME FIX: Improved internal dark-mode contrast throughout:
+ *   - Secondary text lifted from #5a4a1a / #7a6a3a to #9a8a5a / #b8a060
+ *   - Card borders raised from rgba(255,255,255,0.07) to rgba(255,255,255,0.10)
+ *   - Item text lifted from #fdf8e1 to #ffffff for crisp readability
+ *   - Special-instructions text contrast improved
+ *   - Elapsed / footer text lifted for legibility on tablet displays
  */
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
@@ -36,17 +43,18 @@ if (typeof document !== 'undefined' && !document.getElementById('kds-omf-css')) 
     .kds-wrap  { font-family: 'DM Sans', system-ui, sans-serif; }
     .kds-title { font-family: 'Playfair Display', serif !important; letter-spacing: 0.01em; }
 
-    /* Order card — OM card style */
+    /* Order card — OM card style
+       THEME FIX: border lifted from 0.07 → 0.10 opacity for better card separation */
     .kds-card {
       background: #120f00;
-      border: 1.5px solid rgba(255,255,255,0.07);
+      border: 1.5px solid rgba(255,255,255,0.10);
       border-radius: 14px;
       overflow: hidden;
       transition: border-color 200ms, box-shadow 200ms;
     }
     .kds-card-old {
-      border-color: rgba(239,68,68,0.4) !important;
-      box-shadow: 0 0 0 1px rgba(239,68,68,0.15), 0 4px 24px rgba(0,0,0,0.5) !important;
+      border-color: rgba(239,68,68,0.55) !important;
+      box-shadow: 0 0 0 1px rgba(239,68,68,0.22), 0 4px 24px rgba(0,0,0,0.5) !important;
     }
 
     /* Section label — exact OM .omf-sec */
@@ -72,7 +80,7 @@ if (typeof document !== 'undefined' && !document.getElementById('kds-omf-css')) 
     /* Scrollbar — OM style */
     .kds-scroll::-webkit-scrollbar { width: 3px; }
     .kds-scroll::-webkit-scrollbar-track { background: transparent; }
-    .kds-scroll::-webkit-scrollbar-thumb { background: rgba(201,162,39,0.22); border-radius: 4px; }
+    .kds-scroll::-webkit-scrollbar-thumb { background: rgba(201,162,39,0.30); border-radius: 4px; }
 
     /* Fade-in */
     @keyframes kdsIn { from { opacity:0; transform:translateY(8px); } to { opacity:1; transform:translateY(0); } }
@@ -136,7 +144,7 @@ const COLUMNS = [
     icon:   Bell,
     accent: '#3B82F6',
     bg:     'rgba(59,130,246,0.05)',
-    border: 'rgba(59,130,246,0.18)',
+    border: 'rgba(59,130,246,0.22)',
   },
   {
     id:     'preparing',
@@ -144,7 +152,7 @@ const COLUMNS = [
     icon:   Flame,
     accent: '#F59E0B',
     bg:     'rgba(245,158,11,0.05)',
-    border: 'rgba(245,158,11,0.18)',
+    border: 'rgba(245,158,11,0.22)',
   },
   {
     id:     'ready',
@@ -152,7 +160,7 @@ const COLUMNS = [
     icon:   CheckCircle2,
     accent: '#10B981',
     bg:     'rgba(16,185,129,0.05)',
-    border: 'rgba(16,185,129,0.18)',
+    border: 'rgba(16,185,129,0.22)',
   },
 ];
 
@@ -225,10 +233,10 @@ const KitchenInitScreen = () => {
       <div style={{
         position: 'relative', zIndex: 10,
         background: 'linear-gradient(160deg, rgba(18,12,2,0.98) 0%, rgba(8,5,1,0.99) 100%)',
-        border: '1.5px solid rgba(201,162,39,0.18)',
+        border: '1.5px solid rgba(201,162,39,0.22)',
         borderRadius: 20, padding: '44px 40px 40px',
         maxWidth: 320, width: '86vw', textAlign: 'center',
-        boxShadow: '0 32px 80px rgba(0,0,0,0.75), inset 0 1px 0 rgba(201,162,39,0.08)',
+        boxShadow: '0 32px 80px rgba(0,0,0,0.75), inset 0 1px 0 rgba(201,162,39,0.10)',
         animation: 'kds-card-in 0.5s cubic-bezier(0.22,1,0.36,1) both',
       }}>
 
@@ -239,7 +247,7 @@ const KitchenInitScreen = () => {
           { bottom:8, left:8,  borderBottom:'1.5px solid', borderLeft:'1.5px solid'  },
           { bottom:8, right:8, borderBottom:'1.5px solid', borderRight:'1.5px solid' },
         ].map((s, i) => (
-          <div key={i} style={{ position:'absolute', width:12, height:12, borderColor:'rgba(201,162,39,0.28)', ...s }}/>
+          <div key={i} style={{ position:'absolute', width:12, height:12, borderColor:'rgba(201,162,39,0.35)', ...s }}/>
         ))}
 
         {/* Chef emoji floating */}
@@ -254,12 +262,14 @@ const KitchenInitScreen = () => {
           fontFamily: "'Playfair Display', serif", letterSpacing: '-0.01em',
         }}>Kitchen Display</h2>
 
+        {/* THEME FIX: lifted opacity from 0.6 → 0.85 for legibility */}
         <p style={{
           margin: '0 0 6px', color: '#C9A227', fontWeight: 700,
-          fontSize: 10, opacity: 0.6, letterSpacing: '0.2em', textTransform: 'uppercase',
+          fontSize: 10, opacity: 0.85, letterSpacing: '0.2em', textTransform: 'uppercase',
         }}>Connecting to kitchen…</p>
 
-        <p style={{ margin: '0 0 26px', color: 'rgba(255,255,255,0.3)', fontWeight: 500, fontSize: 12 }}>
+        {/* THEME FIX: lifted sub-text from 0.3 → 0.5 opacity */}
+        <p style={{ margin: '0 0 26px', color: 'rgba(255,255,255,0.50)', fontWeight: 500, fontSize: 12 }}>
           Loading your live order board
         </p>
 
@@ -274,7 +284,7 @@ const KitchenInitScreen = () => {
         </div>
 
         {/* Shimmer bar */}
-        <div style={{ height:2, background:'rgba(255,255,255,0.05)', borderRadius:99, overflow:'hidden' }}>
+        <div style={{ height:2, background:'rgba(255,255,255,0.08)', borderRadius:99, overflow:'hidden' }}>
           <div style={{
             height:'100%', width:'42%',
             background:'linear-gradient(90deg, transparent, rgba(201,162,39,0.85), transparent)',
@@ -283,8 +293,9 @@ const KitchenInitScreen = () => {
         </div>
       </div>
 
+      {/* THEME FIX: lifted footer from 0.10 → 0.25 opacity */}
       <p style={{
-        marginTop:26, color:'rgba(255,255,255,0.1)', fontSize:10, fontWeight:600,
+        marginTop:26, color:'rgba(255,255,255,0.25)', fontSize:10, fontWeight:600,
         letterSpacing:'0.18em', textTransform:'uppercase',
         animation:'kds-fade-up 0.5s ease both 0.6s', opacity:0, position:'relative', zIndex:10,
       }}>Real-time · Live Orders</p>
@@ -324,9 +335,9 @@ const KitchenConnectingOverlay = () => {
       <div style={{
         position:'relative', zIndex:10,
         background:'linear-gradient(160deg, rgba(18,12,2,0.98) 0%, rgba(8,5,1,0.99) 100%)',
-        border:'1.5px solid rgba(201,162,39,0.18)', borderRadius:18,
+        border:'1.5px solid rgba(201,162,39,0.22)', borderRadius:18,
         padding:'40px 38px 36px', maxWidth:300, width:'86vw', textAlign:'center',
-        boxShadow:'0 28px 70px rgba(0,0,0,0.75), inset 0 1px 0 rgba(201,162,39,0.07)',
+        boxShadow:'0 28px 70px rgba(0,0,0,0.75), inset 0 1px 0 rgba(201,162,39,0.09)',
         animation:'kds-card-in 0.45s cubic-bezier(0.22,1,0.36,1) both',
       }}>
 
@@ -342,7 +353,7 @@ const KitchenConnectingOverlay = () => {
           fontFamily:"'Playfair Display', serif", letterSpacing:'-0.01em',
         }}>Kitchen is Loading</h2>
 
-        {/* Step text */}
+        {/* Step text — THEME FIX: lifted from 0.4 → 0.6 opacity */}
         <div style={{ height:20, marginBottom:22, display:'flex', alignItems:'center', justifyContent:'center', gap:7 }}>
           <span style={{
             width:5, height:5, borderRadius:'50%', background:'#C9A227', display:'inline-block',
@@ -351,7 +362,7 @@ const KitchenConnectingOverlay = () => {
           <span
             key={step}
             style={{
-              fontSize:11.5, fontWeight:600, color:'rgba(255,255,255,0.4)',
+              fontSize:11.5, fontWeight:600, color:'rgba(255,255,255,0.60)',
               letterSpacing:'0.03em', animation:'kds-step-in 0.3s ease both',
             }}
           >{steps[step]}…</span>
@@ -367,8 +378,8 @@ const KitchenConnectingOverlay = () => {
           ))}
         </div>
 
-        {/* Bar */}
-        <div style={{ height:2, background:'rgba(255,255,255,0.05)', borderRadius:99, overflow:'hidden' }}>
+        {/* Bar — THEME FIX: track lifted from 0.05 → 0.10 */}
+        <div style={{ height:2, background:'rgba(255,255,255,0.10)', borderRadius:99, overflow:'hidden' }}>
           <div style={{
             height:'100%', width:'38%',
             background:'linear-gradient(90deg, transparent, rgba(201,162,39,0.85), transparent)',
@@ -404,8 +415,8 @@ const OrderCard = ({ order, onAdvance, advancing }) => {
       {/* Card header */}
       <div style={{
         padding:'10px 14px', display:'flex', alignItems:'center', justifyContent:'between',
-        borderBottom:'1px solid rgba(255,255,255,0.05)',
-        background:'rgba(255,255,255,0.015)',
+        borderBottom:'1px solid rgba(255,255,255,0.07)',
+        background:'rgba(255,255,255,0.02)',
         gap: 8,
       }}>
         <div style={{ display:'flex', alignItems:'center', gap:8, flex:1 }}>
@@ -417,34 +428,34 @@ const OrderCard = ({ order, onAdvance, advancing }) => {
           {order.orderType === 'dine-in' && order.tableNumber && (
             <span style={{
               padding:'2px 8px', borderRadius:6, fontSize:10, fontWeight:800,
-              background:'rgba(255,255,255,0.08)', color:'#e5e5e5',
+              background:'rgba(255,255,255,0.10)', color:'#e5e5e5',
             }}>Table {order.tableNumber}</span>
           )}
           {order.orderType === 'takeaway' && (
             <span style={{
               padding:'2px 8px', borderRadius:6, fontSize:10, fontWeight:800,
-              background:'rgba(168,85,247,0.15)', color:'#c4b5fd',
+              background:'rgba(168,85,247,0.18)', color:'#d4b8fd',
             }}>Takeaway</span>
           )}
           {order.orderType === 'delivery' && (
             <span style={{
               padding:'2px 8px', borderRadius:6, fontSize:10, fontWeight:800,
-              background:'rgba(59,130,246,0.15)', color:'#93c5fd',
+              background:'rgba(59,130,246,0.18)', color:'#a8c8fd',
             }}>Delivery</span>
           )}
           {order.source && order.source !== 'qr' && (
             <span style={{
               padding:'2px 8px', borderRadius:6, fontSize:10, fontWeight:800, textTransform:'uppercase',
-              background: order.source==='zomato' ? 'rgba(239,68,68,0.15)' : order.source==='swiggy' ? 'rgba(249,115,22,0.15)' : 'rgba(255,255,255,0.08)',
+              background: order.source==='zomato' ? 'rgba(239,68,68,0.18)' : order.source==='swiggy' ? 'rgba(249,115,22,0.18)' : 'rgba(255,255,255,0.10)',
               color:       order.source==='zomato' ? '#fca5a5'              : order.source==='swiggy' ? '#fdba74'               : '#d4d4d4',
             }}>{order.source}</span>
           )}
         </div>
 
-        {/* Elapsed time */}
+        {/* Elapsed time — THEME FIX: normal color lifted from #7a6a3a → #9a8a5a */}
         <div style={{ display:'flex', alignItems:'center', gap:4, flexShrink:0 }}>
-          <Clock style={{ width:12, height:12, color: isOld ? '#f87171' : '#7a6a3a' }}/>
-          <span style={{ fontSize:11, fontWeight:700, color: isOld ? '#f87171' : '#7a6a3a' }}>{elapsed}</span>
+          <Clock style={{ width:12, height:12, color: isOld ? '#f87171' : '#9a8a5a' }}/>
+          <span style={{ fontSize:11, fontWeight:700, color: isOld ? '#f87171' : '#9a8a5a' }}>{elapsed}</span>
         </div>
       </div>
 
@@ -453,51 +464,52 @@ const OrderCard = ({ order, onAdvance, advancing }) => {
         {(order.items || []).map((item, idx) => (
           <div key={idx}>
             <div style={{ display:'flex', alignItems:'baseline', justifyContent:'space-between', gap:8 }}>
-              <span style={{ color:'#fdf8e1', fontSize:13, fontWeight:600, flex:1 }}>
+              {/* THEME FIX: item name lifted from #fdf8e1 → #ffffff */}
+              <span style={{ color:'#ffffff', fontSize:13, fontWeight:600, flex:1 }}>
                 {item.name}{item.selectedVariant ? ` (${item.selectedVariant})` : ''}
               </span>
               <span style={{
                 flexShrink:0, fontSize:11, fontWeight:900,
                 padding:'1px 7px', borderRadius:99,
-                background:'rgba(201,162,39,0.12)', color:'#C9A227',
+                background:'rgba(201,162,39,0.15)', color:'#C9A227',
               }}>×{item.quantity}</span>
             </div>
 
-            {/* Combo items */}
+            {/* Combo items — THEME FIX: lifted from #5a4a1a → #8a7a4a */}
             {item.comboItems?.length > 0 && item.comboItems.map((ci, ci2) => (
-              <div key={ci2} style={{ fontSize:11, color:'#5a4a1a', paddingLeft:10, marginTop:1 }}>
+              <div key={ci2} style={{ fontSize:11, color:'#8a7a4a', paddingLeft:10, marginTop:1 }}>
                 — {ci.name}{ci.quantity > 1 ? ` ×${ci.quantity}` : ''}
               </div>
             ))}
 
-            {/* Addons */}
+            {/* Addons — THEME FIX: lifted from #5a4a1a → #8a7a4a */}
             {item.addons?.length > 0 && (
-              <div style={{ fontSize:11, color:'#5a4a1a', paddingLeft:10, marginTop:1 }}>
+              <div style={{ fontSize:11, color:'#8a7a4a', paddingLeft:10, marginTop:1 }}>
                 + {item.addons.map(a => a.quantity > 1 ? `${a.name} ×${a.quantity}` : a.name).join(', ')}
               </div>
             )}
           </div>
         ))}
 
-        {/* Special instructions */}
+        {/* Special instructions — THEME FIX: improved contrast on text */}
         {order.specialInstructions && (
           <div style={{
             marginTop:4, padding:'7px 10px', borderRadius:9, fontSize:11,
-            color:'#fbbf24', background:'rgba(245,158,11,0.07)',
-            border:'1px solid rgba(245,158,11,0.18)',
+            color:'#fcd34d', background:'rgba(245,158,11,0.09)',
+            border:'1px solid rgba(245,158,11,0.25)',
           }}>
             📝 {order.specialInstructions}
           </div>
         )}
       </div>
 
-      {/* Footer */}
+      {/* Footer — THEME FIX: items count / customer name lifted #7a6a3a → #9a8a5a */}
       <div style={{
-        padding:'9px 14px', borderTop:'1px solid rgba(255,255,255,0.05)',
+        padding:'9px 14px', borderTop:'1px solid rgba(255,255,255,0.07)',
         background:'rgba(255,255,255,0.01)',
         display:'flex', alignItems:'center', justifyContent:'space-between', gap:8,
       }}>
-        <span style={{ fontSize:11, fontWeight:600, color:'#7a6a3a' }}>
+        <span style={{ fontSize:11, fontWeight:600, color:'#9a8a5a' }}>
           {totalItems} item{totalItems !== 1 ? 's' : ''}
           {order.customerName ? ` · ${order.customerName}` : ''}
         </span>
@@ -655,11 +667,12 @@ const KitchenDisplay = () => {
         display:'flex', alignItems:'center', justifyContent:'center', textAlign:'center', padding:32,
       }}>
         <div>
-          <UtensilsCrossed style={{ width:56, height:56, color:'#7a6a3a', margin:'0 auto 16px' }}/>
+          <UtensilsCrossed style={{ width:56, height:56, color:'#9a8a5a', margin:'0 auto 16px' }}/>
           <h2 className="kds-title" style={{ color:'#fff', fontSize:22, fontWeight:900, marginBottom:8 }}>
             Café Not Found
           </h2>
-          <p style={{ color:'#7a6a3a', fontSize:13 }}>
+          {/* THEME FIX: lifted from #7a6a3a → #9a8a5a */}
+          <p style={{ color:'#9a8a5a', fontSize:13 }}>
             No café with ID: <code style={{ color:'#C9A227' }}>{cafeId}</code>
           </p>
         </div>
@@ -677,13 +690,13 @@ const KitchenDisplay = () => {
       {/* ── Top bar ── */}
       <header style={{
         flexShrink:0, display:'flex', alignItems:'center', justifyContent:'space-between',
-        padding:'10px 20px', borderBottom:'1px solid rgba(255,255,255,0.06)',
+        padding:'10px 20px', borderBottom:'1px solid rgba(255,255,255,0.08)',
         background:'#0A0702',
       }}>
         <div style={{ display:'flex', alignItems:'center', gap:12 }}>
           <div style={{
             width:38, height:38, borderRadius:10,
-            background:'rgba(201,162,39,0.1)', border:'1.5px solid rgba(201,162,39,0.18)',
+            background:'rgba(201,162,39,0.12)', border:'1.5px solid rgba(201,162,39,0.25)',
             display:'flex', alignItems:'center', justifyContent:'center',
           }}>
             <ChefHat style={{ width:20, height:20, color:'#C9A227' }}/>
@@ -692,7 +705,8 @@ const KitchenDisplay = () => {
             <h1 className="kds-title" style={{ color:'#fff', fontSize:16, fontWeight:900, lineHeight:1 }}>
               {cafe.name || 'Kitchen'}
             </h1>
-            <span style={{ fontSize:10, color:'#7a6a3a', textTransform:'uppercase', letterSpacing:'0.12em', fontWeight:700 }}>
+            {/* THEME FIX: lifted from #7a6a3a → #9a8a5a */}
+            <span style={{ fontSize:10, color:'#9a8a5a', textTransform:'uppercase', letterSpacing:'0.12em', fontWeight:700 }}>
               Kitchen Display
             </span>
           </div>
@@ -704,13 +718,14 @@ const KitchenDisplay = () => {
             <p style={{ fontSize:26, fontWeight:900, color:'#C9A227', lineHeight:1, fontFamily:"'Playfair Display',serif" }}>
               {totalActive}
             </p>
-            <p style={{ fontSize:9, color:'#7a6a3a', textTransform:'uppercase', letterSpacing:'0.1em', fontWeight:700 }}>Active</p>
+            {/* THEME FIX: #7a6a3a → #9a8a5a */}
+            <p style={{ fontSize:9, color:'#9a8a5a', textTransform:'uppercase', letterSpacing:'0.1em', fontWeight:700 }}>Active</p>
           </div>
 
           {columns.map(col => (
             <div key={col.id} style={{ textAlign:'center', display:'none' }} className="md:block">
               <p style={{ fontSize:18, fontWeight:900, color:col.accent, lineHeight:1 }}>{col.orders.length}</p>
-              <p style={{ fontSize:9, color:col.accent+'99', textTransform:'uppercase', letterSpacing:'0.08em', fontWeight:700 }}>
+              <p style={{ fontSize:9, color:col.accent+'bb', textTransform:'uppercase', letterSpacing:'0.08em', fontWeight:700 }}>
                 {col.label.split(' ')[0]}
               </p>
             </div>
@@ -720,14 +735,15 @@ const KitchenDisplay = () => {
         <div style={{ display:'flex', alignItems:'center', gap:14 }}>
           <div style={{ textAlign:'right' }}>
             <p style={{ fontSize:13, fontWeight:800, color:'#fdf8e1' }}>{timeStr}</p>
-            <p style={{ fontSize:10, color:'#7a6a3a', fontWeight:600 }}>{dateStr}</p>
+            {/* THEME FIX: #7a6a3a → #9a8a5a */}
+            <p style={{ fontSize:10, color:'#9a8a5a', fontWeight:600 }}>{dateStr}</p>
           </div>
           <div style={{
             display:'flex', alignItems:'center', gap:5,
             padding:'4px 10px', borderRadius:20, fontSize:10, fontWeight:800,
-            background: online ? 'rgba(34,197,94,0.12)' : 'rgba(239,68,68,0.12)',
+            background: online ? 'rgba(34,197,94,0.14)' : 'rgba(239,68,68,0.14)',
             color:       online ? '#4ade80'              : '#f87171',
-            border: `1px solid ${online ? 'rgba(34,197,94,0.22)' : 'rgba(239,68,68,0.22)'}`,
+            border: `1px solid ${online ? 'rgba(34,197,94,0.28)' : 'rgba(239,68,68,0.28)'}`,
           }}>
             {online
               ? <><Wifi style={{width:11,height:11}}/> Live</>
@@ -740,7 +756,7 @@ const KitchenDisplay = () => {
       {/* ── Column headers ── */}
       <div style={{
         flexShrink:0, display:'flex', gap:1,
-        borderBottom:'1px solid rgba(255,255,255,0.05)',
+        borderBottom:'1px solid rgba(255,255,255,0.07)',
         background:'#080602',
       }}>
         {columns.map(col => {
@@ -759,7 +775,7 @@ const KitchenDisplay = () => {
                 width:22, height:22, borderRadius:'50%',
                 display:'flex', alignItems:'center', justifyContent:'center',
                 fontSize:11, fontWeight:900, color:col.accent,
-                background: col.accent + '20',
+                background: col.accent + '25',
               }}>{col.totalCount}</span>
             </div>
           );
@@ -786,12 +802,13 @@ const KitchenDisplay = () => {
                   >
                     <div style={{
                       width:44, height:44, borderRadius:'50%',
-                      background: col.accent+'15', border:`1px solid ${col.border}`,
+                      background: col.accent+'18', border:`1px solid ${col.border}`,
                       display:'flex', alignItems:'center', justifyContent:'center',
                     }}>
-                      <col.icon style={{ width:20, height:20, color:col.accent+'70' }}/>
+                      <col.icon style={{ width:20, height:20, color:col.accent+'88' }}/>
                     </div>
-                    <p style={{ fontSize:12, color:col.accent+'55', fontWeight:600 }}>No orders</p>
+                    {/* THEME FIX: slightly lifted empty-state text opacity */}
+                    <p style={{ fontSize:12, color:col.accent+'70', fontWeight:600 }}>No orders</p>
                   </motion.div>
                 ) : (
                   col.orders.map(order => (
@@ -811,16 +828,16 @@ const KitchenDisplay = () => {
                   onClick={() => setColPage(col.id, Math.max(0, col.page-1))}
                   disabled={col.page === 0}
                   className="kds-btn"
-                  style={{ background: col.page===0 ? 'transparent' : col.accent+'20', color:col.accent, padding:'5px 10px', opacity: col.page===0 ? 0.3 : 1 }}
+                  style={{ background: col.page===0 ? 'transparent' : col.accent+'25', color:col.accent, padding:'5px 10px', opacity: col.page===0 ? 0.35 : 1 }}
                 >← Prev</button>
-                <span style={{ fontSize:11, color:col.accent+'99', fontWeight:600 }}>
+                <span style={{ fontSize:11, color:col.accent+'bb', fontWeight:600 }}>
                   {col.page+1}/{col.totalPages} · {col.totalCount}
                 </span>
                 <button
                   onClick={() => setColPage(col.id, Math.min(col.totalPages-1, col.page+1))}
                   disabled={col.page >= col.totalPages-1}
                   className="kds-btn"
-                  style={{ background: col.page>=col.totalPages-1 ? 'transparent' : col.accent+'20', color:col.accent, padding:'5px 10px', opacity: col.page>=col.totalPages-1 ? 0.3 : 1 }}
+                  style={{ background: col.page>=col.totalPages-1 ? 'transparent' : col.accent+'25', color:col.accent, padding:'5px 10px', opacity: col.page>=col.totalPages-1 ? 0.35 : 1 }}
                 >Next →</button>
               </div>
             )}

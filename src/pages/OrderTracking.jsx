@@ -2,31 +2,17 @@
  * OrderTracking.jsx
  * Route: /track/:orderId
  *
- * Customer-facing real-time order status page.
- * Uses onSnapshot on orders/{orderId} — SAME listener pattern as before.
- * DO NOT modify this listener — it is the existing real-time system.
- *
- * VISUAL UPGRADE — ZERO LOGIC CHANGES:
- * - Matched fonts: Nunito + Fredoka One + Playfair Display (same as CafeOrderingPremium)
- * - Floating food emoji particles (ambient decoration)
- * - Glow pulse animations on status nodes
- * - Premium card gradients & shadows matching CafeOrderingPremium
- * - Emoji decorations on all section headers and badges
- * - Richer animated status bubble
- * - Premium loyalty promo card styling
- * - All buttons match CafeOrderingPremium style
- * - Background ambient orb animations
- *
- * Original features preserved 100%:
- * - Add-ons shown under each item
- * - comboItems shown under combo items
- * - Payment status badge
- * - "Send Invoice on WhatsApp" button
- * - Cancelled state
- * - Full bill breakdown
- * - Estimated time hint per status
- * - "Add More Items" button
- * - FREE ITEM FIX
+ * VISUAL UPGRADE — ZERO LOGIC CHANGES.
+ * THEME FIX — contrast improvements throughout (dark-mode internal):
+ *  - Secondary/muted text: #7a6a3a → #a89050  (passes WCAG AA on #050505 bg)
+ *  - Tertiary text: #555 → #888, #666 → #999, #777 → #aaa
+ *  - Near-invisible text (#333, #2a2a2a, #444) lifted to visible values
+ *  - Card/section borders lifted for better separation
+ *  - FloatingParticles opacity lifted 0.18 → 0.25
+ *  - Item name color: #F5F0DC → #ffffff for crisp readability
+ *  - Combo/addon sub-text lifted from #555 → #888
+ *  - Bill breakdown rows: #7a6a3a → #a89050
+ *  - Footer credit text: #2a2a2a → #555
  */
 
 import React, { useState, useEffect, useCallback, useRef } from 'react';
@@ -43,7 +29,7 @@ import {
 import { generateInvoiceMessage } from '../services/invoiceService';
 import AddOnModal from '../components/AddOnModal';
 
-// ─── Inject premium fonts — same as CafeOrderingPremium ──────────────────────
+// ─── Inject premium fonts ─────────────────────────────────────────────────────
 if (typeof document !== 'undefined' && !document.getElementById('ot-premium-css')) {
   const el = document.createElement('style');
   el.id = 'ot-premium-css';
@@ -119,7 +105,7 @@ const getStatusConfig = (status) =>
     ? CANCELLED
     : STATUSES.find(s => s.id === status) || STATUSES[0];
 
-// ─── Floating food emoji particles (matches CafeOrderingPremium) ──────────────
+// ─── Floating food emoji particles ───────────────────────────────────────────
 const FOOD_EMOJIS = ['☕', '🍰', '🥐', '🧁', '🍩', '🫖', '🍫', '🥗', '🍜', '🧆'];
 const FloatingParticles = () => (
   <div className="fixed inset-0 overflow-hidden pointer-events-none select-none" aria-hidden style={{ zIndex: 0 }}>
@@ -133,7 +119,8 @@ const FloatingParticles = () => (
         }}
         animate={{
           y:       [0, -22, 0],
-          opacity: [0, 0.18, 0],
+          // THEME FIX: opacity lifted from 0.18 → 0.25 for visible ambient decoration
+          opacity: [0, 0.25, 0],
           rotate:  [0, i % 2 === 0 ? 14 : -14, 0],
         }}
         transition={{
@@ -182,20 +169,20 @@ const ProgressBar = ({ status }) => {
                   style={{
                     background:  done
                       ? `linear-gradient(135deg, ${s.color}, ${s.color}cc)`
-                      : 'rgba(255,255,255,0.04)',
-                    borderColor: done ? s.color : 'rgba(255,255,255,0.10)',
+                      : 'rgba(255,255,255,0.06)',
+                    borderColor: done ? s.color : 'rgba(255,255,255,0.14)',
                     boxShadow:   done && !active ? `0 2px 10px ${s.color}40` : undefined,
                   }}
                 >
                   {active
                     ? <span className="text-base select-none">{s.emoji}</span>
-                    : <Icon className="w-4 h-4" style={{ color: done ? '#000' : '#444' }} />
+                    : <Icon className="w-4 h-4" style={{ color: done ? '#000' : '#666' }} />
                   }
                 </motion.div>
                 <p
                   className="text-xs mt-1.5 text-center leading-tight ot"
                   style={{
-                    color:      done ? s.color : '#444',
+                    color:      done ? s.color : '#666',
                     fontWeight: active ? 800 : 500,
                     maxWidth:   52,
                     fontFamily: "'Nunito', sans-serif",
@@ -211,7 +198,7 @@ const ProgressBar = ({ status }) => {
                   style={{
                     background: i < currentStep
                       ? `linear-gradient(90deg, ${STATUSES[i].color}, ${STATUSES[i+1].color})`
-                      : 'rgba(255,255,255,0.07)',
+                      : 'rgba(255,255,255,0.10)',
                   }}
                 />
               )}
@@ -227,9 +214,9 @@ const ProgressBar = ({ status }) => {
 
 const PaymentBadge = ({ status }) => {
   const map = {
-    paid:    { label: 'Paid',    color: '#10B981', bg: 'rgba(16,185,129,0.15)',  border: 'rgba(16,185,129,0.3)'  },
-    pending: { label: 'Pending', color: '#F59E0B', bg: 'rgba(245,158,11,0.15)', border: 'rgba(245,158,11,0.3)'  },
-    failed:  { label: 'Failed',  color: '#EF4444', bg: 'rgba(239,68,68,0.15)',  border: 'rgba(239,68,68,0.3)'   },
+    paid:    { label: 'Paid',    color: '#10B981', bg: 'rgba(16,185,129,0.15)',  border: 'rgba(16,185,129,0.35)'  },
+    pending: { label: 'Pending', color: '#F59E0B', bg: 'rgba(245,158,11,0.15)', border: 'rgba(245,158,11,0.35)'  },
+    failed:  { label: 'Failed',  color: '#EF4444', bg: 'rgba(239,68,68,0.15)',  border: 'rgba(239,68,68,0.35)'   },
   };
   const cfg = map[status] || map.pending;
   const emoji = cfg.label === 'Paid' ? '✅' : cfg.label === 'Failed' ? '❌' : '⏳';
@@ -253,13 +240,15 @@ const ItemAddonBreakdown = ({ item, CUR, primary }) => {
 
   return (
     <div className="mt-1 space-y-0.5">
-      <p className="text-xs ml-1 ot" style={{ color: '#666' }}>
+      {/* THEME FIX: #666 → #999 */}
+      <p className="text-xs ml-1 ot" style={{ color: '#999' }}>
         Base: {CUR}{basePrice.toFixed(2)}{qty > 1 ? ` ×${qty}` : ''}
       </p>
       {comboItems.length > 0 && (
         <div className="ml-3 space-y-0.5">
           {comboItems.map((ci, cIdx) => (
-            <p key={cIdx} className="text-xs ot" style={{ color: '#555' }}>
+            // THEME FIX: #555 → #888
+            <p key={cIdx} className="text-xs ot" style={{ color: '#888' }}>
               — {ci.name}{ci.quantity > 1 ? ` ×${ci.quantity}` : ''}
             </p>
           ))}
@@ -267,26 +256,29 @@ const ItemAddonBreakdown = ({ item, CUR, primary }) => {
       )}
       {addons.length > 0 ? (
         <div className="ml-3 space-y-0.5 pt-0.5">
-          <p className="text-xs font-black ot" style={{ color: '#888' }}>
+          {/* THEME FIX: #888 → #aaa */}
+          <p className="text-xs font-black ot" style={{ color: '#aaa' }}>
             ✨ Add-ons ({addons.length}):
           </p>
           {addons.map((a, ai) => {
             const aQty   = parseInt(a.quantity) || 1;
             const aPrice = parseFloat(a.price)  || 0;
             return (
-              <div key={ai} className="flex justify-between text-xs ot" style={{ color: '#777' }}>
+              <div key={ai} className="flex justify-between text-xs ot" style={{ color: '#999' }}>
                 <span>╰ {a.name} ×{aQty}</span>
-                <span style={{ color: '#888' }}>+{CUR}{(aPrice * aQty).toFixed(2)}</span>
+                {/* THEME FIX: #888 → #aaa */}
+                <span style={{ color: '#aaa' }}>+{CUR}{(aPrice * aQty).toFixed(2)}</span>
               </div>
             );
           })}
-          <div className="flex justify-between text-xs pt-0.5 border-t ot" style={{ color: '#666', borderColor: 'rgba(255,255,255,0.05)' }}>
+          <div className="flex justify-between text-xs pt-0.5 border-t ot" style={{ color: '#999', borderColor: 'rgba(255,255,255,0.08)' }}>
             <span>Add-ons total</span>
             <span>+{CUR}{(addonTotal * qty).toFixed(2)}</span>
           </div>
         </div>
       ) : (
-        <p className="text-xs ml-3 italic ot" style={{ color: '#444' }}>No add-ons selected</p>
+        // THEME FIX: #444 → #777
+        <p className="text-xs ml-3 italic ot" style={{ color: '#777' }}>No add-ons selected</p>
       )}
     </div>
   );
@@ -498,7 +490,7 @@ const AddMoreItemsModal = ({ order, onClose, primary, setAddonModal, setVariantM
           className="relative w-full sm:max-w-lg rounded-t-3xl sm:rounded-3xl overflow-hidden flex flex-col"
           style={{
             background: 'linear-gradient(180deg, #1a1400 0%, #110d00 100%)',
-            border: '1.5px solid rgba(212,175,55,0.18)',
+            border: '1.5px solid rgba(212,175,55,0.22)',
             boxShadow: '0 -20px 60px rgba(212,175,55,0.12)',
             maxHeight: '90vh',
           }}
@@ -510,31 +502,32 @@ const AddMoreItemsModal = ({ order, onClose, primary, setAddonModal, setVariantM
         >
           {/* Grip */}
           <div className="flex justify-center pt-3 pb-1 sm:hidden flex-shrink-0">
-            <div className="w-10 h-1 rounded-full" style={{ background: 'rgba(212,175,55,0.3)' }} />
+            <div className="w-10 h-1 rounded-full" style={{ background: 'rgba(212,175,55,0.35)' }} />
           </div>
 
           {/* Header */}
           <div className="flex items-center justify-between px-5 py-4 flex-shrink-0"
-            style={{ borderBottom: '1px solid rgba(212,175,55,0.12)' }}>
+            style={{ borderBottom: '1px solid rgba(212,175,55,0.16)' }}>
             <div>
               <h3 className="text-white font-black text-lg ot-serif flex items-center gap-2">
                 🛒 Add More Items
               </h3>
-              <p className="text-xs mt-0.5 ot font-semibold" style={{ color: '#7a6a3a' }}>
+              {/* THEME FIX: #7a6a3a → #a89050 */}
+              <p className="text-xs mt-0.5 ot font-semibold" style={{ color: '#a89050' }}>
                 Order #{String(order.orderNumber || '').padStart(3, '0')}
               </p>
             </div>
             <button
               onClick={onClose}
               className="w-9 h-9 rounded-2xl flex items-center justify-center transition-all"
-              style={{ background: 'rgba(212,175,55,0.1)', border: '1.5px solid rgba(212,175,55,0.2)' }}
+              style={{ background: 'rgba(212,175,55,0.12)', border: '1.5px solid rgba(212,175,55,0.25)' }}
             >
               <X className="w-4 h-4" style={{ color: '#D4AF37' }} />
             </button>
           </div>
 
           {/* Search */}
-          <div className="px-4 py-3 flex-shrink-0" style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+          <div className="px-4 py-3 flex-shrink-0" style={{ borderBottom: '1px solid rgba(255,255,255,0.07)' }}>
             <div className="relative">
               <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm">🔍</span>
               <input
@@ -544,8 +537,8 @@ const AddMoreItemsModal = ({ order, onClose, primary, setAddonModal, setVariantM
                 placeholder="Search menu..."
                 className="w-full pl-9 pr-4 py-2.5 rounded-2xl text-sm outline-none font-semibold ot"
                 style={{
-                  background: 'rgba(255,255,255,0.06)',
-                  border: '1.5px solid rgba(212,175,55,0.15)',
+                  background: 'rgba(255,255,255,0.07)',
+                  border: '1.5px solid rgba(212,175,55,0.20)',
                   color: '#fff',
                   fontFamily: "'Nunito', sans-serif",
                 }}
@@ -564,12 +557,14 @@ const AddMoreItemsModal = ({ order, onClose, primary, setAddonModal, setVariantM
                 >
                   🍳
                 </motion.div>
-                <p className="text-sm font-bold ot" style={{ color: '#7a6a3a' }}>Loading menu…</p>
+                {/* THEME FIX: #7a6a3a → #a89050 */}
+                <p className="text-sm font-bold ot" style={{ color: '#a89050' }}>Loading menu…</p>
               </div>
             ) : filteredItems.length === 0 ? (
               <div className="text-center py-10">
                 <div className="text-4xl mb-2">🫙</div>
-                <p className="text-sm font-bold ot" style={{ color: '#5a4a1a' }}>No items found</p>
+                {/* THEME FIX: #5a4a1a → #8a7030 */}
+                <p className="text-sm font-bold ot" style={{ color: '#8a7030' }}>No items found</p>
               </div>
             ) : (
               filteredItems.map(item => {
@@ -604,24 +599,25 @@ const AddMoreItemsModal = ({ order, onClose, primary, setAddonModal, setVariantM
                     key={item.id}
                     className="flex items-center justify-between p-3 rounded-2xl transition-all"
                     style={{
-                      background: 'rgba(255,255,255,0.04)',
-                      border: '1.5px solid rgba(255,255,255,0.07)',
+                      background: 'rgba(255,255,255,0.05)',
+                      border: '1.5px solid rgba(255,255,255,0.09)',
                     }}
                     whileHover={{
-                      borderColor: 'rgba(212,175,55,0.25)',
-                      background: 'rgba(212,175,55,0.06)',
+                      borderColor: 'rgba(212,175,55,0.30)',
+                      background: 'rgba(212,175,55,0.07)',
                     }}
                   >
                     <div className="flex-1 min-w-0 mr-3">
                       <p className="text-white text-sm font-black truncate ot">{item.name}</p>
                       {item.category && (
-                        <p className="text-xs mt-0.5 ot font-semibold" style={{ color: '#5a4a1a' }}>{item.category}</p>
+                        // THEME FIX: #5a4a1a → #8a7030
+                        <p className="text-xs mt-0.5 ot font-semibold" style={{ color: '#8a7030' }}>{item.category}</p>
                       )}
                       {hasVariants ? (
                         <div className="flex flex-wrap gap-1 mt-1">
                           {itemVariants.map((v, vi) => (
                             <span key={vi} className="text-xs px-1.5 py-0.5 rounded-full ot font-black"
-                              style={{ background: 'rgba(212,175,55,0.12)', color: '#D4AF37', border: '1px solid rgba(212,175,55,0.25)', fontSize: '0.65rem' }}>
+                              style={{ background: 'rgba(212,175,55,0.14)', color: '#D4AF37', border: '1px solid rgba(212,175,55,0.30)', fontSize: '0.65rem' }}>
                               {v.name || `S${vi+1}`} {CUR}{fmt(v.price)}
                             </span>
                           ))}
@@ -638,7 +634,7 @@ const AddMoreItemsModal = ({ order, onClose, primary, setAddonModal, setVariantM
                         <button
                           onClick={() => removeFromNewCart(item.id)}
                           className="w-7 h-7 rounded-full flex items-center justify-center"
-                          style={{ background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.10)' }}
+                          style={{ background: 'rgba(255,255,255,0.10)', border: '1px solid rgba(255,255,255,0.14)' }}
                         >
                           <Minus className="w-3 h-3 text-white" />
                         </button>
@@ -680,7 +676,7 @@ const AddMoreItemsModal = ({ order, onClose, primary, setAddonModal, setVariantM
           {/* Footer */}
           {newCart.length > 0 && (
             <div className="px-4 py-4 flex-shrink-0 space-y-3"
-              style={{ borderTop: '1px solid rgba(212,175,55,0.12)', background: 'rgba(0,0,0,0.2)' }}>
+              style={{ borderTop: '1px solid rgba(212,175,55,0.16)', background: 'rgba(0,0,0,0.2)' }}>
               <p className="text-xs font-black ot" style={{ color: '#D4AF37' }}>
                 🛒 Cart · {newCart.length} item{newCart.length !== 1 ? 's' : ''}
               </p>
@@ -691,7 +687,7 @@ const AddMoreItemsModal = ({ order, onClose, primary, setAddonModal, setVariantM
                   const addonAmt = addons.reduce((s, a) => s + (parseFloat(a?.price) || 0) * (parseInt(a?.quantity) || 1), 0);
                   const lineTotal = ((parseFloat(item.basePrice ?? item.price) || 0) + addonAmt) * (parseInt(item.quantity) || 1);
                   return (
-                    <div key={idx} className="flex justify-between text-xs ot font-semibold" style={{ color: '#7a6a3a' }}>
+                    <div key={idx} className="flex justify-between text-xs ot font-semibold" style={{ color: '#a89050' }}>
                       <span>
                         {item.name}
                         {(item.selectedVariant || item.selectedSize) ? ` (${item.selectedVariant || item.selectedSize})` : ''}
@@ -702,8 +698,8 @@ const AddMoreItemsModal = ({ order, onClose, primary, setAddonModal, setVariantM
                     </div>
                   );
                 })}
-                <div className="flex justify-between text-sm font-black pt-1" style={{ borderTop: '1px solid rgba(212,175,55,0.1)' }}>
-                  <span style={{ color: '#7a6a3a' }} className="ot">New items total</span>
+                <div className="flex justify-between text-sm font-black pt-1" style={{ borderTop: '1px solid rgba(212,175,55,0.14)' }}>
+                  <span style={{ color: '#a89050' }} className="ot">New items total</span>
                   <span style={{ color: primary }} className="ot-fun">{CUR}{fmt(newCartTotal)}</span>
                 </div>
               </div>
@@ -865,7 +861,7 @@ const OrderTracking = () => {
           animate={{ rotate: 360 }}
           transition={{ duration: 0.9, repeat: Infinity, ease: 'linear' }}
           className="w-8 h-8 rounded-full border-4 border-t-transparent mx-auto"
-          style={{ borderColor: `${primary}30`, borderTopColor: primary }}
+          style={{ borderColor: `${primary}40`, borderTopColor: primary }}
         />
       </div>
     </div>
@@ -885,6 +881,7 @@ const OrderTracking = () => {
         <h1 className="text-2xl font-black text-white mb-2 ot-serif">
           Order Not Found
         </h1>
+        {/* THEME FIX: #A3A3A3 was fine — kept as-is */}
         <p className="font-semibold" style={{ color: '#A3A3A3' }}>
           This order doesn't exist or may have expired.
         </p>
@@ -927,13 +924,13 @@ const OrderTracking = () => {
           className="rounded-3xl overflow-hidden"
           style={{
             background:     'linear-gradient(180deg, rgba(18,14,5,0.98) 0%, rgba(10,8,0,0.99) 100%)',
-            border:         '1.5px solid rgba(212,175,55,0.15)',
+            border:         '1.5px solid rgba(212,175,55,0.20)',
             backdropFilter: 'blur(24px)',
-            boxShadow:      '0 24px 80px rgba(0,0,0,0.6), 0 0 0 1px rgba(212,175,55,0.08)',
+            boxShadow:      '0 24px 80px rgba(0,0,0,0.6), 0 0 0 1px rgba(212,175,55,0.10)',
           }}
         >
           {/* Header */}
-          <div className="px-6 pt-8 pb-5 text-center" style={{ borderBottom: '1px solid rgba(212,175,55,0.08)' }}>
+          <div className="px-6 pt-8 pb-5 text-center" style={{ borderBottom: '1px solid rgba(212,175,55,0.12)' }}>
             <motion.div
               animate={{ scale: [1, 1.12, 1] }}
               transition={{ duration: 2.4, repeat: Infinity, ease: 'easeInOut' }}
@@ -945,14 +942,16 @@ const OrderTracking = () => {
               Order #{String(order.orderNumber || '').padStart(3, '0')}
             </h1>
             <div className="flex items-center justify-center gap-2 mt-2.5 flex-wrap">
-              <span className="text-xs ot font-semibold" style={{ color: '#7a6a3a' }}>{orderTypeLabel}</span>
+              {/* THEME FIX: #7a6a3a → #a89050 throughout header meta */}
+              <span className="text-xs ot font-semibold" style={{ color: '#a89050' }}>{orderTypeLabel}</span>
               {orderTime && (
                 <>
-                  <span style={{ color: '#333' }} className="text-xs">·</span>
-                  <span className="text-xs ot font-semibold" style={{ color: '#7a6a3a' }}>🕐 {orderTime}</span>
+                  {/* THEME FIX: separator #333 → #555 */}
+                  <span style={{ color: '#555' }} className="text-xs">·</span>
+                  <span className="text-xs ot font-semibold" style={{ color: '#a89050' }}>🕐 {orderTime}</span>
                 </>
               )}
-              <span style={{ color: '#333' }} className="text-xs">·</span>
+              <span style={{ color: '#555' }} className="text-xs">·</span>
               <PaymentBadge status={payStatus} />
             </div>
           </div>
@@ -970,9 +969,9 @@ const OrderTracking = () => {
               transition={{ duration: 0.3 }}
               className="mx-6 mb-5 p-4 rounded-2xl text-center"
               style={{
-                background: `${statusCfg.color}10`,
-                border:     `1.5px solid ${statusCfg.color}35`,
-                boxShadow:  `0 4px 20px ${statusCfg.color}15`,
+                background: `${statusCfg.color}12`,
+                border:     `1.5px solid ${statusCfg.color}40`,
+                boxShadow:  `0 4px 20px ${statusCfg.color}18`,
               }}
             >
               <motion.p
@@ -983,9 +982,11 @@ const OrderTracking = () => {
               >
                 {statusCfg.emoji} {statusCfg.label}
               </motion.p>
+              {/* THEME FIX: #A3A3A3 was fine — kept */}
               <p className="font-semibold text-sm mt-1 ot" style={{ color: '#A3A3A3' }}>{statusCfg.desc}</p>
+              {/* THEME FIX: hint #555 → #888 */}
               {statusCfg.hint && (
-                <p className="text-xs mt-1 italic ot" style={{ color: '#555' }}>{statusCfg.hint}</p>
+                <p className="text-xs mt-1 italic ot" style={{ color: '#888' }}>{statusCfg.hint}</p>
               )}
             </motion.div>
           </AnimatePresence>
@@ -994,24 +995,25 @@ const OrderTracking = () => {
           {(order.customerName || order.customerPhone || order.deliveryAddress) && (
             <div className="mx-6 mb-4 p-3.5 rounded-2xl space-y-2"
               style={{
-                background: 'rgba(212,175,55,0.04)',
-                border: '1.5px solid rgba(212,175,55,0.1)',
+                background: 'rgba(212,175,55,0.05)',
+                border: '1.5px solid rgba(212,175,55,0.14)',
               }}>
               {order.customerName && (
                 <div className="flex items-center gap-2 text-xs ot font-semibold" style={{ color: '#A3A3A3' }}>
-                  <User className="w-3.5 h-3.5 flex-shrink-0" style={{ color: '#7a6a3a' }} />
+                  {/* THEME FIX: icon color #7a6a3a → #a89050 */}
+                  <User className="w-3.5 h-3.5 flex-shrink-0" style={{ color: '#a89050' }} />
                   👤 {order.customerName}
                 </div>
               )}
               {order.customerPhone && (
                 <div className="flex items-center gap-2 text-xs ot font-semibold" style={{ color: '#A3A3A3' }}>
-                  <Phone className="w-3.5 h-3.5 flex-shrink-0" style={{ color: '#7a6a3a' }} />
+                  <Phone className="w-3.5 h-3.5 flex-shrink-0" style={{ color: '#a89050' }} />
                   📞 {order.customerPhone}
                 </div>
               )}
               {order.deliveryAddress && (
                 <div className="flex items-start gap-2 text-xs ot font-semibold" style={{ color: '#A3A3A3' }}>
-                  <MapPin className="w-3.5 h-3.5 flex-shrink-0 mt-0.5" style={{ color: '#7a6a3a' }} />
+                  <MapPin className="w-3.5 h-3.5 flex-shrink-0 mt-0.5" style={{ color: '#a89050' }} />
                   📍 {order.deliveryAddress}
                 </div>
               )}
@@ -1040,13 +1042,14 @@ const OrderTracking = () => {
                     transition={{ delay: i * 0.06 }}
                     className="rounded-2xl p-3.5 space-y-1"
                     style={{
-                      background: 'rgba(212,175,55,0.04)',
-                      border: '1.5px solid rgba(212,175,55,0.1)',
+                      background: 'rgba(212,175,55,0.05)',
+                      border: '1.5px solid rgba(212,175,55,0.14)',
                     }}
                   >
                     {/* Item name + qty + line total */}
                     <div className="flex justify-between items-start">
-                      <span className="font-black text-sm flex-1 pr-2 ot" style={{ color: '#F5F0DC' }}>
+                      {/* THEME FIX: #F5F0DC → #ffffff for crisp readability */}
+                      <span className="font-black text-sm flex-1 pr-2 ot" style={{ color: '#ffffff' }}>
                         🍴 {item.name}
                         {(item.selectedVariant || item.selectedSize)
                           ? ` (${item.selectedVariant || item.selectedSize})`
@@ -1056,7 +1059,7 @@ const OrderTracking = () => {
                       {item.isFree ? (
                         <span
                           className="text-xs font-black px-2 py-0.5 rounded-full flex-shrink-0 ot"
-                          style={{ background: 'rgba(16,185,129,0.15)', color: '#10B981', border: '1.5px solid rgba(16,185,129,0.3)' }}
+                          style={{ background: 'rgba(16,185,129,0.15)', color: '#10B981', border: '1.5px solid rgba(16,185,129,0.35)' }}
                         >
                           🎁 FREE
                         </span>
@@ -1073,7 +1076,8 @@ const OrderTracking = () => {
                         🎁 FREE · was {CUR}{fmt(item.actualPrice ?? item.basePrice ?? item.price)}
                       </p>
                     ) : (
-                      <p className="text-xs ot font-semibold" style={{ color: '#666' }}>
+                      // THEME FIX: #666 → #999
+                      <p className="text-xs ot font-semibold" style={{ color: '#999' }}>
                         Base: {CUR}{fmt(basePrice)}{qty > 1 ? ` ×${qty}` : ''}
                       </p>
                     )}
@@ -1082,7 +1086,8 @@ const OrderTracking = () => {
                     {Array.isArray(item.comboItems) && item.comboItems.length > 0 && (
                       <div className="ml-2 space-y-0.5 pt-0.5">
                         {item.comboItems.map((ci, cIdx) => (
-                          <p key={cIdx} className="text-xs ot font-semibold" style={{ color: '#555' }}>
+                          // THEME FIX: #555 → #888
+                          <p key={cIdx} className="text-xs ot font-semibold" style={{ color: '#888' }}>
                             🔗 {ci.name}{ci.quantity > 1 ? ` ×${ci.quantity}` : ''}
                           </p>
                         ))}
@@ -1091,8 +1096,10 @@ const OrderTracking = () => {
 
                     {/* Add-ons */}
                     {addons.length > 0 ? (
-                      <div className="ml-2 pt-1.5 space-y-0.5 border-t" style={{ borderColor: 'rgba(212,175,55,0.08)' }}>
-                        <p className="text-xs font-black ot" style={{ color: '#888' }}>
+                      // THEME FIX: divider border opacity lifted
+                      <div className="ml-2 pt-1.5 space-y-0.5 border-t" style={{ borderColor: 'rgba(212,175,55,0.12)' }}>
+                        {/* THEME FIX: #888 → #aaa */}
+                        <p className="text-xs font-black ot" style={{ color: '#aaa' }}>
                           ✨ Add-ons ({addons.length}):
                         </p>
                         {addons.map((a, ai) => {
@@ -1100,18 +1107,21 @@ const OrderTracking = () => {
                           const aPrice = safeN(a.price);
                           return (
                             <div key={ai} className="flex justify-between text-xs ot font-semibold">
-                              <span style={{ color: '#777' }}>╰ {a.name} ×{aQty}</span>
-                              <span style={{ color: '#888' }}>+{CUR}{fmt(aPrice * aQty)}</span>
+                              {/* THEME FIX: #777 → #999 */}
+                              <span style={{ color: '#999' }}>╰ {a.name} ×{aQty}</span>
+                              {/* THEME FIX: #888 → #aaa */}
+                              <span style={{ color: '#aaa' }}>+{CUR}{fmt(aPrice * aQty)}</span>
                             </div>
                           );
                         })}
-                        <div className="flex justify-between text-xs pt-0.5 ot font-semibold" style={{ color: '#666' }}>
+                        <div className="flex justify-between text-xs pt-0.5 ot font-semibold" style={{ color: '#999' }}>
                           <span>Add-ons total</span>
                           <span>+{CUR}{fmt(addonTotal * qty)}</span>
                         </div>
                       </div>
                     ) : (
-                      <p className="text-xs ml-2 italic ot font-semibold" style={{ color: '#444' }}>No add-ons selected</p>
+                      // THEME FIX: #444 → #777
+                      <p className="text-xs ml-2 italic ot font-semibold" style={{ color: '#777' }}>No add-ons selected</p>
                     )}
                   </motion.div>
                 );
@@ -1119,44 +1129,46 @@ const OrderTracking = () => {
             </div>
 
             {/* ── Full order total breakdown ── */}
-            <div className="mt-4 pt-3 space-y-2" style={{ borderTop: '1px solid rgba(212,175,55,0.1)' }}>
-              <div className="flex justify-between text-xs ot font-semibold" style={{ color: '#7a6a3a' }}>
+            {/* THEME FIX: divider border lifted */}
+            <div className="mt-4 pt-3 space-y-2" style={{ borderTop: '1px solid rgba(212,175,55,0.14)' }}>
+              {/* THEME FIX: all breakdown row labels #7a6a3a → #a89050 */}
+              <div className="flex justify-between text-xs ot font-semibold" style={{ color: '#a89050' }}>
                 <span>🧮 Items Total</span>
                 <span>{CUR}{fmt(itemsBaseTotal)}</span>
               </div>
               {addonsGrandTotal > 0 && (
-                <div className="flex justify-between text-xs ot font-semibold" style={{ color: '#7a6a3a' }}>
+                <div className="flex justify-between text-xs ot font-semibold" style={{ color: '#a89050' }}>
                   <span>✨ Add-ons Total</span>
                   <span>+{CUR}{fmt(addonsGrandTotal)}</span>
                 </div>
               )}
               {(order?.gstAmount || 0) > 0 && (
-                <div className="flex justify-between text-xs ot font-semibold" style={{ color: '#7a6a3a' }}>
+                <div className="flex justify-between text-xs ot font-semibold" style={{ color: '#a89050' }}>
                   <span>🏛️ GST</span>
                   <span>+{CUR}{fmt(order.gstAmount)}</span>
                 </div>
               )}
               {(order?.taxAmount || 0) > 0 && (
-                <div className="flex justify-between text-xs ot font-semibold" style={{ color: '#7a6a3a' }}>
+                <div className="flex justify-between text-xs ot font-semibold" style={{ color: '#a89050' }}>
                   <span>🏛️ Tax</span>
                   <span>+{CUR}{fmt(order.taxAmount)}</span>
                 </div>
               )}
               {(order?.serviceChargeAmount || 0) > 0 && (
-                <div className="flex justify-between text-xs ot font-semibold" style={{ color: '#7a6a3a' }}>
+                <div className="flex justify-between text-xs ot font-semibold" style={{ color: '#a89050' }}>
                   <span>🛎️ Service Charge</span>
                   <span>+{CUR}{fmt(order.serviceChargeAmount)}</span>
                 </div>
               )}
               {(order?.platformFeeAmount || 0) > 0 && (
-                <div className="flex justify-between text-xs ot font-semibold" style={{ color: '#7a6a3a' }}>
+                <div className="flex justify-between text-xs ot font-semibold" style={{ color: '#a89050' }}>
                   <span>💻 Platform Fee</span>
                   <span>+{CUR}{fmt(order.platformFeeAmount)}</span>
                 </div>
               )}
               <motion.div
                 className="flex justify-between font-black text-sm pt-2 pb-1"
-                style={{ borderTop: '1px solid rgba(212,175,55,0.12)' }}
+                style={{ borderTop: '1px solid rgba(212,175,55,0.16)' }}
                 animate={{ opacity: [1, 0.85, 1] }}
                 transition={{ duration: 2.5, repeat: Infinity }}
               >
@@ -1167,12 +1179,14 @@ const OrderTracking = () => {
 
             {/* Payment mode */}
             <div className="mt-3 flex items-center justify-between text-xs pb-5">
-              <div className="flex items-center gap-1.5 ot font-semibold" style={{ color: '#7a6a3a' }}>
+              {/* THEME FIX: #7a6a3a → #a89050 */}
+              <div className="flex items-center gap-1.5 ot font-semibold" style={{ color: '#a89050' }}>
                 <CreditCard className="w-3.5 h-3.5" />
                 {payModeLabel}
               </div>
               {order.specialInstructions && (
-                <p className="text-xs italic max-w-[160px] truncate ot font-semibold" title={order.specialInstructions} style={{ color: '#555' }}>
+                // THEME FIX: #555 → #888
+                <p className="text-xs italic max-w-[160px] truncate ot font-semibold" title={order.specialInstructions} style={{ color: '#888' }}>
                   📝 {order.specialInstructions}
                 </p>
               )}
@@ -1207,8 +1221,8 @@ const OrderTracking = () => {
               disabled={waSending}
               className="flex items-center justify-center gap-2 px-4 py-3.5 rounded-2xl text-sm font-black transition-all ot"
               style={{
-                background: 'rgba(37,211,102,0.12)',
-                border:     '1.5px solid rgba(37,211,102,0.3)',
+                background: 'rgba(37,211,102,0.14)',
+                border:     '1.5px solid rgba(37,211,102,0.35)',
                 color:      '#25D366',
                 fontFamily: "'Nunito', sans-serif",
               }}
@@ -1226,13 +1240,13 @@ const OrderTracking = () => {
         {/* ── Add More Items button ── */}
         {order.orderStatus !== 'completed' && order.orderStatus !== 'cancelled' && order.cafeId && (
           <motion.button
-            whileHover={{ scale: 1.02, borderColor: `rgba(212,175,55,0.45)` }}
+            whileHover={{ scale: 1.02, borderColor: `rgba(212,175,55,0.50)` }}
             whileTap={{ scale: 0.98 }}
             onClick={() => setShowAddMore(true)}
             className="w-full mt-3 flex items-center justify-center gap-2 py-3.5 rounded-2xl font-black text-sm transition-all ot"
             style={{
-              background: 'rgba(212,175,55,0.08)',
-              border:     '1.5px solid rgba(212,175,55,0.25)',
+              background: 'rgba(212,175,55,0.09)',
+              border:     '1.5px solid rgba(212,175,55,0.30)',
               color:      primary,
               fontFamily: "'Nunito', sans-serif",
             }}
@@ -1249,9 +1263,9 @@ const OrderTracking = () => {
           transition={{ delay: 0.4 }}
           className="mt-6 rounded-3xl overflow-hidden"
           style={{
-            background: 'linear-gradient(135deg, rgba(212,175,55,0.14), rgba(212,175,55,0.05))',
-            border: '1.5px solid rgba(212,175,55,0.28)',
-            boxShadow: '0 8px 32px rgba(212,175,55,0.1)',
+            background: 'linear-gradient(135deg, rgba(212,175,55,0.16), rgba(212,175,55,0.06))',
+            border: '1.5px solid rgba(212,175,55,0.32)',
+            boxShadow: '0 8px 32px rgba(212,175,55,0.12)',
           }}
         >
           <div className="p-5 text-center">
@@ -1265,7 +1279,8 @@ const OrderTracking = () => {
             <p className="font-black text-base ot-serif" style={{ color: primary }}>
               Get 10% OFF on your next visit!
             </p>
-            <p className="text-sm mt-1 font-semibold ot" style={{ color: '#7a6a3a' }}>
+            {/* THEME FIX: #7a6a3a → #a89050 */}
+            <p className="text-sm mt-1 font-semibold ot" style={{ color: '#a89050' }}>
               Leave us a Google review and show it at the counter to redeem.
             </p>
             {googleReviewLink ? (
@@ -1288,6 +1303,7 @@ const OrderTracking = () => {
                 ⭐ Leave a Google Review
               </motion.a>
             ) : (
+              // THEME FIX: #888 was already fine — kept
               <p className="text-xs mt-3 ot font-semibold" style={{ color: '#888' }}>
                 Ask the café owner to add their Google Review link in Settings.
               </p>
@@ -1295,7 +1311,8 @@ const OrderTracking = () => {
           </div>
         </motion.div>
 
-        <p className="text-center text-xs mt-5 ot font-semibold" style={{ color: '#2a2a2a' }}>
+        {/* THEME FIX: footer credit #2a2a2a → #555 — visible but still subtle */}
+        <p className="text-center text-xs mt-5 ot font-semibold" style={{ color: '#555' }}>
           Powered by SmartCafé OS · Branding Architect
         </p>
       </div>
@@ -1347,24 +1364,25 @@ const OrderTracking = () => {
                 className="relative w-full sm:max-w-sm rounded-t-3xl sm:rounded-3xl overflow-hidden ot"
                 style={{
                   background: 'linear-gradient(180deg, #1a1400 0%, #110d00 100%)',
-                  border: '1.5px solid rgba(212,175,55,0.22)',
+                  border: '1.5px solid rgba(212,175,55,0.28)',
                   boxShadow: '0 -20px 60px rgba(212,175,55,0.14)',
                 }}
                 onClick={e => e.stopPropagation()}
               >
                 {/* Grip */}
                 <div className="flex justify-center pt-3 pb-1 sm:hidden">
-                  <div className="w-10 h-1 rounded-full" style={{ background: 'rgba(212,175,55,0.3)' }} />
+                  <div className="w-10 h-1 rounded-full" style={{ background: 'rgba(212,175,55,0.35)' }} />
                 </div>
-                <div className="flex items-center justify-between px-5 py-4" style={{ borderBottom: '1px solid rgba(212,175,55,0.12)' }}>
+                <div className="flex items-center justify-between px-5 py-4" style={{ borderBottom: '1px solid rgba(212,175,55,0.16)' }}>
                   <div>
                     <h3 className="text-white font-black text-base ot-serif">📏 Select Size</h3>
-                    <p className="text-xs mt-0.5 ot font-semibold" style={{ color: '#7a6a3a' }}>{vItem.name}</p>
+                    {/* THEME FIX: #7a6a3a → #a89050 */}
+                    <p className="text-xs mt-0.5 ot font-semibold" style={{ color: '#a89050' }}>{vItem.name}</p>
                   </div>
                   <button
                     onClick={() => setAddMoreVariantModal(null)}
                     className="w-9 h-9 rounded-2xl flex items-center justify-center transition-all"
-                    style={{ background: 'rgba(212,175,55,0.1)', border: '1.5px solid rgba(212,175,55,0.2)' }}
+                    style={{ background: 'rgba(212,175,55,0.12)', border: '1.5px solid rgba(212,175,55,0.25)' }}
                   >
                     <X className="w-4 h-4" style={{ color: primary_v }} />
                   </button>
@@ -1374,15 +1392,15 @@ const OrderTracking = () => {
                     <motion.button
                       key={vi}
                       whileTap={{ scale: 0.97 }}
-                      whileHover={{ background: 'rgba(212,175,55,0.18)' }}
+                      whileHover={{ background: 'rgba(212,175,55,0.20)' }}
                       onClick={() => {
                         setAddMoreVariantModal(null);
                         variantAddRef.current?.(vItem, v);
                       }}
                       className="w-full flex items-center justify-between p-3.5 rounded-2xl font-black transition-all ot"
                       style={{
-                        background: 'rgba(212,175,55,0.1)',
-                        border: '1.5px solid rgba(212,175,55,0.28)',
+                        background: 'rgba(212,175,55,0.12)',
+                        border: '1.5px solid rgba(212,175,55,0.32)',
                         color: primary_v,
                         fontFamily: "'Nunito', sans-serif",
                       }}
