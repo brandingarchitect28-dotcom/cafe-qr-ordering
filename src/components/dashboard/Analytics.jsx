@@ -1,6 +1,7 @@
 import React, { useMemo, useState, useCallback } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
 import { useCollection, useDocument } from '../../hooks/useFirestore';
+import { useTheme } from '../../hooks/useTheme';
 import { where } from 'firebase/firestore';
 import {
   BarChart, Bar, LineChart, Line, PieChart, Pie, Cell,
@@ -15,16 +16,21 @@ import { motion, AnimatePresence } from 'framer-motion';
 
 /* ─────────────────────────────────────────────────────────────────────────────
    VISUAL-ONLY HELPERS  (no business logic)
+   Theme-adaptive: all card/text/border colors now respond to isLight
 ───────────────────────────────────────────────────────────────────────────── */
 
-// Glassmorphism card base styles
-const glass = (accentColor = 'rgba(212,175,55,0.12)', extra = {}) => ({
-  background: 'linear-gradient(135deg, rgba(18,18,18,0.97) 0%, rgba(24,24,24,0.93) 100%)',
-  border: `1px solid ${accentColor}`,
+// Glassmorphism card base styles — theme-adaptive
+const glass = (accentColor = 'rgba(212,175,55,0.12)', extra = {}, isLight = false) => ({
+  background: isLight
+    ? 'linear-gradient(135deg, rgba(255,255,255,0.97) 0%, rgba(248,246,240,0.95) 100%)'
+    : 'linear-gradient(135deg, rgba(18,18,18,0.97) 0%, rgba(24,24,24,0.93) 100%)',
+  border: `1px solid ${isLight ? accentColor.replace('0.12', '0.25') : accentColor}`,
   borderRadius: 14,
   backdropFilter: 'blur(12px)',
   WebkitBackdropFilter: 'blur(12px)',
-  boxShadow: '0 8px 32px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.04)',
+  boxShadow: isLight
+    ? '0 4px 24px rgba(0,0,0,0.08), inset 0 1px 0 rgba(255,255,255,0.8)'
+    : '0 8px 32px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.04)',
   ...extra,
 });
 
@@ -45,20 +51,23 @@ const GradientRule = ({ color = '#D4AF37' }) => (
   <div style={{ height: 1, background: `linear-gradient(90deg, transparent, ${color}55, transparent)`, margin: '4px 0' }} />
 );
 
-// Section header with accent line
-const SectionHeading = ({ children, badge }) => (
+// Section header with accent line — theme-adaptive text
+const SectionHeading = ({ children, badge, isLight }) => (
   <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 20 }}>
     <div style={{ width: 3, height: 22, background: 'linear-gradient(180deg, #D4AF37, rgba(212,175,55,0.2))', borderRadius: 2 }} />
     <h3 style={{
-      fontSize: 17, fontWeight: 700, color: '#F0F0F0',
+      fontSize: 17, fontWeight: 700,
+      color: isLight ? '#1A1A1A' : '#F0F0F0',
       fontFamily: "'Playfair Display', serif", letterSpacing: '-0.01em', margin: 0,
     }}>
       {children}
     </h3>
     {badge && (
       <span style={{
-        marginLeft: 'auto', fontSize: 10, color: '#666',
-        background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.07)',
+        marginLeft: 'auto', fontSize: 10,
+        color: isLight ? '#555' : '#666',
+        background: isLight ? 'rgba(0,0,0,0.05)' : 'rgba(255,255,255,0.04)',
+        border: `1px solid ${isLight ? 'rgba(0,0,0,0.1)' : 'rgba(255,255,255,0.07)'}`,
         borderRadius: 20, padding: '3px 10px', fontFamily: 'monospace',
       }}>
         {badge}
@@ -81,17 +90,17 @@ const InsightPill = ({ text, color = '#D4AF37' }) => (
   </div>
 );
 
-// Custom tooltip wrapper for recharts
-const CustomTooltipStyle = {
-  backgroundColor: 'rgba(14,14,14,0.97)',
-  border: '1px solid rgba(212,175,55,0.2)',
+// Custom tooltip wrapper for recharts — theme-adaptive
+const makeTooltipStyle = (isLight) => ({
+  backgroundColor: isLight ? 'rgba(255,255,255,0.98)' : 'rgba(14,14,14,0.97)',
+  border: `1px solid ${isLight ? 'rgba(212,175,55,0.35)' : 'rgba(212,175,55,0.2)'}`,
   borderRadius: 10,
-  boxShadow: '0 8px 32px rgba(0,0,0,0.5)',
+  boxShadow: isLight ? '0 4px 24px rgba(0,0,0,0.12)' : '0 8px 32px rgba(0,0,0,0.5)',
   padding: '10px 14px',
-};
+});
 
-// Modal backdrop + panel
-const ChartModal = ({ isOpen, onClose, title, children }) => (
+// Modal backdrop + panel — theme-adaptive
+const ChartModal = ({ isOpen, onClose, title, children, isLight }) => (
   <AnimatePresence>
     {isOpen && (
       <motion.div
@@ -103,7 +112,7 @@ const ChartModal = ({ isOpen, onClose, title, children }) => (
         onClick={onClose}
         style={{
           position: 'fixed', inset: 0, zIndex: 9999,
-          background: 'rgba(0,0,0,0.75)',
+          background: isLight ? 'rgba(0,0,0,0.4)' : 'rgba(0,0,0,0.75)',
           backdropFilter: 'blur(6px)',
           display: 'flex', alignItems: 'center', justifyContent: 'center',
           padding: '16px',
@@ -117,7 +126,7 @@ const ChartModal = ({ isOpen, onClose, title, children }) => (
           transition={{ duration: 0.25, ease: [0.16, 1, 0.3, 1] }}
           onClick={e => e.stopPropagation()}
           style={{
-            ...glass('rgba(212,175,55,0.15)'),
+            ...glass('rgba(212,175,55,0.15)', {}, isLight),
             width: '100%', maxWidth: 680,
             maxHeight: '90vh', overflowY: 'auto',
             padding: '28px 28px 32px',
@@ -127,19 +136,31 @@ const ChartModal = ({ isOpen, onClose, title, children }) => (
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 24 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
               <div style={{ width: 3, height: 20, background: 'linear-gradient(180deg,#D4AF37,rgba(212,175,55,0.1))', borderRadius: 2 }} />
-              <h2 style={{ color: '#F0F0F0', fontSize: 18, fontWeight: 700, fontFamily: "'Playfair Display', serif", margin: 0 }}>
+              <h2 style={{
+                color: isLight ? '#1A1A1A' : '#F0F0F0',
+                fontSize: 18, fontWeight: 700,
+                fontFamily: "'Playfair Display', serif", margin: 0,
+              }}>
                 {title}
               </h2>
             </div>
             <button
               onClick={onClose}
               style={{
-                background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)',
-                borderRadius: 8, width: 32, height: 32, display: 'flex', alignItems: 'center', justifyContent: 'center',
-                cursor: 'pointer', color: '#888', transition: 'all 0.15s',
+                background: isLight ? 'rgba(0,0,0,0.05)' : 'rgba(255,255,255,0.06)',
+                border: `1px solid ${isLight ? 'rgba(0,0,0,0.12)' : 'rgba(255,255,255,0.1)'}`,
+                borderRadius: 8, width: 32, height: 32,
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                cursor: 'pointer', color: isLight ? '#555' : '#888', transition: 'all 0.15s',
               }}
-              onMouseEnter={e => { e.currentTarget.style.background = 'rgba(255,255,255,0.1)'; e.currentTarget.style.color = '#fff'; }}
-              onMouseLeave={e => { e.currentTarget.style.background = 'rgba(255,255,255,0.06)'; e.currentTarget.style.color = '#888'; }}
+              onMouseEnter={e => {
+                e.currentTarget.style.background = isLight ? 'rgba(0,0,0,0.1)' : 'rgba(255,255,255,0.1)';
+                e.currentTarget.style.color = isLight ? '#000' : '#fff';
+              }}
+              onMouseLeave={e => {
+                e.currentTarget.style.background = isLight ? 'rgba(0,0,0,0.05)' : 'rgba(255,255,255,0.06)';
+                e.currentTarget.style.color = isLight ? '#555' : '#888';
+              }}
             >
               <X size={15} />
             </button>
@@ -151,8 +172,8 @@ const ChartModal = ({ isOpen, onClose, title, children }) => (
   </AnimatePresence>
 );
 
-// Metric chip inside modal
-const ModalMetric = ({ label, value, color = '#D4AF37', sub }) => (
+// Metric chip inside modal — theme-adaptive
+const ModalMetric = ({ label, value, color = '#D4AF37', sub, isLight }) => (
   <div style={{
     flex: 1, minWidth: 100,
     background: `${color}0C`,
@@ -160,13 +181,13 @@ const ModalMetric = ({ label, value, color = '#D4AF37', sub }) => (
     borderRadius: 10, padding: '12px 14px',
     textAlign: 'center',
   }}>
-    <p style={{ color: '#555', fontSize: 10, textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 4 }}>{label}</p>
+    <p style={{ color: isLight ? '#666' : '#555', fontSize: 10, textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 4 }}>{label}</p>
     <p style={{ color, fontSize: 20, fontWeight: 900, fontFamily: "'Playfair Display', serif" }}>{value}</p>
-    {sub && <p style={{ color: '#444', fontSize: 10, marginTop: 3 }}>{sub}</p>}
+    {sub && <p style={{ color: isLight ? '#777' : '#444', fontSize: 10, marginTop: 3 }}>{sub}</p>}
   </div>
 );
 
-// Derive chart insight text + metrics from data
+// Derive chart insight text + metrics from data — UNCHANGED LOGIC
 const deriveChartInsights = (chartKey, data, CUR) => {
   if (!data) return null;
   switch (chartKey) {
@@ -291,6 +312,7 @@ const deriveChartInsights = (chartKey, data, CUR) => {
 const Analytics = () => {
   const { user } = useAuth();
   const cafeId = user?.cafeId;
+  const { isLight } = useTheme();  // ← added for theme awareness
 
   const { data: orders } = useCollection('orders', cafeId ? [where('cafeId', '==', cafeId)] : []);
   const { data: cafe } = useDocument('cafes', cafeId);
@@ -303,11 +325,11 @@ const Analytics = () => {
   const [pdfLoading, setPdfLoading] = useState(false);
   const [csvLoading, setCsvLoading] = useState(false);
 
-  // ── NEW: which insight card is expanded ───────────────────────────────────
+  // ── which insight card is expanded ────────────────────────────────────────
   const [openInsight, setOpenInsight] = useState(null);
 
-  // ── NEW: chart modal state ─────────────────────────────────────────────────
-  const [activeModal, setActiveModal] = useState(null); // 'revenue' | 'orders' | 'items' | 'payment' | 'orderstatus'
+  // ── chart modal state ──────────────────────────────────────────────────────
+  const [activeModal, setActiveModal] = useState(null);
 
   const openModal  = useCallback((key) => setActiveModal(key), []);
   const closeModal = useCallback(() => setActiveModal(null), []);
@@ -408,7 +430,7 @@ const Analytics = () => {
     }
   };
 
-  // ── NEW: growthData — additive only, zero impact on analytics/feeSummary ──
+  // ── growthData — UNCHANGED LOGIC ──────────────────────────────────────────
   const growthData = useMemo(() => {
     if (!analytics || !orders_ || orders_.length === 0) return null;
 
@@ -565,19 +587,19 @@ const Analytics = () => {
     };
   }, [analytics, orders_, feeSummary, CUR]);
 
-  // ── empty state — UNCHANGED ────────────────────────────────────────────────
+  // ── empty state ────────────────────────────────────────────────────────────
   if (!analytics) {
     return (
       <motion.div
         initial={{ opacity: 0, y: 8 }}
         animate={{ opacity: 1, y: 0 }}
         style={{
-          ...glass(),
+          ...glass('rgba(212,175,55,0.12)', {}, isLight),
           padding: '48px 24px', textAlign: 'center',
         }}
       >
         <div style={{ fontSize: 40, marginBottom: 16 }}>📊</div>
-        <p style={{ color: '#A3A3A3', fontSize: 15, fontFamily: "'Playfair Display', serif" }}>
+        <p style={{ color: isLight ? '#555' : '#A3A3A3', fontSize: 15, fontFamily: "'Playfair Display', serif" }}>
           No data available yet. Start receiving orders to see analytics!
         </p>
       </motion.div>
@@ -586,7 +608,22 @@ const Analytics = () => {
 
   const COLORS = ['#D4AF37', '#10B981', '#3B82F6', '#F59E0B', '#EF4444'];
 
-  // ── small presentational helpers (pure, no side effects) ──────────────────
+  // Resolved theme tokens for use throughout render
+  const T = {
+    text:       isLight ? '#1A1A1A' : '#F0F0F0',
+    textSub:    isLight ? '#555555' : '#A3A3A3',
+    textMuted:  isLight ? '#777777' : '#666666',
+    textFaint:  isLight ? '#999999' : '#444444',
+    border:     isLight ? 'rgba(0,0,0,0.1)'     : 'rgba(255,255,255,0.07)',
+    borderFaint:isLight ? 'rgba(0,0,0,0.06)'    : 'rgba(255,255,255,0.04)',
+    rowEven:    isLight ? 'rgba(0,0,0,0.025)'   : 'rgba(255,255,255,0.02)',
+    divider:    isLight ? 'rgba(0,0,0,0.08)'    : 'rgba(255,255,255,0.04)',
+    chartStroke:isLight ? 'rgba(0,0,0,0.08)'    : 'rgba(255,255,255,0.06)',
+    axisColor:  isLight ? '#888888'             : '#444444',
+    tickColor:  isLight ? '#666666'             : '#666666',
+  };
+
+  // ── small presentational helpers ──────────────────────────────────────────
   const PctBadge = ({ val }) => {
     if (val === null || val === undefined) return null;
     const pos = val >= 0;
@@ -607,8 +644,11 @@ const Analytics = () => {
   const ClickHint = () => (
     <span style={{
       display: 'inline-flex', alignItems: 'center', gap: 4,
-      fontSize: 10, color: '#444', fontWeight: 500,
-      background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)',
+      fontSize: 10,
+      color: isLight ? '#888' : '#444',
+      fontWeight: 500,
+      background: isLight ? 'rgba(0,0,0,0.04)' : 'rgba(255,255,255,0.03)',
+      border: `1px solid ${isLight ? 'rgba(0,0,0,0.08)' : 'rgba(255,255,255,0.06)'}`,
       padding: '3px 9px', borderRadius: 20, cursor: 'default',
     }}>
       <span style={{ fontSize: 9 }}>🔍</span> Click for detailed analysis
@@ -626,12 +666,16 @@ const Analytics = () => {
         onMouseEnter={() => setHovered(true)}
         onMouseLeave={() => setHovered(false)}
         style={{
-          ...glass(hovered ? 'rgba(212,175,55,0.18)' : 'rgba(255,255,255,0.06)'),
+          ...glass(
+            hovered ? 'rgba(212,175,55,0.18)' : isLight ? 'rgba(0,0,0,0.08)' : 'rgba(255,255,255,0.06)',
+            {},
+            isLight
+          ),
           padding: '24px',
           transition: 'all 0.25s ease',
           boxShadow: hovered
-            ? '0 0 0 1px rgba(212,175,55,0.15), 0 16px 48px rgba(0,0,0,0.5), 0 0 80px rgba(212,175,55,0.04)'
-            : '0 8px 32px rgba(0,0,0,0.35)',
+            ? `0 0 0 1px rgba(212,175,55,0.15), 0 16px 48px ${isLight ? 'rgba(0,0,0,0.1)' : 'rgba(0,0,0,0.5)'}, 0 0 80px rgba(212,175,55,0.04)`
+            : `0 4px 24px ${isLight ? 'rgba(0,0,0,0.07)' : 'rgba(0,0,0,0.35)'}`,
           ...extraStyle,
         }}
       >
@@ -667,29 +711,30 @@ const Analytics = () => {
   // ── Modal content builder ──────────────────────────────────────────────────
   const ModalContent = ({ chartKey }) => {
     const info = deriveChartInsights(chartKey, analytics, CUR);
-    if (!info) return <p style={{ color: '#555' }}>No data available.</p>;
+    if (!info) return <p style={{ color: T.textMuted }}>No data available.</p>;
 
     return (
       <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
         {/* Key metrics row */}
         <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
-          <ModalMetric label={info.highest.label} value={info.highest.value} sub={info.highest.sub} color={info.highest.color} />
-          <ModalMetric label={info.lowest.label}  value={info.lowest.value}  sub={info.lowest.sub}  color={info.lowest.color} />
-          <ModalMetric label={info.average.label} value={info.average.value} color={info.average.color} />
-          {info.change && <ModalMetric label={info.change.label} value={info.change.value} color={info.change.color} />}
+          <ModalMetric label={info.highest.label} value={info.highest.value} sub={info.highest.sub} color={info.highest.color} isLight={isLight} />
+          <ModalMetric label={info.lowest.label}  value={info.lowest.value}  sub={info.lowest.sub}  color={info.lowest.color}  isLight={isLight} />
+          <ModalMetric label={info.average.label} value={info.average.value} color={info.average.color} isLight={isLight} />
+          {info.change && <ModalMetric label={info.change.label} value={info.change.value} color={info.change.color} isLight={isLight} />}
         </div>
 
         <GradientRule />
 
         {/* Written analysis */}
         <div style={{
-          background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)',
+          background: isLight ? 'rgba(0,0,0,0.03)' : 'rgba(255,255,255,0.02)',
+          border: `1px solid ${T.border}`,
           borderRadius: 10, padding: '16px 18px',
         }}>
-          <p style={{ color: '#666', fontSize: 10, textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 8 }}>
+          <p style={{ color: T.textMuted, fontSize: 10, textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 8 }}>
             Trend Analysis
           </p>
-          <p style={{ color: '#B0B0B0', fontSize: 13, lineHeight: 1.7 }}>{info.analysis}</p>
+          <p style={{ color: isLight ? '#444' : '#B0B0B0', fontSize: 13, lineHeight: 1.7 }}>{info.analysis}</p>
         </div>
 
         {/* Suggestion */}
@@ -707,7 +752,9 @@ const Analytics = () => {
     );
   };
 
-  // ── Custom chart tooltip ───────────────────────────────────────────────────
+  // ── Custom chart tooltips ──────────────────────────────────────────────────
+  const tooltipStyle = makeTooltipStyle(isLight);
+
   const RevenueTooltip = ({ active, payload, label }) => {
     if (!active || !payload?.length) return null;
     const rev = payload.find(p => p.dataKey === 'revenue');
@@ -716,12 +763,12 @@ const Analytics = () => {
     const isHigh = rev?.value > avg * 1.2;
     const isLow  = rev?.value < avg * 0.8;
     return (
-      <div style={CustomTooltipStyle}>
-        <p style={{ color: '#888', fontSize: 10, marginBottom: 6, textTransform: 'uppercase', letterSpacing: '0.08em' }}>{label}</p>
+      <div style={tooltipStyle}>
+        <p style={{ color: isLight ? '#888' : '#888', fontSize: 10, marginBottom: 6, textTransform: 'uppercase', letterSpacing: '0.08em' }}>{label}</p>
         <p style={{ color: '#D4AF37', fontSize: 16, fontWeight: 800 }}>{CUR}{rev?.value?.toFixed(2)}</p>
         {isHigh && <p style={{ color: '#10B981', fontSize: 10, marginTop: 4 }}>▲ Above average</p>}
         {isLow  && <p style={{ color: '#EF4444', fontSize: 10, marginTop: 4 }}>▼ Below average</p>}
-        {!isHigh && !isLow && <p style={{ color: '#888', fontSize: 10, marginTop: 4 }}>≈ Near average</p>}
+        {!isHigh && !isLow && <p style={{ color: isLight ? '#888' : '#888', fontSize: 10, marginTop: 4 }}>≈ Near average</p>}
       </div>
     );
   };
@@ -733,12 +780,12 @@ const Analytics = () => {
     const avg = vals.length ? vals.reduce((s, d) => s + d.orders, 0) / vals.length : 0;
     const isHigh = ord?.value > avg * 1.2;
     return (
-      <div style={CustomTooltipStyle}>
-        <p style={{ color: '#888', fontSize: 10, marginBottom: 6, textTransform: 'uppercase', letterSpacing: '0.08em' }}>{label}</p>
+      <div style={tooltipStyle}>
+        <p style={{ color: isLight ? '#888' : '#888', fontSize: 10, marginBottom: 6, textTransform: 'uppercase', letterSpacing: '0.08em' }}>{label}</p>
         <p style={{ color: '#10B981', fontSize: 16, fontWeight: 800 }}>{ord?.value} orders</p>
         {isHigh && <p style={{ color: '#10B981', fontSize: 10, marginTop: 4 }}>▲ High traffic day</p>}
         {!isHigh && ord?.value === 0 && <p style={{ color: '#EF4444', fontSize: 10, marginTop: 4 }}>✕ No orders</p>}
-        {!isHigh && ord?.value > 0 && <p style={{ color: '#888', fontSize: 10, marginTop: 4 }}>≈ Normal volume</p>}
+        {!isHigh && ord?.value > 0 && <p style={{ color: isLight ? '#888' : '#888', fontSize: 10, marginTop: 4 }}>≈ Normal volume</p>}
       </div>
     );
   };
@@ -750,8 +797,8 @@ const Analytics = () => {
     const maxCount = allItems.length ? Math.max(...allItems.map(i => i.count)) : 1;
     const isTop = cnt?.value === maxCount;
     return (
-      <div style={CustomTooltipStyle}>
-        <p style={{ color: '#888', fontSize: 10, marginBottom: 6 }}>{label}</p>
+      <div style={tooltipStyle}>
+        <p style={{ color: isLight ? '#555' : '#888', fontSize: 10, marginBottom: 6 }}>{label}</p>
         <p style={{ color: '#D4AF37', fontSize: 16, fontWeight: 800 }}>{cnt?.value} units</p>
         {isTop && <p style={{ color: '#10B981', fontSize: 10, marginTop: 4 }}>🔥 Best seller</p>}
       </div>
@@ -763,7 +810,7 @@ const Analytics = () => {
     const p = payload[0];
     const colorMap = { 'Paid': '#10B981', 'Pending': '#F59E0B' };
     return (
-      <div style={CustomTooltipStyle}>
+      <div style={tooltipStyle}>
         <p style={{ color: colorMap[p?.name] ?? '#D4AF37', fontSize: 14, fontWeight: 800 }}>
           {p?.name}: {p?.value}
         </p>
@@ -802,17 +849,18 @@ const Analytics = () => {
         >
           <div>
             <h1 style={{
-              fontSize: 22, fontWeight: 800, color: '#F0F0F0',
+              fontSize: 22, fontWeight: 800,
+              color: T.text,
               fontFamily: "'Playfair Display', serif", margin: 0, letterSpacing: '-0.02em',
             }}>
               Analytics
             </h1>
-            <p style={{ color: '#444', fontSize: 12, margin: '3px 0 0' }}>
+            <p style={{ color: T.textMuted, fontSize: 12, margin: '3px 0 0' }}>
               {orders_?.filter(o => o.paymentStatus === 'paid').length ?? 0} paid orders · live data
             </p>
           </div>
 
-          {/* Download buttons — UNCHANGED logic, improved style */}
+          {/* Download buttons — UNCHANGED logic */}
           {orders_ && cafe && (
             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
               <motion.button
@@ -853,43 +901,43 @@ const Analytics = () => {
           )}
         </motion.div>
 
-        {/* ── Fee cards — UNCHANGED data, enhanced visual ───────────────────── */}
+        {/* ── Fee cards — UNCHANGED data ────────────────────────────────────── */}
         {showFeeCards && (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
             {scEnabled && (
               <motion.div
                 initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.05 }}
                 whileHover={{ y: -2 }}
-                style={{ ...glass('rgba(212,175,55,0.1)'), padding: 20, position: 'relative', overflow: 'hidden' }}
+                style={{ ...glass('rgba(212,175,55,0.1)', {}, isLight), padding: 20, position: 'relative', overflow: 'hidden' }}
                 data-testid="stat-service-charges-collected"
               >
                 <div style={{ position: 'absolute', top: 0, right: 0, width: 70, height: 70, background: 'radial-gradient(circle at 100% 0%, rgba(212,175,55,0.08), transparent 70%)', pointerEvents: 'none' }} />
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
-                  <p style={{ color: '#555', fontSize: 10, textTransform: 'uppercase', letterSpacing: '0.1em', fontWeight: 600 }}>Service Charges</p>
+                  <p style={{ color: T.textMuted, fontSize: 10, textTransform: 'uppercase', letterSpacing: '0.1em', fontWeight: 600 }}>Service Charges</p>
                   <div style={{ background: 'rgba(212,175,55,0.1)', border: '1px solid rgba(212,175,55,0.2)', borderRadius: 6, padding: 5 }}>
                     <Percent size={13} style={{ color: '#D4AF37' }} />
                   </div>
                 </div>
-                <p style={{ fontSize: 26, fontWeight: 900, color: '#F0F0F0', fontFamily: "'Playfair Display', serif" }}>{CUR}{feeSummary.totalServiceCharge.toFixed(2)}</p>
-                <p style={{ color: '#444', fontSize: 11, marginTop: 4 }}>{cafe?.serviceChargeRate || 0}% · all paid orders</p>
+                <p style={{ fontSize: 26, fontWeight: 900, color: T.text, fontFamily: "'Playfair Display', serif" }}>{CUR}{feeSummary.totalServiceCharge.toFixed(2)}</p>
+                <p style={{ color: T.textFaint, fontSize: 11, marginTop: 4 }}>{cafe?.serviceChargeRate || 0}% · all paid orders</p>
               </motion.div>
             )}
             {pfEnabled && (
               <motion.div
                 initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }}
                 whileHover={{ y: -2 }}
-                style={{ ...glass('rgba(239,68,68,0.1)'), padding: 20, position: 'relative', overflow: 'hidden' }}
+                style={{ ...glass('rgba(239,68,68,0.1)', {}, isLight), padding: 20, position: 'relative', overflow: 'hidden' }}
                 data-testid="stat-platform-fees-collected"
               >
                 <div style={{ position: 'absolute', top: 0, right: 0, width: 70, height: 70, background: 'radial-gradient(circle at 100% 0%, rgba(239,68,68,0.06), transparent 70%)', pointerEvents: 'none' }} />
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
-                  <p style={{ color: '#555', fontSize: 10, textTransform: 'uppercase', letterSpacing: '0.1em', fontWeight: 600 }}>Platform Fees</p>
+                  <p style={{ color: T.textMuted, fontSize: 10, textTransform: 'uppercase', letterSpacing: '0.1em', fontWeight: 600 }}>Platform Fees</p>
                   <div style={{ background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.2)', borderRadius: 6, padding: 5 }}>
                     <BadgeMinus size={13} style={{ color: '#EF4444' }} />
                   </div>
                 </div>
-                <p style={{ fontSize: 26, fontWeight: 900, color: '#F0F0F0', fontFamily: "'Playfair Display', serif" }}>{CUR}{feeSummary.totalPlatformFee.toFixed(2)}</p>
-                <p style={{ color: '#444', fontSize: 11, marginTop: 4 }}>
+                <p style={{ fontSize: 26, fontWeight: 900, color: T.text, fontFamily: "'Playfair Display', serif" }}>{CUR}{feeSummary.totalPlatformFee.toFixed(2)}</p>
+                <p style={{ color: T.textFaint, fontSize: 11, marginTop: 4 }}>
                   {cafe?.platformFeeType === 'fixed' ? `Fixed ${CUR}${cafe?.platformFeeValue || 0} / order` : `${cafe?.platformFeeValue || 0}% · all paid orders`}
                 </p>
               </motion.div>
@@ -897,45 +945,45 @@ const Analytics = () => {
             <motion.div
               initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.15 }}
               whileHover={{ y: -2 }}
-              style={{ ...glass('rgba(16,185,129,0.15)'), padding: 20, position: 'relative', overflow: 'hidden' }}
+              style={{ ...glass('rgba(16,185,129,0.15)', {}, isLight), padding: 20, position: 'relative', overflow: 'hidden' }}
               data-testid="stat-final-net-amount"
             >
               <div style={{ position: 'absolute', top: 0, right: 0, width: 70, height: 70, background: 'radial-gradient(circle at 100% 0%, rgba(16,185,129,0.08), transparent 70%)', pointerEvents: 'none' }} />
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
-                <p style={{ color: '#555', fontSize: 10, textTransform: 'uppercase', letterSpacing: '0.1em', fontWeight: 600 }}>Final Net</p>
+                <p style={{ color: T.textMuted, fontSize: 10, textTransform: 'uppercase', letterSpacing: '0.1em', fontWeight: 600 }}>Final Net</p>
                 <div style={{ background: 'rgba(16,185,129,0.12)', border: '1px solid rgba(16,185,129,0.25)', borderRadius: 6, width: 28, height: 28, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                   <span style={{ color: '#10B981', fontSize: 12, fontWeight: 900 }}>₌</span>
                 </div>
               </div>
               <p style={{ fontSize: 26, fontWeight: 900, color: '#10B981', fontFamily: "'Playfair Display', serif" }}>{CUR}{feeSummary.finalNetAmount.toFixed(2)}</p>
-              <p style={{ color: '#444', fontSize: 11, marginTop: 4 }}>After GST {pfEnabled ? '+ platform fees' : ''}</p>
+              <p style={{ color: T.textFaint, fontSize: 11, marginTop: 4 }}>After GST {pfEnabled ? '+ platform fees' : ''}</p>
             </motion.div>
           </div>
         )}
 
-        {/* ── Payment breakdown table — UNCHANGED data, enhanced visual ─────── */}
+        {/* ── Payment breakdown table — UNCHANGED data ──────────────────────── */}
         {showFeeCards && (
           <motion.div
             initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}
-            style={{ ...glass(), padding: '24px 28px' }}
+            style={{ ...glass('rgba(212,175,55,0.08)', {}, isLight), padding: '24px 28px' }}
           >
-            <SectionHeading>Payment Breakdown</SectionHeading>
+            <SectionHeading isLight={isLight}>Payment Breakdown</SectionHeading>
             <div style={{ display: 'flex', flexDirection: 'column' }}>
               {[
-                { label: 'Total Orders',        value: feeSummary.totalOrders,        isMoney: false, color: '#E5E5E5' },
-                { label: 'Gross Revenue',        value: feeSummary.grossRevenue,       isMoney: true,  color: '#E5E5E5' },
-                { label: 'GST / Tax Collected',  value: feeSummary.gstCollected,       isMoney: true,  color: '#A3A3A3' },
+                { label: 'Total Orders',        value: feeSummary.totalOrders,        isMoney: false, color: T.text },
+                { label: 'Gross Revenue',        value: feeSummary.grossRevenue,       isMoney: true,  color: T.text },
+                { label: 'GST / Tax Collected',  value: feeSummary.gstCollected,       isMoney: true,  color: T.textSub },
                 ...(scEnabled ? [{ label: 'Service Charges Collected', value: feeSummary.totalServiceCharge, isMoney: true, color: '#D4AF37' }] : []),
                 ...(pfEnabled ? [{ label: 'Platform Fees Deducted',    value: feeSummary.totalPlatformFee,   isMoney: true, color: '#EF4444' }] : []),
-                { label: 'Net Revenue',          value: feeSummary.netRevenue,         isMoney: true,  color: '#E5E5E5' },
+                { label: 'Net Revenue',          value: feeSummary.netRevenue,         isMoney: true,  color: T.text },
               ].map((row, idx) => (
                 <div key={row.label} style={{
                   display: 'flex', alignItems: 'center', justifyContent: 'space-between',
                   padding: '11px 14px', borderRadius: 8, marginBottom: 2,
-                  background: idx % 2 === 0 ? 'rgba(255,255,255,0.02)' : 'transparent',
+                  background: idx % 2 === 0 ? T.rowEven : 'transparent',
                   transition: 'background 0.15s',
                 }}>
-                  <span style={{ color: '#888', fontSize: 13 }}>{row.label}</span>
+                  <span style={{ color: T.textMuted, fontSize: 13 }}>{row.label}</span>
                   <span style={{ fontWeight: 700, fontSize: 13, color: row.color }}>
                     {row.isMoney ? `${CUR}${Number(row.value).toFixed(2)}` : row.value}
                   </span>
@@ -946,23 +994,23 @@ const Analytics = () => {
                 padding: '14px 14px 0', marginTop: 6,
                 borderTop: '1px solid rgba(212,175,55,0.25)',
               }}>
-                <span style={{ color: '#F0F0F0', fontWeight: 700, fontSize: 14 }}>Final Net Amount</span>
+                <span style={{ color: T.text, fontWeight: 700, fontSize: 14 }}>Final Net Amount</span>
                 <span style={{ fontSize: 20, fontWeight: 900, color: feeSummary.finalNetAmount >= 0 ? '#10B981' : '#EF4444', fontFamily: "'Playfair Display', serif" }}>
                   {CUR}{feeSummary.finalNetAmount.toFixed(2)}
                 </span>
               </div>
-              {pfEnabled && <p style={{ color: '#444', fontSize: 11, marginTop: 6, paddingLeft: 14 }}>Gross Revenue − GST − Platform Fees</p>}
+              {pfEnabled && <p style={{ color: T.textFaint, fontSize: 11, marginTop: 6, paddingLeft: 14 }}>Gross Revenue − GST − Platform Fees</p>}
             </div>
           </motion.div>
         )}
 
         {/* ════════════════════════════════════════════════════════════════════
-            GROWTH ANALYTICS LAYER (additive)
+            GROWTH ANALYTICS LAYER
         ════════════════════════════════════════════════════════════════════ */}
 
         {growthData && (
           <>
-            {/* ── Risk Alerts — enhanced styling ─────────────────────────── */}
+            {/* ── Risk Alerts ─────────────────────────────────────────────── */}
             {growthData.alerts.length > 0 && (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                 {growthData.alerts.map((alert, i) => (
@@ -1014,7 +1062,6 @@ const Analytics = () => {
                   value: `${CUR}${growthData.todayRev.toFixed(0)}`,
                   pct: growthData.revPct,
                   sub: `Yesterday: ${CUR}${growthData.yesterdayRev.toFixed(0)}`,
-                  icon: IndianRupeeIcon,
                   color: '#D4AF37',
                 },
                 {
@@ -1022,7 +1069,6 @@ const Analytics = () => {
                   value: growthData.todayOrders,
                   pct: growthData.ordersPct,
                   sub: `Yesterday: ${growthData.yOrders}`,
-                  icon: ZapIcon,
                   color: '#10B981',
                 },
                 {
@@ -1030,7 +1076,6 @@ const Analytics = () => {
                   value: `${CUR}${growthData.aov}`,
                   pct: null,
                   sub: 'Per paid order',
-                  icon: TrendingUpIcon,
                   color: '#3B82F6',
                 },
                 {
@@ -1038,8 +1083,7 @@ const Analytics = () => {
                   value: `${CUR}${growthData.unpaidRev.toFixed(0)}`,
                   pct: null,
                   sub: 'Pending payments',
-                  icon: AlertIcon,
-                  color: growthData.unpaidRev > 0 ? '#F59E0B' : '#555',
+                  color: growthData.unpaidRev > 0 ? '#F59E0B' : T.textFaint,
                 },
               ].map((card, i) => (
                 <motion.div
@@ -1049,7 +1093,7 @@ const Analytics = () => {
                   transition={{ delay: i * 0.06, duration: 0.3 }}
                   whileHover={{ y: -3, transition: { duration: 0.15 } }}
                   style={{
-                    ...glass(`${card.color}18`),
+                    ...glass(`${card.color}18`, {}, isLight),
                     borderLeft: `3px solid ${card.color}`,
                     padding: '18px 16px',
                     cursor: 'default',
@@ -1057,7 +1101,7 @@ const Analytics = () => {
                   }}
                 >
                   <div style={{ position: 'absolute', top: 0, right: 0, width: 60, height: 60, background: `radial-gradient(circle at 100% 0%, ${card.color}15, transparent 70%)`, pointerEvents: 'none' }} />
-                  <p style={{ color: '#555', fontSize: 10, textTransform: 'uppercase', letterSpacing: '0.08em', fontWeight: 600, marginBottom: 8 }}>
+                  <p style={{ color: T.textMuted, fontSize: 10, textTransform: 'uppercase', letterSpacing: '0.08em', fontWeight: 600, marginBottom: 8 }}>
                     {card.label}
                   </p>
                   <p style={{ color: card.color, fontSize: 22, fontWeight: 900, fontFamily: "'Playfair Display', serif", lineHeight: 1 }}>
@@ -1065,7 +1109,7 @@ const Analytics = () => {
                   </p>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 7 }}>
                     {card.pct !== null && <PctBadge val={card.pct} />}
-                    <span style={{ color: '#444', fontSize: 11 }}>{card.sub}</span>
+                    <span style={{ color: T.textFaint, fontSize: 11 }}>{card.sub}</span>
                   </div>
                 </motion.div>
               ))}
@@ -1080,11 +1124,11 @@ const Analytics = () => {
                   initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}
                   style={{
                     gridColumn: growthData.insights.length > 2 ? 'span 2' : 'span 1',
-                    ...glass('rgba(212,175,55,0.08)'),
+                    ...glass('rgba(212,175,55,0.08)', {}, isLight),
                     padding: '20px',
                   }}
                 >
-                  <SectionHeading badge={`${growthData.insights.length} active`}>
+                  <SectionHeading badge={`${growthData.insights.length} active`} isLight={isLight}>
                     <Zap size={13} style={{ color: '#D4AF37', marginRight: 2 }} />
                     Insights
                   </SectionHeading>
@@ -1097,19 +1141,21 @@ const Analytics = () => {
                             width: '100%', textAlign: 'left',
                             display: 'flex', alignItems: 'center', gap: 10,
                             padding: '10px 12px', borderRadius: 8,
-                            background: openInsight === ins.id ? `${ins.color}10` : 'rgba(255,255,255,0.025)',
-                            border: `1px solid ${openInsight === ins.id ? `${ins.color}30` : 'rgba(255,255,255,0.06)'}`,
+                            background: openInsight === ins.id
+                              ? `${ins.color}10`
+                              : isLight ? 'rgba(0,0,0,0.03)' : 'rgba(255,255,255,0.025)',
+                            border: `1px solid ${openInsight === ins.id ? `${ins.color}30` : T.border}`,
                             cursor: 'pointer', transition: 'all 0.15s',
                           }}
                         >
                           <span style={{ fontSize: 16, flexShrink: 0 }}>{ins.icon}</span>
                           <div style={{ flex: 1, minWidth: 0 }}>
-                            <p style={{ color: '#ddd', fontSize: 12, fontWeight: 700 }}>{ins.title}</p>
-                            <p style={{ color: '#555', fontSize: 11, marginTop: 1 }}>{ins.summary}</p>
+                            <p style={{ color: isLight ? '#222' : '#ddd', fontSize: 12, fontWeight: 700 }}>{ins.title}</p>
+                            <p style={{ color: T.textMuted, fontSize: 11, marginTop: 1 }}>{ins.summary}</p>
                           </div>
                           {openInsight === ins.id
-                            ? <ChevronUp size={13} style={{ color: '#555', flexShrink: 0 }} />
-                            : <ChevronDown size={13} style={{ color: '#555', flexShrink: 0 }} />
+                            ? <ChevronUp size={13} style={{ color: T.textMuted, flexShrink: 0 }} />
+                            : <ChevronDown size={13} style={{ color: T.textMuted, flexShrink: 0 }} />
                           }
                         </button>
                         <AnimatePresence>
@@ -1125,9 +1171,9 @@ const Analytics = () => {
                                 padding: '10px 14px',
                                 borderLeft: `3px solid ${ins.color}`,
                                 marginTop: 4, borderRadius: '0 0 6px 6px',
-                                background: 'rgba(255,255,255,0.02)',
+                                background: isLight ? 'rgba(0,0,0,0.02)' : 'rgba(255,255,255,0.02)',
                               }}>
-                                <p style={{ color: '#888', fontSize: 12, lineHeight: 1.7 }}>{ins.detail}</p>
+                                <p style={{ color: T.textSub, fontSize: 12, lineHeight: 1.7 }}>{ins.detail}</p>
                               </div>
                             </motion.div>
                           )}
@@ -1144,25 +1190,25 @@ const Analytics = () => {
                 {/* Missed Revenue */}
                 <motion.div
                   initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }}
-                  style={{ ...glass('rgba(239,68,68,0.1)'), padding: '16px 18px' }}
+                  style={{ ...glass('rgba(239,68,68,0.1)', {}, isLight), padding: '16px 18px' }}
                 >
-                  <SectionHeading>Missed Revenue</SectionHeading>
+                  <SectionHeading isLight={isLight}>Missed Revenue</SectionHeading>
                   {[
                     { label: 'Unpaid',    val: growthData.unpaidRev,    color: '#F59E0B' },
                     { label: 'Cancelled', val: growthData.cancelledRev, color: '#EF4444' },
                   ].map(r => (
                     <div key={r.label} style={{
                       display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-                      padding: '7px 0', borderBottom: '1px solid rgba(255,255,255,0.04)',
+                      padding: '7px 0', borderBottom: `1px solid ${T.borderFaint}`,
                     }}>
-                      <span style={{ color: '#666', fontSize: 12 }}>{r.label}</span>
-                      <span style={{ color: r.val > 0 ? r.color : '#333', fontWeight: 800, fontSize: 13 }}>
+                      <span style={{ color: T.textMuted, fontSize: 12 }}>{r.label}</span>
+                      <span style={{ color: r.val > 0 ? r.color : T.textFaint, fontWeight: 800, fontSize: 13 }}>
                         {CUR}{r.val.toFixed(0)}
                       </span>
                     </div>
                   ))}
                   <div style={{ marginTop: 10, padding: '8px 10px', borderRadius: 7, background: 'rgba(239,68,68,0.07)', border: '1px solid rgba(239,68,68,0.15)' }}>
-                    <p style={{ color: '#888', fontSize: 11 }}>
+                    <p style={{ color: T.textSub, fontSize: 11 }}>
                       Total at risk: <strong style={{ color: '#EF4444' }}>{CUR}{(growthData.unpaidRev + growthData.cancelledRev).toFixed(0)}</strong>
                     </p>
                   </div>
@@ -1172,16 +1218,16 @@ const Analytics = () => {
                 {growthData.peakLabel && (
                   <motion.div
                     initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.15 }}
-                    style={{ ...glass('rgba(212,175,55,0.1)'), padding: '16px 18px' }}
+                    style={{ ...glass('rgba(212,175,55,0.1)', {}, isLight), padding: '16px 18px' }}
                   >
                     <div style={{ display: 'flex', alignItems: 'center', gap: 7, marginBottom: 10 }}>
                       <Clock size={13} style={{ color: '#D4AF37' }} />
-                      <p style={{ color: '#fff', fontWeight: 700, fontSize: 13, fontFamily: "'Playfair Display', serif" }}>Peak Time</p>
+                      <p style={{ color: T.text, fontWeight: 700, fontSize: 13, fontFamily: "'Playfair Display', serif" }}>Peak Time</p>
                     </div>
                     <p style={{ color: '#D4AF37', fontSize: 22, fontWeight: 900, fontFamily: "'Playfair Display', serif" }}>
                       {growthData.peakLabel}
                     </p>
-                    <p style={{ color: '#555', fontSize: 11, marginTop: 4 }}>
+                    <p style={{ color: T.textMuted, fontSize: 11, marginTop: 4 }}>
                       {growthData.peakCount} order{growthData.peakCount !== 1 ? 's' : ''} in peak hour
                     </p>
                     {growthData.peakCount >= 8 && (
@@ -1196,23 +1242,23 @@ const Analytics = () => {
                 {growthData.uniqueCount > 0 && (
                   <motion.div
                     initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }}
-                    style={{ ...glass('rgba(59,130,246,0.1)'), padding: '16px 18px' }}
+                    style={{ ...glass('rgba(59,130,246,0.1)', {}, isLight), padding: '16px 18px' }}
                   >
                     <div style={{ display: 'flex', alignItems: 'center', gap: 7, marginBottom: 12 }}>
                       <Users size={13} style={{ color: '#3B82F6' }} />
-                      <p style={{ color: '#fff', fontWeight: 700, fontSize: 13, fontFamily: "'Playfair Display', serif" }}>Customers</p>
+                      <p style={{ color: T.text, fontWeight: 700, fontSize: 13, fontFamily: "'Playfair Display', serif" }}>Customers</p>
                     </div>
                     <div style={{ display: 'flex', gap: 8 }}>
                       <div style={{ flex: 1, textAlign: 'center', padding: '10px 8px', borderRadius: 8, background: 'rgba(16,185,129,0.07)', border: '1px solid rgba(16,185,129,0.15)' }}>
                         <p style={{ color: '#10B981', fontSize: 20, fontWeight: 900 }}>{growthData.repeatPct}%</p>
-                        <p style={{ color: '#555', fontSize: 10, marginTop: 3 }}>Repeat</p>
+                        <p style={{ color: T.textMuted, fontSize: 10, marginTop: 3 }}>Repeat</p>
                       </div>
                       <div style={{ flex: 1, textAlign: 'center', padding: '10px 8px', borderRadius: 8, background: 'rgba(59,130,246,0.07)', border: '1px solid rgba(59,130,246,0.15)' }}>
                         <p style={{ color: '#3B82F6', fontSize: 20, fontWeight: 900 }}>{growthData.oneTimePct}%</p>
-                        <p style={{ color: '#555', fontSize: 10, marginTop: 3 }}>One-time</p>
+                        <p style={{ color: T.textMuted, fontSize: 10, marginTop: 3 }}>One-time</p>
                       </div>
                     </div>
-                    <p style={{ color: '#444', fontSize: 11, marginTop: 8 }}>{growthData.uniqueCount} unique customers identified</p>
+                    <p style={{ color: T.textFaint, fontSize: 11, marginTop: 8 }}>{growthData.uniqueCount} unique customers identified</p>
                   </motion.div>
                 )}
               </div>
@@ -1223,8 +1269,8 @@ const Analytics = () => {
               <motion.div
                 initial={{ opacity: 0 }} animate={{ opacity: 1 }}
                 style={{
-                  background: 'rgba(212,175,55,0.03)',
-                  border: '1px solid rgba(212,175,55,0.1)',
+                  background: isLight ? 'rgba(212,175,55,0.06)' : 'rgba(212,175,55,0.03)',
+                  border: `1px solid ${isLight ? 'rgba(212,175,55,0.2)' : 'rgba(212,175,55,0.1)'}`,
                   borderRadius: 10, padding: '12px 16px',
                   display: 'flex', flexWrap: 'wrap', gap: '6px 20px',
                 }}
@@ -1233,23 +1279,23 @@ const Analytics = () => {
                   📊 Quick Summary
                 </span>
                 {analytics.topItems[0] && (
-                  <span style={{ color: '#888', fontSize: 12 }}>
-                    🔥 Best item: <strong style={{ color: '#ccc' }}>{analytics.topItems[0].name}</strong> ({analytics.topItems[0].count} sold)
+                  <span style={{ color: T.textSub, fontSize: 12 }}>
+                    🔥 Best item: <strong style={{ color: T.text }}>{analytics.topItems[0].name}</strong> ({analytics.topItems[0].count} sold)
                   </span>
                 )}
                 {growthData.peakDay.orders > 0 && (
-                  <span style={{ color: '#888', fontSize: 12 }}>
-                    📅 Most active day: <strong style={{ color: '#ccc' }}>{growthData.peakDay.date}</strong> ({growthData.peakDay.orders} orders)
+                  <span style={{ color: T.textSub, fontSize: 12 }}>
+                    📅 Most active day: <strong style={{ color: T.text }}>{growthData.peakDay.date}</strong> ({growthData.peakDay.orders} orders)
                   </span>
                 )}
                 {growthData.pendingPct > 0 && (
-                  <span style={{ color: '#888', fontSize: 12 }}>
-                    ⏳ Pending: <strong style={{ color: growthData.pendingPct > 40 ? '#F59E0B' : '#ccc' }}>{growthData.pendingPct.toFixed(0)}%</strong> of orders
+                  <span style={{ color: T.textSub, fontSize: 12 }}>
+                    ⏳ Pending: <strong style={{ color: growthData.pendingPct > 40 ? '#F59E0B' : T.text }}>{growthData.pendingPct.toFixed(0)}%</strong> of orders
                   </span>
                 )}
                 {growthData.aov > 0 && (
-                  <span style={{ color: '#888', fontSize: 12 }}>
-                    💰 AOV: <strong style={{ color: '#ccc' }}>{CUR}{growthData.aov}</strong>
+                  <span style={{ color: T.textSub, fontSize: 12 }}>
+                    💰 AOV: <strong style={{ color: T.text }}>{CUR}{growthData.aov}</strong>
                   </span>
                 )}
               </motion.div>
@@ -1258,7 +1304,7 @@ const Analytics = () => {
         )}
 
         {/* ════════════════════════════════════════════════════════════════════
-            CHARTS — logic 100% unchanged, visual wrappers added
+            CHARTS — logic 100% unchanged
         ════════════════════════════════════════════════════════════════════ */}
 
         {/* ── Revenue Chart ──────────────────────────────────────────────────── */}
@@ -1268,16 +1314,16 @@ const Analytics = () => {
           insightColor={revenueInsight?.pillColor}
         >
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
-            <SectionHeading>Revenue (Last 7 Days)</SectionHeading>
+            <SectionHeading isLight={isLight}>Revenue (Last 7 Days)</SectionHeading>
             <ClickHint />
           </div>
           <ResponsiveContainer width="100%" height={300}>
             <LineChart data={analytics.revenueByDay}>
-              <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.06)" />
-              <XAxis dataKey="date" stroke="#444" tick={{ fill: '#666', fontSize: 11 }} />
-              <YAxis stroke="#444" tick={{ fill: '#666', fontSize: 11 }} />
+              <CartesianGrid strokeDasharray="3 3" stroke={T.chartStroke} />
+              <XAxis dataKey="date" stroke={T.axisColor} tick={{ fill: T.tickColor, fontSize: 11 }} />
+              <YAxis stroke={T.axisColor} tick={{ fill: T.tickColor, fontSize: 11 }} />
               <Tooltip content={<RevenueTooltip />} />
-              <Legend wrapperStyle={{ color: '#666', fontSize: 12 }} />
+              <Legend wrapperStyle={{ color: T.tickColor, fontSize: 12 }} />
               <Line
                 type="monotone" dataKey="revenue" stroke="#D4AF37" strokeWidth={2.5}
                 dot={{ fill: '#D4AF37', strokeWidth: 2, r: 4 }}
@@ -1295,16 +1341,16 @@ const Analytics = () => {
           insightColor={ordersInsight?.pillColor}
         >
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
-            <SectionHeading>Orders (Last 7 Days)</SectionHeading>
+            <SectionHeading isLight={isLight}>Orders (Last 7 Days)</SectionHeading>
             <ClickHint />
           </div>
           <ResponsiveContainer width="100%" height={300}>
             <BarChart data={analytics.revenueByDay}>
-              <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.06)" />
-              <XAxis dataKey="date" stroke="#444" tick={{ fill: '#666', fontSize: 11 }} />
-              <YAxis stroke="#444" tick={{ fill: '#666', fontSize: 11 }} />
+              <CartesianGrid strokeDasharray="3 3" stroke={T.chartStroke} />
+              <XAxis dataKey="date" stroke={T.axisColor} tick={{ fill: T.tickColor, fontSize: 11 }} />
+              <YAxis stroke={T.axisColor} tick={{ fill: T.tickColor, fontSize: 11 }} />
               <Tooltip content={<OrdersTooltip />} />
-              <Legend wrapperStyle={{ color: '#666', fontSize: 12 }} />
+              <Legend wrapperStyle={{ color: T.tickColor, fontSize: 12 }} />
               <Bar dataKey="orders" fill="#10B981" name="Orders" radius={[4, 4, 0, 0]} />
             </BarChart>
           </ResponsiveContainer>
@@ -1320,14 +1366,14 @@ const Analytics = () => {
             insightColor={itemsInsight?.pillColor}
           >
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
-              <SectionHeading>Best Selling Items</SectionHeading>
+              <SectionHeading isLight={isLight}>Best Selling Items</SectionHeading>
               <ClickHint />
             </div>
             <ResponsiveContainer width="100%" height={300}>
               <BarChart data={analytics.topItems} layout="vertical">
-                <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.06)" />
-                <XAxis type="number" stroke="#444" tick={{ fill: '#666', fontSize: 11 }} />
-                <YAxis type="category" dataKey="name" stroke="#444" width={100} tick={{ fill: '#888', fontSize: 11 }} />
+                <CartesianGrid strokeDasharray="3 3" stroke={T.chartStroke} />
+                <XAxis type="number" stroke={T.axisColor} tick={{ fill: T.tickColor, fontSize: 11 }} />
+                <YAxis type="category" dataKey="name" stroke={T.axisColor} width={100} tick={{ fill: T.textSub, fontSize: 11 }} />
                 <Tooltip content={<ItemsTooltip />} />
                 <Bar dataKey="count" fill="#D4AF37" name="Quantity Sold" radius={[0, 4, 4, 0]} />
               </BarChart>
@@ -1341,7 +1387,7 @@ const Analytics = () => {
             insightColor={paymentInsight?.pillColor}
           >
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
-              <SectionHeading>Payment Status</SectionHeading>
+              <SectionHeading isLight={isLight}>Payment Status</SectionHeading>
               <ClickHint />
             </div>
             <ResponsiveContainer width="100%" height={300}>
@@ -1355,7 +1401,7 @@ const Analytics = () => {
                   fill="#8884d8"
                   dataKey="value"
                   strokeWidth={2}
-                  stroke="rgba(0,0,0,0.3)"
+                  stroke={isLight ? 'rgba(0,0,0,0.08)' : 'rgba(0,0,0,0.3)'}
                 >
                   {analytics.paymentSplit.map((entry, index) => (
                     <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
@@ -1374,7 +1420,7 @@ const Analytics = () => {
           insightColor={statusInsight?.pillColor}
         >
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
-            <SectionHeading>Order Status Distribution</SectionHeading>
+            <SectionHeading isLight={isLight}>Order Status Distribution</SectionHeading>
             <ClickHint />
           </div>
           <ResponsiveContainer width="100%" height={300}>
@@ -1388,15 +1434,15 @@ const Analytics = () => {
                 fill="#8884d8"
                 dataKey="value"
                 strokeWidth={2}
-                stroke="rgba(0,0,0,0.3)"
+                stroke={isLight ? 'rgba(0,0,0,0.08)' : 'rgba(0,0,0,0.3)'}
               >
                 {analytics.orderStatusSplit.map((entry, index) => (
                   <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                 ))}
               </Pie>
               <Tooltip
-                contentStyle={CustomTooltipStyle}
-                labelStyle={{ color: '#E5E5E5' }}
+                contentStyle={makeTooltipStyle(isLight)}
+                labelStyle={{ color: T.text }}
               />
             </PieChart>
           </ResponsiveContainer>
@@ -1414,7 +1460,7 @@ const Analytics = () => {
           orderstatus: 'Order Status Analysis',
         };
         return (
-          <ChartModal key={key} isOpen={activeModal === key} onClose={closeModal} title={titles[key]}>
+          <ChartModal key={key} isOpen={activeModal === key} onClose={closeModal} title={titles[key]} isLight={isLight}>
             <ModalContent chartKey={key} />
           </ChartModal>
         );

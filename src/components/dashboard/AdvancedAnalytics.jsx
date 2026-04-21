@@ -8,13 +8,11 @@
  * 4. Category-wise breakdown
  * 5. Payment + source breakdown
  *
- * UI UPGRADE (safe-only):
- * - Premium StatCard with colored border accent + glow
- * - SectionCard with dark header bar + explanation panel
- * - CustomTooltip with glass styling
- * - Grouped toolbar buttons
- * - Gradient category bars
- * - Enhanced growth + customer cards
+ * UI THEME FIX (safe-only):
+ * - StatCard, SectionCard, CustomTooltip, date range card, growth cards,
+ *   customer cards all now adapt to isLight via useTheme()
+ * - All hardcoded rgba(15,15,15), rgba(12,12,12), #ccc, #ddd on dark-only
+ *   backgrounds replaced with T.* tokens
  * ALL logic, calculations, hooks, APIs — 100% unchanged.
  */
 
@@ -47,18 +45,51 @@ const safeLower = (v) => {
   return String(v).toLowerCase();
 };
 
-// ─── CustomTooltip — logic UNCHANGED, styling upgraded ───────────────────────
-const CustomTooltip = ({ active, payload, label, CUR = '₹', T: TProp }) => {
-  const T = TProp || { card: 'bg-[#0F0F0F] border border-white/5', muted: 'text-[#A3A3A3]', heading: 'text-white', faint: 'text-[#555]', border: 'border-white/5' };
+// ─── Theme token builder — used throughout render ────────────────────────────
+const buildTokens = (isLight) => ({
+  cardBg:       isLight
+    ? 'linear-gradient(135deg, rgba(255,255,255,0.98) 0%, rgba(250,248,244,0.96) 100%)'
+    : 'linear-gradient(135deg, rgba(15,15,15,0.98) 0%, rgba(20,20,20,0.95) 100%)',
+  sectionBg:    isLight
+    ? 'linear-gradient(180deg, rgba(255,255,255,0.99) 0%, rgba(252,250,246,0.98) 100%)'
+    : 'linear-gradient(180deg, rgba(15,15,15,0.99) 0%, rgba(12,12,12,0.98) 100%)',
+  dateBg:       isLight ? 'rgba(255,255,255,0.98)' : 'rgba(12,12,12,0.98)',
+  tooltipBg:    isLight ? 'rgba(255,255,255,0.98)' : 'rgba(10,10,10,0.96)',
+  tooltipBorder:isLight ? 'rgba(212,175,55,0.4)'  : 'rgba(212,175,55,0.35)',
+  border:       isLight ? 'rgba(0,0,0,0.08)'       : 'rgba(255,255,255,0.07)',
+  borderFaint:  isLight ? 'rgba(0,0,0,0.05)'       : 'rgba(255,255,255,0.05)',
+  shadow:       isLight ? '0 4px 20px rgba(0,0,0,0.08)' : '0 4px 24px rgba(0,0,0,0.3)',
+  headerBg:     isLight ? 'rgba(0,0,0,0.02)'       : 'rgba(255,255,255,0.02)',
+  pillBg:       isLight ? 'rgba(0,0,0,0.04)'       : 'rgba(255,255,255,0.04)',
+  pillBorder:   isLight ? 'rgba(0,0,0,0.08)'       : 'rgba(255,255,255,0.08)',
+  innerCard:    isLight ? 'rgba(0,0,0,0.025)'      : 'rgba(255,255,255,0.03)',
+  rowEven:      isLight ? 'rgba(0,0,0,0.025)'      : 'rgba(255,255,255,0.03)',
+  // Text
+  text:         isLight ? '#1A1A1A' : '#FFFFFF',
+  textSub:      isLight ? '#444444' : '#CCCCCC',
+  textMuted:    isLight ? '#666666' : '#A3A3A3',
+  textFaint:    isLight ? '#888888' : '#555555',
+  textDim:      isLight ? '#999999' : '#444444',
+  // Chart
+  gridStroke:   isLight ? 'rgba(0,0,0,0.06)' : 'rgba(255,255,255,0.04)',
+  axisStroke:   isLight ? '#BBBBBB'           : '#333333',
+  axisTick:     isLight ? '#666666'           : '#555555',
+});
+
+// ─── CustomTooltip — logic UNCHANGED, now theme-adaptive ─────────────────────
+const CustomTooltip = ({ active, payload, label, CUR = '₹', isLight }) => {
+  const TK = buildTokens(isLight);
   if (!active || !payload?.length) return null;
   return (
     <div style={{
-      background: 'rgba(10,10,10,0.96)',
-      border: '1px solid rgba(212,175,55,0.35)',
+      background: TK.tooltipBg,
+      border: `1px solid ${TK.tooltipBorder}`,
       borderRadius: 10,
       padding: '12px 16px',
-      color: '#fff',
-      boxShadow: '0 8px 32px rgba(0,0,0,0.5), 0 0 0 1px rgba(212,175,55,0.1)',
+      color: TK.text,
+      boxShadow: isLight
+        ? '0 4px 24px rgba(0,0,0,0.12)'
+        : '0 8px 32px rgba(0,0,0,0.5), 0 0 0 1px rgba(212,175,55,0.1)',
       backdropFilter: 'blur(12px)',
       minWidth: 140,
     }}>
@@ -68,10 +99,10 @@ const CustomTooltip = ({ active, payload, label, CUR = '₹', T: TProp }) => {
         </p>
       )}
       {payload.map((p, i) => (
-        <p key={i} style={{ color: '#fff', fontSize: 13, margin: '3px 0', display: 'flex', alignItems: 'center', gap: 6 }}>
+        <p key={i} style={{ color: TK.text, fontSize: 13, margin: '3px 0', display: 'flex', alignItems: 'center', gap: 6 }}>
           <span style={{ color: p.color || '#D4AF37', fontSize: 8 }}>◆</span>
-          <span style={{ color: '#A3A3A3', fontSize: 11 }}>{p.name}:</span>
-          <strong style={{ color: '#fff' }}>
+          <span style={{ color: TK.textMuted, fontSize: 11 }}>{p.name}:</span>
+          <strong style={{ color: TK.text }}>
             {typeof p.value === 'number' && safeLower(p.name).includes('revenue')
               ? `${CUR}${p.value.toFixed(2)}`
               : p.value}
@@ -82,113 +113,118 @@ const CustomTooltip = ({ active, payload, label, CUR = '₹', T: TProp }) => {
   );
 };
 
-// ─── StatCard — logic UNCHANGED, styling upgraded ─────────────────────────────
-const StatCard = ({ label, value, sub, icon: Icon, color, index, T }) => (
-  <motion.div
-    initial={{ opacity: 0, y: 20 }}
-    animate={{ opacity: 1, y: 0 }}
-    transition={{ delay: index * 0.06, duration: 0.4 }}
-    whileHover={{ y: -4, transition: { duration: 0.2 } }}
-    className={`relative rounded-xl p-5 overflow-hidden cursor-default`}
-    style={{
-      background: 'linear-gradient(135deg, rgba(15,15,15,0.98) 0%, rgba(20,20,20,0.95) 100%)',
-      border: `1px solid rgba(255,255,255,0.07)`,
-      borderLeft: `3px solid ${color}`,
-      boxShadow: `0 4px 24px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.04)`,
-    }}
-  >
-    {/* Ambient glow */}
-    <div style={{
-      position: 'absolute', top: 0, right: 0, width: 80, height: 80,
-      background: `radial-gradient(circle at 100% 0%, ${color}18 0%, transparent 70%)`,
-      pointerEvents: 'none',
-    }} />
-
-    <div className="flex items-center justify-between mb-3">
-      <p style={{ color: '#666', fontSize: 10, textTransform: 'uppercase', letterSpacing: '0.08em', fontWeight: 600 }}>
-        {label}
-      </p>
+// ─── StatCard — logic UNCHANGED, now theme-adaptive ──────────────────────────
+const StatCard = ({ label, value, sub, icon: Icon, color, index, isLight }) => {
+  const TK = buildTokens(isLight);
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ delay: index * 0.06, duration: 0.4 }}
+      whileHover={{ y: -4, transition: { duration: 0.2 } }}
+      className="relative rounded-xl p-5 overflow-hidden cursor-default"
+      style={{
+        background: TK.cardBg,
+        border: `1px solid ${TK.border}`,
+        borderLeft: `3px solid ${color}`,
+        boxShadow: TK.shadow,
+      }}
+    >
+      {/* Ambient glow */}
       <div style={{
-        width: 32, height: 32, borderRadius: 8,
-        background: `${color}18`,
-        border: `1px solid ${color}30`,
-        display: 'flex', alignItems: 'center', justifyContent: 'center',
-      }}>
-        <Icon style={{ width: 15, height: 15, color }} />
-      </div>
-    </div>
+        position: 'absolute', top: 0, right: 0, width: 80, height: 80,
+        background: `radial-gradient(circle at 100% 0%, ${color}18 0%, transparent 70%)`,
+        pointerEvents: 'none',
+      }} />
 
-    <p style={{ fontSize: 24, fontWeight: 900, color, lineHeight: 1, fontFamily: 'Playfair Display, serif' }}>
-      {value}
-    </p>
-    {sub && (
-      <p style={{ color: '#555', fontSize: 11, marginTop: 6, fontWeight: 500 }}>{sub}</p>
-    )}
-  </motion.div>
-);
-
-// ─── SectionCard — logic UNCHANGED, styling upgraded ─────────────────────────
-// Chart container height is always stable — no collapse, no mount/unmount risk.
-const SectionCard = ({ title, icon: Icon, explanation, children, delay = 0, T }) => (
-  <motion.div
-    initial={{ opacity: 0, y: 16 }}
-    animate={{ opacity: 1, y: 0 }}
-    transition={{ delay, duration: 0.4 }}
-    style={{
-      background: 'linear-gradient(180deg, rgba(15,15,15,0.99) 0%, rgba(12,12,12,0.98) 100%)',
-      border: '1px solid rgba(255,255,255,0.07)',
-      borderRadius: 14,
-      overflow: 'hidden',
-      boxShadow: '0 8px 32px rgba(0,0,0,0.25)',
-    }}
-  >
-    {/* Header bar */}
-    <div style={{
-      display: 'flex', alignItems: 'center', gap: 10,
-      padding: '14px 20px',
-      borderBottom: '1px solid rgba(255,255,255,0.05)',
-      background: 'rgba(255,255,255,0.02)',
-    }}>
-      <div style={{
-        width: 28, height: 28, borderRadius: 7,
-        background: 'rgba(212,175,55,0.12)',
-        border: '1px solid rgba(212,175,55,0.2)',
-        display: 'flex', alignItems: 'center', justifyContent: 'center',
-        flexShrink: 0,
-      }}>
-        <Icon style={{ width: 14, height: 14, color: '#D4AF37' }} />
-      </div>
-      <h3 style={{
-        color: '#fff', fontWeight: 600, fontSize: 14, flex: 1,
-        fontFamily: 'Playfair Display, serif',
-      }}>
-        {title}
-      </h3>
-      {/* Subtle gold accent line */}
-      <div style={{ width: 24, height: 2, background: 'linear-gradient(90deg, #D4AF37, transparent)', borderRadius: 2 }} />
-    </div>
-
-    <div style={{ padding: 20 }}>
-      {/* Explanation panel — styled as an insight card */}
-      {explanation && (
+      <div className="flex items-center justify-between mb-3">
+        <p style={{ color: TK.textMuted, fontSize: 10, textTransform: 'uppercase', letterSpacing: '0.08em', fontWeight: 600 }}>
+          {label}
+        </p>
         <div style={{
-          marginBottom: 18,
-          padding: '10px 14px',
-          background: 'rgba(212,175,55,0.04)',
-          border: '1px solid rgba(212,175,55,0.12)',
-          borderRadius: 8,
-          borderLeft: '3px solid rgba(212,175,55,0.4)',
+          width: 32, height: 32, borderRadius: 8,
+          background: `${color}18`,
+          border: `1px solid ${color}30`,
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
         }}>
-          <p style={{ color: '#888', fontSize: 12, lineHeight: 1.6 }}>
-            <span style={{ color: '#D4AF37', fontWeight: 700, marginRight: 6, fontSize: 10 }}>INSIGHT</span>
-            {explanation}
-          </p>
+          <Icon style={{ width: 15, height: 15, color }} />
         </div>
+      </div>
+
+      <p style={{ fontSize: 24, fontWeight: 900, color, lineHeight: 1, fontFamily: 'Playfair Display, serif' }}>
+        {value}
+      </p>
+      {sub && (
+        <p style={{ color: TK.textFaint, fontSize: 11, marginTop: 6, fontWeight: 500 }}>{sub}</p>
       )}
-      {children}
-    </div>
-  </motion.div>
-);
+    </motion.div>
+  );
+};
+
+// ─── SectionCard — logic UNCHANGED, now theme-adaptive ───────────────────────
+const SectionCard = ({ title, icon: Icon, explanation, children, delay = 0, isLight }) => {
+  const TK = buildTokens(isLight);
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 16 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ delay, duration: 0.4 }}
+      style={{
+        background: TK.sectionBg,
+        border: `1px solid ${TK.border}`,
+        borderRadius: 14,
+        overflow: 'hidden',
+        boxShadow: TK.shadow,
+      }}
+    >
+      {/* Header bar */}
+      <div style={{
+        display: 'flex', alignItems: 'center', gap: 10,
+        padding: '14px 20px',
+        borderBottom: `1px solid ${TK.borderFaint}`,
+        background: TK.headerBg,
+      }}>
+        <div style={{
+          width: 28, height: 28, borderRadius: 7,
+          background: 'rgba(212,175,55,0.12)',
+          border: '1px solid rgba(212,175,55,0.2)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          flexShrink: 0,
+        }}>
+          <Icon style={{ width: 14, height: 14, color: '#D4AF37' }} />
+        </div>
+        <h3 style={{
+          color: TK.text, fontWeight: 600, fontSize: 14, flex: 1,
+          fontFamily: 'Playfair Display, serif',
+        }}>
+          {title}
+        </h3>
+        {/* Subtle gold accent line */}
+        <div style={{ width: 24, height: 2, background: 'linear-gradient(90deg, #D4AF37, transparent)', borderRadius: 2 }} />
+      </div>
+
+      <div style={{ padding: 20 }}>
+        {/* Explanation panel */}
+        {explanation && (
+          <div style={{
+            marginBottom: 18,
+            padding: '10px 14px',
+            background: 'rgba(212,175,55,0.04)',
+            border: '1px solid rgba(212,175,55,0.12)',
+            borderRadius: 8,
+            borderLeft: '3px solid rgba(212,175,55,0.4)',
+          }}>
+            <p style={{ color: TK.textSub, fontSize: 12, lineHeight: 1.6 }}>
+              <span style={{ color: '#D4AF37', fontWeight: 700, marginRight: 6, fontSize: 10 }}>INSIGHT</span>
+              {explanation}
+            </p>
+          </div>
+        )}
+        {children}
+      </div>
+    </motion.div>
+  );
+};
 
 // ─── Skeleton — UNCHANGED ─────────────────────────────────────────────────────
 const Skel = ({ h='h-4', w='w-full', T: TT }) => <div className={`${h} ${w} rounded ${TT ? TT.subCard : 'bg-white/5'} animate-pulse`} />;
@@ -220,6 +256,7 @@ const AdvancedAnalytics = () => {
   const cafeId   = user?.cafeId;
   const { data: cafe } = useDocument('cafes', cafeId);
   const { T, isLight } = useTheme();
+  const TK = buildTokens(isLight);   // ← theme tokens
   const CUR = cafe?.currencySymbol || '₹';
 
   // Feature 1: Custom date range — UNCHANGED
@@ -340,23 +377,23 @@ const AdvancedAnalytics = () => {
       <div className="flex flex-col gap-4">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <div>
-            <h2 style={{ color: '#fff', fontWeight: 900, fontSize: 26, fontFamily: 'Playfair Display, serif', lineHeight: 1.2 }}>
+            <h2 style={{ color: TK.text, fontWeight: 900, fontSize: 26, fontFamily: 'Playfair Display, serif', lineHeight: 1.2 }}>
               Advanced Analytics
             </h2>
             {lastFetch && (
-              <p style={{ color: '#444', fontSize: 11, marginTop: 4 }}>
+              <p style={{ color: TK.textFaint, fontSize: 11, marginTop: 4 }}>
                 Last updated: {lastFetch.toLocaleTimeString()}
               </p>
             )}
           </div>
 
-          {/* Toolbar — grouped visually */}
+          {/* Toolbar — unchanged layout */}
           <div className="flex items-center gap-2 flex-wrap">
             {/* Control group */}
             <div style={{
               display: 'flex', gap: 6,
-              background: 'rgba(255,255,255,0.04)',
-              border: '1px solid rgba(255,255,255,0.08)',
+              background: TK.pillBg,
+              border: `1px solid ${TK.pillBorder}`,
               borderRadius: 8, padding: '4px 6px',
             }}>
               <button
@@ -365,12 +402,12 @@ const AdvancedAnalytics = () => {
                 style={{
                   display: 'flex', alignItems: 'center', gap: 5,
                   padding: '5px 10px', borderRadius: 6,
-                  background: 'transparent', color: '#A3A3A3',
+                  background: 'transparent', color: TK.textMuted,
                   fontSize: 12, fontWeight: 600, border: 'none', cursor: 'pointer',
                   transition: 'color 0.15s',
                 }}
-                onMouseEnter={e => e.currentTarget.style.color = '#fff'}
-                onMouseLeave={e => e.currentTarget.style.color = '#A3A3A3'}
+                onMouseEnter={e => e.currentTarget.style.color = TK.text}
+                onMouseLeave={e => e.currentTarget.style.color = TK.textMuted}
               >
                 <RefreshCw style={{ width: 13, height: 13 }} className={loading ? 'animate-spin' : ''} />
                 Refresh
@@ -394,8 +431,8 @@ const AdvancedAnalytics = () => {
             {/* Export group */}
             <div style={{
               display: 'flex', gap: 6,
-              background: 'rgba(255,255,255,0.04)',
-              border: '1px solid rgba(255,255,255,0.08)',
+              background: TK.pillBg,
+              border: `1px solid ${TK.pillBorder}`,
               borderRadius: 8, padding: '4px 6px',
             }}>
               <button
@@ -447,24 +484,24 @@ const AdvancedAnalytics = () => {
           </div>
         </div>
 
-        {/* Date range card — upgraded */}
+        {/* Date range card — theme-adaptive */}
         <div style={{
-          background: 'rgba(12,12,12,0.98)',
-          border: '1px solid rgba(255,255,255,0.07)',
+          background: TK.dateBg,
+          border: `1px solid ${TK.border}`,
           borderRadius: 12,
           padding: '16px 20px',
-          boxShadow: '0 4px 16px rgba(0,0,0,0.2)',
+          boxShadow: TK.shadow,
         }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
             <Calendar style={{ width: 14, height: 14, color: '#D4AF37' }} />
-            <span style={{ color: '#fff', fontSize: 13, fontWeight: 700 }}>Date Range</span>
+            <span style={{ color: TK.text, fontSize: 13, fontWeight: 700 }}>Date Range</span>
           </div>
           <div className="flex flex-wrap items-center gap-3">
             {/* Preset pills */}
             <div style={{
               display: 'flex', gap: 4,
-              background: 'rgba(255,255,255,0.04)',
-              border: '1px solid rgba(255,255,255,0.08)',
+              background: TK.pillBg,
+              border: `1px solid ${TK.pillBorder}`,
               borderRadius: 8, padding: 4,
             }}>
               {[{v:'today',l:'Today'},{v:'7',l:'7 Days'},{v:'30',l:'30 Days'},{v:'90',l:'90 Days'}].map(p => (
@@ -474,7 +511,7 @@ const AdvancedAnalytics = () => {
                   style={{
                     padding: '5px 12px', borderRadius: 6,
                     background: preset === p.v ? '#D4AF37' : 'transparent',
-                    color: preset === p.v ? '#000' : '#666',
+                    color: preset === p.v ? '#000' : TK.textMuted,
                     fontSize: 12, fontWeight: 700, border: 'none', cursor: 'pointer',
                     transition: 'all 0.15s',
                   }}
@@ -484,11 +521,11 @@ const AdvancedAnalytics = () => {
               ))}
             </div>
 
-            <span style={{ color: '#333', fontSize: 11 }}>or custom:</span>
+            <span style={{ color: TK.textFaint, fontSize: 11 }}>or custom:</span>
 
             <div className="flex items-center gap-2 flex-wrap">
               <div className="flex items-center gap-2">
-                <span style={{ color: '#666', fontSize: 11 }}>From</span>
+                <span style={{ color: TK.textMuted, fontSize: 11 }}>From</span>
                 <input
                   type="date"
                   value={fromDate}
@@ -498,7 +535,7 @@ const AdvancedAnalytics = () => {
                 />
               </div>
               <div className="flex items-center gap-2">
-                <span style={{ color: '#666', fontSize: 11 }}>To</span>
+                <span style={{ color: TK.textMuted, fontSize: 11 }}>To</span>
                 <input
                   type="date"
                   value={toDate}
@@ -523,7 +560,7 @@ const AdvancedAnalytics = () => {
         </div>
       </div>
 
-      {/* Error — UNCHANGED logic, upgraded styling */}
+      {/* Error — theme-adaptive ─────────────────────────────────────────────── */}
       {error && (
         <div style={{
           display: 'flex', alignItems: 'center', gap: 10,
@@ -551,11 +588,12 @@ const AdvancedAnalytics = () => {
       {/* No data — UNCHANGED logic */}
       {!loading && !data && !error && (
         <div style={{
-          background: 'rgba(12,12,12,0.98)', border: '1px solid rgba(255,255,255,0.07)',
+          background: TK.sectionBg,
+          border: `1px solid ${TK.border}`,
           borderRadius: 14, padding: '48px 24px', textAlign: 'center',
         }}>
-          <BarChart2 style={{ width: 40, height: 40, color: '#333', margin: '0 auto 12px' }} />
-          <p style={{ color: '#555' }}>No orders in selected date range.</p>
+          <BarChart2 style={{ width: 40, height: 40, color: isLight ? '#CCC' : '#333', margin: '0 auto 12px' }} />
+          <p style={{ color: TK.textMuted }}>No orders in selected date range.</p>
         </div>
       )}
 
@@ -571,18 +609,18 @@ const AdvancedAnalytics = () => {
               { label:'GST Collected',   value:`${CUR}${data.gst.totalGST.toFixed(2)}`,        sub:`${data.gst.byRate?.length||0} slabs`,     icon:FileText,    color:'#8B5CF6', index:4 },
               { label:'Net Profit',      value:`${CUR}${data.profit.netProfit.toFixed(2)}`,    sub:`Margin: ${data.profit.margin}%`,           icon:Star,        color:data.profit.netProfit>=0?'#10B981':'#EF4444', index:5 },
               { label:'Service Charges', value:`${CUR}${Number(serviceCharge).toFixed(2)}`,   sub:'Collected from paid orders',              icon:FileText,    color:'#EC4899', index:6 },
-            ].map(s => <StatCard T={T} key={s.label} {...s} />)}
+            ].map(s => <StatCard key={s.label} {...s} isLight={isLight} />)}
           </div>
 
           {/* ── Revenue trend — chart DATA + logic UNCHANGED ─────── */}
-          <SectionCard T={T} title="Revenue Trend" icon={TrendingUp} delay={0.1} explanation={explanations.revenue}>
+          <SectionCard title="Revenue Trend" icon={TrendingUp} delay={0.1} explanation={explanations.revenue} isLight={isLight}>
             <ResponsiveContainer width="100%" height={240}>
               <LineChart data={data.revenueByDay}>
-                <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.04)" />
-                <XAxis dataKey="label" stroke="#333" fontSize={10} tick={{ fill: '#555' }} />
-                <YAxis stroke="#333" fontSize={10} tick={{ fill: '#555' }} />
-                <Tooltip content={<CustomTooltip CUR={CUR} />} />
-                <Legend wrapperStyle={{ color: '#666', fontSize: 11 }} />
+                <CartesianGrid strokeDasharray="3 3" stroke={TK.gridStroke} />
+                <XAxis dataKey="label" stroke={TK.axisStroke} fontSize={10} tick={{ fill: TK.axisTick }} />
+                <YAxis stroke={TK.axisStroke} fontSize={10} tick={{ fill: TK.axisTick }} />
+                <Tooltip content={<CustomTooltip CUR={CUR} isLight={isLight} />} />
+                <Legend wrapperStyle={{ color: TK.textMuted, fontSize: 11 }} />
                 <Line type="monotone" dataKey="revenue" name={`Revenue (${CUR})`} stroke="#D4AF37" strokeWidth={2.5} dot={false} />
                 <Line type="monotone" dataKey="orders"  name="Orders"             stroke="#10B981" strokeWidth={2.5} dot={false} />
               </LineChart>
@@ -591,29 +629,29 @@ const AdvancedAnalytics = () => {
 
           {/* ── GST + Profit — DATA + logic UNCHANGED ─────────────── */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <SectionCard T={T} title="GST Summary" icon={FileText} delay={0.15} explanation={explanations.gst}>
+            <SectionCard title="GST Summary" icon={FileText} delay={0.15} explanation={explanations.gst} isLight={isLight}>
               <div className="space-y-2 mb-4">
                 {(data.gst.byRate||[]).map((g,i) => (
                   <div key={i} style={{
                     display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                    padding: '10px 0', borderBottom: '1px solid rgba(255,255,255,0.05)',
+                    padding: '10px 0', borderBottom: `1px solid ${TK.borderFaint}`,
                   }}>
                     <span style={{
-                      color: '#666', fontSize: 12,
-                      background: 'rgba(255,255,255,0.05)',
-                      border: '1px solid rgba(255,255,255,0.08)',
+                      color: TK.textMuted, fontSize: 12,
+                      background: isLight ? 'rgba(0,0,0,0.05)' : 'rgba(255,255,255,0.05)',
+                      border: `1px solid ${TK.border}`,
                       borderRadius: 6, padding: '2px 8px',
                     }}>
                       GST {g.rate}%
                     </span>
                     <div style={{ textAlign: 'right' }}>
-                      <p style={{ color: '#fff', fontWeight: 700, fontSize: 14 }}>{CUR}{g.gst.toFixed(2)}</p>
-                      <p style={{ color: '#444', fontSize: 11 }}>on {CUR}{g.taxable.toFixed(2)}</p>
+                      <p style={{ color: TK.text, fontWeight: 700, fontSize: 14 }}>{CUR}{g.gst.toFixed(2)}</p>
+                      <p style={{ color: TK.textFaint, fontSize: 11 }}>on {CUR}{g.taxable.toFixed(2)}</p>
                     </div>
                   </div>
                 ))}
                 {!(data.gst.byRate?.length) && (
-                  <p style={{ color: '#333', fontSize: 13, textAlign: 'center', padding: '16px 0' }}>
+                  <p style={{ color: TK.textFaint, fontSize: 13, textAlign: 'center', padding: '16px 0' }}>
                     No GST data for this period
                   </p>
                 )}
@@ -624,16 +662,16 @@ const AdvancedAnalytics = () => {
                 background: 'rgba(212,175,55,0.06)',
                 border: '1px solid rgba(212,175,55,0.18)',
               }}>
-                <span style={{ color: '#fff', fontWeight: 700, fontSize: 13 }}>Total GST</span>
+                <span style={{ color: TK.text, fontWeight: 700, fontSize: 13 }}>Total GST</span>
                 <span style={{ color: '#D4AF37', fontWeight: 900, fontSize: 18, fontFamily: 'Playfair Display, serif' }}>
                   {CUR}{data.gst.totalGST.toFixed(2)}
                 </span>
               </div>
             </SectionCard>
 
-            <SectionCard T={T} title="Profit Analysis" icon={IndianRupee} delay={0.2} explanation={explanations.profit}>
+            <SectionCard title="Profit Analysis" icon={IndianRupee} delay={0.2} explanation={explanations.profit} isLight={isLight}>
               {!data.profit.hasCostData && (
-                <p style={{ color: '#444', fontSize: 11, fontStyle: 'italic', marginBottom: 12 }}>
+                <p style={{ color: TK.textFaint, fontSize: 11, fontStyle: 'italic', marginBottom: 12 }}>
                   Add recipe costs in Inventory → Manage Recipes to see full profit
                 </p>
               )}
@@ -644,9 +682,9 @@ const AdvancedAnalytics = () => {
               ].map(r => (
                 <div key={r.label} style={{
                   display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-                  padding: '10px 0', borderBottom: '1px solid rgba(255,255,255,0.05)',
+                  padding: '10px 0', borderBottom: `1px solid ${TK.borderFaint}`,
                 }}>
-                  <span style={{ color: '#666', fontSize: 13 }}>{r.label}</span>
+                  <span style={{ color: TK.textMuted, fontSize: 13 }}>{r.label}</span>
                   <span style={{ color: r.color, fontWeight: 700, fontSize: 14 }}>
                     {r.val>=0?'+':''}{CUR}{Math.abs(r.val).toFixed(2)}
                   </span>
@@ -656,7 +694,7 @@ const AdvancedAnalytics = () => {
                 display: 'flex', justifyContent: 'space-between', alignItems: 'center',
                 paddingTop: 14, marginTop: 2,
               }}>
-                <span style={{ color: '#fff', fontWeight: 800, fontSize: 15 }}>Net Profit</span>
+                <span style={{ color: TK.text, fontWeight: 800, fontSize: 15 }}>Net Profit</span>
                 <span style={{
                   color: data.profit.netProfit>=0 ? '#10B981' : '#EF4444',
                   fontWeight: 900, fontSize: 18, fontFamily: 'Playfair Display, serif',
@@ -672,10 +710,8 @@ const AdvancedAnalytics = () => {
 
           {/* ── Payment + Source — DATA + logic UNCHANGED ────────── */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <SectionCard T={T} title="Payment Methods" icon={IndianRupee} delay={0.25} explanation={explanations.payment}>
-              {/* Desktop: chart left, legend+insight right. Mobile: stacked. */}
+            <SectionCard title="Payment Methods" icon={IndianRupee} delay={0.25} explanation={explanations.payment} isLight={isLight}>
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: 16, alignItems: 'center' }}>
-                {/* Chart — labels removed to prevent overlap; tooltip + legend carry all info */}
                 <ResponsiveContainer width="100%" height={200}>
                   <PieChart>
                     <Pie
@@ -688,30 +724,27 @@ const AdvancedAnalytics = () => {
                     >
                       {data.payment.map((_,i) => <Cell key={i} fill={COLORS[i%COLORS.length]} />)}
                     </Pie>
-                    <Tooltip content={<CustomTooltip CUR={CUR} />} />
+                    <Tooltip content={<CustomTooltip CUR={CUR} isLight={isLight} />} />
                   </PieChart>
                 </ResponsiveContainer>
 
-                {/* Legend + per-row breakdown */}
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                   {data.payment.map((p,i) => (
                     <div key={p.method} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                      {/* Color swatch */}
                       <div style={{ width: 10, height: 10, borderRadius: 3, flexShrink: 0, background: COLORS[i%COLORS.length] }} />
                       <div style={{ flex: 1, minWidth: 0 }}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 4 }}>
-                          <span style={{ color: '#ccc', fontSize: 12, fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                          <span style={{ color: TK.textSub, fontSize: 12, fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                             {p.method}
                           </span>
                           <span style={{ color: COLORS[i%COLORS.length], fontSize: 12, fontWeight: 700, flexShrink: 0 }}>
                             {p.pct}%
                           </span>
                         </div>
-                        {/* Mini bar */}
-                        <div style={{ height: 3, borderRadius: 2, background: 'rgba(255,255,255,0.06)', marginTop: 3, overflow: 'hidden' }}>
+                        <div style={{ height: 3, borderRadius: 2, background: isLight ? 'rgba(0,0,0,0.08)' : 'rgba(255,255,255,0.06)', marginTop: 3, overflow: 'hidden' }}>
                           <div style={{ height: '100%', width: `${p.pct}%`, background: COLORS[i%COLORS.length], borderRadius: 2 }} />
                         </div>
-                        <span style={{ color: '#444', fontSize: 11 }}>{CUR}{p.revenue?.toFixed(0)}</span>
+                        <span style={{ color: TK.textFaint, fontSize: 11 }}>{CUR}{p.revenue?.toFixed(0)}</span>
                       </div>
                     </div>
                   ))}
@@ -719,11 +752,8 @@ const AdvancedAnalytics = () => {
               </div>
             </SectionCard>
 
-            <SectionCard T={T} title="Order Sources" icon={ShoppingBag} delay={0.3}
-              explanation={explanations.source}>
-              {/* Desktop: chart left, legend+insight right. Mobile: stacked. */}
+            <SectionCard title="Order Sources" icon={ShoppingBag} delay={0.3} explanation={explanations.source} isLight={isLight}>
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: 16, alignItems: 'center' }}>
-                {/* Chart — labels removed to prevent overlap */}
                 <ResponsiveContainer width="100%" height={200}>
                   <PieChart>
                     <Pie
@@ -736,28 +766,27 @@ const AdvancedAnalytics = () => {
                     >
                       {data.source.map((_,i) => <Cell key={i} fill={COLORS[i%COLORS.length]} />)}
                     </Pie>
-                    <Tooltip content={<CustomTooltip CUR={CUR} />} />
+                    <Tooltip content={<CustomTooltip CUR={CUR} isLight={isLight} />} />
                   </PieChart>
                 </ResponsiveContainer>
 
-                {/* Legend + per-row breakdown */}
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                   {data.source.map((s,i) => (
                     <div key={s.source} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                       <div style={{ width: 10, height: 10, borderRadius: 3, flexShrink: 0, background: COLORS[i%COLORS.length] }} />
                       <div style={{ flex: 1, minWidth: 0 }}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 4 }}>
-                          <span style={{ color: '#ccc', fontSize: 12, fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                          <span style={{ color: TK.textSub, fontSize: 12, fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                             {s.source}
                           </span>
                           <span style={{ color: COLORS[i%COLORS.length], fontSize: 12, fontWeight: 700, flexShrink: 0 }}>
                             {s.pct}%
                           </span>
                         </div>
-                        <div style={{ height: 3, borderRadius: 2, background: 'rgba(255,255,255,0.06)', marginTop: 3, overflow: 'hidden' }}>
+                        <div style={{ height: 3, borderRadius: 2, background: isLight ? 'rgba(0,0,0,0.08)' : 'rgba(255,255,255,0.06)', marginTop: 3, overflow: 'hidden' }}>
                           <div style={{ height: '100%', width: `${s.pct}%`, background: COLORS[i%COLORS.length], borderRadius: 2 }} />
                         </div>
-                        <span style={{ color: '#444', fontSize: 11 }}>{s.count} order{s.count !== 1 ? 's' : ''}</span>
+                        <span style={{ color: TK.textFaint, fontSize: 11 }}>{s.count} order{s.count !== 1 ? 's' : ''}</span>
                       </div>
                     </div>
                   ))}
@@ -767,14 +796,15 @@ const AdvancedAnalytics = () => {
           </div>
 
           {/* ── Peak hours — DATA + logic UNCHANGED ──────────────── */}
-          <SectionCard T={T} title="Peak Hours" icon={Clock} delay={0.35}
-            explanation="Hours with the most orders. Use this to plan staffing and kitchen prep.">
+          <SectionCard title="Peak Hours" icon={Clock} delay={0.35}
+            explanation="Hours with the most orders. Use this to plan staffing and kitchen prep."
+            isLight={isLight}>
             <ResponsiveContainer width="100%" height={200}>
               <BarChart data={data.peakHours.slice(6,24)}>
-                <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.03)" />
-                <XAxis dataKey="label" stroke="#333" fontSize={9} tick={{ fill: '#555' }} interval={1} />
-                <YAxis stroke="#333" fontSize={9} tick={{ fill: '#555' }} />
-                <Tooltip content={<CustomTooltip CUR={CUR} />} />
+                <CartesianGrid strokeDasharray="3 3" stroke={TK.gridStroke} />
+                <XAxis dataKey="label" stroke={TK.axisStroke} fontSize={9} tick={{ fill: TK.axisTick }} interval={1} />
+                <YAxis stroke={TK.axisStroke} fontSize={9} tick={{ fill: TK.axisTick }} />
+                <Tooltip content={<CustomTooltip CUR={CUR} isLight={isLight} />} />
                 <Bar dataKey="count" name="Orders" fill="#D4AF37" radius={[4,4,0,0]}>
                   {data.peakHours.slice(6,24).map((entry, index) => (
                     <Cell
@@ -790,19 +820,18 @@ const AdvancedAnalytics = () => {
           </SectionCard>
 
           {/* ── Category — DATA + logic UNCHANGED ─────────────────── */}
-          <SectionCard T={T} title="Category Performance" icon={BarChart2} delay={0.4} explanation={explanations.category}>
+          <SectionCard title="Category Performance" icon={BarChart2} delay={0.4} explanation={explanations.category} isLight={isLight}>
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
               <div className="space-y-4">
                 {(data.categories.categories||[]).slice(0,6).map((cat,i) => (
                   <div key={cat.category}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 5 }}>
-                      <span style={{ color: '#ccc', fontSize: 13, fontWeight: 600 }}>{cat.category}</span>
-                      <span style={{ color: '#666', fontSize: 12 }}>{CUR}{cat.revenue.toFixed(2)} · {cat.pct}%</span>
+                      <span style={{ color: TK.textSub, fontSize: 13, fontWeight: 600 }}>{cat.category}</span>
+                      <span style={{ color: TK.textMuted, fontSize: 12 }}>{CUR}{cat.revenue.toFixed(2)} · {cat.pct}%</span>
                     </div>
-                    {/* Gradient bar — safe style-only change */}
                     <div style={{
                       height: 6, borderRadius: 3,
-                      background: 'rgba(255,255,255,0.06)',
+                      background: isLight ? 'rgba(0,0,0,0.08)' : 'rgba(255,255,255,0.06)',
                       overflow: 'hidden',
                     }}>
                       <motion.div
@@ -818,7 +847,6 @@ const AdvancedAnalytics = () => {
                   </div>
                 ))}
 
-                {/* Best / Worst insight cards */}
                 {data.categories.highest && (
                   <div style={{
                     marginTop: 8, padding: '10px 12px', borderRadius: 8, fontSize: 12,
@@ -826,8 +854,8 @@ const AdvancedAnalytics = () => {
                     border: '1px solid rgba(16,185,129,0.15)',
                   }}>
                     🏆 <span style={{ color: '#10B981', fontWeight: 700 }}>Best:</span>
-                    <span style={{ color: '#ccc', marginLeft: 4 }}>{data.categories.highest.category}</span>
-                    <span style={{ color: '#444', marginLeft: 4 }}>— {CUR}{data.categories.highest.revenue?.toFixed(2)}</span>
+                    <span style={{ color: TK.textSub, marginLeft: 4 }}>{data.categories.highest.category}</span>
+                    <span style={{ color: TK.textFaint, marginLeft: 4 }}>— {CUR}{data.categories.highest.revenue?.toFixed(2)}</span>
                   </div>
                 )}
                 {data.categories.lowest && data.categories.categories?.length > 1 && (
@@ -837,12 +865,11 @@ const AdvancedAnalytics = () => {
                     border: '1px solid rgba(239,68,68,0.15)',
                   }}>
                     ⚠️ <span style={{ color: '#EF4444', fontWeight: 700 }}>Needs attention:</span>
-                    <span style={{ color: '#ccc', marginLeft: 4 }}>{data.categories.lowest.category}</span>
+                    <span style={{ color: TK.textSub, marginLeft: 4 }}>{data.categories.lowest.category}</span>
                   </div>
                 )}
               </div>
 
-              {/* Pie chart — labels removed; bar list on left serves as legend */}
               <ResponsiveContainer width="100%" height={200}>
                 <PieChart>
                   <Pie data={(data.categories.categories||[]).slice(0,6)} cx="50%" cy="50%"
@@ -852,23 +879,23 @@ const AdvancedAnalytics = () => {
                     labelLine={false}>
                     {(data.categories.categories||[]).slice(0,6).map((_,i) => <Cell key={i} fill={COLORS[i%COLORS.length]} />)}
                   </Pie>
-                  <Tooltip content={<CustomTooltip CUR={CUR} />} formatter={(v) => [`${CUR}${v.toFixed(2)}`, 'Revenue']} />
+                  <Tooltip content={<CustomTooltip CUR={CUR} isLight={isLight} />} formatter={(v) => [`${CUR}${v.toFixed(2)}`, 'Revenue']} />
                 </PieChart>
               </ResponsiveContainer>
             </div>
           </SectionCard>
 
           {/* ── Item performance — DATA + logic UNCHANGED ─────────── */}
-          <SectionCard T={T} title="Item Performance" icon={Star} delay={0.45} explanation={explanations.items}>
+          <SectionCard title="Item Performance" icon={Star} delay={0.45} explanation={explanations.items} isLight={isLight}>
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
               <div>
-                <p style={{ color: '#555', fontSize: 10, textTransform: 'uppercase', letterSpacing: '0.08em', fontWeight: 700, marginBottom: 12 }}>
+                <p style={{ color: TK.textFaint, fontSize: 10, textTransform: 'uppercase', letterSpacing: '0.08em', fontWeight: 700, marginBottom: 12 }}>
                   🏆 Top Performers
                 </p>
                 {(data.items.top||[]).slice(0,5).map((item,i) => (
                   <div key={item.name} style={{
                     display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                    padding: '10px 0', borderBottom: '1px solid rgba(255,255,255,0.04)',
+                    padding: '10px 0', borderBottom: `1px solid ${TK.borderFaint}`,
                   }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                       <span style={{
@@ -878,34 +905,34 @@ const AdvancedAnalytics = () => {
                         {i+1}
                       </span>
                       <div>
-                        <p style={{ color: '#ddd', fontWeight: 600, fontSize: 13 }}>{item.name}</p>
-                        <p style={{ color: '#444', fontSize: 11 }}>{item.category}</p>
+                        <p style={{ color: TK.textSub, fontWeight: 600, fontSize: 13 }}>{item.name}</p>
+                        <p style={{ color: TK.textFaint, fontSize: 11 }}>{item.category}</p>
                       </div>
                     </div>
                     <div style={{ textAlign: 'right' }}>
                       <p style={{ color: '#D4AF37', fontWeight: 700, fontSize: 14 }}>{CUR}{item.revenue.toFixed(0)}</p>
-                      <p style={{ color: '#444', fontSize: 11 }}>{item.qty} sold</p>
+                      <p style={{ color: TK.textFaint, fontSize: 11 }}>{item.qty} sold</p>
                     </div>
                   </div>
                 ))}
               </div>
 
               <div>
-                <p style={{ color: '#555', fontSize: 10, textTransform: 'uppercase', letterSpacing: '0.08em', fontWeight: 700, marginBottom: 12 }}>
+                <p style={{ color: TK.textFaint, fontSize: 10, textTransform: 'uppercase', letterSpacing: '0.08em', fontWeight: 700, marginBottom: 12 }}>
                   ⚠️ Needs Attention
                 </p>
                 {(data.items.bottom||[]).slice(0,5).map((item) => (
                   <div key={item.name} style={{
                     display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                    padding: '10px 0', borderBottom: '1px solid rgba(255,255,255,0.04)',
+                    padding: '10px 0', borderBottom: `1px solid ${TK.borderFaint}`,
                   }}>
                     <div>
-                      <p style={{ color: '#ddd', fontWeight: 600, fontSize: 13 }}>{item.name}</p>
-                      <p style={{ color: '#444', fontSize: 11 }}>{item.category}</p>
+                      <p style={{ color: TK.textSub, fontWeight: 600, fontSize: 13 }}>{item.name}</p>
+                      <p style={{ color: TK.textFaint, fontSize: 11 }}>{item.category}</p>
                     </div>
                     <div style={{ textAlign: 'right' }}>
                       <p style={{ color: '#EF4444', fontWeight: 700, fontSize: 14 }}>{CUR}{item.revenue.toFixed(0)}</p>
-                      <p style={{ color: '#444', fontSize: 11 }}>{item.qty} sold</p>
+                      <p style={{ color: TK.textFaint, fontSize: 11 }}>{item.qty} sold</p>
                     </div>
                   </div>
                 ))}
@@ -915,29 +942,30 @@ const AdvancedAnalytics = () => {
 
           {/* ── Growth Analysis — DATA + logic UNCHANGED ─────────── */}
           {growthMetrics && (
-            <SectionCard T={T} title="Growth Analysis" icon={TrendingUp} delay={0.5}
-              explanation="Compares revenue performance across time periods. Growth % = ((Current - Previous) / Previous) × 100.">
+            <SectionCard title="Growth Analysis" icon={TrendingUp} delay={0.5}
+              explanation="Compares revenue performance across time periods. Growth % = ((Current - Previous) / Previous) × 100."
+              isLight={isLight}>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
 
                 {/* Today vs Yesterday */}
                 <div style={{
-                  background: 'rgba(255,255,255,0.03)',
-                  border: '1px solid rgba(255,255,255,0.07)',
+                  background: TK.innerCard,
+                  border: `1px solid ${TK.border}`,
                   borderRadius: 12, padding: 20,
                 }}>
-                  <p style={{ color: '#555', fontSize: 10, textTransform: 'uppercase', letterSpacing: '0.08em', fontWeight: 700, marginBottom: 14 }}>
+                  <p style={{ color: TK.textFaint, fontSize: 10, textTransform: 'uppercase', letterSpacing: '0.08em', fontWeight: 700, marginBottom: 14 }}>
                     Today vs Yesterday
                   </p>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', marginBottom: 14 }}>
                     <div>
-                      <p style={{ color: '#444', fontSize: 11, marginBottom: 3 }}>Today</p>
+                      <p style={{ color: TK.textFaint, fontSize: 11, marginBottom: 3 }}>Today</p>
                       <p style={{ color: '#D4AF37', fontSize: 22, fontWeight: 900, fontFamily: 'Playfair Display, serif' }}>
                         {CUR}{growthMetrics.todayRev.toFixed(2)}
                       </p>
                     </div>
                     <div style={{ textAlign: 'right' }}>
-                      <p style={{ color: '#444', fontSize: 11, marginBottom: 3 }}>Yesterday</p>
-                      <p style={{ color: '#fff', fontSize: 22, fontWeight: 900, fontFamily: 'Playfair Display, serif' }}>
+                      <p style={{ color: TK.textFaint, fontSize: 11, marginBottom: 3 }}>Yesterday</p>
+                      <p style={{ color: TK.text, fontSize: 22, fontWeight: 900, fontFamily: 'Playfair Display, serif' }}>
                         {CUR}{growthMetrics.yesterdayRev.toFixed(2)}
                       </p>
                     </div>
@@ -948,7 +976,7 @@ const AdvancedAnalytics = () => {
                     background: growthMetrics.todayPct >= 0 ? 'rgba(16,185,129,0.08)' : 'rgba(239,68,68,0.08)',
                     border: `1px solid ${growthMetrics.todayPct >= 0 ? 'rgba(16,185,129,0.2)' : 'rgba(239,68,68,0.2)'}`,
                   }}>
-                    <span style={{ color: '#ccc', fontWeight: 700, fontSize: 13 }}>Daily Growth</span>
+                    <span style={{ color: TK.textSub, fontWeight: 700, fontSize: 13 }}>Daily Growth</span>
                     <span style={{
                       color: growthMetrics.todayPct >= 0 ? '#10B981' : '#EF4444',
                       fontSize: 18, fontWeight: 900,
@@ -961,23 +989,23 @@ const AdvancedAnalytics = () => {
 
                 {/* This Week vs Last Week */}
                 <div style={{
-                  background: 'rgba(255,255,255,0.03)',
-                  border: '1px solid rgba(255,255,255,0.07)',
+                  background: TK.innerCard,
+                  border: `1px solid ${TK.border}`,
                   borderRadius: 12, padding: 20,
                 }}>
-                  <p style={{ color: '#555', fontSize: 10, textTransform: 'uppercase', letterSpacing: '0.08em', fontWeight: 700, marginBottom: 14 }}>
+                  <p style={{ color: TK.textFaint, fontSize: 10, textTransform: 'uppercase', letterSpacing: '0.08em', fontWeight: 700, marginBottom: 14 }}>
                     This Week vs Last Week
                   </p>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', marginBottom: 14 }}>
                     <div>
-                      <p style={{ color: '#444', fontSize: 11, marginBottom: 3 }}>This Week</p>
+                      <p style={{ color: TK.textFaint, fontSize: 11, marginBottom: 3 }}>This Week</p>
                       <p style={{ color: '#D4AF37', fontSize: 22, fontWeight: 900, fontFamily: 'Playfair Display, serif' }}>
                         {CUR}{growthMetrics.thisWeekRev.toFixed(2)}
                       </p>
                     </div>
                     <div style={{ textAlign: 'right' }}>
-                      <p style={{ color: '#444', fontSize: 11, marginBottom: 3 }}>Last Week</p>
-                      <p style={{ color: '#fff', fontSize: 22, fontWeight: 900, fontFamily: 'Playfair Display, serif' }}>
+                      <p style={{ color: TK.textFaint, fontSize: 11, marginBottom: 3 }}>Last Week</p>
+                      <p style={{ color: TK.text, fontSize: 22, fontWeight: 900, fontFamily: 'Playfair Display, serif' }}>
                         {CUR}{growthMetrics.lastWeekRev.toFixed(2)}
                       </p>
                     </div>
@@ -988,7 +1016,7 @@ const AdvancedAnalytics = () => {
                     background: growthMetrics.weekPct >= 0 ? 'rgba(16,185,129,0.08)' : 'rgba(239,68,68,0.08)',
                     border: `1px solid ${growthMetrics.weekPct >= 0 ? 'rgba(16,185,129,0.2)' : 'rgba(239,68,68,0.2)'}`,
                   }}>
-                    <span style={{ color: '#ccc', fontWeight: 700, fontSize: 13 }}>Weekly Growth</span>
+                    <span style={{ color: TK.textSub, fontWeight: 700, fontSize: 13 }}>Weekly Growth</span>
                     <span style={{
                       color: growthMetrics.weekPct >= 0 ? '#10B981' : '#EF4444',
                       fontSize: 18, fontWeight: 900,
@@ -1005,8 +1033,9 @@ const AdvancedAnalytics = () => {
 
           {/* ── Customer Analysis — DATA + logic UNCHANGED ────────── */}
           {customerMetrics && (
-            <SectionCard T={T} title="Customer Analysis" icon={ShoppingBag} delay={0.55}
-              explanation="Unique customers identified by phone number. New = first order within selected period. Repeat = ordered more than once across all time.">
+            <SectionCard title="Customer Analysis" icon={ShoppingBag} delay={0.55}
+              explanation="Unique customers identified by phone number. New = first order within selected period. Repeat = ordered more than once across all time."
+              isLight={isLight}>
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
 
                 <div style={{
@@ -1023,11 +1052,11 @@ const AdvancedAnalytics = () => {
                   }}>
                     <ShoppingBag style={{ width: 18, height: 18, color: '#D4AF37' }} />
                   </div>
-                  <p style={{ color: '#555', fontSize: 10, textTransform: 'uppercase', letterSpacing: '0.08em', fontWeight: 700, marginBottom: 6 }}>Total Customers</p>
+                  <p style={{ color: TK.textFaint, fontSize: 10, textTransform: 'uppercase', letterSpacing: '0.08em', fontWeight: 700, marginBottom: 6 }}>Total Customers</p>
                   <p style={{ color: '#D4AF37', fontSize: 32, fontWeight: 900, fontFamily: 'Playfair Display, serif' }}>
                     {customerMetrics.total}
                   </p>
-                  <p style={{ color: '#444', fontSize: 11, marginTop: 4 }}>unique phone numbers</p>
+                  <p style={{ color: TK.textFaint, fontSize: 11, marginTop: 4 }}>unique phone numbers</p>
                 </div>
 
                 <div style={{
@@ -1044,11 +1073,11 @@ const AdvancedAnalytics = () => {
                   }}>
                     <Star style={{ width: 18, height: 18, color: '#10B981' }} />
                   </div>
-                  <p style={{ color: '#555', fontSize: 10, textTransform: 'uppercase', letterSpacing: '0.08em', fontWeight: 700, marginBottom: 6 }}>New Customers</p>
+                  <p style={{ color: TK.textFaint, fontSize: 10, textTransform: 'uppercase', letterSpacing: '0.08em', fontWeight: 700, marginBottom: 6 }}>New Customers</p>
                   <p style={{ color: '#10B981', fontSize: 32, fontWeight: 900, fontFamily: 'Playfair Display, serif' }}>
                     {customerMetrics.newCustomers}
                   </p>
-                  <p style={{ color: '#444', fontSize: 11, marginTop: 4 }}>first order this period</p>
+                  <p style={{ color: TK.textFaint, fontSize: 11, marginTop: 4 }}>first order this period</p>
                 </div>
 
                 <div style={{
@@ -1065,28 +1094,27 @@ const AdvancedAnalytics = () => {
                   }}>
                     <TrendingUp style={{ width: 18, height: 18, color: '#8B5CF6' }} />
                   </div>
-                  <p style={{ color: '#555', fontSize: 10, textTransform: 'uppercase', letterSpacing: '0.08em', fontWeight: 700, marginBottom: 6 }}>Repeat Customers</p>
+                  <p style={{ color: TK.textFaint, fontSize: 10, textTransform: 'uppercase', letterSpacing: '0.08em', fontWeight: 700, marginBottom: 6 }}>Repeat Customers</p>
                   <p style={{ color: '#8B5CF6', fontSize: 32, fontWeight: 900, fontFamily: 'Playfair Display, serif' }}>
                     {customerMetrics.repeat}
                   </p>
-                  <p style={{ color: '#444', fontSize: 11, marginTop: 4 }}>ordered more than once</p>
+                  <p style={{ color: TK.textFaint, fontSize: 11, marginTop: 4 }}>ordered more than once</p>
                 </div>
 
               </div>
 
-              {/* Retention bar — upgraded to segmented, safe style-only ── */}
+              {/* Retention bar — unchanged logic */}
               {customerMetrics.total > 0 && (
                 <div style={{ marginTop: 20 }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
-                    <span style={{ color: '#555', fontSize: 11 }}>Retention Rate</span>
+                    <span style={{ color: TK.textMuted, fontSize: 11 }}>Retention Rate</span>
                     <span style={{ color: '#D4AF37', fontWeight: 700, fontSize: 12 }}>
                       {Math.round((customerMetrics.repeat / customerMetrics.total) * 100)}%
                     </span>
                   </div>
-                  {/* Segmented bar: new (gold) + repeat (purple) */}
                   <div style={{
                     height: 8, borderRadius: 4,
-                    background: 'rgba(255,255,255,0.06)',
+                    background: isLight ? 'rgba(0,0,0,0.08)' : 'rgba(255,255,255,0.06)',
                     overflow: 'hidden', display: 'flex',
                   }}>
                     <motion.div
@@ -1103,14 +1131,14 @@ const AdvancedAnalytics = () => {
                     />
                   </div>
                   <div style={{ display: 'flex', gap: 12, marginTop: 6 }}>
-                    <span style={{ fontSize: 10, color: '#555' }}>
+                    <span style={{ fontSize: 10, color: TK.textMuted }}>
                       <span style={{ color: '#D4AF37' }}>■</span> New: {customerMetrics.newCustomers}
                     </span>
-                    <span style={{ fontSize: 10, color: '#555' }}>
+                    <span style={{ fontSize: 10, color: TK.textMuted }}>
                       <span style={{ color: '#8B5CF6' }}>■</span> Repeat: {customerMetrics.repeat}
                     </span>
                   </div>
-                  <p style={{ color: '#333', fontSize: 11, marginTop: 4 }}>
+                  <p style={{ color: TK.textFaint, fontSize: 11, marginTop: 4 }}>
                     {customerMetrics.repeat} of {customerMetrics.total} customers came back
                   </p>
                 </div>
