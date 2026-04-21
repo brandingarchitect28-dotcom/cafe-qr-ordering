@@ -1,9 +1,7 @@
 /**
  * Settings.jsx
- *
- * FIX (2026-04-06): Restored Platform Fee option.
- * UI UPGRADE: Café-vibe premium aesthetic. Zero logic changes.
- * All Firestore reads/writes, state, handlers, toggles — 100% identical.
+ * Theme-aware version — full light/dark support.
+ * All logic, state, hooks, handlers: 100% UNCHANGED.
  */
 
 import React, { useState, useEffect } from 'react';
@@ -14,9 +12,52 @@ import { uploadImage } from '../../utils/uploadImage';
 import { Save, Sun, Moon, ShoppingCart, Plus, Coffee, CreditCard, Eye, EyeOff, ShieldCheck, Settings as SettingsIcon, Phone, Receipt, ArrowLeftRight, Landmark, BellRing, Monitor, Palette, ScanEye, Lock, Smartphone, Loader, Upload } from 'lucide-react';
 import { toast } from 'sonner';
 import ChangePassword from './ChangePassword';
+import { useTheme } from '../../hooks/useTheme';
 
-// ── Inject café-vibe CSS once ─────────────────────────────────────────────────
-if (typeof document !== 'undefined' && !document.getElementById('set-cafe-css')) {
+// ── Theme-aware CSS injection ─────────────────────────────────────────────────
+function injectSettingsCSS(isLight) {
+  if (typeof document === 'undefined') return;
+  const existing = document.getElementById('set-cafe-css');
+  if (existing) existing.remove();
+
+  const C = isLight ? {
+    cardBg:         '#FFFFFF',
+    cardBorder:     'rgba(0,0,0,0.10)',
+    cardHover:      'rgba(201,162,39,0.14)',
+    sectionTitle:   '#111111',
+    inputBg:        '#FFFFFF',
+    inputBorder:    'rgba(0,0,0,0.15)',
+    inputColor:     '#111111',
+    inputPH:        '#999999',
+    selectBg:       '#FFFFFF',
+    selectBorder:   'rgba(0,0,0,0.15)',
+    selectColor:    '#111111',
+    selectOptBg:    '#FFFFFF',
+    labelColor:     '#B8941F',   // darker gold — readable on white
+    hintColor:      '#555555',
+    toggleRowBg:    'rgba(0,0,0,0.03)',
+    toggleRowBd:    'rgba(0,0,0,0.08)',
+    toggleRowHover: 'rgba(201,162,39,0.08)',
+  } : {
+    cardBg:         '#141008',
+    cardBorder:     'rgba(255,255,255,0.07)',
+    cardHover:      'rgba(201,162,39,0.14)',
+    sectionTitle:   '#ffffff',
+    inputBg:        '#1c1509',
+    inputBorder:    'rgba(255,255,255,0.08)',
+    inputColor:     '#fff8ee',
+    inputPH:        '#3d3020',
+    selectBg:       '#1c1509',
+    selectBorder:   'rgba(255,255,255,0.08)',
+    selectColor:    '#fff8ee',
+    selectOptBg:    '#1c1509',
+    labelColor:     '#C9A227',
+    hintColor:      '#7a6a55',
+    toggleRowBg:    'rgba(255,255,255,0.03)',
+    toggleRowBd:    'rgba(255,255,255,0.06)',
+    toggleRowHover: 'rgba(201,162,39,0.08)',
+  };
+
   const el = document.createElement('style');
   el.id = 'set-cafe-css';
   el.textContent = `
@@ -24,25 +65,25 @@ if (typeof document !== 'undefined' && !document.getElementById('set-cafe-css'))
     .set { font-family: 'DM Sans', system-ui, sans-serif; }
     .set-title { font-family: 'Playfair Display', serif !important; }
     .set-card {
-      background: #141008;
-      border: 1.5px solid rgba(255,255,255,0.07);
+      background: ${C.cardBg};
+      border: 1.5px solid ${C.cardBorder};
       border-radius: 16px;
       padding: 24px;
       transition: border-color 200ms;
     }
-    .set-card:hover { border-color: rgba(201,162,39,0.14); }
+    .set-card:hover { border-color: ${C.cardHover}; }
     .set-section-title {
       font-family: 'Playfair Display', serif;
-      font-size: 1.2rem; color: #fff;
+      font-size: 1.2rem; color: ${C.sectionTitle};
       margin-bottom: 20px;
       display: flex; align-items: center; gap: 8px;
     }
     .set-input {
       width: 100%;
-      background: #1c1509;
-      border: 1.5px solid rgba(255,255,255,0.08);
+      background: ${C.inputBg};
+      border: 1.5px solid ${C.inputBorder};
       border-radius: 12px;
-      color: #fff8ee;
+      color: ${C.inputColor};
       padding: 12px 16px;
       font-size: 14px; font-weight: 600;
       font-family: 'DM Sans', system-ui, sans-serif;
@@ -51,13 +92,13 @@ if (typeof document !== 'undefined' && !document.getElementById('set-cafe-css'))
       height: 48px;
     }
     .set-input:focus { border-color: rgba(201,162,39,0.55); box-shadow: 0 0 0 3px rgba(201,162,39,0.1); }
-    .set-input::placeholder { color: #3d3020; }
+    .set-input::placeholder { color: ${C.inputPH}; }
     .set-select {
       width: 100%;
-      background: #1c1509;
-      border: 1.5px solid rgba(255,255,255,0.08);
+      background: ${C.selectBg};
+      border: 1.5px solid ${C.selectBorder};
       border-radius: 12px;
-      color: #fff8ee;
+      color: ${C.selectColor};
       padding: 12px 16px;
       font-size: 14px; font-weight: 600;
       font-family: 'DM Sans', system-ui, sans-serif;
@@ -66,24 +107,24 @@ if (typeof document !== 'undefined' && !document.getElementById('set-cafe-css'))
       height: 48px;
     }
     .set-select:focus { border-color: rgba(201,162,39,0.5); }
-    .set-select option { background: #1c1509; }
+    .set-select option { background: ${C.selectOptBg}; color: ${C.selectColor}; }
     .set-label {
       display: block;
-      color: #C9A227;
+      color: ${C.labelColor};
       font-size: 11px; font-weight: 900;
       text-transform: uppercase; letter-spacing: 0.08em;
       margin-bottom: 6px;
       font-family: 'DM Sans', system-ui, sans-serif;
     }
-    .set-hint { color: #7a6a55; font-size: 11px; font-weight: 600; margin-top: 5px; }
+    .set-hint { color: ${C.hintColor}; font-size: 11px; font-weight: 600; margin-top: 5px; }
     .set-toggle-row {
       display: flex; align-items: center; justify-content: space-between;
       padding: 14px 16px;
-      background: rgba(255,255,255,0.03);
-      border: 1px solid rgba(255,255,255,0.06);
+      background: ${C.toggleRowBg};
+      border: 1px solid ${C.toggleRowBd};
       border-radius: 12px;
     }
-    .set-toggle-row:hover { border-color: rgba(201,162,39,0.15); }
+    .set-toggle-row:hover { border-color: ${C.cardHover}; }
     .set-save-btn {
       display: inline-flex; align-items: center; gap: 8px;
       background: linear-gradient(135deg,#C9A227,#A67C00);
@@ -103,96 +144,78 @@ if (typeof document !== 'undefined' && !document.getElementById('set-cafe-css'))
 const Settings = () => {
   const { user } = useAuth();
   const cafeId = user?.cafeId;
-  const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
-  const [uploading, setUploading] = useState(false);
 
+  // ── Theme ─────────────────────────────────────────────────────────────────
+  const { isLight } = useTheme();
+  useEffect(() => { injectSettingsCSS(isLight); }, [isLight]);
+
+  // ── Color tokens ──────────────────────────────────────────────────────────
+  const text          = isLight ? '#111111' : '#ffffff';
+  const muted         = isLight ? '#555555' : '#7a6a55';
+  const faint         = isLight ? '#666666' : '#4a3f35';
+  const toggleRowTxt  = isLight ? '#111111' : '#ffffff';
+  const toggleRowHint = isLight ? '#555555' : '#7a6a55';
+  const modeInactiveBd= isLight ? 'rgba(0,0,0,0.15)'         : 'rgba(255,255,255,0.1)';
+  const modeInactiveTxt= isLight ? 'rgba(0,0,0,0.45)'        : 'rgba(255,255,255,0.5)';
+  const securityBg    = isLight ? 'rgba(16,185,129,0.05)'    : 'rgba(16,185,129,0.06)';
+  const securityBd    = isLight ? 'rgba(16,185,129,0.20)'    : 'rgba(16,185,129,0.18)';
+  const securityHint  = isLight ? '#555555'                   : '#7a6a55';
+  const eyeC          = isLight ? '#666666'                   : '#4a3f35';
+  const eyeHover      = isLight ? '#111111'                   : '#C9A227';
+  const fileInputBg   = isLight ? '#F5F3EE'                   : '#1c1509';
+  const fileInputBd   = isLight ? 'rgba(0,0,0,0.10)'         : 'rgba(255,255,255,0.08)';
+  const fileInputTxt  = isLight ? '#555555'                   : '#7a6a55';
+  const toggleOffBg   = isLight ? 'rgba(0,0,0,0.15)'         : 'rgba(255,255,255,0.10)';
+  // ─────────────────────────────────────────────────────────────────────────
+
+  const [loading,  setLoading ] = useState(true);
+  const [saving,   setSaving  ] = useState(false);
+  const [uploading,setUploading] = useState(false);
   const [showKeySecret, setShowKeySecret] = useState(false);
+
   const [paymentSettings, setPaymentSettings] = useState({
-    enabled:      false,
-    gateway:      'cashfree',
-    keyId:        '',
-    keySecret:    '',
-    merchantName: '',
-    backendUrl:   '',
-    currency:     'INR',
+    enabled: false, gateway: 'cashfree', keyId: '', keySecret: '', merchantName: '', backendUrl: '', currency: 'INR',
   });
 
-  // FIX: platformFeeEnabled + platformFeeRate restored
   const [settings, setSettings] = useState({
-    name: '',
-    logo: '',
-    tagline: '',
-    whatsappNumber: '',
-    upiId: '',
-    primaryColor: '#D4AF37',
-    mode: 'light',
-    gstEnabled: false,
-    gstRate: 5,
-    gstNumber: '',
-    currencyCode: 'INR',
-    currencySymbol: '₹',
-    taxEnabled: false,
-    taxName: 'GST',
-    taxRate: 5,
-    serviceChargeEnabled: false,
-    serviceChargeRate: 10,
-    platformFeeEnabled: false,  // ← FIX
-    platformFeeRate: 2,         // ← FIX
+    name: '', logo: '', tagline: '', whatsappNumber: '', upiId: '',
+    primaryColor: '#D4AF37', mode: 'light',
+    gstEnabled: false, gstRate: 5, gstNumber: '',
+    currencyCode: 'INR', currencySymbol: '₹',
+    taxEnabled: false, taxName: 'GST', taxRate: 5,
+    serviceChargeEnabled: false, serviceChargeRate: 10,
+    platformFeeEnabled: false, platformFeeRate: 2,
   });
 
-  // ── Real-time load — UNCHANGED ────────────────────────────────────────────
   useEffect(() => {
     if (!cafeId) return;
-    const unsubscribe = onSnapshot(
-      doc(db, 'cafes', cafeId),
-      (docSnap) => {
-        if (docSnap.exists()) {
-          const data = docSnap.data();
-          setSettings({
-            name: data.name || '',
-            logo: data.logo || '',
-            tagline: data.tagline || '',
-            whatsappNumber: data.whatsappNumber || '',
-            upiId: data.upiId || '',
-            primaryColor: data.primaryColor || '#D4AF37',
-            mode: data.mode || 'light',
-            gstEnabled: data.gstEnabled || false,
-            gstRate: data.gstRate ?? 5,
-            gstNumber: data.gstNumber || '',
-            currencyCode: data.currencyCode || 'INR',
-            currencySymbol: data.currencySymbol || '₹',
-            taxEnabled: data.taxEnabled || false,
-            taxName: data.taxName || 'GST',
-            taxRate: data.taxRate ?? 5,
-            serviceChargeEnabled: data.serviceChargeEnabled || false,
-            serviceChargeRate: data.serviceChargeRate ?? 10,
-            platformFeeEnabled: data.platformFeeEnabled || false,  // ← FIX
-            platformFeeRate: data.platformFeeRate ?? 2,            // ← FIX
+    const unsubscribe = onSnapshot(doc(db, 'cafes', cafeId), (docSnap) => {
+      if (docSnap.exists()) {
+        const data = docSnap.data();
+        setSettings({
+          name: data.name || '', logo: data.logo || '', tagline: data.tagline || '',
+          whatsappNumber: data.whatsappNumber || '', upiId: data.upiId || '',
+          primaryColor: data.primaryColor || '#D4AF37', mode: data.mode || 'light',
+          gstEnabled: data.gstEnabled || false, gstRate: data.gstRate ?? 5, gstNumber: data.gstNumber || '',
+          currencyCode: data.currencyCode || 'INR', currencySymbol: data.currencySymbol || '₹',
+          taxEnabled: data.taxEnabled || false, taxName: data.taxName || 'GST', taxRate: data.taxRate ?? 5,
+          serviceChargeEnabled: data.serviceChargeEnabled || false, serviceChargeRate: data.serviceChargeRate ?? 10,
+          platformFeeEnabled: data.platformFeeEnabled || false, platformFeeRate: data.platformFeeRate ?? 2,
+        });
+        if (data.paymentSettings) {
+          setPaymentSettings({
+            enabled: data.paymentSettings.enabled ?? false, gateway: data.paymentSettings.gateway || 'cashfree',
+            keyId: data.paymentSettings.keyId || '', keySecret: data.paymentSettings.keySecret || '',
+            merchantName: data.paymentSettings.merchantName || '', backendUrl: data.paymentSettings.backendUrl || '',
+            currency: data.paymentSettings.currency || 'INR',
           });
-          if (data.paymentSettings) {
-            setPaymentSettings({
-              enabled:      data.paymentSettings.enabled      ?? false,
-              gateway:      data.paymentSettings.gateway      || 'cashfree',
-              keyId:        data.paymentSettings.keyId        || '',
-              keySecret:    data.paymentSettings.keySecret    || '',
-              merchantName: data.paymentSettings.merchantName || '',
-              backendUrl:   data.paymentSettings.backendUrl   || '',
-              currency:     data.paymentSettings.currency     || 'INR',
-            });
-          }
         }
-        setLoading(false);
-      },
-      (error) => {
-        toast.error('Failed to load settings');
-        setLoading(false);
       }
-    );
+      setLoading(false);
+    }, () => { toast.error('Failed to load settings'); setLoading(false); });
     return () => unsubscribe();
   }, [cafeId]);
 
-  // ── Logo upload — UNCHANGED ───────────────────────────────────────────────
   const handleLogoUpload = async (e) => {
     const file = e.target.files[0];
     if (!file) return;
@@ -202,80 +225,58 @@ const Settings = () => {
     const toastId = toast.loading('Uploading logo...');
     try {
       const path = `logos/${cafeId}/${Date.now()}_${file.name}`;
-      const url = await uploadImage(file, path, (pct) => {
-        toast.loading(`Uploading... ${pct}%`, { id: toastId });
-      });
+      const url = await uploadImage(file, path, (pct) => { toast.loading(`Uploading... ${pct}%`, { id: toastId }); });
       setSettings(prev => ({ ...prev, logo: url }));
       toast.success('Logo uploaded!', { id: toastId });
     } catch (error) {
       console.error('Logo upload error:', error);
       toast.error(error.message || 'Upload failed', { id: toastId });
-    } finally {
-      setUploading(false);
-    }
+    } finally { setUploading(false); }
   };
 
-  // ── Save — UNCHANGED (FIX: platformFee fields included) ──────────────────
   const handleSave = async () => {
     if (!cafeId) { toast.error('Cafe ID not found'); return; }
     setSaving(true);
     try {
       await updateDoc(doc(db, 'cafes', cafeId), {
-        name: settings.name,
-        logo: settings.logo,
-        tagline: settings.tagline,
-        whatsappNumber: settings.whatsappNumber,
-        upiId: settings.upiId,
-        primaryColor: settings.primaryColor,
-        mode: settings.mode,
-        gstEnabled: settings.gstEnabled,
-        gstRate: parseFloat(settings.gstRate) || 0,
-        gstNumber: settings.gstNumber,
-        currencyCode: settings.currencyCode,
-        currencySymbol: settings.currencySymbol,
-        taxEnabled: settings.taxEnabled,
-        taxName: settings.taxName || 'GST',
-        taxRate: parseFloat(settings.taxRate) || 0,
-        serviceChargeEnabled: settings.serviceChargeEnabled,
-        serviceChargeRate: parseFloat(settings.serviceChargeRate) || 0,
-        platformFeeEnabled: settings.platformFeeEnabled,              // ← FIX
-        platformFeeRate: parseFloat(settings.platformFeeRate) || 0,  // ← FIX
+        name: settings.name, logo: settings.logo, tagline: settings.tagline,
+        whatsappNumber: settings.whatsappNumber, upiId: settings.upiId,
+        primaryColor: settings.primaryColor, mode: settings.mode,
+        gstEnabled: settings.gstEnabled, gstRate: parseFloat(settings.gstRate) || 0, gstNumber: settings.gstNumber,
+        currencyCode: settings.currencyCode, currencySymbol: settings.currencySymbol,
+        taxEnabled: settings.taxEnabled, taxName: settings.taxName || 'GST', taxRate: parseFloat(settings.taxRate) || 0,
+        serviceChargeEnabled: settings.serviceChargeEnabled, serviceChargeRate: parseFloat(settings.serviceChargeRate) || 0,
+        platformFeeEnabled: settings.platformFeeEnabled, platformFeeRate: parseFloat(settings.platformFeeRate) || 0,
         paymentSettings: {
-          enabled:      paymentSettings.enabled,
-          gateway:      paymentSettings.gateway,
-          keyId:        paymentSettings.keyId.trim(),
-          keySecret:    paymentSettings.keySecret.trim(),
-          merchantName: paymentSettings.merchantName.trim(),
-          backendUrl:   paymentSettings.backendUrl.trim(),
-          currency:     paymentSettings.currency,
+          enabled: paymentSettings.enabled, gateway: paymentSettings.gateway,
+          keyId: paymentSettings.keyId.trim(), keySecret: paymentSettings.keySecret.trim(),
+          merchantName: paymentSettings.merchantName.trim(), backendUrl: paymentSettings.backendUrl.trim(),
+          currency: paymentSettings.currency,
         },
       });
       toast.success('Settings saved! ✓');
-    } catch (error) {
-      toast.error('Failed to save settings');
-    } finally {
-      setSaving(false);
-    }
+    } catch (error) { toast.error('Failed to save settings'); }
+    finally { setSaving(false); }
   };
 
   const getPreviewColors = () => {
-    const isLight = settings.mode === 'light';
+    const isLightPrev = settings.mode === 'light';
     return {
-      background: isLight ? '#ffffff' : '#0f0f0f',
-      backgroundSecondary: isLight ? '#f5f5f5' : '#1a1a1a',
-      text: isLight ? '#111111' : '#ffffff',
-      textMuted: isLight ? '#666666' : '#a3a3a3',
+      background: isLightPrev ? '#ffffff' : '#0f0f0f',
+      backgroundSecondary: isLightPrev ? '#f5f5f5' : '#1a1a1a',
+      text: isLightPrev ? '#111111' : '#ffffff',
+      textMuted: isLightPrev ? '#666666' : '#a3a3a3',
       primary: settings.primaryColor,
-      cardBg: isLight ? '#ffffff' : '#151515',
-      border: isLight ? '#e5e5e5' : '#2a2a2a',
+      cardBg: isLightPrev ? '#ffffff' : '#151515',
+      border: isLightPrev ? '#e5e5e5' : '#2a2a2a',
     };
   };
   const colors = getPreviewColors();
 
-  // ── Toggle component ──────────────────────────────────────────────────────
   const Toggle = ({ enabled, onToggle }) => (
     <button type="button" onClick={onToggle}
-      className={`relative inline-flex h-7 w-12 items-center rounded-full transition-colors duration-200 focus:outline-none flex-shrink-0 ${enabled ? 'bg-[#C9A227]' : 'bg-white/10'}`}>
+      className={`relative inline-flex h-7 w-12 items-center rounded-full transition-colors duration-200 focus:outline-none flex-shrink-0`}
+      style={{ background: enabled ? '#C9A227' : toggleOffBg }}>
       <span className={`inline-block h-5 w-5 transform rounded-full bg-white shadow transition-transform duration-200 ${enabled ? 'translate-x-6' : 'translate-x-1'}`} />
     </button>
   );
@@ -283,8 +284,8 @@ const Settings = () => {
   if (loading) {
     return (
       <div className="set flex flex-col items-center justify-center py-20 gap-3">
-        <div className="text-4xl animate-bounce"><SettingsIcon className="w-9 h-9" style={{ color: '#7a6a55' }} /></div>
-        <p className="text-sm font-bold" style={{ color: '#7a6a55' }}>Loading settings…</p>
+        <SettingsIcon className="w-9 h-9 animate-bounce" style={{ color: muted }} />
+        <p className="text-sm font-bold" style={{ color: muted }}>Loading settings…</p>
       </div>
     );
   }
@@ -292,7 +293,7 @@ const Settings = () => {
   return (
     <div className="set space-y-5">
 
-      {/* ── Café Information ──────────────────────────────────────────────── */}
+      {/* Café Information */}
       <div className="set-card">
         <h3 className="set-section-title"><Coffee className="w-5 h-5" /> Café Information</h3>
         <div className="space-y-4">
@@ -319,13 +320,13 @@ const Settings = () => {
               <input type="file" accept="image/*" data-testid="settings-logo-upload"
                 onChange={handleLogoUpload}
                 className="w-full rounded-xl px-4 py-3 text-sm font-semibold transition-all file:mr-4 file:py-2 file:px-4 file:rounded-xl file:border-0 file:font-black file:text-black file:cursor-pointer"
-                style={{ background: '#1c1509', border: '1.5px solid rgba(255,255,255,0.08)', color: '#7a6a55', '--tw-file-bg': '#C9A227' }} />
+                style={{ background: fileInputBg, border: `1.5px solid ${fileInputBd}`, color: fileInputTxt }} />
             </div>
           </div>
         </div>
       </div>
 
-      {/* ── Contact & Payment ─────────────────────────────────────────────── */}
+      {/* Contact & Payment */}
       <div className="set-card">
         <h3 className="set-section-title"><Phone className="w-5 h-5" /> Contact & Payment</h3>
         <div className="space-y-4">
@@ -345,13 +346,13 @@ const Settings = () => {
         </div>
       </div>
 
-      {/* ── Billing / GST ─────────────────────────────────────────────────── */}
+      {/* Billing / GST */}
       <div className="set-card">
         <h3 className="set-section-title"><Receipt className="w-5 h-5" /> Billing Settings</h3>
         <div className="space-y-4">
           <div className="set-toggle-row">
             <div>
-              <p className="font-black text-sm text-white">Enable GST Billing</p>
+              <p className="font-black text-sm" style={{ color: toggleRowTxt }}>Enable GST Billing</p>
               <p className="set-hint mt-0.5">Apply GST tax to all customer orders</p>
             </div>
             <Toggle enabled={settings.gstEnabled} onToggle={() => setSettings(prev => ({ ...prev, gstEnabled: !prev.gstEnabled }))} />
@@ -376,7 +377,7 @@ const Settings = () => {
         </div>
       </div>
 
-      {/* ── Currency ──────────────────────────────────────────────────────── */}
+      {/* Currency */}
       <div className="set-card">
         <h3 className="set-section-title"><ArrowLeftRight className="w-5 h-5" /> Currency Settings</h3>
         <div>
@@ -385,8 +386,7 @@ const Settings = () => {
             onChange={e => {
               const options = { INR:'₹', USD:'$', EUR:'€', GBP:'£', AED:'د.إ', AUD:'$' };
               setSettings(prev => ({ ...prev, currencyCode: e.target.value, currencySymbol: options[e.target.value] || '₹' }));
-            }}
-            className="set-select">
+            }} className="set-select">
             <option value="INR">INR (₹) — Indian Rupee</option>
             <option value="USD">USD ($) — US Dollar</option>
             <option value="EUR">EUR (€) — Euro</option>
@@ -398,13 +398,13 @@ const Settings = () => {
         </div>
       </div>
 
-      {/* ── Tax Settings ──────────────────────────────────────────────────── */}
+      {/* Tax Settings */}
       <div className="set-card">
         <h3 className="set-section-title"><Landmark className="w-5 h-5" /> Tax Settings</h3>
         <div className="space-y-4">
           <div className="set-toggle-row">
             <div>
-              <p className="font-black text-sm text-white">Enable Tax</p>
+              <p className="font-black text-sm" style={{ color: toggleRowTxt }}>Enable Tax</p>
               <p className="set-hint mt-0.5">Apply tax to all customer orders</p>
             </div>
             <Toggle enabled={settings.taxEnabled} onToggle={() => setSettings(prev => ({ ...prev, taxEnabled: !prev.taxEnabled }))} />
@@ -428,13 +428,13 @@ const Settings = () => {
         </div>
       </div>
 
-      {/* ── Service Charge ────────────────────────────────────────────────── */}
+      {/* Service Charge */}
       <div className="set-card">
         <h3 className="set-section-title"><BellRing className="w-5 h-5" /> Service Charge</h3>
         <div className="space-y-4">
           <div className="set-toggle-row">
             <div>
-              <p className="font-black text-sm text-white">Enable Service Charge</p>
+              <p className="font-black text-sm" style={{ color: toggleRowTxt }}>Enable Service Charge</p>
               <p className="set-hint mt-0.5">Add a service charge to all orders</p>
             </div>
             <Toggle enabled={settings.serviceChargeEnabled} onToggle={() => setSettings(prev => ({ ...prev, serviceChargeEnabled: !prev.serviceChargeEnabled }))} />
@@ -450,13 +450,13 @@ const Settings = () => {
         </div>
       </div>
 
-      {/* ── Platform Fee — FIX: restored ─────────────────────────────────── */}
+      {/* Platform Fee */}
       <div className="set-card">
         <h3 className="set-section-title"><Monitor className="w-5 h-5" /> Platform Fee</h3>
         <div className="space-y-4">
           <div className="set-toggle-row">
             <div>
-              <p className="font-black text-sm text-white">Enable Platform Fee</p>
+              <p className="font-black text-sm" style={{ color: toggleRowTxt }}>Enable Platform Fee</p>
               <p className="set-hint mt-0.5">Add a platform fee to all orders</p>
             </div>
             <Toggle enabled={settings.platformFeeEnabled} onToggle={() => setSettings(prev => ({ ...prev, platformFeeEnabled: !prev.platformFeeEnabled }))} />
@@ -472,11 +472,10 @@ const Settings = () => {
         </div>
       </div>
 
-      {/* ── Appearance ────────────────────────────────────────────────────── */}
+      {/* Appearance */}
       <div className="set-card">
         <h3 className="set-section-title"><Palette className="w-5 h-5" /> Appearance Settings</h3>
         <div className="space-y-6">
-
           {/* Mode */}
           <div>
             <label className="set-label">Mode</label>
@@ -486,7 +485,7 @@ const Settings = () => {
                 className="flex-1 flex items-center justify-center gap-3 py-4 px-6 rounded-xl border-2 font-black text-sm transition-all"
                 style={settings.mode === 'light'
                   ? { borderColor: '#C9A227', background: 'rgba(201,162,39,0.1)', color: '#C9A227' }
-                  : { borderColor: 'rgba(255,255,255,0.1)', color: 'rgba(255,255,255,0.5)' }}>
+                  : { borderColor: modeInactiveBd, color: modeInactiveTxt }}>
                 <Sun className="w-5 h-5" /> Light Mode
               </button>
               <button type="button" data-testid="mode-dark"
@@ -494,7 +493,7 @@ const Settings = () => {
                 className="flex-1 flex items-center justify-center gap-3 py-4 px-6 rounded-xl border-2 font-black text-sm transition-all"
                 style={settings.mode === 'dark'
                   ? { borderColor: '#C9A227', background: 'rgba(201,162,39,0.1)', color: '#C9A227' }
-                  : { borderColor: 'rgba(255,255,255,0.1)', color: 'rgba(255,255,255,0.5)' }}>
+                  : { borderColor: modeInactiveBd, color: modeInactiveTxt }}>
                 <Moon className="w-5 h-5" /> Dark Mode
               </button>
             </div>
@@ -504,7 +503,8 @@ const Settings = () => {
           <div>
             <label className="set-label">Primary Brand Color</label>
             <div className="flex items-center gap-4">
-              <div className="relative w-14 h-14 rounded-xl overflow-hidden flex-shrink-0" style={{ border: '1.5px solid rgba(255,255,255,0.15)' }}>
+              <div className="relative w-14 h-14 rounded-xl overflow-hidden flex-shrink-0"
+                style={{ border: isLight ? '1.5px solid rgba(0,0,0,0.15)' : '1.5px solid rgba(255,255,255,0.15)' }}>
                 <input type="color" id="primaryColorPicker" data-testid="settings-primary-color"
                   value={settings.primaryColor}
                   onChange={e => setSettings(prev => ({ ...prev, primaryColor: e.target.value }))}
@@ -523,18 +523,18 @@ const Settings = () => {
             <label className="set-label">Quick Presets</label>
             <div className="flex flex-wrap gap-2">
               {[
-                { color:'#D4AF37', name:'Gold'   }, { color:'#C9A227', name:'Orange' },
-                { color:'#E74C3C', name:'Red'    }, { color:'#27AE60', name:'Green'  },
-                { color:'#3498DB', name:'Blue'   }, { color:'#9B59B6', name:'Purple' },
-                { color:'#1ABC9C', name:'Teal'   }, { color:'#E91E63', name:'Pink'   },
+                { color:'#D4AF37', name:'Gold' }, { color:'#C9A227', name:'Orange' },
+                { color:'#E74C3C', name:'Red'  }, { color:'#27AE60', name:'Green'  },
+                { color:'#3498DB', name:'Blue' }, { color:'#9B59B6', name:'Purple' },
+                { color:'#1ABC9C', name:'Teal' }, { color:'#E91E63', name:'Pink'   },
               ].map(preset => (
                 <button key={preset.color} type="button"
                   onClick={() => setSettings(prev => ({ ...prev, primaryColor: preset.color }))}
                   className="w-11 h-11 rounded-xl border-2 transition-all hover:scale-110"
                   style={{
                     backgroundColor: preset.color,
-                    borderColor: settings.primaryColor.toUpperCase() === preset.color.toUpperCase() ? '#fff' : 'transparent',
-                    boxShadow: settings.primaryColor.toUpperCase() === preset.color.toUpperCase() ? '0 0 0 2px rgba(255,255,255,0.3)' : 'none',
+                    borderColor: settings.primaryColor.toUpperCase() === preset.color.toUpperCase() ? (isLight ? '#111' : '#fff') : 'transparent',
+                    boxShadow: settings.primaryColor.toUpperCase() === preset.color.toUpperCase() ? '0 0 0 2px rgba(0,0,0,0.2)' : 'none',
                   }}
                   title={preset.name} />
               ))}
@@ -543,7 +543,7 @@ const Settings = () => {
         </div>
       </div>
 
-      {/* ── Live Preview ──────────────────────────────────────────────────── */}
+      {/* Live Preview */}
       <div className="set-card">
         <h3 className="set-section-title"><ScanEye className="w-5 h-5" /> Live Preview</h3>
         <p className="set-hint mb-4">This is how your ordering page will look to customers.</p>
@@ -590,101 +590,78 @@ const Settings = () => {
         </div>
       </div>
 
-      {/* ── Online Payment Settings ───────────────────────────────────────── */}
+      {/* Online Payment Settings */}
       <div className="set-card">
         <h3 className="set-section-title"><CreditCard className="w-5 h-5" /> Online Payment Settings</h3>
         <div className="space-y-5">
-
-          {/* Enable toggle */}
           <div className="set-toggle-row">
             <div>
-              <p className="font-black text-sm text-white">Enable Online Payments</p>
+              <p className="font-black text-sm" style={{ color: toggleRowTxt }}>Enable Online Payments</p>
               <p className="set-hint mt-0.5">Allow customers to pay online at checkout</p>
             </div>
             <Toggle enabled={paymentSettings.enabled} onToggle={() => setPaymentSettings(prev => ({ ...prev, enabled: !prev.enabled }))} />
           </div>
-
           <div className="space-y-4">
-            {/* Gateway */}
             <div>
               <label className="set-label">Payment Gateway</label>
               <select value={paymentSettings.gateway}
-                onChange={e => setPaymentSettings(prev => ({ ...prev, gateway: e.target.value }))}
-                className="set-select">
+                onChange={e => setPaymentSettings(prev => ({ ...prev, gateway: e.target.value }))} className="set-select">
                 <option value="cashfree">Cashfree</option>
                 <option value="razorpay">Razorpay</option>
               </select>
             </div>
-
-            {/* Key ID */}
             <div>
-              <label className="set-label">
-                {paymentSettings.gateway === 'cashfree' ? 'Cashfree App ID' : 'Razorpay Key ID'}
-              </label>
+              <label className="set-label">{paymentSettings.gateway === 'cashfree' ? 'Cashfree App ID' : 'Razorpay Key ID'}</label>
               <input type="text" value={paymentSettings.keyId}
                 onChange={e => setPaymentSettings(prev => ({ ...prev, keyId: e.target.value }))}
                 placeholder={paymentSettings.gateway === 'cashfree' ? 'Your Cashfree App ID' : 'rzp_live_xxxxxxxxxxxx'}
                 className="set-input font-mono" />
             </div>
-
-            {/* Secret */}
             <div>
-              <label className="set-label">
-                {paymentSettings.gateway === 'cashfree' ? 'Cashfree Secret Key' : 'Razorpay Key Secret'}
-              </label>
+              <label className="set-label">{paymentSettings.gateway === 'cashfree' ? 'Cashfree Secret Key' : 'Razorpay Key Secret'}</label>
               <div className="relative">
                 <input type={showKeySecret ? 'text' : 'password'} value={paymentSettings.keySecret}
                   onChange={e => setPaymentSettings(prev => ({ ...prev, keySecret: e.target.value }))}
-                  placeholder="••••••••••••••••"
-                  className="set-input font-mono" style={{ paddingRight: '44px' }} />
+                  placeholder="••••••••••••••••" className="set-input font-mono" style={{ paddingRight: '44px' }} />
                 <button type="button" onClick={() => setShowKeySecret(v => !v)}
                   className="absolute right-3 top-1/2 -translate-y-1/2 transition-colors"
-                  style={{ color: '#4a3f35' }}
-                  onMouseEnter={e => e.currentTarget.style.color = '#C9A227'}
-                  onMouseLeave={e => e.currentTarget.style.color = '#4a3f35'}>
+                  style={{ color: eyeC }}
+                  onMouseEnter={e => e.currentTarget.style.color = eyeHover}
+                  onMouseLeave={e => e.currentTarget.style.color = eyeC}>
                   {showKeySecret ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                 </button>
               </div>
             </div>
-
-            {/* Merchant Name */}
             <div>
               <label className="set-label">Merchant Name</label>
               <input type="text" value={paymentSettings.merchantName}
                 onChange={e => setPaymentSettings(prev => ({ ...prev, merchantName: e.target.value }))}
-                placeholder="Your café name as shown to customers"
-                className="set-input" />
+                placeholder="Your café name as shown to customers" className="set-input" />
             </div>
-
-            {/* Backend URL */}
             <div>
               <label className="set-label">Render Backend URL</label>
               <input type="url" value={paymentSettings.backendUrl}
                 onChange={e => setPaymentSettings(prev => ({ ...prev, backendUrl: e.target.value }))}
-                placeholder="https://your-app.onrender.com"
-                className="set-input font-mono" />
+                placeholder="https://your-app.onrender.com" className="set-input font-mono" />
               <p className="set-hint">Required for Cashfree payments and AI Menu Upload</p>
             </div>
-
-            {/* Currency */}
             <div>
               <label className="set-label">Payment Currency</label>
               <select value={paymentSettings.currency}
-                onChange={e => setPaymentSettings(prev => ({ ...prev, currency: e.target.value }))}
-                className="set-select">
+                onChange={e => setPaymentSettings(prev => ({ ...prev, currency: e.target.value }))} className="set-select">
                 <option value="INR">INR — Indian Rupee</option>
                 <option value="USD">USD — US Dollar</option>
                 <option value="EUR">EUR — Euro</option>
                 <option value="GBP">GBP — British Pound</option>
               </select>
             </div>
-
-            {/* Security notice */}
-            <div className="flex items-start gap-3 p-4 rounded-xl" style={{ background: 'rgba(16,185,129,0.06)', border: '1px solid rgba(16,185,129,0.18)' }}>
+            <div className="flex items-start gap-3 p-4 rounded-xl" style={{ background: securityBg, border: `1px solid ${securityBd}` }}>
               <ShieldCheck className="w-4 h-4 flex-shrink-0 mt-0.5" style={{ color: '#34d399' }} />
               <div>
-                <p className="text-xs font-black flex items-center gap-1" style={{ color: '#34d399' }}><Lock className="inline w-3 h-3" /> Secured via Render Backend</p>
-                <p className="text-xs mt-0.5 leading-relaxed" style={{ color: '#7a6a55' }}>
+                <p className="text-xs font-black flex items-center gap-1" style={{ color: '#34d399' }}>
+                  <Lock className="inline w-3 h-3" /> Secured via Render Backend
+                </p>
+                <p className="text-xs mt-0.5 leading-relaxed" style={{ color: securityHint }}>
                   Payment processing happens server-side on your Render backend. API keys are used by the server — never exposed to customers.
                 </p>
               </div>
@@ -693,19 +670,17 @@ const Settings = () => {
         </div>
       </div>
 
-      {/* ── Change Password ───────────────────────────────────────────────── */}
+      {/* Change Password */}
       <ChangePassword />
 
-      {/* ── Save Button ───────────────────────────────────────────────────── */}
+      {/* Save Button */}
       <div>
         <button onClick={handleSave} disabled={saving || uploading}
-          data-testid="save-settings-btn"
-          className="set-save-btn">
+          data-testid="save-settings-btn" className="set-save-btn">
           <Save className="w-5 h-5" />
           {saving ? <><Loader className="w-4 h-4 animate-spin" /> Saving…</> : uploading ? <><Upload className="w-4 h-4" /> Uploading…</> : 'Save Settings'}
         </button>
       </div>
-
     </div>
   );
 };
