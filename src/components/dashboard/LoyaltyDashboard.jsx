@@ -37,9 +37,80 @@ import {
   Users, Trophy, RotateCcw, Coffee, Edit, Copy, ChevronUp, Flame, Crown, Send, X,
 } from 'lucide-react';
 import GoogleReviewSettings from './GoogleReviewSettings';
+import { useTheme } from '../../hooks/useTheme';
 
-// ── Inject café-vibe CSS once ─────────────────────────────────────────────────
-if (typeof document !== 'undefined' && !document.getElementById('loy-cafe-css')) {
+// ── Theme-aware CSS injection ──────────────────────────────────────────────────
+// Called once on mount and again whenever isLight changes.
+// Removes the old tag and injects a fresh one with correct colors.
+// Zero logic changes — only colors switch between light and dark values.
+function injectLoyaltyCSS(isLight) {
+  if (typeof document === 'undefined') return;
+  const existing = document.getElementById('loy-cafe-css');
+  if (existing) existing.remove();
+
+  // ── Color tokens ──────────────────────────────────────────────────────────
+  // Dark mode: original warm-dark palette
+  // Light mode: white/light backgrounds, dark readable text
+  const C = isLight ? {
+    // Backgrounds
+    cardBg:        '#FFFFFF',
+    cardBorder:    'rgba(0,0,0,0.10)',
+    inputBg:       '#F5F3EE',
+    inputBorder:   'rgba(0,0,0,0.15)',
+    inputColor:    '#111111',
+    inputPH:       '#999999',
+    dropdownBg:    '#FFFFFF',
+    dropdownBorder:'rgba(201,162,39,0.35)',
+    dropdownItem:  '#111111',
+    dropdownBorderB:'rgba(0,0,0,0.06)',
+    insightBg:     'linear-gradient(135deg, #FDFCF9 0%, #F8F6F1 100%)',
+    insightBorder: 'rgba(201,162,39,0.35)',
+    rankRowBorder: 'rgba(0,0,0,0.06)',
+    copyBtnBg:     'rgba(0,0,0,0.05)',
+    copyBtnColor:  '#555555',
+    copyBtnBorder: 'rgba(0,0,0,0.10)',
+    modalBg:       '#FFFFFF',
+    modalBorder:   'rgba(201,162,39,0.35)',
+    modalHeaderBorder: 'rgba(0,0,0,0.08)',
+    modalCloseBg:  'rgba(0,0,0,0.05)',
+    modalCloseBorder: 'rgba(0,0,0,0.10)',
+    modalCloseColor: '#555555',
+    ghostBg:       'rgba(0,0,0,0.05)',
+    ghostColor:    '#555555',
+    ghostBorder:   'rgba(0,0,0,0.10)',
+    ghostHoverBg:  'rgba(0,0,0,0.09)',
+    ghostHoverColor:'#111111',
+  } : {
+    // Dark mode — original values
+    cardBg:        '#141008',
+    cardBorder:    'rgba(255,255,255,0.07)',
+    inputBg:       '#1c1509',
+    inputBorder:   'rgba(255,255,255,0.08)',
+    inputColor:    '#fff8ee',
+    inputPH:       '#3d3020',
+    dropdownBg:    '#1a1208',
+    dropdownBorder:'rgba(201,162,39,0.25)',
+    dropdownItem:  '#fff8ee',
+    dropdownBorderB:'rgba(255,255,255,0.04)',
+    insightBg:     'linear-gradient(135deg, #16100a 0%, #1a1208 100%)',
+    insightBorder: 'rgba(212,175,55,0.28)',
+    rankRowBorder: 'rgba(255,255,255,0.04)',
+    copyBtnBg:     'rgba(255,255,255,0.05)',
+    copyBtnColor:  '#7a6a55',
+    copyBtnBorder: 'rgba(255,255,255,0.07)',
+    modalBg:       '#1a1208',
+    modalBorder:   'rgba(201,162,39,0.28)',
+    modalHeaderBorder: 'rgba(201,162,39,0.12)',
+    modalCloseBg:  'rgba(255,255,255,0.05)',
+    modalCloseBorder: 'rgba(255,255,255,0.08)',
+    modalCloseColor: '#7a6a55',
+    ghostBg:       'rgba(255,255,255,0.05)',
+    ghostColor:    '#7a6a55',
+    ghostBorder:   'rgba(255,255,255,0.08)',
+    ghostHoverBg:  'rgba(255,255,255,0.09)',
+    ghostHoverColor:'#ffffff',
+  };
+
   const el = document.createElement('style');
   el.id = 'loy-cafe-css';
   el.textContent = `
@@ -47,22 +118,22 @@ if (typeof document !== 'undefined' && !document.getElementById('loy-cafe-css'))
     .loy { font-family: 'DM Sans', system-ui, sans-serif; }
     .loy-title { font-family: 'Playfair Display', serif !important; }
     .loy-card {
-      background: #141008;
-      border: 1.5px solid rgba(255,255,255,0.07);
+      background: ${C.cardBg};
+      border: 1.5px solid ${C.cardBorder};
       border-radius: 16px;
       overflow: hidden;
       transition: border-color 200ms;
     }
     .loy-card:hover { border-color: rgba(201,162,39,0.2); }
     .loy-input {
-      width: 100%; background: #1c1509;
-      border: 1.5px solid rgba(255,255,255,0.08); border-radius: 12px;
-      color: #fff8ee; padding: 10px 14px; font-size: 14px; font-weight: 600;
+      width: 100%; background: ${C.inputBg};
+      border: 1.5px solid ${C.inputBorder}; border-radius: 12px;
+      color: ${C.inputColor}; padding: 10px 14px; font-size: 14px; font-weight: 600;
       font-family: 'DM Sans', system-ui, sans-serif;
       outline: none; transition: border-color 180ms, box-shadow 180ms;
     }
     .loy-input:focus { border-color: rgba(201,162,39,0.55); box-shadow: 0 0 0 3px rgba(201,162,39,0.1); }
-    .loy-input::placeholder { color: #3d3020; }
+    .loy-input::placeholder { color: ${C.inputPH}; }
     .loy-btn {
       display: inline-flex; align-items: center; gap: 5px;
       font-family: 'DM Sans', system-ui, sans-serif;
@@ -74,13 +145,13 @@ if (typeof document !== 'undefined' && !document.getElementById('loy-cafe-css'))
     .loy-btn:hover { transform: translateY(-1px); filter: brightness(1.1); }
     .loy-btn:active { transform: scale(0.96); }
     .loy-btn-orange { background: linear-gradient(135deg,#C9A227,#A67C00); color:#fff; box-shadow: 0 3px 12px rgba(201,162,39,0.3); }
-    .loy-btn-ghost  { background: rgba(255,255,255,0.05); color: #7a6a55; border-color: rgba(255,255,255,0.08); }
-    .loy-btn-ghost:hover  { background: rgba(255,255,255,0.09); color: #fff; }
+    .loy-btn-ghost  { background: ${C.ghostBg}; color: ${C.ghostColor}; border-color: ${C.ghostBorder}; }
+    .loy-btn-ghost:hover  { background: ${C.ghostHoverBg}; color: ${C.ghostHoverColor}; }
     .loy-btn-green  { background: rgba(37,211,102,0.1); color: #25D366; border-color: rgba(37,211,102,0.25); }
     .loy-btn-green:hover  { background: rgba(37,211,102,0.18); }
     .loy-btn-red    { background: rgba(220,50,50,0.12); color: #f87171; border-color: rgba(220,50,50,0.22); }
     .loy-btn-red:hover    { background: rgba(220,50,50,0.22); }
-    .loy-btn-gold   { background: rgba(212,175,55,0.12); color: #fbbf24; border-color: rgba(212,175,55,0.25); }
+    .loy-btn-gold   { background: rgba(212,175,55,0.12); color: ${isLight ? '#8B6914' : '#fbbf24'}; border-color: rgba(212,175,55,0.25); }
     .loy-btn-gold:hover   { background: rgba(212,175,55,0.22); }
     @keyframes loyIn { from { opacity:0; transform:translateY(8px); } to { opacity:1; transform:translateY(0); } }
     .loy-in { animation: loyIn 280ms ease forwards; }
@@ -88,13 +159,13 @@ if (typeof document !== 'undefined' && !document.getElementById('loy-cafe-css'))
     /* ── Dropdown styles ── */
     .loy-dropdown {
       position: absolute; top: calc(100% + 6px); left: 0; right: 0;
-      background: #1a1208;
-      border: 1.5px solid rgba(201,162,39,0.25);
+      background: ${C.dropdownBg};
+      border: 1.5px solid ${C.dropdownBorder};
       border-radius: 12px;
       z-index: 999;
       max-height: 200px;
       overflow-y: auto;
-      box-shadow: 0 12px 40px rgba(0,0,0,0.6), 0 0 0 1px rgba(201,162,39,0.08);
+      box-shadow: 0 12px 40px rgba(0,0,0,${isLight ? '0.12' : '0.6'}), 0 0 0 1px rgba(201,162,39,0.08);
       scrollbar-width: thin;
       scrollbar-color: rgba(201,162,39,0.2) transparent;
     }
@@ -107,35 +178,35 @@ if (typeof document !== 'undefined' && !document.getElementById('loy-cafe-css'))
       padding: 9px 14px;
       font-family: 'DM Sans', system-ui, sans-serif;
       font-size: 13px; font-weight: 600;
-      color: #fff8ee;
+      color: ${C.dropdownItem};
       background: transparent;
       border: none; cursor: pointer;
       transition: background 140ms;
-      border-bottom: 1px solid rgba(255,255,255,0.04);
+      border-bottom: 1px solid ${C.dropdownBorderB};
     }
     .loy-dropdown-item:last-child { border-bottom: none; }
-    .loy-dropdown-item:hover { background: rgba(201,162,39,0.1); color: #fff; }
+    .loy-dropdown-item:hover { background: rgba(201,162,39,0.1); color: ${isLight ? '#111111' : '#fff'}; }
     .loy-dropdown-item:first-child { border-radius: 10px 10px 0 0; }
     .loy-dropdown-item:last-child  { border-radius: 0 0 10px 10px; }
     .loy-dropdown-item:only-child  { border-radius: 10px; }
 
     /* ── Top Customers Panel ── */
     .loy-insight-card {
-      background: linear-gradient(135deg, #16100a 0%, #1a1208 100%);
-      border: 1.5px solid rgba(212,175,55,0.28);
+      background: ${C.insightBg};
+      border: 1.5px solid ${C.insightBorder};
       border-radius: 16px;
       overflow: hidden;
       box-shadow:
         0 0 0 1px rgba(212,175,55,0.10),
-        0 0 12px rgba(212,175,55,0.13),
-        0 0 24px rgba(212,175,55,0.07),
+        0 0 12px rgba(212,175,55,${isLight ? '0.08' : '0.13'}),
+        0 0 24px rgba(212,175,55,${isLight ? '0.04' : '0.07'}),
         0 0 10px rgba(192,192,192,0.05),
-        0 4px 32px rgba(0,0,0,0.45);
+        0 4px 32px rgba(0,0,0,${isLight ? '0.06' : '0.45'});
     }
     .loy-rank-row {
       display: flex; align-items: center; gap: 10px;
       padding: 10px 14px;
-      border-bottom: 1px solid rgba(255,255,255,0.04);
+      border-bottom: 1px solid ${C.rankRowBorder};
       transition: background 150ms;
     }
     .loy-rank-row:last-child { border-bottom: none; }
@@ -145,9 +216,9 @@ if (typeof document !== 'undefined' && !document.getElementById('loy-cafe-css'))
       padding: 4px 9px; border-radius: 7px;
       font-family: 'DM Sans', system-ui, sans-serif;
       font-size: 11px; font-weight: 700;
-      background: rgba(255,255,255,0.05);
-      color: #7a6a55;
-      border: 1px solid rgba(255,255,255,0.07);
+      background: ${C.copyBtnBg};
+      color: ${C.copyBtnColor};
+      border: 1px solid ${C.copyBtnBorder};
       cursor: pointer; transition: all 150ms; white-space: nowrap; flex-shrink: 0;
     }
     .loy-copy-btn:hover { background: rgba(201,162,39,0.12); color: #C9A227; border-color: rgba(201,162,39,0.25); transform: translateY(-1px); }
@@ -162,25 +233,25 @@ if (typeof document !== 'undefined' && !document.getElementById('loy-cafe-css'))
       backdrop-filter: blur(4px);
     }
     .loy-modal {
-      background: #1a1208;
-      border: 1.5px solid rgba(201,162,39,0.28);
+      background: ${C.modalBg};
+      border: 1.5px solid ${C.modalBorder};
       border-radius: 18px;
       width: 100%; max-width: 420px;
-      box-shadow: 0 24px 64px rgba(0,0,0,0.7), 0 0 0 1px rgba(201,162,39,0.1);
+      box-shadow: 0 24px 64px rgba(0,0,0,${isLight ? '0.15' : '0.7'}), 0 0 0 1px rgba(201,162,39,0.1);
       overflow: hidden;
     }
     .loy-modal-header {
       display: flex; align-items: center; justify-content: space-between;
       padding: 18px 20px 14px;
-      border-bottom: 1px solid rgba(201,162,39,0.12);
+      border-bottom: 1px solid ${C.modalHeaderBorder};
     }
     .loy-modal-body { padding: 20px; }
     .loy-modal-footer { padding: 0 20px 20px; display: flex; gap: 10px; }
     .loy-modal-close {
       display: inline-flex; align-items: center; justify-content: center;
       width: 30px; height: 30px; border-radius: 8px;
-      background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.08);
-      color: #7a6a55; cursor: pointer; transition: all 150ms; flex-shrink: 0;
+      background: ${C.modalCloseBg}; border: 1px solid ${C.modalCloseBorder};
+      color: ${C.modalCloseColor}; cursor: pointer; transition: all 150ms; flex-shrink: 0;
     }
     .loy-modal-close:hover { background: rgba(220,50,50,0.12); color: #f87171; border-color: rgba(220,50,50,0.22); }
   `;
@@ -228,13 +299,17 @@ const RankBadge = ({ rank }) => {
   if (rank === 1) return <Crown className="w-3.5 h-3.5 flex-shrink-0" style={{ color: RANK_COLORS[1].icon }} />;
   if (rank === 2) return <Crown className="w-3.5 h-3.5 flex-shrink-0" style={{ color: RANK_COLORS[2].icon }} />;
   if (rank === 3) return <Crown className="w-3.5 h-3.5 flex-shrink-0" style={{ color: RANK_COLORS[3].icon }} />;
-  return <span className="text-xs font-black flex-shrink-0" style={{ color: '#3d3020', minWidth: 14, textAlign: 'center' }}>#{rank}</span>;
+  return <span className="text-xs font-black flex-shrink-0" style={{ color: '#888888', minWidth: 14, textAlign: 'center' }}>#{rank}</span>;
 };
 
 // ══════════════════════════════════════════════════════════════════════════════
 const LoyaltyDashboard = () => {
   const { user } = useAuth();
   const cafeId = user?.cafeId;
+
+  // ── Theme awareness — re-inject CSS whenever light/dark changes ───────────
+  const { isLight } = useTheme();
+  useEffect(() => { injectLoyaltyCSS(isLight); }, [isLight]);
 
   // ── Cafe doc: used ONLY to build QR menu link for Send Loyalty Card ──────
   // Same pattern as QRGenerator — READ-ONLY, no writes, no side effects.
@@ -667,8 +742,8 @@ const LoyaltyDashboard = () => {
               <StatIcon className="w-5 h-5" style={{ color }} />
             </div>
             <div>
-              <p className="text-2xl font-black text-white">{value}</p>
-              <p className="text-xs font-bold mt-0.5" style={{ color: '#7a6a55' }}>{label}</p>
+              <p className="text-2xl font-black" style={{ color: isLight ? '#111111' : '#ffffff' }}>{value}</p>
+              <p className="text-xs font-bold mt-0.5" style={{ color: isLight ? '#666666' : '#7a6a55' }}>{label}</p>
             </div>
           </div>
         ))}
@@ -677,7 +752,7 @@ const LoyaltyDashboard = () => {
       {/* ── Search + Add (UNCHANGED) ───────────────────────────────────────── */}
       <div className="flex flex-col sm:flex-row gap-3">
         <div className="relative flex-1">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4" style={{ color: '#7a6a55' }} />
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4" style={{ color: isLight ? '#999999' : '#7a6a55' }} />
           <input type="text" value={search} onChange={e => setSearch(e.target.value)}
             placeholder="Search by name or phone…"
             className="loy-input" style={{ paddingLeft: '2.2rem' }} />
@@ -698,11 +773,11 @@ const LoyaltyDashboard = () => {
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -10 }}
             className="loy-card p-6"
-            style={{ border: '1.5px solid rgba(201,162,39,0.2)' }}
+            style={{ border: isLight ? '1.5px solid rgba(201,162,39,0.35)' : '1.5px solid rgba(201,162,39,0.2)' }}
           >
             <div className="flex items-center gap-2 mb-4">
               <User className="w-5 h-5" style={{ color: '#C9A227' }} />
-              <h3 className="text-white font-black loy-title text-lg">Add New Loyalty Customer</h3>
+              <h3 className="font-black loy-title text-lg" style={{ color: isLight ? '#111111' : '#ffffff' }}>Add New Loyalty Customer</h3>
             </div>
             <form onSubmit={handleAddCustomer} className="space-y-4">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -796,9 +871,9 @@ const LoyaltyDashboard = () => {
                                 }}
                               >
                                 <span className="flex items-center gap-2">
-                                  <Phone className="w-3 h-3 flex-shrink-0" style={{ color: '#7a6a55' }} />
-                                  <span style={{ color: '#fff8ee' }}>{phone}</span>
-                                  {name && <span style={{ color: '#5a4a35', fontSize: 11 }}>· {name}</span>}
+                                  <Phone className="w-3 h-3 flex-shrink-0" style={{ color: isLight ? '#999999' : '#7a6a55' }} />
+                                  <span style={{ color: isLight ? '#111111' : '#fff8ee' }}>{phone}</span>
+                                  {name && <span style={{ color: isLight ? '#888888' : '#5a4a35', fontSize: 11 }}>· {name}</span>}
                                 </span>
                               </button>
                             ))}
@@ -813,7 +888,7 @@ const LoyaltyDashboard = () => {
               {/* Validity (UNCHANGED) */}
               <div>
                 <label className="block text-xs font-black uppercase tracking-widest mb-1.5" style={{ color: '#C9A227' }}>
-                  Validity (days) <span className="font-normal normal-case" style={{ color: '#7a6a55' }}>(optional)</span>
+                  Validity (days) <span className="font-normal normal-case" style={{ color: isLight ? '#888888' : '#7a6a55' }}>(optional)</span>
                 </label>
                 <input type="number" min="0" value={validityDays} onChange={e => setValidityDays(e.target.value)}
                   placeholder="e.g. 30" className="loy-input" disabled={saving} data-testid="loyalty-validity-input" />
@@ -822,13 +897,13 @@ const LoyaltyDashboard = () => {
               {/* Custom discount (UNCHANGED) */}
               <div>
                 <label className="block text-xs font-black uppercase tracking-widest mb-1.5" style={{ color: '#C9A227' }}>
-                  Custom Discount (%) <span className="font-normal normal-case" style={{ color: '#7a6a55' }}>(optional — overrides default 10%)</span>
+                  Custom Discount (%) <span className="font-normal normal-case" style={{ color: isLight ? '#888888' : '#7a6a55' }}>(optional — overrides default 10%)</span>
                 </label>
                 <input type="number" min="0" max="100" value={customDiscount} onChange={e => setCustomDiscount(e.target.value)}
                   placeholder="e.g. 20" className="loy-input" disabled={saving} data-testid="loyalty-discount-input" />
               </div>
 
-              <p className="text-xs font-bold" style={{ color: '#7a6a55' }}>
+              <p className="text-xs font-bold" style={{ color: isLight ? '#666666' : '#7a6a55' }}>
                 First visit will be recorded automatically. Customer starts with <span style={{ color: '#C9A227' }}>10% OFF</span>.
               </p>
               <div className="flex gap-3">
@@ -852,7 +927,7 @@ const LoyaltyDashboard = () => {
           { label: '5+ visits', disc: '30% / Free Item' },
         ].map(({ label, disc }) => (
           <span key={label} className="text-xs px-3 py-1.5 rounded-xl font-black flex items-center gap-1"
-            style={{ background: 'rgba(201,162,39,0.07)', color: '#7a6a55', border: '1px solid rgba(201,162,39,0.15)' }}>
+            style={{ background: 'rgba(201,162,39,0.07)', color: isLight ? '#666666' : '#7a6a55', border: '1px solid rgba(201,162,39,0.15)' }}>
             {label} → <span style={{ color: '#C9A227' }}>{disc}</span>
             {label === '5+ visits' && <Gift className="w-3 h-3 ml-0.5" style={{ color: '#C9A227' }} />}
           </span>
@@ -864,18 +939,18 @@ const LoyaltyDashboard = () => {
       {/* ═══════════════════════════════════════════════════════════════════ */}
       {!loading && sortedByFrequency.length > 0 && (
         // TASK 3: subtle gold glow border to visually distinguish from loyalty list below
-        <div className="loy-insight-card" style={{ boxShadow: '0 0 0 1px rgba(212,175,55,0.12), 0 0 14px rgba(212,175,55,0.15), 0 0 28px rgba(212,175,55,0.08), 0 0 12px rgba(192,192,192,0.06), 0 6px 36px rgba(0,0,0,0.5)' }}>
+        <div className="loy-insight-card" style={{ boxShadow: isLight ? '0 0 0 1px rgba(212,175,55,0.18), 0 0 14px rgba(212,175,55,0.08), 0 2px 12px rgba(0,0,0,0.06)' : '0 0 0 1px rgba(212,175,55,0.12), 0 0 14px rgba(212,175,55,0.15), 0 0 28px rgba(212,175,55,0.08), 0 0 12px rgba(192,192,192,0.06), 0 6px 36px rgba(0,0,0,0.5)' }}>
           {/* Panel header — TASK 2: View All toggle moved here */}
           <div className="flex items-center justify-between px-5 py-4"
-            style={{ borderBottom: '1px solid rgba(201,162,39,0.12)' }}>
+            style={{ borderBottom: isLight ? '1px solid rgba(0,0,0,0.08)' : '1px solid rgba(201,162,39,0.12)' }}>
             <div className="flex items-center gap-2.5">
               <div className="w-8 h-8 rounded-xl flex items-center justify-center"
                 style={{ background: 'rgba(201,162,39,0.12)', border: '1px solid rgba(201,162,39,0.2)' }}>
                 <Flame className="w-4 h-4" style={{ color: '#C9A227' }} />
               </div>
               <div>
-                <h3 className="text-white font-black text-sm loy-title">Top Customers</h3>
-                <p className="text-xs font-bold" style={{ color: '#5a4a35' }}>Based on order history</p>
+                <h3 className="font-black text-sm loy-title" style={{ color: isLight ? '#111111' : '#ffffff' }}>Top Customers</h3>
+                <p className="text-xs font-bold" style={{ color: isLight ? '#888888' : '#5a4a35' }}>Based on order history</p>
               </div>
             </div>
             <div className="flex items-center gap-2">
@@ -908,7 +983,7 @@ const LoyaltyDashboard = () => {
           {/* TASK 1: Search bar inside Top Customers section */}
           <div className="px-5 pt-3 pb-2">
             <div className="relative">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5" style={{ color: '#5a4a35' }} />
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5" style={{ color: isLight ? '#999999' : '#5a4a35' }} />
               <input
                 type="text"
                 value={topSearch}
@@ -960,24 +1035,24 @@ const LoyaltyDashboard = () => {
                     {/* Name + phone + bar */}
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2">
-                        <p className="text-white font-black text-sm truncate" style={{ maxWidth: 120 }}>
+                        <p className="text-white font-black text-sm truncate" style={{ maxWidth: 120, color: isLight ? '#111111' : '#ffffff' }}>
                           {customer.name}
                         </p>
                       </div>
                       <div className="flex items-center gap-2 mt-0.5">
-                        <Phone className="w-2.5 h-2.5 flex-shrink-0" style={{ color: '#3d3020' }} />
-                        <span className="text-xs font-bold" style={{ color: '#5a4a35' }}>{customer.phone}</span>
+                        <Phone className="w-2.5 h-2.5 flex-shrink-0" style={{ color: isLight ? '#999999' : '#3d3020' }} />
+                        <span className="text-xs font-bold" style={{ color: isLight ? '#666666' : '#5a4a35' }}>{customer.phone}</span>
                       </div>
                       {/* Order frequency bar */}
                       <div className="mt-1.5 h-1 rounded-full overflow-hidden"
-                        style={{ background: 'rgba(255,255,255,0.05)', width: '100%' }}>
+                        style={{ background: isLight ? 'rgba(0,0,0,0.08)' : 'rgba(255,255,255,0.05)', width: '100%' }}>
                         <div
                           className="h-full rounded-full transition-all duration-500"
                           style={{
                             width: `${barPct}%`,
                             background: rankStyle
                               ? `linear-gradient(90deg,${rankStyle.icon},${rankStyle.border})`
-                              : 'linear-gradient(90deg,#3d3020,#2a2010)',
+                              : isLight ? 'linear-gradient(90deg,#AAAAAA,#CCCCCC)' : 'linear-gradient(90deg,#3d3020,#2a2010)',
                           }}
                         />
                       </div>
@@ -985,10 +1060,10 @@ const LoyaltyDashboard = () => {
 
                     {/* Order count pill */}
                     <div className="flex items-center gap-1 px-2 py-1 rounded-lg flex-shrink-0"
-                      style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.06)' }}>
-                      <Coffee className="w-2.5 h-2.5" style={{ color: '#5a4a35' }} />
-                      <span className="text-xs font-black text-white">{orderCount}</span>
-                      <span className="text-xs font-bold hidden sm:inline" style={{ color: '#5a4a35' }}>
+                      style={{ background: isLight ? 'rgba(0,0,0,0.05)' : 'rgba(255,255,255,0.04)', border: isLight ? '1px solid rgba(0,0,0,0.08)' : '1px solid rgba(255,255,255,0.06)' }}>
+                      <Coffee className="w-2.5 h-2.5" style={{ color: isLight ? '#888888' : '#5a4a35' }} />
+                      <span className="text-xs font-black" style={{ color: isLight ? '#111111' : '#ffffff' }}>{orderCount}</span>
+                      <span className="text-xs font-bold hidden sm:inline" style={{ color: isLight ? '#666666' : '#5a4a35' }}>
                         visit{orderCount !== 1 ? 's' : ''}
                       </span>
                     </div>
@@ -1032,12 +1107,12 @@ const LoyaltyDashboard = () => {
       {loading ? (
         <div className="flex flex-col items-center justify-center py-12 gap-2">
           <Star className="w-10 h-10 animate-bounce" style={{ color: '#C9A227' }} />
-          <p className="text-sm font-bold" style={{ color: '#7a6a55' }}>Loading customers…</p>
+          <p className="text-sm font-bold" style={{ color: isLight ? '#666666' : '#7a6a55' }}>Loading customers…</p>
         </div>
       ) : filtered.length === 0 ? (
         <div className="loy-card p-12 text-center">
           <Gift className="w-12 h-12 mb-3 mx-auto" style={{ color: '#3a2e1a' }} />
-          <p className="font-bold" style={{ color: '#7a6a55' }}>
+          <p className="font-bold" style={{ color: isLight ? '#666666' : '#7a6a55' }}>
             {search ? 'No customers match your search.' : 'No loyalty customers yet. Add your first one!'}
           </p>
         </div>
@@ -1076,19 +1151,19 @@ const LoyaltyDashboard = () => {
                     <User className="w-5 h-5" style={{ color: '#C9A227' }} />
                   </div>
                   <div className="min-w-0 flex-1">
-                    <p className="text-white font-black text-sm truncate">{customer.name}</p>
+                    <p className="font-black text-sm truncate" style={{ color: isLight ? '#111111' : '#ffffff' }}>{customer.name}</p>
                     <div className="flex items-center gap-1.5 mt-0.5">
-                      <Phone className="w-3 h-3 flex-shrink-0" style={{ color: '#7a6a55' }} />
-                      <p className="text-xs font-bold truncate" style={{ color: '#7a6a55' }}>{customer.phone}</p>
+                      <Phone className="w-3 h-3 flex-shrink-0" style={{ color: isLight ? '#999999' : '#7a6a55' }} />
+                      <p className="text-xs font-bold truncate" style={{ color: isLight ? '#666666' : '#7a6a55' }}>{customer.phone}</p>
                     </div>
                   </div>
 
                   {/* Visit count */}
                   <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-xl flex-shrink-0"
-                    style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.07)' }}>
-                    <Coffee className="w-3 h-3" style={{ color: '#7a6a55' }} />
-                    <span className="text-white text-xs font-black">{visits}</span>
-                    <span className="text-xs font-bold hidden sm:inline" style={{ color: '#7a6a55' }}>visit{visits !== 1 ? 's' : ''}</span>
+                    style={{ background: isLight ? 'rgba(0,0,0,0.05)' : 'rgba(255,255,255,0.05)', border: isLight ? '1px solid rgba(0,0,0,0.08)' : '1px solid rgba(255,255,255,0.07)' }}>
+                    <Coffee className="w-3 h-3" style={{ color: isLight ? '#888888' : '#7a6a55' }} />
+                    <span className="text-xs font-black" style={{ color: isLight ? '#111111' : '#ffffff' }}>{visits}</span>
+                    <span className="text-xs font-bold hidden sm:inline" style={{ color: isLight ? '#666666' : '#7a6a55' }}>visit{visits !== 1 ? 's' : ''}</span>
                   </div>
 
                   {/* Discount badge */}
@@ -1116,7 +1191,7 @@ const LoyaltyDashboard = () => {
                   transition={{ duration: 0.25, ease: 'easeInOut' }}
                   style={{ overflow: 'hidden' }}
                 >
-                  <div className="px-4 pb-4 pt-2 space-y-3" style={{ borderTop: '1px solid rgba(201,162,39,0.2)' }}>
+                  <div className="px-4 pb-4 pt-2 space-y-3" style={{ borderTop: isLight ? '1px solid rgba(0,0,0,0.10)' : '1px solid rgba(201,162,39,0.2)' }}>
 
                     {/* Expiry date */}
                     {customer.expiryDate && (() => {
@@ -1127,11 +1202,11 @@ const LoyaltyDashboard = () => {
                       return (
                         <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl"
                           style={{
-                            background: isExpired ? 'rgba(220,50,50,0.08)' : 'rgba(255,255,255,0.04)',
-                            border: isExpired ? '1px solid rgba(220,50,50,0.25)' : '1px solid rgba(255,255,255,0.08)',
+                            background: isExpired ? 'rgba(220,50,50,0.08)' : (isLight ? 'rgba(0,0,0,0.04)' : 'rgba(255,255,255,0.04)'),
+                            border: isExpired ? '1px solid rgba(220,50,50,0.25)' : (isLight ? '1px solid rgba(0,0,0,0.08)' : '1px solid rgba(255,255,255,0.08)'),
                           }}>
                           <Calendar className="w-3 h-3" style={{ color: isExpired ? '#f87171' : '#7a6a55' }} />
-                          <span className="text-xs font-bold" style={{ color: isExpired ? '#f87171' : '#7a6a55' }}>
+                          <span className="text-xs font-bold" style={{ color: isExpired ? '#f87171' : (isLight ? '#555555' : '#7a6a55') }}>
                             {isExpired ? 'Expired ' : 'Valid till '}
                             {exp.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}
                           </span>
@@ -1193,14 +1268,14 @@ const LoyaltyDashboard = () => {
 
                     {/* Inline edit panel */}
                     {editingCustomerId === customer.id && (
-                      <div className="mt-2 pt-3 space-y-3" style={{ borderTop: '1px solid rgba(201,162,39,0.2)' }}
+                      <div className="mt-2 pt-3 space-y-3" style={{ borderTop: isLight ? '1px solid rgba(0,0,0,0.10)' : '1px solid rgba(201,162,39,0.2)' }}
                         data-testid={`edit-panel-${customer.id}`}>
                         <p className="text-xs font-black uppercase tracking-widest flex items-center gap-1" style={{ color: '#C9A227' }}>
                           <Edit className="w-3 h-3" /> Edit Loyalty Card
                         </p>
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                           <div>
-                            <label className="block text-xs font-bold mb-1" style={{ color: '#7a6a55' }}>Discount (%)</label>
+                            <label className="block text-xs font-bold mb-1" style={{ color: isLight ? '#555555' : '#7a6a55' }}>Discount (%)</label>
                             <input type="number" min="0" max="100" value={editDiscount}
                               onChange={e => setEditDiscount(e.target.value)}
                               placeholder={`Current: ${customer.currentDiscount || 10}%`}
@@ -1208,7 +1283,7 @@ const LoyaltyDashboard = () => {
                               data-testid={`edit-discount-${customer.id}`} />
                           </div>
                           <div>
-                            <label className="block text-xs font-bold mb-1" style={{ color: '#7a6a55' }}>Validity (days)</label>
+                            <label className="block text-xs font-bold mb-1" style={{ color: isLight ? '#555555' : '#7a6a55' }}>Validity (days)</label>
                             <input type="number" min="0" value={editValidity}
                               onChange={e => setEditValidity(e.target.value)}
                               placeholder={`Current: ${customer.validityDays || 0}d`}
@@ -1244,13 +1319,13 @@ const LoyaltyDashboard = () => {
             onClick={() => setShowAllCustomers(v => !v)}
             className="w-full flex items-center justify-center gap-2 py-2.5 text-xs font-black rounded-xl transition-colors"
             style={{
-              background: 'rgba(255,255,255,0.03)',
-              border: '1.5px solid rgba(255,255,255,0.07)',
-              color: '#7a6a55',
+              background: isLight ? 'rgba(0,0,0,0.03)' : 'rgba(255,255,255,0.03)',
+              border: isLight ? '1.5px solid rgba(0,0,0,0.08)' : '1.5px solid rgba(255,255,255,0.07)',
+              color: isLight ? '#666666' : '#7a6a55',
               cursor: 'pointer',
             }}
             onMouseEnter={e => { e.currentTarget.style.borderColor = 'rgba(201,162,39,0.2)'; e.currentTarget.style.color = '#C9A227'; }}
-            onMouseLeave={e => { e.currentTarget.style.borderColor = 'rgba(255,255,255,0.07)'; e.currentTarget.style.color = '#7a6a55'; }}
+            onMouseLeave={e => { e.currentTarget.style.borderColor = isLight ? 'rgba(0,0,0,0.08)' : 'rgba(255,255,255,0.07)'; e.currentTarget.style.color = isLight ? '#666666' : '#7a6a55'; }}
             data-testid="loyalty-list-load-more"
           >
             {showAllCustomers
@@ -1264,8 +1339,8 @@ const LoyaltyDashboard = () => {
 
       {/* Footer (UNCHANGED) */}
       <div className="flex items-center justify-center gap-2 py-2">
-        <Star className="w-4 h-4" style={{ color: '#7a6a55' }} />
-        <p className="text-xs font-bold" style={{ color: '#7a6a55' }}>
+        <Star className="w-4 h-4" style={{ color: isLight ? '#999999' : '#7a6a55' }} />
+        <p className="text-xs font-bold" style={{ color: isLight ? '#666666' : '#7a6a55' }}>
           {totalCustomers} member{totalCustomers !== 1 ? 's' : ''} · {totalVisits} total visits
         </p>
         <span className="inline-block w-1.5 h-1.5 rounded-full animate-pulse" style={{ background: '#34d399' }} />
@@ -1305,8 +1380,8 @@ const LoyaltyDashboard = () => {
                     <Send className="w-4 h-4" style={{ color: '#25D366' }} />
                   </div>
                   <div>
-                    <p className="text-white font-black text-sm loy-title">Send Loyalty Card</p>
-                    <p className="text-xs font-bold mt-0.5" style={{ color: '#5a4a35' }}>
+                    <p className="font-black text-sm loy-title" style={{ color: isLight ? '#111111' : '#ffffff' }}>Send Loyalty Card</p>
+                    <p className="text-xs font-bold mt-0.5" style={{ color: isLight ? '#888888' : '#5a4a35' }}>
                       via WhatsApp · {loyaltyCardModal.customer.name}
                     </p>
                   </div>
@@ -1326,12 +1401,12 @@ const LoyaltyDashboard = () => {
 
                 {/* Customer info pill */}
                 <div className="flex items-center gap-2 px-3 py-2 rounded-xl"
-                  style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.07)' }}>
+                  style={{ background: isLight ? 'rgba(0,0,0,0.04)' : 'rgba(255,255,255,0.04)', border: isLight ? '1px solid rgba(0,0,0,0.08)' : '1px solid rgba(255,255,255,0.07)' }}>
                   <User className="w-3.5 h-3.5 flex-shrink-0" style={{ color: '#C9A227' }} />
-                  <span className="text-xs font-black text-white">{loyaltyCardModal.customer.name}</span>
-                  <span className="mx-1" style={{ color: '#3d3020' }}>·</span>
-                  <Phone className="w-3 h-3 flex-shrink-0" style={{ color: '#5a4a35' }} />
-                  <span className="text-xs font-bold" style={{ color: '#7a6a55' }}>{loyaltyCardModal.customer.phone || '—'}</span>
+                  <span className="text-xs font-black" style={{ color: isLight ? '#111111' : '#ffffff' }}>{loyaltyCardModal.customer.name}</span>
+                  <span className="mx-1" style={{ color: isLight ? '#999999' : '#3d3020' }}>·</span>
+                  <Phone className="w-3 h-3 flex-shrink-0" style={{ color: isLight ? '#999999' : '#5a4a35' }} />
+                  <span className="text-xs font-bold" style={{ color: isLight ? '#666666' : '#7a6a55' }}>{loyaltyCardModal.customer.phone || '—'}</span>
                 </div>
 
                 {/* Discount input */}
@@ -1419,7 +1494,8 @@ const LoyaltyDashboard = () => {
                           style={{
                             borderRadius: 0, border: 'none', resize: 'vertical',
                             fontSize: 12, lineHeight: 1.7, padding: '10px 12px',
-                            background: 'rgba(37,211,102,0.04)', color: 'rgba(255,255,255,0.75)',
+                            background: isLight ? 'rgba(37,211,102,0.04)' : 'rgba(37,211,102,0.04)',
+                            color: isLight ? '#111111' : 'rgba(255,255,255,0.75)',
                             width: '100%', display: 'block',
                           }}
                           data-testid="lc-message-textarea"
@@ -1429,7 +1505,7 @@ const LoyaltyDashboard = () => {
                           padding: '10px 12px',
                           background: 'rgba(37,211,102,0.04)',
                           fontSize: 12, lineHeight: 1.7,
-                          color: 'rgba(255,255,255,0.55)',
+                          color: isLight ? '#333333' : 'rgba(255,255,255,0.55)',
                           whiteSpace: 'pre-line',
                           fontFamily: 'DM Sans, system-ui, sans-serif',
                           fontWeight: 600,
