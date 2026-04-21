@@ -1,17 +1,15 @@
 /**
- * ChangePassword.jsx
+ * ChangePassword.jsx  — THEME-FIXED
  *
- * FIX (2026-04-06) — Password input layout shift on mobile focus:
- * Root cause: PasswordField was defined INSIDE the ChangePassword component body.
- * On every keystroke (setOldPass / setNewPass / setConfirm), ChangePassword
- * re-rendered → PasswordField became a new function reference → React unmounted
- * and remounted the DOM input node → input lost focus, shifted on screen, and
- * on mobile the virtual keyboard dismissed/re-appeared.
+ * Previously used 100% hardcoded dark classes.
+ * Now imports useTheme and uses T.* tokens throughout.
  *
- * Fix: Move PasswordField and inputCls OUTSIDE the ChangePassword component so
- * they have a stable reference across renders. PasswordField now receives `show`
- * and `onToggleShow` as props instead of closing over them from the parent scope.
- * Everything else (logic, JSX structure, classNames, behavior) is unchanged.
+ * PasswordField component updated to accept T prop.
+ * inputCls function now uses T.input token.
+ * Card, labels, borders, success banner, password rules all themed.
+ *
+ * The PasswordField stability fix (defined outside component) is preserved.
+ * Nothing structural changed — only colour/class strings.
  */
 
 import React, { useState } from 'react';
@@ -24,30 +22,25 @@ import { auth } from '../../lib/firebase';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Lock, Eye, EyeOff, CheckCircle, AlertCircle } from 'lucide-react';
 import { toast } from 'sonner';
-
-// ─── inputCls outside component — never recreated on parent re-render ─────────
-const inputCls = (err) =>
-  `w-full bg-black/20 border ${err ? 'border-red-500/50' : 'border-white/10'} text-white placeholder:text-neutral-600 focus:border-[#D4AF37] focus:ring-1 focus:ring-[#D4AF37] rounded-sm h-12 px-4 pr-12 transition-all outline-none text-sm`;
+import { useTheme } from '../../hooks/useTheme';
 
 // ─── PasswordField outside component — stable reference across renders ────────
-// When defined inside the parent, every parent re-render creates a new function
-// reference → React treats it as a different component type → unmounts + remounts
-// the input DOM node → loses focus → layout shift → mobile keyboard flickers.
-const PasswordField = ({ label, value, onChange, error, showKey, show, onToggleShow }) => (
+// (Preserves original fix: defined outside to prevent focus-loss on re-render)
+const PasswordField = ({ label, value, onChange, error, showKey, show, onToggleShow, T }) => (
   <div>
-    <label className="block text-white text-sm font-medium mb-1.5">{label}</label>
+    <label className={`block ${T.label} text-sm font-medium mb-1.5`}>{label}</label>
     <div className="relative">
       <input
         type={show[showKey] ? 'text' : 'password'}
         value={value}
         onChange={e => onChange(e.target.value)}
         placeholder="••••••••"
-        className={inputCls(error)}
+        className={`w-full ${T.input} ${error ? 'border-red-500/70' : ''} rounded-sm h-12 px-4 pr-12 transition-all outline-none text-sm`}
       />
       <button
         type="button"
         onClick={() => onToggleShow(showKey)}
-        className="absolute right-3 top-1/2 -translate-y-1/2 text-[#555] hover:text-[#A3A3A3] transition-colors"
+        className={`absolute right-3 top-1/2 -translate-y-1/2 ${T.faint} hover:${T.muted} transition-colors`}
       >
         {show[showKey] ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
       </button>
@@ -63,6 +56,8 @@ const PasswordField = ({ label, value, onChange, error, showKey, show, onToggleS
 // ─── Main component ───────────────────────────────────────────────────────────
 
 const ChangePassword = () => {
+  const { T } = useTheme();
+
   const [oldPass,  setOldPass ] = useState('');
   const [newPass,  setNewPass ] = useState('');
   const [confirm,  setConfirm ] = useState('');
@@ -75,10 +70,10 @@ const ChangePassword = () => {
 
   const validate = () => {
     const e = {};
-    if (!oldPass)                   e.old     = 'Current password is required';
-    if (newPass.length < 6)         e.new     = 'New password must be at least 6 characters';
-    if (newPass === oldPass)        e.new     = 'New password must be different from current';
-    if (newPass !== confirm)        e.confirm = 'Passwords do not match';
+    if (!oldPass)               e.old     = 'Current password is required';
+    if (newPass.length < 6)     e.new     = 'New password must be at least 6 characters';
+    if (newPass === oldPass)    e.new     = 'New password must be different from current';
+    if (newPass !== confirm)    e.confirm = 'Passwords do not match';
     setErrors(e);
     return Object.keys(e).length === 0;
   };
@@ -98,7 +93,7 @@ const ChangePassword = () => {
 
       setSuccess(true);
       setOldPass(''); setNewPass(''); setConfirm('');
-      toast.success('Password updated successfully \u2713');
+      toast.success('Password updated successfully ✓');
 
       setTimeout(() => setSuccess(false), 5000);
     } catch (err) {
@@ -115,16 +110,16 @@ const ChangePassword = () => {
   };
 
   return (
-    <div className="bg-[#0F0F0F] border border-white/5 rounded-sm p-6 space-y-5">
+    <div className={`${T.card} rounded-sm p-6 space-y-5`}>
       <div className="flex items-center gap-3">
         <div className="w-8 h-8 rounded-lg bg-[#D4AF37]/10 flex items-center justify-center">
           <Lock className="w-4 h-4 text-[#D4AF37]" />
         </div>
         <div>
-          <h3 className="text-white font-semibold text-xl" style={{ fontFamily: 'Playfair Display, serif' }}>
+          <h3 className={`${T.heading} font-semibold text-xl`} style={{ fontFamily: 'Playfair Display, serif' }}>
             Change Password
           </h3>
-          <p className="text-[#555] text-xs">Re-enter your current password to confirm</p>
+          <p className={`${T.faint} text-xs`}>Re-enter your current password to confirm</p>
         </div>
       </div>
 
@@ -150,6 +145,7 @@ const ChangePassword = () => {
         showKey="old"
         show={show}
         onToggleShow={handleToggleShow}
+        T={T}
       />
       <PasswordField
         label="New Password"
@@ -159,6 +155,7 @@ const ChangePassword = () => {
         showKey="new"
         show={show}
         onToggleShow={handleToggleShow}
+        T={T}
       />
       <PasswordField
         label="Confirm New Password"
@@ -168,19 +165,22 @@ const ChangePassword = () => {
         showKey="confirm"
         show={show}
         onToggleShow={handleToggleShow}
+        T={T}
       />
 
       {newPass.length > 0 && (
         <div className="space-y-1">
           {[
-            { ok: newPass.length >= 6,                        label: 'At least 6 characters'    },
-            { ok: /[A-Z]/.test(newPass),                      label: 'Contains uppercase letter' },
-            { ok: /[0-9]/.test(newPass),                      label: 'Contains a number'         },
-            { ok: newPass !== oldPass && oldPass.length > 0,  label: 'Different from current'    },
+            { ok: newPass.length >= 6,                       label: 'At least 6 characters'    },
+            { ok: /[A-Z]/.test(newPass),                     label: 'Contains uppercase letter' },
+            { ok: /[0-9]/.test(newPass),                     label: 'Contains a number'         },
+            { ok: newPass !== oldPass && oldPass.length > 0, label: 'Different from current'    },
           ].map(rule => (
-            <p key={rule.label} className="flex items-center gap-1.5 text-xs"
-              style={{ color: rule.ok ? '#10B981' : '#555' }}>
-              <span>{rule.ok ? '\u2713' : '\u00b7'}</span>
+            <p key={rule.label}
+              className="flex items-center gap-1.5 text-xs"
+              style={{ color: rule.ok ? '#10B981' : (T.faint?.includes('888') ? '#888888' : '#555555') }}
+            >
+              <span>{rule.ok ? '✓' : '·'}</span>
               {rule.label}
             </p>
           ))}
@@ -193,7 +193,7 @@ const ChangePassword = () => {
         className="flex items-center gap-2 px-6 py-3 bg-[#D4AF37] hover:bg-[#C5A059] text-black font-bold rounded-sm text-sm transition-all disabled:opacity-50"
       >
         {loading
-          ? <><div className="w-4 h-4 rounded-full border-2 border-black/30 border-t-black animate-spin" />Updating\u2026</>
+          ? <><div className="w-4 h-4 rounded-full border-2 border-black/30 border-t-black animate-spin" />Updating…</>
           : <><Lock className="w-4 h-4" />Update Password</>
         }
       </button>
