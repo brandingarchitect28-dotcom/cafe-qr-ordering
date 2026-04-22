@@ -1,15 +1,31 @@
 {
+  "id": "/",
   "name": "Branding Architect",
   "short_name": "BA Smart OS",
-  "description": "Branding Architect — Your Smart Café OS. QR ordering, kitchen management, analytics and more.",
-  "start_url": "/",
+  "description": "Branding Architect — Your Smart Café OS. QR ordering, kitchen management, billing, analytics, loyalty programs and staff management — all in one powerful platform.",
+  "start_url": "/?source=pwa",
   "scope": "/",
   "display": "standalone",
+  "display_override": ["window-controls-overlay", "standalone", "minimal-ui", "browser"],
   "orientation": "portrait",
   "background_color": "#050505",
   "theme_color": "#D4AF37",
   "lang": "en",
-  "categories": ["business", "food", "productivity"],
+  "dir": "ltr",
+  "categories": ["business", "food", "productivity", "utilities", "lifestyle"],
+  "launch_handler": {
+    "client_mode": ["navigate-existing", "auto"]
+  },
+  "edge_side_panel": {
+    "preferred_width": 400
+  },
+  "protocol_handlers": [
+    {
+      "protocol": "web+cafeorder",
+      "url": "/order?ref=%s"
+    }
+  ],
+  "handle_links": "preferred",
   "icons": [
     {
       "src": "/icons/icon-48x48.png",
@@ -48,7 +64,90 @@
       "purpose": "any maskable"
     }
   ],
-  "screenshots": [],
+  "shortcuts": [
+    {
+      "name": "New Order",
+      "short_name": "Order",
+      "description": "Start a new QR table order instantly",
+      "url": "/order?source=shortcut",
+      "icons": [
+        {
+          "src": "/icons/icon-96x96.png",
+          "sizes": "96x96",
+          "type": "image/png"
+        }
+      ]
+    },
+    {
+      "name": "Kitchen Display",
+      "short_name": "Kitchen",
+      "description": "Open the live kitchen order display",
+      "url": "/kitchen?source=shortcut",
+      "icons": [
+        {
+          "src": "/icons/icon-96x96.png",
+          "sizes": "96x96",
+          "type": "image/png"
+        }
+      ]
+    },
+    {
+      "name": "Analytics Dashboard",
+      "short_name": "Analytics",
+      "description": "View sales reports and performance insights",
+      "url": "/analytics?source=shortcut",
+      "icons": [
+        {
+          "src": "/icons/icon-96x96.png",
+          "sizes": "96x96",
+          "type": "image/png"
+        }
+      ]
+    },
+    {
+      "name": "Manage Menu",
+      "short_name": "Menu",
+      "description": "Edit menu items, categories and pricing",
+      "url": "/menu?source=shortcut",
+      "icons": [
+        {
+          "src": "/icons/icon-96x96.png",
+          "sizes": "96x96",
+          "type": "image/png"
+        }
+      ]
+    }
+  ],
+  "screenshots": [
+    {
+      "src": "/screenshots/screenshot-orders.png",
+      "sizes": "1080x1920",
+      "type": "image/png",
+      "form_factor": "narrow",
+      "label": "QR Order Management Screen"
+    },
+    {
+      "src": "/screenshots/screenshot-kitchen.png",
+      "sizes": "1080x1920",
+      "type": "image/png",
+      "form_factor": "narrow",
+      "label": "Live Kitchen Display System"
+    },
+    {
+      "src": "/screenshots/screenshot-analytics.png",
+      "sizes": "1080x1920",
+      "type": "image/png",
+      "form_factor": "narrow",
+      "label": "Sales Analytics Dashboard"
+    },
+    {
+      "src": "/screenshots/screenshot-desktop-dashboard.png",
+      "sizes": "1920x1080",
+      "type": "image/png",
+      "form_factor": "wide",
+      "label": "Full Dashboard — Desktop View"
+    }
+  ],
   "related_applications": [],
   "prefer_related_applications": false
 }
