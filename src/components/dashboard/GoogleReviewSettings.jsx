@@ -17,10 +17,12 @@ import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { db } from '../../lib/firebase';
 import { toast } from 'sonner';
 import { RefreshCw, Link, CheckCircle } from 'lucide-react';
+import { useTheme } from '../../hooks/useTheme';
 
 const GoogleReviewSettings = () => {
   const { user } = useAuth();
   const cafeId   = user?.cafeId;
+  const { T, isLight } = useTheme();
 
   const [link,    setLink   ] = useState('');
   const [loading, setLoading] = useState(true);
@@ -77,7 +79,7 @@ const GoogleReviewSettings = () => {
 
   return (
     <div
-      className="bg-[#0F0F0F] border border-white/5 rounded-sm p-5"
+      className={`${T.card} rounded-sm p-5`}
       data-testid="google-review-settings"
     >
       <div className="flex items-start gap-3 mb-4">
@@ -86,12 +88,12 @@ const GoogleReviewSettings = () => {
         </div>
         <div>
           <h3
-            className="text-white font-semibold"
+            className={`${T.heading} font-semibold`}
             style={{ fontFamily: 'Playfair Display, serif' }}
           >
             Google Review Link
           </h3>
-          <p className="text-[#A3A3A3] text-xs mt-0.5">
+          <p className={`${T.muted} text-xs mt-0.5`}>
             Customers see a "Leave a Google Review — get 10% OFF" prompt on their
             order tracking page. Paste your Google review URL below.
           </p>
@@ -99,7 +101,7 @@ const GoogleReviewSettings = () => {
       </div>
 
       {loading ? (
-        <div className="flex items-center gap-2 text-[#A3A3A3] text-sm py-2">
+        <div className={`flex items-center gap-2 ${T.muted} text-sm py-2`}>
           <RefreshCw className="w-4 h-4 animate-spin" />
           Loading…
         </div>
@@ -111,12 +113,12 @@ const GoogleReviewSettings = () => {
             onChange={e => setLink(e.target.value)}
             placeholder="https://g.page/r/YOUR_REVIEW_ID/review"
             disabled={saving}
-            className="w-full bg-black/20 border border-white/10 text-white placeholder:text-neutral-600 focus:border-[#D4AF37] focus:ring-1 focus:ring-[#D4AF37] rounded-sm h-11 px-4 transition-all text-sm"
+            className={`w-full ${T.input} rounded-sm h-11 px-4 transition-all text-sm`}
             data-testid="review-link-input"
           />
 
           {link.trim() && (
-            <p className="text-[#A3A3A3] text-xs flex items-center gap-1.5">
+            <p className={`${T.muted} text-xs flex items-center gap-1.5`}>
               <CheckCircle className="w-3.5 h-3.5 text-green-400" />
               Preview:{' '}
               <a
