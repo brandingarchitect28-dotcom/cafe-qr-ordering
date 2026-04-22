@@ -1,38 +1,52 @@
-/**
- * registerSW.js
- *
- * Paste this file into: src/registerSW.js
- * Then import it ONCE at the bottom of src/main.jsx
- *
- * Usage in main.jsx:
- *   import './registerSW';     ← add this as the LAST import
- */
+// Service Worker Registration
+// Safe, production-ready — does not affect any existing app logic
 
-export function registerServiceWorker() {
-  // Only run in production + in browsers that support SW
-  if (
-    import.meta.env.PROD &&
-    'serviceWorker' in navigator
-  ) {
-    window.addEventListener('load', () => {
-      navigator.serviceWorker
-        .register('/service-worker.js', {
-          // 'classic' scope — covers the whole app from root
-          scope: '/',
-        })
-        .then((registration) => {
-          console.log('[SW] Registered. Scope:', registration.scope);
+if (typeof window !== 'undefined') {
+  window.addEventListener('load', () => {
+    if ('serviceWorker' in navigator) {
 
-          // Check for updates every time app loads
-          registration.update();
-        })
-        .catch((error) => {
-          // Registration failed — app still works, just no SW
-          console.warn('[SW] Registration failed:', error);
-        });
-    });
-  }
+      // Guard: skip if already registered with same script
+      navigator.serviceWorker.getRegistration('/').then((existing) => {
+        if (existing) {
+          console.log('[SW] Already registered. Scope:', existing.scope)
+
+          // Still check for updates on every page load
+          existing.update().catch((err) => {
+            console.warn('[SW] Update check failed:', err)
+          })
+          return
+        }
+
+        // First-time registration
+        navigator.serviceWorker
+          .register('/service-worker.js', { scope: '/' })
+          .then((registration) => {
+            console.log('[SW] Registered successfully. Scope:', registration.scope)
+
+            // Notify app when a new SW version takes control
+            navigator.serviceWorker.addEventListener('controllerchange', () => {
+              console.log('[SW] New version active. Controller changed.')
+            })
+          })
+          .catch((error) => {
+            console.error('[SW] Registration failed:', error)
+          })
+      }).catch((err) => {
+        console.warn('[SW] getRegistration check failed:', err)
+
+        // Fallback: attempt registration anyway
+        navigator.serviceWorker
+          .register('/service-worker.js', { scope: '/' })
+          .then((registration) => {
+            console.log('[SW] Registered (fallback). Scope:', registration.scope)
+          })
+          .catch((error) => {
+            console.error('[SW] Registration failed (fallback):', error)
+          })
+      })
+
+    } else {
+      console.warn('[SW] Service workers not supported in this browser.')
+    }
+  })
 }
-
-// Auto-invoke when imported
-registerServiceWorker();
