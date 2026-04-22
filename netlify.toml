@@ -1,35 +1,59 @@
+# netlify.toml
+# Branding Architect — Netlify Deployment Configuration
+# ─────────────────────────────────────────────────────────────────────────────
+# IMPORTANT: Set `publish` to match your actual build output folder.
+# Common values: "dist" (Vite), "build" (CRA), "out" (Next.js static export)
+# ─────────────────────────────────────────────────────────────────────────────
+
 [build]
   command = "npm run build"
   publish = "dist"
 
-[build.environment]
-  NODE_VERSION  = "20"
-  NPM_FLAGS     = "--legacy-peer-deps"
+# ─── Service Worker & PWA Files — MUST have no-cache headers ─────────────────
+# The Service Worker spec requires the SW script to be re-validated on every
+# load. If Netlify caches it, browsers will never pick up updates.
 
-# SPA catch-all — must come LAST after any API routes
-[[redirects]]
-  from   = "/*"
-  to     = "/index.html"
-  status = 200
-
-# Prevent clickjacking etc.
 [[headers]]
-  for = "/*"
+  for = "/service-worker.js"
   [headers.values]
-    X-Frame-Options         = "DENY"
-    X-Content-Type-Options  = "nosniff"
-    Referrer-Policy         = "strict-origin-when-cross-origin"
-    # Required for Firebase Auth to work cross-origin
-    Cross-Origin-Opener-Policy = "same-origin-allow-popups"
+    Cache-Control = "no-cache, no-store, must-revalidate"
+    Content-Type  = "application/javascript; charset=utf-8"
+    Pragma        = "no-cache"
+    Expires       = "0"
 
-# Long-lived cache for hashed asset bundles
+[[headers]]
+  for = "/registerSW.js"
+  [headers.values]
+    Cache-Control = "no-cache, no-store, must-revalidate"
+    Content-Type  = "application/javascript; charset=utf-8"
+    Pragma        = "no-cache"
+    Expires       = "0"
+
+[[headers]]
+  for = "/manifest.json"
+  [headers.values]
+    Cache-Control = "no-cache, no-store, must-revalidate"
+    Content-Type  = "application/manifest+json; charset=utf-8"
+
+# ─── Static assets — long-lived cache (safe because filenames are hashed) ─────
 [[headers]]
   for = "/assets/*"
   [headers.values]
     Cache-Control = "public, max-age=31536000, immutable"
 
-# Never cache the HTML entry point
 [[headers]]
-  for = "/index.html"
+  for = "/icons/*"
   [headers.values]
-    Cache-Control = "public, max-age=0, must-revalidate"
+    Cache-Control = "public, max-age=86400"
+
+[[headers]]
+  for = "/screenshots/*"
+  [headers.values]
+    Cache-Control = "public, max-age=86400"
+
+# ─── SPA Routing — all routes return index.html ──────────────────────────────
+# Without this, direct navigation to /kitchen, /analytics etc. returns 404.
+[[redirects]]
+  from   = "/*"
+  to     = "/index.html"
+  status = 200
