@@ -104,7 +104,7 @@ self.addEventListener('fetch', (event) => {
   // 1. Only handle GET requests — never intercept POST/PUT/DELETE
   if (request.method !== 'GET') return;
 
-  // 2. Only handle http/https — skip chrome-extension etc.
+  // 2. Only handle http/https — skip chrome-extension, data: URIs etc.
   if (!url.protocol.startsWith('http')) return;
 
   // 3. Network-only check — if URL matches any blocked pattern, bypass cache
@@ -121,8 +121,8 @@ self.addEventListener('fetch', (event) => {
     event.respondWith(
       fetch(request)
         .then((response) => {
-          // Only cache successful responses
-          if (response && response.status === 200) {
+          // Only cache valid successful responses (guard against opaque)
+          if (response && response.status === 200 && response.type === 'basic') {
             const clone = response.clone();
             caches.open(CACHE_NAME).then((cache) => cache.put(request, clone));
           }
@@ -152,14 +152,19 @@ self.addEventListener('fetch', (event) => {
         if (cached) return cached;
         // Not in cache — fetch and store
         return fetch(request).then((response) => {
-          if (response && response.status === 200) {
+          // Guard: only cache valid same-origin or CORS responses, not opaque
+          if (
+            response &&
+            response.status === 200 &&
+            (response.type === 'basic' || response.type === 'cors')
+          ) {
             const clone = response.clone();
             caches.open(CACHE_NAME).then((cache) => cache.put(request, clone));
           }
           return response;
         }).catch(() => {
-          // Static asset failed and not cached — nothing we can do
-          return new Response('', { status: 408 });
+          // Static asset failed and not cached — return a clean 503
+          return new Response('', { status: 503, statusText: 'Service Unavailable' });
         });
       })
     );
