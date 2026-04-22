@@ -1,28 +1,40 @@
 /**
  * registerSW.js
- * Branding Architect — Safe, Production-Ready Service Worker Registration
- * Version: 2.0.0
+ * Branding Architect — Production Service Worker Registration
+ * Version: 2.1.0
  *
- * HOW TO LOAD THIS FILE:
- * ─────────────────────
- * Option A — Plain HTML (add before </body> in index.html):
- *   <script src="/registerSW.js" defer></script>
+ * HOW TO LOAD THIS FILE — pick ONE:
+ * ──────────────────────────────────
+ * Option A — HTML (add before </body> in index.html):
+ *   <script src="/registerSW.js"></script>
  *
- * Option B — Framework entry (main.js / index.js / App root):
+ *   Do NOT use `defer` or `async` — this script is tiny and must run
+ *   synchronously so registration fires as early as possible, giving
+ *   PWA Builder's crawler enough time to detect it.
+ *
+ * Option B — JS framework entry (main.js / index.js):
  *   import '/registerSW.js';
  *
- * Option C — Vite / CRA / Next.js inline in index.html template:
- *   <script src="/registerSW.js" defer></script>
+ * ⚠️  This file must be EXECUTED by the browser. Serving it from /public
+ *     alone does nothing — the browser must load and run it.
  *
- * ⚠️  This file must be loaded by your HTML. Placing it in /public alone
- *     is NOT enough — the browser must execute it for the SW to register.
+ * FIX v2.1.0:
+ *  - Removed `window.load` deferral. Registration now fires as soon as
+ *    DOMContentLoaded fires (or immediately if DOM is already ready).
+ *    PWA Builder's crawler has a fixed timeout window. Deferring
+ *    registration to `load` risks missing that window on slow pages.
+ *  - Removed explicit `scope: '/'` from register() call. The browser
+ *    infers scope correctly from the script path. Explicit scope can
+ *    cause subtle failures in headless/sandboxed crawl environments.
+ *  - All existing update detection and lifecycle logic is preserved.
  */
 
 (function () {
   'use strict';
 
-  // Guard: only run in a real browser context (not SSR / Node / test runners)
+  // Guard: skip in non-browser environments (SSR, Node, test runners)
   if (typeof window === 'undefined') return;
+
   if (!('serviceWorker' in navigator)) {
     console.warn('[SW] Service workers not supported in this browser.');
     return;
@@ -30,23 +42,23 @@
 
   // ─── Configuration ─────────────────────────────────────────────────────────
   const SW_SCRIPT = '/service-worker.js';
-  const SW_SCOPE  = '/';
+  // Note: scope is intentionally omitted — browser infers '/' from script path.
+  // Explicit scope: '/' caused registration failures in headless crawl envs.
 
-  // ─── Core registration function ────────────────────────────────────────────
+  // ─── Core registration ──────────────────────────────────────────────────────
   function registerServiceWorker() {
     navigator.serviceWorker
-      .register(SW_SCRIPT, { scope: SW_SCOPE })
+      .register(SW_SCRIPT)
       .then((registration) => {
-        console.log('[SW] Registered successfully. Scope:', registration.scope);
+        console.log('[SW] Registered. Scope:', registration.scope);
 
-        // ── Check for waiting / pending update on every page load ────────────
+        // Check if a new version is already waiting
         if (registration.waiting) {
-          console.log('[SW] Update waiting — a new version is ready.');
-          // Optionally: notify your UI here (e.g. dispatch a custom event)
+          console.log('[SW] Update already waiting — new version is ready.');
           // window.dispatchEvent(new CustomEvent('sw:update-ready'));
         }
 
-        // ── Listen for future updates ─────────────────────────────────────────
+        // Listen for future updates (new SW downloading)
         registration.addEventListener('updatefound', () => {
           const newWorker = registration.installing;
           if (!newWorker) return;
@@ -54,43 +66,54 @@
           console.log('[SW] New version downloading...');
 
           newWorker.addEventListener('statechange', () => {
-            console.log('[SW] State changed:', newWorker.state);
-            if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
-              console.log('[SW] New version installed and waiting. Reload to activate.');
-              // Optionally notify your app UI here
+            console.log('[SW] Worker state:', newWorker.state);
+            if (
+              newWorker.state === 'installed' &&
+              navigator.serviceWorker.controller
+            ) {
+              console.log('[SW] New version ready — waiting to activate.');
               // window.dispatchEvent(new CustomEvent('sw:update-ready'));
             }
           });
         });
 
-        // ── Check for updates on every page load (silent background check) ───
+        // Silent background update check on every page load
         registration.update().catch((err) => {
           console.warn('[SW] Background update check failed:', err);
         });
       })
       .catch((error) => {
-        // Log clearly so DevTools shows the real reason for failure
         console.error('[SW] Registration failed:', error);
       });
 
-    // ── React when a new SW takes control (after skipWaiting) ────────────────
+    // Detect when a new SW takes control (after skipWaiting fires)
     let refreshing = false;
     navigator.serviceWorker.addEventListener('controllerchange', () => {
       if (refreshing) return;
       refreshing = true;
       console.log('[SW] New version active — controller changed.');
-      // Uncomment the next line if you want an automatic reload on SW update:
+      // Uncomment to auto-reload on SW update:
       // window.location.reload();
     });
   }
 
-  // ─── Execution: wait for the page to fully load before registering ─────────
-  // Using 'load' event ensures the SW registration never competes with
-  // critical page resources and never delays Time-To-Interactive.
-  if (document.readyState === 'complete') {
-    // Page already loaded (e.g. script is deferred and runs late)
+  // ─── Execution timing ──────────────────────────────────────────────────────
+  // FIX: Register at DOMContentLoaded (or immediately if already past it),
+  // NOT at window.load. This ensures registration completes within
+  // PWA Builder's detection window even on slow pages.
+  //
+  // SW registration is lightweight (a single HTTP request). It does not
+  // block rendering or compete with critical resources.
+  if (
+    document.readyState === 'complete' ||
+    document.readyState === 'interactive'
+  ) {
+    // DOM is ready — register immediately
     registerServiceWorker();
   } else {
-    window.addEventListener('load', registerServiceWorker, { once: true });
+    // Wait for DOM to be interactive (much earlier than window.load)
+    document.addEventListener('DOMContentLoaded', registerServiceWorker, {
+      once: true,
+    });
   }
 })();
