@@ -2,6 +2,7 @@ import React from 'react'
 import ReactDOM from 'react-dom/client'
 import App from './App'
 import './index.css'
+import './registerSW'
 
 // Global error boundary fallback — prevents total black screen
 // when an uncaught error occurs during render
