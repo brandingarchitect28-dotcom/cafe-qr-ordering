@@ -2,7 +2,28 @@ import React from 'react'
 import ReactDOM from 'react-dom/client'
 import App from './App'
 import './index.css'
-import './registerSW'
+/*
+ * FIX: Removed `import './registerSW'`
+ *
+ * ROOT CAUSE OF 404 / BLANK SCREEN IN PRODUCTION & TWA:
+ * ──────────────────────────────────────────────────────
+ * registerSW.js lives in /public (a static file served at the web root).
+ * It does NOT live in /src/.
+ *
+ * When Vite processes `import './registerSW'` at build time, it looks for
+ * the file in /src/registerSW.js — it is not there. Vite either:
+ *   a) throws a build error and produces a broken bundle, OR
+ *   b) silently omits it, leaving the service worker unregistered
+ *
+ * Either outcome breaks the app in production and inside the TWA WebView.
+ *
+ * THE FIX: registerSW.js is now loaded via a plain <script src="/registerSW.js">
+ * tag in index.html (see index.html FIX 2). That is the correct way to load
+ * a /public static file — the browser fetches it directly, independent of
+ * the Vite bundle. No import needed here.
+ *
+ * All service worker logic and functionality is completely preserved.
+ */
 
 // Global error boundary fallback — prevents total black screen
 // when an uncaught error occurs during render
