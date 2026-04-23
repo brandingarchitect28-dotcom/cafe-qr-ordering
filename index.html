@@ -14,7 +14,13 @@
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <meta name="apple-mobile-web-app-title" content="BA Smart OS" />
-    <link rel="apple-touch-icon" href="/icons/ios/icon-180x180.png" />
+    <!--
+      FIX 1: Changed /icons/ios/icon-180x180.png → /icons/icon-192x192.png
+      Reason: /icons/ios/ subdirectory is not defined in manifest.json.
+      Using the same icon path that manifest.json declares avoids a 404
+      in iOS Safari PWA install and TWA WebView icon resolution.
+    -->
+    <link rel="apple-touch-icon" href="/icons/icon-192x192.png" />
 
     <!-- ── Android / Chrome extra ── -->
     <meta name="mobile-web-app-capable" content="yes" />
@@ -77,8 +83,28 @@
         </div>
       </div>
     </div>
+
     <!-- Cashfree JS SDK — loaded before React so window.Cashfree is ready -->
     <script src="https://sdk.cashfree.com/js/v3/cashfree.js"></script>
+
+    <!--
+      FIX 2: Load registerSW.js directly as a plain script tag.
+      Reason: registerSW.js lives in /public and is served as a static file.
+      The import './registerSW' in main.jsx looks for it in /src/ at build
+      time — Vite cannot find it there and the import silently fails in
+      production, so the service worker never registers in the TWA/APK.
+      Loading it here as a plain <script> tag means it runs independently
+      of the React bundle, always, in every environment.
+      The duplicate-registration guard inside registerSW.js makes this
+      100% safe even if both paths execute.
+    -->
+    <script src="/registerSW.js"></script>
+
+    <!--
+      Vite dev: resolves /src/main.jsx directly via the dev server.
+      Vite build: this line is rewritten to /assets/main-[hash].js automatically.
+      DO NOT change this path — it is correct for both dev and production.
+    -->
     <script type="module" src="/src/main.jsx"></script>
   </body>
 </html>

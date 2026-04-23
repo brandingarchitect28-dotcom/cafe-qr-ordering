@@ -1,17 +1,14 @@
 # netlify.toml
 # Branding Architect — Netlify Deployment Configuration
 # ─────────────────────────────────────────────────────────────────────────────
-# IMPORTANT: Set `publish` to match your actual build output folder.
-# Common values: "dist" (Vite), "build" (CRA), "out" (Next.js static export)
-# ─────────────────────────────────────────────────────────────────────────────
 
 [build]
   command = "npm run build"
   publish = "dist"
 
-# ─── Service Worker & PWA Files — MUST have no-cache headers ─────────────────
-# The Service Worker spec requires the SW script to be re-validated on every
-# load. If Netlify caches it, browsers will never pick up updates.
+# ─── Service Worker & PWA Files — no-cache headers (REQUIRED) ────────────────
+# SW spec: the SW script must be re-validated on every page load.
+# TWA/WebView: requires correct Content-Type — text/html causes silent failure.
 
 [[headers]]
   for = "/service-worker.js"
@@ -35,7 +32,13 @@
     Cache-Control = "no-cache, no-store, must-revalidate"
     Content-Type  = "application/manifest+json; charset=utf-8"
 
-# ─── Static assets — long-lived cache (safe because filenames are hashed) ─────
+[[headers]]
+  for = "/offline.html"
+  [headers.values]
+    Cache-Control = "no-cache, no-store, must-revalidate"
+    Content-Type  = "text/html; charset=utf-8"
+
+# ─── Static assets — long-lived cache (Vite content-hashes filenames) ─────────
 [[headers]]
   for = "/assets/*"
   [headers.values]
@@ -51,9 +54,82 @@
   [headers.values]
     Cache-Control = "public, max-age=86400"
 
-# ─── SPA Routing — all routes return index.html ──────────────────────────────
-# Without this, direct navigation to /kitchen, /analytics etc. returns 404.
+# ─── Redirects ────────────────────────────────────────────────────────────────
+#
+# ROOT CAUSE OF 404 IN TWA / APK (diagnosed):
+# ─────────────────────────────────────────────
+# Netlify evaluates [[redirects]] top-to-bottom and stops at first match.
+# With only the `/*` catch-all, requests for /service-worker.js,
+# /manifest.json, and /registerSW.js all matched `/*` and received
+# index.html (Content-Type: text/html) instead of the real files.
+#
+# The TWA WebView (Android) validates Content-Type strictly:
+#   • A service worker script returned as text/html → rejected, SW fails
+#   • manifest.json returned as text/html → install prompt silently fails
+#   • Result: blank white/black screen or "404 – Not Found" inside the APK
+#
+# FIX: Explicit pass-through rules for all PWA-critical static files are
+# placed BEFORE the catch-all. Netlify stops at the first matching rule,
+# so these files get their real content with the correct Content-Type.
+#
+# `force = false` (the default, made explicit) means: if the real file
+# exists on disk in /dist, serve it directly — never redirect to itself.
+
+# PWA-critical file pass-throughs (must be BEFORE the catch-all)
+[[redirects]]
+  from   = "/service-worker.js"
+  to     = "/service-worker.js"
+  status = 200
+  force  = false
+
+[[redirects]]
+  from   = "/registerSW.js"
+  to     = "/registerSW.js"
+  status = 200
+  force  = false
+
+[[redirects]]
+  from   = "/manifest.json"
+  to     = "/manifest.json"
+  status = 200
+  force  = false
+
+[[redirects]]
+  from   = "/offline.html"
+  to     = "/offline.html"
+  status = 200
+  force  = false
+
+[[redirects]]
+  from   = "/favicon.svg"
+  to     = "/favicon.svg"
+  status = 200
+  force  = false
+
+# Static directory pass-throughs
+[[redirects]]
+  from   = "/assets/*"
+  to     = "/assets/:splat"
+  status = 200
+  force  = false
+
+[[redirects]]
+  from   = "/icons/*"
+  to     = "/icons/:splat"
+  status = 200
+  force  = false
+
+[[redirects]]
+  from   = "/screenshots/*"
+  to     = "/screenshots/:splat"
+  status = 200
+  force  = false
+
+# SPA catch-all — MUST be last
+# Serves index.html for all React Router routes (/dashboard, /kitchen, etc.)
+# force = false: only applies when no real file exists at that path
 [[redirects]]
   from   = "/*"
   to     = "/index.html"
   status = 200
+  force  = false
