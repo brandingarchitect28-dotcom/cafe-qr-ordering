@@ -1,0 +1,8 @@
+[{
+      "relation": ["delegate_permission/common.handle_all_urls"],
+      "target": {
+        "namespace": "android_app",
+        "package_name": "app.netlify.basmartos.twa",
+        "sha256_cert_fingerprints": ["02:3E:DF:C4:9C:16:93:C8:19:AF:6D:BF:14:81:32:8F:AE:6A:5C:F1:9E:50:91:36:C4:A8:9F:F6:9A:71:74:C9"]
+      }
+    }]
