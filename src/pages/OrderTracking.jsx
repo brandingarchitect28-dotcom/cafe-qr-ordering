@@ -205,6 +205,8 @@ const getSystemTheme = () =>
   typeof window !== 'undefined' && window.matchMedia('(prefers-color-scheme: light)').matches
     ? 'light' : 'dark';
 
+const formatWhatsAppNumber = raw => { if (!raw) return ''; const d = String(raw).replace(/\D/g, ''); if (!d) return ''; return d.length === 10 ? `91${d}` : d; };
+
 // ─── Status config ────────────────────────────────────────────────────────────
 const STATUSES = [
   { id:'new',       label:'Order Received',   desc:'Your order is confirmed and waiting to be prepared.', hint:'Usually starts in 2–3 minutes.', icon:Clock,       color:'#3B82F6', emoji:'📋', step:0 },
@@ -573,7 +575,7 @@ const OrderTracking = () => {
 
   const handleSendInvoice = useCallback(() => {
     if (!order) return;
-    const phone=(order.customerPhone||'').replace(/\D/g,'');
+    const phone=formatWhatsAppNumber(order.customerPhone||'');
     if (!phone) { alert('No phone number on this order.'); return; }
     setWaSending(true);
     const msg=generateInvoiceMessage(order);
